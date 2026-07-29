@@ -114,229 +114,216 @@
 <body class="flex flex-col min-h-screen">
 
   <!-- Header -->
-  <header class="bg-[#0c1318] border-b border-[#1e3348] px-6 py-4 flex flex-wrap justify-between items-center shadow-lg z-30">
-    <div class="flex items-center space-x-3">
-      <div class="w-8 h-8 bg-cyan-500 rounded flex items-center justify-center font-bold text-black text-xl rajdhani">E</div>
+  <header class="bg-[#0c1318] border-b border-[#1e3348] px-4 py-2.5 flex flex-wrap justify-between items-center shadow-lg z-30">
+    <div class="flex items-center space-x-2.5">
+      <div class="w-7 h-7 bg-cyan-500 rounded flex items-center justify-center font-bold text-black text-lg rajdhani">E</div>
       <div>
-        <h1 class="text-xl font-bold tracking-widest text-white rajdhani">EVE DEEP-INDUSTRY ENGINE</h1>
-        <div class="text-[10px] mono text-slate-400">0MS INSTANT RECIPE RENDERING &amp; BACKGROUND JITA PRICES</div>
+        <h1 class="text-base font-bold tracking-widest text-white rajdhani">EVE DEEP-INDUSTRY ENGINE</h1>
       </div>
     </div>
     
-    <div class="flex items-center space-x-3 text-xs mono">
+    <div class="flex items-center space-x-2 text-xs mono">
       <!-- ESI SSO Character Status / Login Button -->
       <div id="esi-login-container">
-        <button onclick="startEsiSSOLogin()" class="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded transition flex items-center gap-1.5 shadow" title="Login with EVE Online to import your character assets">
+        <button onclick="startEsiSSOLogin()" class="px-2.5 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded transition flex items-center gap-1 shadow text-[11px]" title="Login with EVE Online to import your character assets">
           🔐 EVE SSO Login
         </button>
       </div>
 
       <!-- Clipboard Hangar Stock Import Button -->
-      <button onclick="openPasteModal()" class="px-3 py-1 bg-[#1e3348] hover:bg-slate-600 text-slate-200 font-bold rounded transition" title="Paste in-game inventory text to import stock">
-        📋 Paste Hangar Stock
+      <button onclick="openPasteModal()" class="px-2.5 py-1 bg-[#1e3348] hover:bg-slate-600 text-slate-200 font-bold rounded transition text-[11px]" title="Paste in-game inventory text to import stock">
+        📋 Paste Hangar
       </button>
 
-      <button onclick="centerOnSelectedNode()" class="px-3 py-1 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded transition">
-        Center Card [F]
+      <button onclick="centerOnSelectedNode()" class="px-2.5 py-1 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded transition text-[11px]">
+        Center [F]
       </button>
-      <button onclick="resetPanZoom()" class="px-3 py-1 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded transition">
+      <button onclick="resetPanZoom()" class="px-2.5 py-1 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded transition text-[11px]">
         Reset View
       </button>
-      <div id="status-badge" class="px-3 py-1 bg-[#0d1922] border border-[#1e3348] rounded flex items-center gap-2">
+      <div id="status-badge" class="px-2 py-0.5 bg-[#0d1922] border border-[#1e3348] rounded flex items-center gap-1.5 text-[11px]">
         <span id="status-dot" class="w-2 h-2 rounded-full bg-green-400"></span>
-        <span id="status-text" class="text-slate-300">INITIALIZING INDEX...</span>
+        <span id="status-text" class="text-slate-300">INDEX READY</span>
       </div>
     </div>
   </header>
 
-  <!-- Main Controls Panel -->
-  <section class="bg-[#0d1922] border-b border-[#1e3348] p-4 grid grid-cols-1 md:grid-cols-11 gap-3 text-xs relative z-50">
+  <!-- Compact Multi-Control Toolbar Row 1 -->
+  <section class="bg-[#0d1922] border-b border-[#1e3348] p-2 flex flex-wrap items-center gap-2 text-xs relative z-50">
     
     <!-- Item Autocomplete Search -->
-    <div class="md:col-span-2 relative z-50">
-      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">Search Item / Blueprint</label>
-      <input type="text" id="item-search" autocomplete="off" placeholder="Type e.g. Drekavac, Leshak, Eagle..." 
-        class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-2 text-white font-bold focus:border-cyan-500 outline-none mono">
+    <div class="relative z-50 w-52 flex-shrink-0">
+      <input type="text" id="item-search" autocomplete="off" placeholder="Search Item / Blueprint..." 
+        class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-1.5 text-white font-bold focus:border-cyan-500 outline-none mono text-xs">
       <div id="search-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
     </div>
 
-    <!-- Build All / Buy All Actions & Smart Savings Threshold -->
-    <div class="md:col-span-3 flex flex-col justify-end">
-      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider flex justify-between">
-        <span>Build &amp; Order Strategy</span>
-        <span class="text-cyan-400 font-normal text-[10px]">Min Buy Savings:</span>
-      </label>
-      <div class="flex items-center space-x-1.5">
-        <button onclick="buildAllComponents()" class="bg-green-700 hover:bg-green-600 text-white font-bold py-2 px-2.5 rounded text-xs mono transition shadow flex-1 flex items-center justify-center gap-1" title="Set all sub-components in the recipe tree to Build">
-          🔨 Build All
-        </button>
-        <button onclick="buyAllSubComponents()" class="bg-[#1e3348] hover:bg-slate-600 text-slate-200 font-bold py-2 px-2.5 rounded text-xs mono transition flex-1 flex items-center justify-center gap-1" title="Reset all sub-components to Buy off Market">
-          🛒 Buy All
-        </button>
+    <!-- Build All / Buy All Actions & Smart Savings Thresholds -->
+    <div class="flex items-center space-x-1.5 bg-[#0c1318] p-1 rounded border border-[#1e3348]">
+      <button onclick="buildAllComponents()" class="bg-green-700 hover:bg-green-600 text-white font-bold py-1 px-2 rounded text-[11px] mono transition shadow" title="Set all sub-components to Build">
+        🔨 Build All
+      </button>
+      <button onclick="buyAllSubComponents()" class="bg-[#1e3348] hover:bg-slate-600 text-slate-200 font-bold py-1 px-2 rounded text-[11px] mono transition" title="Reset all sub-components to Buy off Market">
+        🛒 Buy All
+      </button>
 
-        <!-- Smart Savings Threshold Input + Smart + Reset -->
-        <div class="flex items-center space-x-1 bg-[#0c1318] border border-[#1e3348] rounded p-1">
-          <input type="number" id="buy-savings-threshold" value="3.0" step="0.5" min="0" max="100" oninput="applySmartBuyThreshold()" 
-            class="w-9 bg-transparent text-center text-amber-300 font-bold mono outline-none text-xs" title="Auto-buy off Instant Sell Orders if Buy Order savings is below this threshold %">
-          <span class="text-slate-400 text-[10px] mono">%</span>
-          <button onclick="applySmartBuyThreshold()" class="bg-cyan-700 hover:bg-cyan-600 text-white font-bold px-1.5 py-0.5 rounded text-[10px] mono transition" title="Apply % Savings Threshold to all Buy items">
-            ⚡ Smart
-          </button>
-          <button onclick="resetSmartBuyModes()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold px-1.5 py-0.5 rounded text-[10px] mono transition" title="Reset all cards to Global Pricing strategy">
-            🔄 Reset
-          </button>
-        </div>
+      <span class="text-slate-500 text-[10px] mono">|</span>
+
+      <!-- Smart Threshold Inputs -->
+      <div class="flex items-center space-x-1" title="Threshold % for item order savings vs total budget savings">
+        <span class="text-slate-400 text-[10px] mono">Comp %:</span>
+        <input type="number" id="buy-savings-threshold" value="3.0" step="0.5" min="0" max="100" oninput="applySmartBuyThreshold()" 
+          class="w-8 bg-[#070b0f] border border-[#1e3348] text-center text-amber-300 font-bold mono outline-none text-[11px] rounded p-0.5" title="Component order savings threshold %">
+        
+        <span class="text-slate-400 text-[10px] mono ml-1">Total %:</span>
+        <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100" oninput="applySmartBuyThreshold()" 
+          class="w-8 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-300 font-bold mono outline-none text-[11px] rounded p-0.5" title="Total project cost savings threshold %">
+
+        <button onclick="applySmartBuyThreshold()" class="bg-cyan-700 hover:bg-cyan-600 text-white font-bold px-1.5 py-0.5 rounded text-[10px] mono transition" title="Apply % Savings Thresholds to all Buy items">
+          ⚡ Smart
+        </button>
+        <button onclick="resetSmartBuyModes()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold px-1.5 py-0.5 rounded text-[10px] mono transition" title="Reset all cards to Global Pricing strategy">
+          🔄 Reset
+        </button>
       </div>
     </div>
 
-    <!-- Stock Deduct Toggle -->
-    <div>
-      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">Subtract Owned Stock</label>
-      <select id="deduct-stock-mode" onchange="recalculate()" class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-2 text-cyan-300 font-bold focus:border-cyan-500 outline-none">
+    <!-- Stock Deduct & Checkboxes -->
+    <div class="flex items-center space-x-2 bg-[#0c1318] p-1 rounded border border-[#1e3348]">
+      <select id="deduct-stock-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-bold text-[11px] outline-none">
         <option value="true" selected>Deduct Stock (ON)</option>
         <option value="false">Ignore Stock (OFF)</option>
       </select>
+
+      <label class="flex items-center space-x-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+        <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="accent-cyan-500">
+        <span>Personal</span>
+      </label>
+
+      <label class="flex items-center space-x-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+        <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()" class="accent-cyan-500">
+        <span>Corp</span>
+      </label>
     </div>
 
-    <!-- Stock Location Filter -->
-    <div class="md:col-span-2">
-      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">Stock Location Filter</label>
-      <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-2 text-amber-300 font-bold focus:border-cyan-500 outline-none truncate">
+    <!-- Location Dropdown -->
+    <div class="w-64 flex-shrink-0">
+      <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-1.5 text-amber-300 font-bold text-[11px] outline-none truncate">
         <option value="all" selected>All Locations (Char + Corp)</option>
         <option value="industry_system">Current System Only (JITA)</option>
-        <option value="char_only">Character Assets Only</option>
-        <option value="corp_only">Corporation Assets Only</option>
       </select>
     </div>
 
-    <!-- Target Quantity vs Runs Toggle -->
-    <div>
-      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">Input Mode</label>
-      <select id="run-mode" onchange="recalculate()" class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-2 text-amber-300 font-bold focus:border-cyan-500 outline-none">
-        <option value="qty" selected>Target Unit Count</option>
-        <option value="runs">Blueprint Runs</option>
+    <!-- Target Units / Runs -->
+    <div class="flex items-center space-x-1.5 bg-[#0c1318] p-1 rounded border border-[#1e3348]">
+      <select id="run-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-amber-300 font-bold text-[11px] outline-none">
+        <option value="qty" selected>Units</option>
+        <option value="runs">Runs</option>
       </select>
-    </div>
-
-    <!-- Quantity / Runs Input -->
-    <div>
-      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider" id="run-input-label">Target Units</label>
       <input type="number" id="bp-runs" value="1" min="1" max="1000000" oninput="recalculate()" 
-        class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-2 text-center text-amber-300 font-bold mono">
+        class="w-12 bg-[#070b0f] border border-[#1e3348] rounded p-1 text-center text-amber-300 font-bold mono text-[11px]">
+    </div>
+
+    <!-- Global Pricing Strategy -->
+    <div class="flex-shrink-0">
+      <select id="input-price-mode" onchange="recalculate()" class="bg-[#0c1318] border border-[#1e3348] rounded p-1.5 text-white text-[11px] outline-none">
+        <option value="sell" selected>Sell Orders (Instant)</option>
+        <option value="buy">Buy Orders (Placing)</option>
+      </select>
     </div>
 
     <!-- Reactions Toggle -->
-    <div>
-      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">Reactions</label>
-      <select id="include-reactions" onchange="onDepthOrCategoryChange()" class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-2 text-purple-300 font-bold focus:border-cyan-500 outline-none">
-        <option value="true" selected>Decompose (ON)</option>
+    <div class="flex-shrink-0">
+      <select id="include-reactions" onchange="onDepthOrCategoryChange()" class="bg-[#0c1318] border border-[#1e3348] rounded p-1.5 text-purple-300 font-bold text-[11px] outline-none">
+        <option value="true" selected>Reactions (ON)</option>
         <option value="false">Buy Reaction (OFF)</option>
       </select>
     </div>
 
-    <!-- Facility Bonus -->
-    <div>
-      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">Facility Type</label>
-      <select id="facility-select" onchange="recalculate()" class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-2 text-white focus:border-cyan-500 outline-none">
-        <option value="0.0">NPC Station (0% Bonus)</option>
-        <option value="0.01">Raitaru / Azbel (1% Bonus)</option>
-        <option value="0.01" selected>Sotiyo (1% Bonus)</option>
-      </select>
-    </div>
-
-    <!-- Global Material Buy Strategy -->
-    <div>
-      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">Global Pricing</label>
-      <select id="input-price-mode" onchange="recalculate()" class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-2 text-white focus:border-cyan-500 outline-none">
-        <option value="sell" selected>Sell Orders (Instant Buy)</option>
-        <option value="buy">Buy Orders (Order Placing)</option>
-      </select>
-    </div>
-
   </section>
 
-  <!-- Taxes, Broker Fees & Searchable Solar System Settings Bar -->
-  <section class="bg-[#0c1318] border-b border-[#1e3348] p-3 grid grid-cols-1 md:grid-cols-6 gap-3 text-xs relative z-40">
+  <!-- Compact Taxes & Industry System Bar Row 2 -->
+  <section class="bg-[#0c1318] border-b border-[#1e3348] p-2 flex flex-wrap items-center gap-2 text-xs relative z-40">
     
-    <!-- Full-Universe Searchable Solar System Autocomplete Input -->
-    <div class="relative z-50">
-      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">Industry System (Searches All Systems)</label>
-      <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="Type e.g. 4-HWWF, Perimeter, 1DQ1-A..." 
-        class="w-full bg-[#0d1922] border border-[#1e3348] rounded p-1.5 text-cyan-300 font-bold mono uppercase focus:border-cyan-500 outline-none">
+    <!-- Full-Universe System Search -->
+    <div class="relative z-50 w-40 flex-shrink-0">
+      <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="Industry System..." 
+        class="w-full bg-[#0d1922] border border-[#1e3348] rounded p-1 text-cyan-300 font-bold mono uppercase focus:border-cyan-500 outline-none text-[11px]">
       <div id="system-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
     </div>
 
-    <!-- Structure Role Bonus -->
-    <div>
-      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">Structure Role Bonus</label>
-      <select id="structure-role-bonus" onchange="recalculate()" class="w-full bg-[#0d1922] border border-[#1e3348] rounded p-1.5 text-amber-300 font-bold focus:border-cyan-500 outline-none">
-        <option value="0.03" selected>Sotiyo / Azbel (-3% Job Cost)</option>
-        <option value="0.0">NPC Station / None (0%)</option>
-      </select>
+    <!-- Facility Select -->
+    <select id="facility-select" onchange="recalculate()" class="bg-[#0d1922] border border-[#1e3348] rounded p-1 text-white text-[11px] outline-none">
+      <option value="0.0">NPC Station (0% Bonus)</option>
+      <option value="0.01">Raitaru / Azbel (1%)</option>
+      <option value="0.01" selected>Sotiyo (1% Bonus)</option>
+    </select>
+
+    <!-- Role Bonus -->
+    <select id="structure-role-bonus" onchange="recalculate()" class="bg-[#0d1922] border border-[#1e3348] rounded p-1 text-amber-300 font-bold text-[11px] outline-none">
+      <option value="0.03" selected>Sotiyo / Azbel (-3% Job Cost)</option>
+      <option value="0.0">NPC Station / None (0%)</option>
+    </select>
+
+    <!-- Tax Inputs Inline Row -->
+    <div class="flex items-center space-x-2 bg-[#0d1922] p-1 rounded border border-[#1e3348] text-[10px] mono">
+      <div class="flex items-center space-x-1" title="Facility Structure Tax %">
+        <span class="text-slate-400">Fac Tax:</span>
+        <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="recalculate()" class="w-9 bg-[#070b0f] border border-[#1e3348] rounded text-center text-cyan-400 font-bold p-0.5 outline-none">
+        <span class="text-slate-500">%</span>
+      </div>
+
+      <div class="flex items-center space-x-1" title="SCC Surcharge %">
+        <span class="text-slate-400">SCC:</span>
+        <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="recalculate()" class="w-9 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-400 font-bold p-0.5 outline-none">
+        <span class="text-slate-500">%</span>
+      </div>
+
+      <div class="flex items-center space-x-1" title="Sales Tax %">
+        <span class="text-slate-400">Sales Tax:</span>
+        <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="recalculate()" class="w-9 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-0.5 outline-none">
+        <span class="text-slate-500">%</span>
+      </div>
+
+      <div class="flex items-center space-x-1" title="Broker Fee %">
+        <span class="text-slate-400">Broker:</span>
+        <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="recalculate()" class="w-9 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-0.5 outline-none">
+        <span class="text-slate-500">%</span>
+      </div>
     </div>
 
-    <!-- Facility Structure Tax % -->
-    <div>
-      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">Facility Tax %</label>
-      <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="recalculate()" 
-        class="w-full bg-[#0d1922] border border-[#1e3348] rounded p-1.5 text-center text-cyan-400 font-bold mono" placeholder="Structure Tax">
-    </div>
-
-    <!-- SCC Surcharge % (EVE Default is 4.0%) -->
-    <div>
-      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">SCC Surcharge %</label>
-      <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="recalculate()" 
-        class="w-full bg-[#0d1922] border border-[#1e3348] rounded p-1.5 text-center text-amber-400 font-bold mono" placeholder="SCC Surcharge">
-    </div>
-
-    <!-- Sales Tax % -->
-    <div>
-      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">Sales Tax %</label>
-      <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="recalculate()" 
-        class="w-full bg-[#0d1922] border border-[#1e3348] rounded p-1.5 text-center text-amber-300 font-bold mono" placeholder="Sales Tax">
-    </div>
-
-    <!-- Broker's Fee % -->
-    <div>
-      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">Broker's Fee %</label>
-      <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="recalculate()" 
-        class="w-full bg-[#0d1922] border border-[#1e3348] rounded p-1.5 text-center text-amber-300 font-bold mono" placeholder="Broker Fee">
+    <!-- Live System SCI Status Pill -->
+    <div class="ml-auto text-amber-300 font-bold text-[11px] mono flex items-center space-x-3">
+      <span id="sci-badge">System: JITA | SCI: 4.25% (Mfg) / 1.10% (React)</span>
+      <span id="stock-status-text" class="text-slate-400 text-[10px]">Stock: <span class="text-cyan-400 font-bold" id="stock-count-display">0 items</span></span>
+      <span id="eiv-status-text" class="text-slate-400 text-[10px]">EIV Prices: <span class="text-amber-400 font-bold">Fetching...</span></span>
     </div>
 
   </section>
 
-  <!-- Live System SCI Status Pill -->
-  <div class="bg-[#070b0f] border-b border-[#1e3348] px-6 py-1.5 text-xs mono flex justify-between items-center z-10">
-    <span id="sci-badge" class="text-amber-300 font-bold">System: JITA | SCI: 4.25% (Mfg) / 1.10% (React)</span>
-    <div class="flex items-center space-x-3">
-      <span id="stock-status-text" class="text-slate-400 text-[10px]">Stock Status: <span class="text-cyan-400 font-bold" id="stock-count-display">0 items loaded</span></span>
-      <span id="eiv-status-text" class="text-slate-400 text-[10px]">EIV Adjusted Prices: <span class="text-amber-400 font-bold">Fetching ESI...</span></span>
-    </div>
-  </div>
-
   <!-- Dashboard Summary Bar -->
-  <section class="p-4 grid grid-cols-1 md:grid-cols-4 gap-4 bg-[#070b0f] relative z-10">
-    <div class="bg-[#0d1922] border border-[#1e3348] p-3 rounded shadow">
-      <div class="text-[11px] text-slate-400 uppercase font-bold mono">Total Production Cost (Mat + Job Fees)</div>
-      <div id="summary-build-cost" class="text-xl font-bold text-cyan-400 mt-1 mono">0 ISK</div>
+  <section class="p-3 grid grid-cols-1 md:grid-cols-4 gap-3 bg-[#070b0f] relative z-10">
+    <div class="bg-[#0d1922] border border-[#1e3348] p-2.5 rounded shadow">
+      <div class="text-[10px] text-slate-400 uppercase font-bold mono">Total Production Cost (Mat + Job Fees)</div>
+      <div id="summary-build-cost" class="text-lg font-bold text-cyan-400 mt-0.5 mono">0 ISK</div>
       <div id="summary-runs-subtext" class="text-[10px] text-slate-500">Includes EIV Job Fees &amp; Input Taxes</div>
     </div>
 
-    <div class="bg-[#0d1922] border border-[#1e3348] p-3 rounded shadow">
-      <div class="text-[11px] text-slate-400 uppercase font-bold mono">Net Output Revenue (After Taxes)</div>
-      <div id="summary-output-sell" class="text-xl font-bold text-amber-300 mt-1 mono">0 ISK</div>
+    <div class="bg-[#0d1922] border border-[#1e3348] p-2.5 rounded shadow">
+      <div class="text-[10px] text-slate-400 uppercase font-bold mono">Net Output Revenue (After Taxes)</div>
+      <div id="summary-output-sell" class="text-lg font-bold text-amber-300 mt-0.5 mono">0 ISK</div>
       <div id="summary-output-buy" class="text-[10px] text-slate-400">Net Instant Buy: 0 ISK</div>
     </div>
 
-    <div class="bg-[#0d1922] border border-[#1e3348] p-3 rounded shadow">
-      <div class="text-[11px] text-slate-400 uppercase font-bold mono">Net Profit (Sell Order Output)</div>
-      <div id="summary-profit-sell" class="text-xl font-bold text-green-400 mt-1 mono">0 ISK</div>
+    <div class="bg-[#0d1922] border border-[#1e3348] p-2.5 rounded shadow">
+      <div class="text-[10px] text-slate-400 uppercase font-bold mono">Net Profit (Sell Order Output)</div>
+      <div id="summary-profit-sell" class="text-lg font-bold text-green-400 mt-0.5 mono">0 ISK</div>
       <div id="summary-roi-sell" class="text-[10px] text-green-400">Net ROI: 0%</div>
     </div>
 
-    <div class="bg-[#0d1922] border border-[#1e3348] p-3 rounded shadow">
-      <div class="text-[11px] text-slate-400 uppercase font-bold mono">Net Profit (Instant Buy Order Output)</div>
-      <div id="summary-profit-buy" class="text-xl font-bold text-green-400 mt-1 mono">0 ISK</div>
+    <div class="bg-[#0d1922] border border-[#1e3348] p-2.5 rounded shadow">
+      <div class="text-[10px] text-slate-400 uppercase font-bold mono">Net Profit (Instant Buy Order Output)</div>
+      <div id="summary-profit-buy" class="text-lg font-bold text-green-400 mt-0.5 mono">0 ISK</div>
       <div id="summary-roi-buy" class="text-[10px] text-green-400">Net ROI: 0%</div>
     </div>
   </section>
@@ -599,7 +586,7 @@
     let blueprintCache = {};        
     let priceCache = {};            
     let eivCache = {};              
-    let rawAssetItems = [];         // Raw ESI / Pasted asset records [{ type_id, qty, location_id, ownerType }]
+    let rawAssetItems = [];         // Raw ESI / Pasted asset records [{ type_id, quantity, location_id, owner_type }]
     let userStockMap = {};          // Filtered { typeId: quantity }
     let systemNameCache = {};       
     let resolvedLocationNames = {}; // { location_id: name }
@@ -929,7 +916,7 @@
           }
         }
 
-        // 3. Fetch Corporation Assets (If Corp ID exists and player has Corp Director/Accountant roles)
+        // 3. Fetch Corporation Assets
         if (corpId) {
           page = 1;
           hasMore = true;
@@ -970,7 +957,7 @@
       }
     }
 
-    // Resolve Location IDs to Names using ESI Universe Names
+    // Resolve Location IDs to Clean Names using ESI Universe Names
     async function resolveAndPopulateLocationFilter() {
       const uniqueLocIds = Array.from(new Set(rawAssetItems.map(a => a.location_id).filter(id => id)));
       if (uniqueLocIds.length > 0) {
@@ -997,15 +984,36 @@
                   });
                 }
               }
-            } catch (e) {
-              // Ignore
-            }
+            } catch (e) {}
           }
         }
       }
 
-      // Populate #stock-location-filter dropdown options
+      // Formatting fallback for locations that ESI names didn't resolve directly
+      rawAssetItems.forEach(item => {
+        const id = item.location_id;
+        if (!resolvedLocationNames[id]) {
+          if (systemNameCache[id]) {
+            resolvedLocationNames[id] = systemNameCache[id];
+          } else if (id >= 30000000 && id < 34000000) {
+            resolvedLocationNames[id] = `SYSTEM #${id}`;
+          } else if (id >= 60000000 && id < 64000000) {
+            resolvedLocationNames[id] = `STATION #${id}`;
+          } else if (id > 1000000000000) {
+            resolvedLocationNames[id] = `UPWELL STRUCTURE #${id.toString().slice(-6)}`;
+          } else {
+            resolvedLocationNames[id] = `CONTAINER #${id}`;
+          }
+        }
+      });
+
+      populateLocationDropdown();
+    }
+
+    function populateLocationDropdown() {
       const filterSelect = document.getElementById('stock-location-filter');
+      if (!filterSelect) return;
+
       const currentSystemName = (document.getElementById('system-search')?.value || 'JITA').toUpperCase();
 
       filterSelect.innerHTML = `
@@ -1015,11 +1023,10 @@
         <option value="corp_only">Corporation Assets Only</option>
       `;
 
-      // Build specific location options
       const locCounts = {};
       rawAssetItems.forEach(item => {
         const locId = item.location_id;
-        const locName = resolvedLocationNames[locId] || (systemNameCache[locId] ? systemNameCache[locId] : `Location #${locId}`);
+        const locName = resolvedLocationNames[locId] || `Location #${locId}`;
         locCounts[locId] = {
           name: locName,
           count: (locCounts[locId]?.count || 0) + item.quantity
@@ -1034,16 +1041,22 @@
       }
     }
 
-    // Apply Location Filter to userStockMap
+    // Apply Location & Checkbox Filter to userStockMap
     function applyStockLocationFilter() {
       const filterVal = document.getElementById('stock-location-filter')?.value || 'all';
       const activeSystemName = (document.getElementById('system-search')?.value || 'JITA').toUpperCase();
 
+      const useChar = document.getElementById('use-char-assets')?.checked ?? true;
+      const useCorp = document.getElementById('use-corp-assets')?.checked ?? true;
+
       userStockMap = {};
 
       rawAssetItems.forEach(item => {
+        if (item.owner_type === 'char' && !useChar) return;
+        if (item.owner_type === 'corp' && !useCorp) return;
+
         let include = false;
-        const itemLocName = resolvedLocationNames[item.location_id] || systemNameCache[item.location_id] || '';
+        const itemLocName = resolvedLocationNames[item.location_id] || '';
 
         if (filterVal === 'all') {
           include = true;
@@ -1084,7 +1097,6 @@
       }
 
       const lines = text.split('\n');
-      let addedCount = 0;
 
       lines.forEach(line => {
         const parts = line.split('\t');
@@ -1104,8 +1116,7 @@
                 location_id: 99999999,
                 owner_type: 'clipboard'
               });
-              resolvedLocationNames[99999999] = 'Clipboard / Manual Import';
-              addedCount++;
+              resolvedLocationNames[99999999] = 'CLIPBOARD / MANUAL IMPORT';
             }
           }
         }
@@ -1408,10 +1419,10 @@
       recalculate();
     }
 
-    // Action: Apply Smart % Savings Threshold to all Buy Items
+    // Action: Apply Smart % Savings Threshold (Component % & Total Cost %) to all Buy Items
     function applySmartBuyThreshold() {
-      const thresholdInput = document.getElementById('buy-savings-threshold');
-      const threshold = thresholdInput ? parseFloat(thresholdInput.value) || 0 : 0;
+      const compThreshold = parseFloat(document.getElementById('buy-savings-threshold')?.value) || 0;
+      const totalCostThreshold = parseFloat(document.getElementById('total-cost-savings-threshold')?.value) || 0;
 
       function optimizeNode(node) {
         if (!node) return;
@@ -1419,13 +1430,21 @@
         if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
           const typeId = node.displayTypeId || node.typeId;
           const prices = priceCache[typeId] || { sell: 0, buy: 0 };
+          const qty = node.qtyNeeded || 1;
           
-          if (prices.sell > 0 && prices.buy > 0 && prices.sell > prices.buy) {
-            const savingsPct = ((prices.sell - prices.buy) / prices.sell) * 100;
-            if (savingsPct <= threshold) {
-              customBuyModes[typeId] = 'sell'; 
+          const sellTotal = prices.sell * qty;
+          const buyTotal = prices.buy * qty;
+
+          if (sellTotal > 0 && buyTotal > 0 && sellTotal > buyTotal) {
+            const compSavingsPct = ((prices.sell - prices.buy) / prices.sell) * 100;
+            
+            const rootTotalCost = recipeTreeRoot?.calculatedCost || 1;
+            const totalCostSavingsPct = rootTotalCost > 0 ? ((sellTotal - buyTotal) / rootTotalCost) * 100 : 0;
+
+            if (compSavingsPct >= compThreshold || totalCostSavingsPct >= totalCostThreshold) {
+              customBuyModes[typeId] = 'buy';  // Worth placing Buy order!
             } else {
-              customBuyModes[typeId] = 'buy';  
+              customBuyModes[typeId] = 'sell'; // Savings below threshold, instant Buy off Sell order!
             }
           } else {
             customBuyModes[typeId] = 'sell'; 
