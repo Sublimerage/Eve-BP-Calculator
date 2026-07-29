@@ -57,7 +57,7 @@
       </div>
     </div>
 
-    <!-- Tree Build / Buy Actions Card (WITH BUILD VS BUY MARGIN OPTIMIZER) -->
+    <!-- Tree Build / Buy Actions Card -->
     <div class="md:col-span-3 bg-[#0c1318] p-3 rounded-lg border border-[#1e3348] flex flex-col justify-between shadow-md space-y-2">
       <div class="flex justify-between items-center border-b border-[#1e3348] pb-1">
         <label class="block text-green-400 font-bold uppercase tracking-wider text-[11px] rajdhani">Sub-Component Build Mode</label>
@@ -77,7 +77,7 @@
         <div class="flex items-center space-x-1.5 flex-1 mono text-xs">
           <span class="text-slate-300 font-bold text-[11px]">Min Build Margin:</span>
           <input type="number" id="build-profit-threshold" value="5.0" step="0.5" min="0" max="100" 
-            class="w-16 bg-[#0d1922] border border-green-500/60 text-center text-green-300 font-bold rounded-md p-1 outline-none text-xs">
+            class="w-20 bg-[#0d1922] border border-green-500/60 text-center text-green-300 font-bold rounded-md p-1 outline-none text-xs">
           <span class="text-slate-400 font-bold text-xs">%</span>
         </div>
         <button onclick="applyBuildProfitOptimizer()" class="bg-green-800 hover:bg-green-700 text-white font-bold py-1 px-2.5 rounded-md text-[11px] transition shadow flex-shrink-0 mono" title="Switches sub-components to Build if building saves >= Threshold % over market buy">
@@ -155,43 +155,43 @@
         <div id="system-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
       </div>
 
-      <select id="facility-select" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded-md p-1.5 text-white font-semibold text-xs outline-none">
+      <select id="facility-select" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded-md p-1.5 text-white font-semibold text-xs outline-none">
         <option value="0.0">NPC Station (0%)</option>
         <option value="0.01">Raitaru / Azbel (1%)</option>
         <option value="0.01" selected>Sotiyo (1% Bonus)</option>
       </select>
 
-      <select id="structure-role-bonus" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded-md p-1.5 text-amber-300 font-bold text-xs outline-none">
+      <select id="structure-role-bonus" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded-md p-1.5 text-amber-300 font-bold text-xs outline-none">
         <option value="0.03" selected>Sotiyo / Azbel (-3% Job Fee)</option>
         <option value="0.0">NPC Station / None (0%)</option>
       </select>
     </div>
 
-    <!-- Tax Rates Panel -->
+    <!-- Tax Rates Panel (EXPANDED INPUT BOXES w-16 FOR 3+ DIGITS & PERSISTENT SAVING) -->
     <div class="flex items-center space-x-3 bg-[#0d1922] p-2.5 rounded-lg border border-[#1e3348] text-xs mono shadow">
       <span class="text-amber-400 font-bold text-[11px] uppercase rajdhani">Taxes & Fees:</span>
       
       <div class="flex items-center space-x-1" title="Facility Structure Tax %">
         <span class="text-slate-400 font-semibold">Fac:</span>
-        <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="recalculate()" class="w-11 bg-[#070b0f] border border-[#1e3348] rounded text-center text-cyan-400 font-bold p-1 outline-none text-xs">
+        <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-16 bg-[#070b0f] border border-[#1e3348] rounded text-center text-cyan-400 font-bold p-1 outline-none text-xs">
         <span class="text-slate-500">%</span>
       </div>
 
       <div class="flex items-center space-x-1" title="SCC Surcharge %">
         <span class="text-slate-400 font-semibold">SCC:</span>
-        <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="recalculate()" class="w-11 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-400 font-bold p-1 outline-none text-xs">
+        <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-16 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-400 font-bold p-1 outline-none text-xs">
         <span class="text-slate-500">%</span>
       </div>
 
       <div class="flex items-center space-x-1" title="Sales Tax %">
         <span class="text-slate-400 font-semibold">Sales:</span>
-        <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="recalculate()" class="w-11 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-1 outline-none text-xs">
+        <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-16 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-1 outline-none text-xs">
         <span class="text-slate-500">%</span>
       </div>
 
       <div class="flex items-center space-x-1" title="Broker Fee %">
         <span class="text-slate-400 font-semibold">Broker:</span>
-        <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="recalculate()" class="w-11 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-1 outline-none text-xs">
+        <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-16 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-1 outline-none text-xs">
         <span class="text-slate-500">%</span>
       </div>
     </div>
@@ -244,7 +244,7 @@
 
   </section>
 
-  <!-- Dashboard Summary Bar (WITH SURPLUS RE-SALE CREDIT METRIC) -->
+  <!-- Dashboard Summary Bar -->
   <section class="p-3 grid grid-cols-1 md:grid-cols-5 gap-3 bg-[#070b0f] relative z-10">
     <div class="bg-[#0d1922] border border-[#1e3348] p-3 rounded-lg shadow">
       <div class="text-[10px] text-slate-400 uppercase font-bold mono">Total Production Cost (Mat + Job Fees)</div>
