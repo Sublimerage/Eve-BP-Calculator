@@ -17,17 +17,14 @@ function isShipLocationFlag(flag) {
          f.includes('autofit');
 }
 
-// Helper to check if an item type name indicates a ship rather than a cargo container
-function isShipTypeName(typeName) {
+// Helper to check if an item type name indicates an actual container (and NOT a ship)
+function isActualContainerType(typeName) {
   if (!typeName) return false;
   const t = typeName.toLowerCase();
-  // If the type explicitly mentions container, canister, vault, freight, or plastic wrap, it is NOT a ship
-  if (t.includes('container') || t.includes('canister') || t.includes('vault') || 
-      t.includes('freight') || t.includes('plastic wrap') || t.includes('box') || 
-      t.includes('crate') || t.includes('chest') || t.includes('audit log')) {
-    return false;
-  }
-  return true;
+  return t.includes('container') || t.includes('canister') || t.includes('vault') || 
+         t.includes('freight') || t.includes('plastic wrap') || t.includes('box') || 
+         t.includes('crate') || t.includes('chest') || t.includes('audit log') ||
+         t.includes('hangar');
 }
 
 // Strict ESI Adjusted Price Fetcher (STRICT CCP ADJUSTED_PRICE ONLY)
@@ -323,7 +320,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     });
 
-    // Trace asset hierarchy up to root station/structure and identify containers (strictly excluding ships)
+    // Trace asset hierarchy up to root station/structure and identify ACTUAL containers (strictly excluding ships)
     const charContainerIds = [];
     const corpContainerIds = [];
 
@@ -339,10 +336,11 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
         const parentTypeObj = IDX[Object.keys(IDX).find(k => IDX[k].id === parentAsset.type_id)];
         const parentTypeName = parentTypeObj ? parentTypeObj.name : (window.EVE_ITEMS && window.EVE_ITEMS[parentAsset.type_id] ? window.EVE_ITEMS[parentAsset.type_id] : '');
 
-        // EXCLUDE SHIPS: Only treat as container if parent is NOT in a ship slot and NOT a ship type
-        const isParentShip = isShipLocationFlag(ast.location_flag) || isShipLocationFlag(parentAsset.location_flag) || isShipTypeName(parentTypeName);
+        // STRICT SHIP EXCLUSION: If parent or flag belongs to a ship, bypass it!
+        const isParentShipSlot = isShipLocationFlag(ast.location_flag) || isShipLocationFlag(parentAsset.location_flag);
+        const isContainerType = isActualContainerType(parentTypeName);
 
-        if (!isParentShip) {
+        if (!isParentShipSlot && isContainerType) {
           if (!containerId) {
             containerId = currentLoc;
             if (ast.owner_type === 'char' && !charContainerIds.includes(containerId)) {
@@ -361,7 +359,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       ast.container_id = containerId;
     });
 
-    // Fetch custom container names via ESI assets/names endpoint
+    // Fetch custom in-game container names via ESI assets/names endpoint
     if (charContainerIds.length > 0) {
       for (let i = 0; i < charContainerIds.length; i += 500) {
         const chunk = charContainerIds.slice(i, i + 500);
@@ -428,7 +426,7 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
   if (uniqueRootLocIds.length > 0) {
     const missingRootIds = uniqueRootLocIds.filter(id => !resolvedLocationNames[id]);
 
-    // 1. CRITICAL FIX: Only POST standard CCP universe IDs (< 1,000,000,000) to /universe/names/
+    // 1. CRITICAL FIX FOR NPC STATIONS: Only POST standard CCP universe IDs (< 1,000,000,000) to /universe/names/
     // Passing structure IDs (> 10^12) causes /universe/names/ to reject the ENTIRE batch with 404!
     const standardUniverseIds = missingRootIds.filter(id => id < 1000000000);
 
@@ -545,7 +543,7 @@ function populateLocationDropdown() {
     <option value="industry_system">Current System Only (${currentSystemName})</option>
   `;
 
-  // Aggregate assets by root station/structure AND track containers
+  // Aggregate assets by root station/structure AND track actual containers
   const locCounts = {};
   rawAssetItems.forEach(item => {
     const locId = item.root_location_id || item.location_id;
