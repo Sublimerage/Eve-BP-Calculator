@@ -523,6 +523,7 @@ async function fetchSystemSCIById(systemId, systemName) {
   }
 }
 
+// Parallelized Market Price Fetcher with 10s Timeout & Instant ESI Fallback
 async function fetchMarketPrices(typeIds) {
   const missing = typeIds.filter(id => !priceCache[id]);
   if (!missing.length) return;
@@ -536,13 +537,14 @@ async function fetchMarketPrices(typeIds) {
     const targetUrl = `https://market.fuzzwork.co.uk/aggregates/?station=60003760&types=${chunk.join(',')}`;
     const tryUrls = [
       targetUrl,
-      `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
+      `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
     ];
 
     for (const url of tryUrls) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
         const res = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
@@ -568,5 +570,13 @@ async function fetchMarketPrices(typeIds) {
         // Try next
       }
     }
+
+    // Instant Fallback: If priceCache is still empty for any material, use ESI Adjusted Price
+    chunk.forEach(id => {
+      if (!priceCache[id] || (!priceCache[id].sell && !priceCache[id].buy)) {
+        const eivVal = getEIV(id);
+        priceCache[id] = { sell: eivVal, buy: eivVal * 0.9 };
+      }
+    });
   }));
 }
