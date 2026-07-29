@@ -63,7 +63,67 @@ function resetSmartBuyModes() {
   recalculate();
 }
 
-// Optimizer 1: Component Market Spread Threshold
+// Optimizer 1: Build vs Buy Profit Margin Optimizer
+async function applyBuildProfitOptimizer() {
+  const threshold = parseFloat(document.getElementById('build-profit-threshold')?.value) || 0;
+
+  if (!recipeTreeRoot) return;
+
+  function evaluateBuildNode(node) {
+    if (!node) return;
+
+    if (node.depth > 0 && node.isManufacturable) {
+      const typeId = node.displayTypeId || node.typeId;
+      const prices = priceCache[typeId] || { sell: 0, buy: 0 };
+      const marketPrice = prices.sell || prices.buy || 0;
+
+      const deductModeInput = document.getElementById('deduct-stock-mode');
+      const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+      const stockQty = isStockDeductEnabled ? (userStockMap[typeId] || userStockMap[node.typeId] || 0) : 0;
+      const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
+
+      const marketBuyCost = marketPrice * netQtyNeeded;
+
+      // Estimate build cost from recipe materials + job fees
+      let estimatedBuildCost = 0;
+      if (node.recipe && node.recipe.materials) {
+        node.recipe.materials.forEach(mat => {
+          const matPrices = priceCache[mat.typeId] || { sell: 0, buy: 0 };
+          const matUnitPrice = matPrices.sell || matPrices.buy || 0;
+          const meFactor = node.isReaction ? 1.0 : (1 - (node.customME || 0) / 100);
+          const facFactor = (1 - parseFloat(document.getElementById('facility-select')?.value || '0.01'));
+          const matQty = Math.max(node.runsNeeded, Math.ceil(node.runsNeeded * mat.baseQty * meFactor * facFactor));
+          estimatedBuildCost += matUnitPrice * matQty;
+        });
+      }
+
+      estimatedBuildCost += (node.jobFee || 0);
+
+      if (marketBuyCost > 0 && estimatedBuildCost > 0) {
+        const buildSavingsPct = ((marketBuyCost - estimatedBuildCost) / marketBuyCost) * 100;
+        if (buildSavingsPct >= threshold) {
+          buildSelfOverrides[typeId] = true;  // Building saves >= threshold %: switch to Build!
+        } else {
+          buildSelfOverrides[typeId] = false; // Building saves < threshold %: buy off Market!
+        }
+      } else {
+        buildSelfOverrides[typeId] = false;
+      }
+    }
+
+    if (node.children) {
+      node.children.forEach(child => evaluateBuildNode(child));
+    }
+  }
+
+  evaluateBuildNode(recipeTreeRoot);
+
+  if (currentProduct) {
+    await selectItem(currentProduct.id, currentProduct.name, true);
+  }
+}
+
+// Optimizer 2: Component Market Spread Threshold
 function applyComponentSpreadOptimizer() {
   const threshold = parseFloat(document.getElementById('buy-savings-threshold')?.value) || 0;
 
@@ -97,7 +157,7 @@ function applyComponentSpreadOptimizer() {
   }
 }
 
-// Optimizer 2: Build Cost Savings Impact Threshold
+// Optimizer 3: Build Cost Savings Impact Threshold
 function applyBudgetImpactOptimizer() {
   const threshold = parseFloat(document.getElementById('total-cost-savings-threshold')?.value) || 0;
 

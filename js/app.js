@@ -256,6 +256,12 @@ function collectGlobalDemand(node, demandMap = {}) {
 function recalculate() {
   if (!recipeTreeRoot) return;
 
+  // Preserve input focus state to prevent multi-digit typing bugs on runs input
+  const activeEl = document.activeElement;
+  const isCardRunsFocused = activeEl && activeEl.id === 'card-bp-runs';
+  const selStart = isCardRunsFocused ? activeEl.selectionStart : null;
+  const selEnd = isCardRunsFocused ? activeEl.selectionEnd : null;
+
   const runModeInput = document.getElementById('run-mode');
   const isRunsMode = runModeInput ? runModeInput.value === 'runs' : false;
 
@@ -398,6 +404,17 @@ function recalculate() {
   
   renderBillOfMaterials(recipeTreeRoot, brokerFee);
   setTimeout(drawConnectingLines, 50);
+
+  // Restore active input focus and cursor selection if user was typing in runs box
+  if (isCardRunsFocused) {
+    const newRunsInput = document.getElementById('card-bp-runs');
+    if (newRunsInput) {
+      newRunsInput.focus();
+      if (selStart !== null && selEnd !== null) {
+        try { newRunsInput.setSelectionRange(selStart, selEnd); } catch (e) {}
+      }
+    }
+  }
 }
 
 function renderTreeDiagram(rootNode, priceStrategy, profitSell, roiSell) {
@@ -684,6 +701,29 @@ function applyNodeHighlightClasses() {
       card.classList.add('node-dimmed');
     }
   });
+}
+
+// Selects and centers camera on a diagram node when clicking a row in the Bill of Materials sidebar
+function highlightNodeByTypeId(typeId) {
+  function findMatchingNode(node) {
+    if (!node) return null;
+    if (node.typeId === typeId || node.displayTypeId === typeId) return node;
+    if (node.children) {
+      for (const child of node.children) {
+        const found = findMatchingNode(child);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  const targetNode = findMatchingNode(recipeTreeRoot);
+  if (targetNode) {
+    selectedInstanceId = targetNode.instanceId;
+    applyNodeHighlightClasses();
+    drawConnectingLines();
+    centerOnSelectedNode();
+  }
 }
 
 function isolateComponent(e, instanceId) {
@@ -989,7 +1029,9 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
 
   bomItems.forEach(item => {
     const row = document.createElement('div');
-    row.className = 'bg-[#0c1318] border border-[#1e3348] rounded p-2 flex items-center justify-between';
+    row.className = 'bg-[#0c1318] border border-[#1e3348] hover:border-cyan-500 hover:bg-[#101d2a] rounded p-2 flex items-center justify-between cursor-pointer transition shadow-sm';
+    row.title = 'Click to find and focus this material in the build diagram';
+    row.onclick = () => highlightNodeByTypeId(item.typeId);
 
     row.innerHTML = `
       <div class="flex items-center space-x-2.5 min-w-0">
