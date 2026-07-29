@@ -1,5 +1,11 @@
 'use strict';
 
+// Local HTML Escaper Helper
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+if (!window.esc) window.esc = esc;
+
 // Strict ESI Adjusted Price Fetcher (STRICT CCP ADJUSTED_PRICE ONLY)
 async function fetchAdjustedPrices() {
   const statusEl = document.getElementById('eiv-status-text');
@@ -179,12 +185,12 @@ async function handleEsiSSOCallback() {
 
 function updateEsiUserUI(charName, charId) {
   const container = document.getElementById('esi-login-container');
-  const safeCharName = window.esc ? window.esc(charName) : charName;
+  const safeName = esc(charName);
   if (container) {
     container.innerHTML = `
       <div class="flex items-center space-x-2 text-xs mono bg-[#0d1922] px-2.5 py-1 rounded border border-cyan-500/50 shadow">
         <img src="https://images.evetech.net/characters/${charId}/portrait?size=32" class="w-5 h-5 rounded-full border border-cyan-400">
-        <span class="text-cyan-300 font-bold">${safeCharName}</span>
+        <span class="text-cyan-300 font-bold">${safeName}</span>
         <button onclick="logoutEsiSSO()" class="text-slate-400 hover:text-red-400 font-bold ml-1" title="Log out ESI Character">✖</button>
       </div>
     `;
