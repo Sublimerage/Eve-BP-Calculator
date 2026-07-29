@@ -1,5 +1,32 @@
 'use strict';
 
+// --- Action: Toggle Component Build / Buy Mode ---
+async function toggleBuildSelf(e, typeId) {
+  if (e) e.stopPropagation();
+  const currentState = (buildSelfOverrides[typeId] !== undefined) ? buildSelfOverrides[typeId] : false;
+  buildSelfOverrides[typeId] = !currentState;
+  if (currentProduct) {
+    await selectItem(currentProduct.id, currentProduct.name, true);
+  }
+}
+
+// --- Action: Per-Card ME / TE Inputs ---
+function onCardMEChange(e, typeId, instanceId) {
+  if (e) e.stopPropagation();
+  const val = Math.max(0, Math.min(10, parseFloat(e.target.value) || 0));
+  customMEOverrides[typeId] = val;
+  if (currentProduct) {
+    selectItem(currentProduct.id, currentProduct.name, true);
+  }
+}
+
+function onCardTEChange(e, typeId, instanceId) {
+  if (e) e.stopPropagation();
+  const val = Math.max(0, Math.min(20, parseFloat(e.target.value) || 0));
+  customTEOverrides[typeId] = val;
+  recalculate();
+}
+
 // --- Action: Build All Sub-Components ---
 async function buildAllComponents() {
   function markAllBuild(node) {

@@ -83,7 +83,7 @@ async function fetchEsiSearchResults(query) {
   }
 }
 
-// Autocomplete Setup
+// Item Autocomplete Setup
 const searchInput = document.getElementById('item-search');
 const searchResults = document.getElementById('search-results');
 
@@ -105,7 +105,7 @@ if (searchInput) {
       hits = Array.from(map.values()).slice(0, 15);
     }
 
-    const safeQ = window.esc ? window.esc(q) : q;
+    const safeQ = esc(q);
 
     if (!hits.length) {
       if (searchResults) {
@@ -118,9 +118,9 @@ if (searchInput) {
     if (searchResults) {
       searchResults.innerHTML = hits.map(item => `
         <div class="px-3 py-2 hover:bg-[#1e3348] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#1e3348]/40"
-             onclick="selectItem(${item.id}, '${window.esc ? window.esc(item.name) : item.name}')">
+             onclick="selectItem(${item.id}, '${esc(item.name)}')">
           <img src="https://images.evetech.net/types/${item.id}/icon?size=32" class="w-6 h-6 rounded" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.id}/render?size=32';">
-          <span class="font-semibold text-slate-200">${window.esc ? window.esc(item.name) : item.name}</span>
+          <span class="font-semibold text-slate-200">${esc(item.name)}</span>
         </div>
       `).join('');
       searchResults.classList.remove('hidden');
@@ -131,6 +131,63 @@ if (searchInput) {
 document.addEventListener('click', (e) => {
   if (searchInput && searchResults && !searchInput.contains(e.target) && !searchResults.contains(e.target)) {
     searchResults.classList.add('hidden');
+  }
+});
+
+// System Autocomplete Setup
+const systemSearchInput = document.getElementById('system-search');
+const systemSearchResults = document.getElementById('system-results');
+
+if (systemSearchInput) {
+  systemSearchInput.addEventListener('input', async () => {
+    const q = systemSearchInput.value.trim();
+    if (!q) {
+      if (systemSearchResults) systemSearchResults.classList.add('hidden');
+      return;
+    }
+
+    let hits = searchSolarSystemsLocally(q);
+
+    if (q.length >= 2) {
+      const esiHits = await fetchEsiSystemSearch(q);
+      const map = new Map();
+      hits.forEach(h => map.set(h.id, h));
+      esiHits.forEach(h => map.set(h.id, h));
+      hits = Array.from(map.values()).slice(0, 10);
+    }
+
+    if (!hits.length) {
+      if (systemSearchResults) {
+        systemSearchResults.innerHTML = `<div class="p-2 text-slate-400 text-xs italic">No matching system found</div>`;
+        systemSearchResults.classList.remove('hidden');
+      }
+      return;
+    }
+
+    if (systemSearchResults) {
+      systemSearchResults.innerHTML = hits.map(sys => `
+        <div class="px-3 py-1.5 hover:bg-[#1e3348] cursor-pointer text-xs font-bold text-cyan-300 border-b border-[#1e3348]/40 mono"
+             onclick="selectSolarSystem(${sys.id}, '${esc(sys.name)}')">
+          ${esc(sys.name)}
+        </div>
+      `).join('');
+      systemSearchResults.classList.remove('hidden');
+    }
+  });
+
+  systemSearchInput.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+      const q = systemSearchInput.value.trim();
+      if (q) {
+        await resolveSystemSCI(q);
+      }
+    }
+  });
+}
+
+document.addEventListener('click', (e) => {
+  if (systemSearchInput && systemSearchResults && !systemSearchInput.contains(e.target) && !systemSearchResults.contains(e.target)) {
+    systemSearchResults.classList.add('hidden');
   }
 });
 
@@ -157,7 +214,7 @@ async function selectItem(typeId, name, preserveView = false) {
 
   const statusText = document.getElementById('status-text');
   const statusDot = document.getElementById('status-dot');
-  if (statusText) statusText.textContent = 'TREE READY | UPDATING JITA PRICES...';
+  if (statusText) statusText.textContent = 'TREE READY | UPDATING MARKET PRICES...';
   if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-amber-400';
 
   const allTypeIds = new Set();
@@ -410,7 +467,7 @@ function createNodeCard(node) {
       </div>
     </div>
 
-    <!-- Target Runs Controller (MOVED DIRECTLY TO MAIN ROOT CARD) -->
+    <!-- Target Runs Controller -->
     ${isRoot ? `
       <div class="mb-2 p-1.5 bg-[#070b0f] rounded border border-cyan-500/40 flex items-center justify-between text-[11px] mono" onclick="event.stopPropagation()">
         <span class="text-slate-300 font-bold">Runs:</span>
@@ -657,7 +714,6 @@ document.addEventListener('keydown', (e) => {
 function centerOnSelectedNode() {
   let targetId = isolatedInstanceId || selectedInstanceId;
   
-  // Default to Main Target Output Card if no card is selected
   if (!targetId && recipeTreeRoot) {
     targetId = recipeTreeRoot.instanceId;
   }
@@ -932,7 +988,7 @@ function copyMultibuyText() {
   });
 }
 
-// --- Smooth Pan and Zoom Engine ---
+// Smooth Pan and Zoom Engine
 const viewport = document.getElementById('viewport');
 const content = document.getElementById('pan-zoom-content');
 
@@ -996,26 +1052,26 @@ function resetPanZoom() {
   drawConnectingLines();
 }
 
-// --- Initialize Application ---
+// Initialize Application
 window.onload = async () => {
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
 
-  // 1. Render default item IMMEDIATELY (0ms latency!)
+  // 1. Render default item
   try {
     if (window.IDX && window.IDX['drekavac']) {
-      selectItem(48519, 'Drekavac');
+      await selectItem(48519, 'Drekavac');
     } else if (window.IDX && window.IDX['caracal']) {
-      selectItem(621, 'Caracal');
+      await selectItem(621, 'Caracal');
     } else {
-      selectItem(48519, 'Drekavac');
+      await selectItem(48519, 'Drekavac');
     }
   } catch (e) {
     console.error('Initial selectItem error:', e);
   }
 
-  // 2. Fetch background prices & SSO in parallel without blocking initial rendering
+  // 2. Fetch background prices & SSO in parallel
   fetchAdjustedPrices().catch(e => console.warn('Adjusted prices error:', e));
   handleEsiSSOCallback().catch(e => console.warn('SSO Callback Error:', e));
   loadSavedSystem().catch(e => console.warn('Load system error:', e));

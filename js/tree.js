@@ -20,22 +20,32 @@ function getBatchYield(recipe, isReaction) {
   return 1;
 }
 
+function collectAllTypeIds(node, typeIds = new Set()) {
+  if (!node) return typeIds;
+  if (node.typeId) typeIds.add(node.typeId);
+  if (node.displayTypeId) typeIds.add(node.displayTypeId);
+  if (node.children) {
+    node.children.forEach(child => collectAllTypeIds(child, typeIds));
+  }
+  return typeIds;
+}
+
 async function fetchBlueprintData(typeId) {
   if (blueprintCache[typeId] !== undefined) {
     return blueprintCache[typeId];
   }
 
-  if (RAW_BASE_MATERIALS.has(typeId)) {
+  if (RAW_BASE_MATERIALS && RAW_BASE_MATERIALS.has(typeId)) {
     blueprintCache[typeId] = null;
     return null;
   }
 
-  if (BUILTIN_RECIPES[typeId]) {
+  if (BUILTIN_RECIPES && BUILTIN_RECIPES[typeId]) {
     blueprintCache[typeId] = BUILTIN_RECIPES[typeId];
     return BUILTIN_RECIPES[typeId];
   }
 
-  if (recipeMap[typeId]) {
+  if (recipeMap && recipeMap[typeId]) {
     blueprintCache[typeId] = recipeMap[typeId];
     return recipeMap[typeId];
   }
@@ -53,7 +63,7 @@ async function fetchBlueprintData(typeId) {
   }
 
   const tryTypeIds = [typeId];
-  const popMatch = POPULAR_ITEMS.find(p => p.id === typeId || p.bpId === typeId);
+  const popMatch = POPULAR_ITEMS ? POPULAR_ITEMS.find(p => p.id === typeId || p.bpId === typeId) : null;
   if (popMatch && popMatch.bpId && !tryTypeIds.includes(popMatch.bpId)) {
     tryTypeIds.unshift(popMatch.bpId);
   }
@@ -158,7 +168,7 @@ async function buildRecursiveRecipeTree(typeId, name, qtyNeeded, currentDepth, m
       
       const allowReactions = document.getElementById('include-reactions')?.value === 'true';
 
-      let activeMaterials = recipe.mfgMaterials;
+      let activeMaterials = recipe.mfgMaterials || recipe.materials;
       let isReaction = false;
 
       if (!activeMaterials && allowReactions && recipe.reactionMaterials) {

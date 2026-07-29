@@ -45,58 +45,6 @@ window.isPanning = false;
 window.startX = 0;
 window.startY = 0;
 
-// Global Prepacked Index Builder (Resolves EVE_ITEMS & EVE_RECIPES from eve_db.js)
-window.buildPrepackedIndexes = function() {
-  const statusText = document.getElementById('status-text');
-  const statusDot = document.getElementById('status-dot');
-
-  const itemsObj = (typeof EVE_ITEMS !== 'undefined') ? EVE_ITEMS : (window.EVE_ITEMS || null);
-  const recipesObj = (typeof EVE_RECIPES !== 'undefined') ? EVE_RECIPES : (window.EVE_RECIPES || null);
-  const systemsObj = (typeof EVE_SYSTEMS !== 'undefined') ? EVE_SYSTEMS : (window.EVE_SYSTEMS || null);
-
-  if (itemsObj && Object.keys(itemsObj).length > 10) {
-    for (const [id, name] of Object.entries(itemsObj)) {
-      window.IDX[name.toLowerCase()] = { id: parseInt(id), name: name };
-    }
-  } else {
-    POPULAR_ITEMS.forEach(r => {
-      window.IDX[r.name.toLowerCase()] = { id: r.id, name: r.name };
-    });
-  }
-
-  if (systemsObj && Object.keys(systemsObj).length > 10) {
-    for (const [id, name] of Object.entries(systemsObj)) {
-      window.SYSTEM_IDX[name.toLowerCase()] = { id: parseInt(id), name: name.toUpperCase() };
-      window.systemNameCache[id] = name.toUpperCase();
-    }
-  } else {
-    POPULAR_SYSTEMS.forEach(sys => {
-      window.SYSTEM_IDX[sys.name.toLowerCase()] = { id: sys.id, name: sys.name.toUpperCase() };
-      window.systemNameCache[sys.id] = sys.name.toUpperCase();
-    });
-  }
-
-  if (recipesObj && typeof recipesObj === 'object') {
-    for (const [idStr, recipe] of Object.entries(recipesObj)) {
-      const keyId = parseInt(idStr);
-      window.recipeMap[keyId] = recipe;
-      if (recipe.blueprintTypeID) window.recipeMap[recipe.blueprintTypeID] = recipe;
-      if (recipe.productTypeID) window.recipeMap[recipe.productTypeID] = recipe;
-    }
-  }
-
-  // Explicitly override stale recipes with live verified SDE quantities
-  for (const [idStr, recipe] of Object.entries(BUILTIN_RECIPES)) {
-    const keyId = parseInt(idStr);
-    window.recipeMap[keyId] = recipe;
-    if (recipe.blueprintTypeID) window.recipeMap[recipe.blueprintTypeID] = recipe;
-    if (recipe.productTypeID) window.recipeMap[recipe.productTypeID] = recipe;
-  }
-
-  if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-green-400';
-  if (statusText) statusText.textContent = `INDEX READY (${Object.keys(window.IDX).length.toLocaleString()} ITEMS | ${Object.keys(window.recipeMap).length.toLocaleString()} RECIPES)`;
-};
-
 // Known Base Raw Materials
 const RAW_BASE_MATERIALS = new Set([
   34, 35, 36, 37, 38, 39, 40, 11399, // Minerals
@@ -105,6 +53,7 @@ const RAW_BASE_MATERIALS = new Set([
   3689, 3683, 9848,                  // Coolant, Enriched Uranium, Robotics
   2267, 2268, 2270, 2272, 2305       // Gas / Ores
 ]);
+window.RAW_BASE_MATERIALS = RAW_BASE_MATERIALS;
 
 // Popular Items Map
 const POPULAR_ITEMS = [
@@ -130,6 +79,7 @@ const POPULAR_ITEMS = [
   { id: 39,    name: "Zydrine" },
   { id: 40,    name: "Megacyte" }
 ];
+window.POPULAR_ITEMS = POPULAR_ITEMS;
 
 // Built-in Popular Solar Systems Index
 const POPULAR_SYSTEMS = [
@@ -138,6 +88,7 @@ const POPULAR_SYSTEMS = [
   { id: 30002510, name: "RENS" }, { id: 30002053, name: "HEK" },
   { id: 30002537, name: "AMAMAKE" }, { id: 30004759, name: "1DQ1-A" }
 ];
+window.POPULAR_SYSTEMS = POPULAR_SYSTEMS;
 
 // Corrected Live EVE Client SDE Material Quantities & Verified Type IDs
 const BUILTIN_RECIPES = {
@@ -263,4 +214,57 @@ const BUILTIN_RECIPES = {
       { typeId: 40, name: "Megacyte", baseQty: 140 }
     ]
   }
+};
+window.BUILTIN_RECIPES = BUILTIN_RECIPES;
+
+// Global Prepacked Index Builder (Resolves EVE_ITEMS & EVE_RECIPES from eve_db.js)
+window.buildPrepackedIndexes = function() {
+  const statusText = document.getElementById('status-text');
+  const statusDot = document.getElementById('status-dot');
+
+  const itemsObj = (typeof EVE_ITEMS !== 'undefined') ? EVE_ITEMS : (window.EVE_ITEMS || null);
+  const recipesObj = (typeof EVE_RECIPES !== 'undefined') ? EVE_RECIPES : (window.EVE_RECIPES || null);
+  const systemsObj = (typeof EVE_SYSTEMS !== 'undefined') ? EVE_SYSTEMS : (window.EVE_SYSTEMS || null);
+
+  if (itemsObj && Object.keys(itemsObj).length > 10) {
+    for (const [id, name] of Object.entries(itemsObj)) {
+      window.IDX[name.toLowerCase()] = { id: parseInt(id), name: name };
+    }
+  } else {
+    POPULAR_ITEMS.forEach(r => {
+      window.IDX[r.name.toLowerCase()] = { id: r.id, name: r.name };
+    });
+  }
+
+  if (systemsObj && Object.keys(systemsObj).length > 10) {
+    for (const [id, name] of Object.entries(systemsObj)) {
+      window.SYSTEM_IDX[name.toLowerCase()] = { id: parseInt(id), name: name.toUpperCase() };
+      window.systemNameCache[id] = name.toUpperCase();
+    }
+  } else {
+    POPULAR_SYSTEMS.forEach(sys => {
+      window.SYSTEM_IDX[sys.name.toLowerCase()] = { id: sys.id, name: sys.name.toUpperCase() };
+      window.systemNameCache[sys.id] = sys.name.toUpperCase();
+    });
+  }
+
+  if (recipesObj && typeof recipesObj === 'object') {
+    for (const [idStr, recipe] of Object.entries(recipesObj)) {
+      const keyId = parseInt(idStr);
+      window.recipeMap[keyId] = recipe;
+      if (recipe.blueprintTypeID) window.recipeMap[recipe.blueprintTypeID] = recipe;
+      if (recipe.productTypeID) window.recipeMap[recipe.productTypeID] = recipe;
+    }
+  }
+
+  // Explicitly override stale recipes with live verified SDE quantities
+  for (const [idStr, recipe] of Object.entries(BUILTIN_RECIPES)) {
+    const keyId = parseInt(idStr);
+    window.recipeMap[keyId] = recipe;
+    if (recipe.blueprintTypeID) window.recipeMap[recipe.blueprintTypeID] = recipe;
+    if (recipe.productTypeID) window.recipeMap[recipe.productTypeID] = recipe;
+  }
+
+  if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-green-400';
+  if (statusText) statusText.textContent = `INDEX READY (${Object.keys(window.IDX).length.toLocaleString()} ITEMS | ${Object.keys(window.recipeMap).length.toLocaleString()} RECIPES)`;
 };

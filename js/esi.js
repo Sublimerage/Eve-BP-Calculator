@@ -416,6 +416,13 @@ function filterLocationDropdownOptions() {
   });
 }
 
+function updateStockDisplayCount() {
+  const el = document.getElementById('stock-count-display');
+  if (!el) return;
+  const totalItems = Object.values(userStockMap).reduce((acc, q) => acc + q, 0);
+  el.textContent = `${totalItems.toLocaleString()} items`;
+}
+
 function applyStockLocationFilter() {
   const filterVal = document.getElementById('stock-location-filter')?.value || 'all';
   const activeSystemName = (document.getElementById('system-search')?.value || 'JITA').toUpperCase();
@@ -448,6 +455,91 @@ function applyStockLocationFilter() {
 
   updateStockDisplayCount();
   recalculate();
+}
+
+function openPasteModal() {
+  const modal = document.getElementById('paste-modal');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closePasteModal() {
+  const modal = document.getElementById('paste-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function clearUserStock() {
+  rawAssetItems = rawAssetItems.filter(item => item.location_id !== 99999999);
+  userStockMap = {};
+  updateStockDisplayCount();
+  populateLocationDropdown();
+  recalculate();
+  closePasteModal();
+}
+
+function processPastedStock() {
+  const input = document.getElementById('paste-stock-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+
+  const lines = text.split('\n');
+
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+
+    const parts = trimmed.split('\t');
+    let nameCandidate = '';
+    let qtyCandidate = 1;
+
+    if (parts.length >= 2) {
+      nameCandidate = parts[0].trim();
+      const cleanedQty = parts[1].replace(/,/g, '').replace(/\./g, '').trim();
+      const parsedQty = parseInt(cleanedQty, 10);
+      if (!isNaN(parsedQty) && parsedQty > 0) {
+        qtyCandidate = parsedQty;
+      }
+    } else {
+      const match = trimmed.match(/^(.+?)\s+([0-9,.]+)\s*$/);
+      if (match) {
+        nameCandidate = match[1].trim();
+        const parsedQty = parseInt(match[2].replace(/,/g, '').replace(/\./g, ''), 10);
+        if (!isNaN(parsedQty) && parsedQty > 0) {
+          qtyCandidate = parsedQty;
+        }
+      } else {
+        nameCandidate = trimmed;
+      }
+    }
+
+    if (nameCandidate) {
+      const q = nameCandidate.toLowerCase();
+      let matchedItem = IDX[q];
+      if (!matchedItem && window.EVE_ITEMS) {
+        for (const [idStr, name] of Object.entries(window.EVE_ITEMS)) {
+          if (name.toLowerCase() === q) {
+            matchedItem = { id: parseInt(idStr), name: name };
+            break;
+          }
+        }
+      }
+
+      if (matchedItem) {
+        rawAssetItems.push({
+          type_id: matchedItem.id,
+          quantity: qtyCandidate,
+          location_id: 99999999,
+          owner_type: 'char'
+        });
+      }
+    }
+  });
+
+  resolvedLocationNames[99999999] = 'CLIPBOARD / MANUAL IMPORT';
+  input.value = '';
+  closePasteModal();
+  populateLocationDropdown();
+  applyStockLocationFilter();
 }
 
 async function selectSolarSystem(systemId, systemName) {
