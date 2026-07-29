@@ -6,6 +6,18 @@ function esc(s) {
 }
 if (!window.esc) window.esc = esc;
 
+// Helper to look up exact item type name from loaded index or EVE_ITEMS database
+function getItemTypeName(typeId) {
+  if (!typeId) return '';
+  if (window.EVE_ITEMS && window.EVE_ITEMS[typeId]) {
+    return window.EVE_ITEMS[typeId];
+  }
+  for (const [k, v] of Object.entries(IDX)) {
+    if (v.id === typeId) return v.name;
+  }
+  return '';
+}
+
 // Helper to detect if an asset location flag belongs to a ship slot or ship cargo bay
 function isShipLocationFlag(flag) {
   if (!flag) return false;
@@ -18,11 +30,15 @@ function isShipLocationFlag(flag) {
 }
 
 // Comprehensive check for Rookie Ships and all EVE ship hull types
-function isShipType(typeId, typeName) {
+function isShipType(typeId) {
   // Explicit Rookie Ship Type IDs
-  const rookieShipIds = new Set([601, 606, 608, 596, 33079, 33081, 33083, 33085]);
+  const rookieShipIds = new Set([
+    601, 606, 608, 596, 33079, 33081, 33083, 33085, // Rookie ships (Ibis, Reaper, Velator, Impairor, Taipan, etc.)
+    621, 622, 12005, 587, 24698, 644, 642, 643, 12015, 11987, 11989 // Popular ships
+  ]);
   if (rookieShipIds.has(typeId)) return true;
 
+  const typeName = getItemTypeName(typeId);
   if (!typeName) return false;
   const t = typeName.toLowerCase();
 
@@ -36,15 +52,19 @@ function isShipType(typeId, typeName) {
   }
 
   // Common ship hull / class keywords including rookie ships
-  return t.includes('frigate') || t.includes('destroyer') || t.includes('cruiser') ||
-         t.includes('battlecruiser') || t.includes('battleship') || t.includes('dreadnought') ||
-         t.includes('carrier') || t.includes('titan') || t.includes('corvette') ||
-         t.includes('industrial') || t.includes('freighter') || t.includes('barge') ||
-         t.includes('exhumer') || t.includes('shuttle') || t.includes('interdictor') ||
-         t.includes('covert ops') || t.includes('logistics') || t.includes('ship') ||
-         t.includes('transport') || t.includes('ibis') || t.includes('reaper') ||
-         t.includes('velator') || t.includes('impairor') || t.includes('taipan') ||
-         t.includes('hematite') || t.includes('violator') || t.includes('echo');
+  const shipTerms = [
+    'frigate', 'destroyer', 'cruiser', 'battlecruiser', 'battleship', 'dreadnought',
+    'carrier', 'supercarrier', 'titan', 'corvette', 'industrial', 'freighter',
+    'mining barge', 'exhumer', 'shuttle', 'interdictor', 'covert ops', 'stealth bomber',
+    'logistics', 'assault', 'recon', 'command ship', 'heavy assault', 'blockade runner',
+    'deep space', 'jump freighter', 'tactical destroyer', 'strategic cruiser',
+    'ibis', 'reaper', 'velator', 'impairor', 'taipan', 'hematite', 'violator', 'echo',
+    'venture', 'procurer', 'retriever', 'covetor', 'orca', 'rorqual', 'bowhead',
+    'heron', 'magnate', 'imicus', 'probe', 'condor', 'slicer', 'executioner', 'tormentor',
+    'punisher', 'kestrel', 'merlin', 'tristan', 'inquisitor', 'navitas', 'bantam', 'ship'
+  ];
+
+  return shipTerms.some(term => t.includes(term));
 }
 
 // Strict ESI Adjusted Price Fetcher (STRICT CCP ADJUSTED_PRICE ONLY)
@@ -352,13 +372,9 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       while (itemIdToAssetMap[currentLoc] && depth < 10) {
         const parentAsset = itemIdToAssetMap[currentLoc];
         
-        // Resolve parent type name
-        const parentTypeObj = IDX[Object.keys(IDX).find(k => IDX[k].id === parentAsset.type_id)];
-        const parentTypeName = parentTypeObj ? parentTypeObj.name : (window.EVE_ITEMS && window.EVE_ITEMS[parentAsset.type_id] ? window.EVE_ITEMS[parentAsset.type_id] : '');
-
         // STRICT SHIP EXCLUSION: Check both location flag AND parent type ID / name
         const isShipSlot = isShipLocationFlag(ast.location_flag) || isShipLocationFlag(parentAsset.location_flag);
-        const isShip = isShipType(parentAsset.type_id, parentTypeName);
+        const isShip = isShipType(parentAsset.type_id);
 
         if (!isShipSlot && !isShip) {
           // Parent item is a non-ship holding sub-assets -> IT IS A CONTAINER!
@@ -539,11 +555,10 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
     if (!resolvedLocationNames[containerId]) {
       const containerItem = rawAssetItems.find(a => a.item_id === containerId);
       if (containerItem) {
-        const typeObj = IDX[Object.keys(IDX).find(k => IDX[k].id === containerItem.type_id)];
-        const typeName = typeObj ? typeObj.name : (window.EVE_ITEMS && window.EVE_ITEMS[containerItem.type_id] ? window.EVE_ITEMS[containerItem.type_id] : 'Container');
-        resolvedLocationNames[containerId] = `${typeName} (#${containerId.toString().slice(-5)})`;
+        const typeName = getItemTypeName(containerItem.type_id) || 'Container';
+        resolvedLocationNames[containerId] = `${typeName.toUpperCase()} (#${containerId.toString().slice(-5)})`;
       } else {
-        resolvedLocationNames[containerId] = `Container (#${containerId.toString().slice(-5)})`;
+        resolvedLocationNames[containerId] = `CONTAINER (#${containerId.toString().slice(-5)})`;
       }
     }
   });
