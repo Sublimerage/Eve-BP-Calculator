@@ -228,30 +228,36 @@
 
   </section>
 
-  <!-- Dashboard Summary Bar -->
-  <section class="p-3 grid grid-cols-1 md:grid-cols-4 gap-3 bg-[#070b0f] relative z-10">
+  <!-- Dashboard Summary Bar (WITH SURPLUS RE-SALE CREDIT METRIC) -->
+  <section class="p-3 grid grid-cols-1 md:grid-cols-5 gap-3 bg-[#070b0f] relative z-10">
     <div class="bg-[#0d1922] border border-[#1e3348] p-3 rounded-lg shadow">
       <div class="text-[10px] text-slate-400 uppercase font-bold mono">Total Production Cost (Mat + Job Fees)</div>
-      <div id="summary-build-cost" class="text-xl font-bold text-cyan-400 mt-0.5 mono">0 ISK</div>
+      <div id="summary-build-cost" class="text-lg font-bold text-cyan-400 mt-0.5 mono">0 ISK</div>
       <div id="summary-runs-subtext" class="text-[10px] text-slate-500">Includes EIV Job Fees &amp; Input Taxes</div>
+    </div>
+
+    <div class="bg-[#0d1922] border border-amber-500/50 p-3 rounded-lg shadow">
+      <div class="text-[10px] text-amber-300 uppercase font-bold mono">Surplus Material Credit (Batch Leftovers)</div>
+      <div id="summary-surplus-credit" class="text-lg font-bold text-amber-300 mt-0.5 mono">0 ISK</div>
+      <div class="text-[10px] text-amber-400/80">Re-sale Value of Unused Batch Extra</div>
     </div>
 
     <div class="bg-[#0d1922] border border-[#1e3348] p-3 rounded-lg shadow">
       <div class="text-[10px] text-slate-400 uppercase font-bold mono">Net Output Revenue (After Taxes)</div>
-      <div id="summary-output-sell" class="text-xl font-bold text-amber-300 mt-0.5 mono">0 ISK</div>
+      <div id="summary-output-sell" class="text-lg font-bold text-amber-300 mt-0.5 mono">0 ISK</div>
       <div id="summary-output-buy" class="text-[10px] text-slate-400">Net Instant Buy: 0 ISK</div>
     </div>
 
     <div class="bg-[#0d1922] border border-[#1e3348] p-3 rounded-lg shadow">
       <div class="text-[10px] text-slate-400 uppercase font-bold mono">Net Profit (Sell Order Output)</div>
-      <div id="summary-profit-sell" class="text-xl font-bold text-green-400 mt-0.5 mono">0 ISK</div>
-      <div id="summary-roi-sell" class="text-[10px] text-green-400">Net ROI: 0%</div>
+      <div id="summary-profit-sell" class="text-lg font-bold text-green-400 mt-0.5 mono">0 ISK</div>
+      <div id="summary-roi-sell" class="text-[10px] text-green-400">Includes Surplus Credit</div>
     </div>
 
     <div class="bg-[#0d1922] border border-[#1e3348] p-3 rounded-lg shadow">
       <div class="text-[10px] text-slate-400 uppercase font-bold mono">Net Profit (Instant Buy Order Output)</div>
-      <div id="summary-profit-buy" class="text-xl font-bold text-green-400 mt-0.5 mono">0 ISK</div>
-      <div id="summary-roi-buy" class="text-[10px] text-green-400">Net ROI: 0%</div>
+      <div id="summary-profit-buy" class="text-lg font-bold text-green-400 mt-0.5 mono">0 ISK</div>
+      <div id="summary-roi-buy" class="text-[10px] text-green-400">Includes Surplus Credit</div>
     </div>
   </section>
 
