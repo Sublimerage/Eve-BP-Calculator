@@ -44,7 +44,7 @@
     </div>
   </header>
 
-  <!-- Toolbar Row 1: Primary Search, Build Actions, Smart Optimizers, Pricing Mode -->
+  <!-- Toolbar Row 1: Primary Search, Build Actions, Smart Optimizers, Pricing Strategy -->
   <section class="bg-[#0d1922] border-b border-[#1e3348] p-3 grid grid-cols-1 md:grid-cols-12 gap-3 text-xs relative z-50">
     
     <!-- Item Autocomplete Search Card -->
@@ -57,7 +57,7 @@
       </div>
     </div>
 
-    <!-- Tree Build / Buy Actions Card (LARGE & SEPARATED BUTTONS) -->
+    <!-- Tree Build / Buy Actions Card -->
     <div class="md:col-span-3 bg-[#0c1318] p-3 rounded-lg border border-[#1e3348] flex flex-col justify-between shadow-md">
       <label class="block text-green-400 font-bold uppercase tracking-wider text-[11px] mb-1.5 rajdhani">Sub-Component Build Mode</label>
       <div class="flex space-x-3">
@@ -70,7 +70,7 @@
       </div>
     </div>
 
-    <!-- SMART ORDER OPTIMIZERS CARD (NARROWER, REDESIGNED, EXPANDED INPUTS) -->
+    <!-- SMART ORDER OPTIMIZERS CARD -->
     <div class="md:col-span-3 bg-[#0c1318] p-3 rounded-lg border border-amber-500/60 shadow-lg flex flex-col justify-between space-y-2">
       <div class="flex justify-between items-center border-b border-[#1e3348] pb-1">
         <span class="text-amber-300 font-bold rajdhani text-xs tracking-wider flex items-center gap-1.5">
@@ -131,7 +131,7 @@
   <section class="bg-[#0c1318] border-b border-[#1e3348] p-3 flex flex-wrap items-center gap-3 text-xs relative z-40">
     
     <!-- System & Structure Panel -->
-    <div class="flex items-center space-x-2 bg-[#0d1922] p-2 rounded-lg border border-[#1e3348] shadow">
+    <div class="flex items-center space-x-2 bg-[#0d1922] p-2.5 rounded-lg border border-[#1e3348] shadow">
       <span class="text-cyan-400 text-[11px] font-bold uppercase rajdhani">System & Structure:</span>
       <div class="relative w-36">
         <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="Search System..." 
@@ -152,7 +152,7 @@
     </div>
 
     <!-- Tax Rates Panel -->
-    <div class="flex items-center space-x-3 bg-[#0d1922] p-2 rounded-lg border border-[#1e3348] text-xs mono shadow">
+    <div class="flex items-center space-x-3 bg-[#0d1922] p-2.5 rounded-lg border border-[#1e3348] text-xs mono shadow">
       <span class="text-amber-400 font-bold text-[11px] uppercase rajdhani">Taxes & Fees:</span>
       
       <div class="flex items-center space-x-1" title="Facility Structure Tax %">
@@ -180,37 +180,39 @@
       </div>
     </div>
 
-    <!-- Hangar Stock Deduction & Real-Time Location Filter Panel -->
-    <div class="flex items-center space-x-2.5 bg-[#0d1922] p-2 rounded-lg border border-[#1e3348] flex-1 max-w-2xl shadow">
-      <span class="text-cyan-400 text-[11px] font-bold uppercase rajdhani">Hangar Stock:</span>
-      
-      <select id="deduct-stock-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded-md p-1.5 text-cyan-300 font-bold text-xs outline-none">
-        <option value="true" selected>Deduct (ON)</option>
-        <option value="false">Off</option>
-      </select>
+    <!-- Hangar Stock Deduction & Real-Time Location / Container Filter Panel -->
+    <div class="flex flex-col bg-[#0d1922] p-2.5 rounded-lg border border-[#1e3348] flex-1 max-w-2xl shadow space-y-1.5">
+      <div class="flex items-center justify-between">
+        <span class="text-cyan-400 text-[11px] font-bold uppercase rajdhani">Hangar Stock &amp; Location Deduction:</span>
+        <span id="location-search-feedback" class="text-[10px] text-amber-300 font-mono font-bold hidden"></span>
+      </div>
 
-      <label class="flex items-center space-x-1.5 cursor-pointer text-[#c8d8e8] font-bold text-xs mono">
-        <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
-        <span>Personal</span>
-      </label>
+      <div class="flex flex-wrap items-center gap-2">
+        <select id="deduct-stock-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded-md p-1.5 text-cyan-300 font-bold text-xs outline-none">
+          <option value="true" selected>Deduct (ON)</option>
+          <option value="false">Off</option>
+        </select>
 
-      <label class="flex items-center space-x-1.5 cursor-pointer text-[#c8d8e8] font-bold text-xs mono">
-        <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
-        <span>Corp</span>
-      </label>
+        <label class="flex items-center space-x-1 cursor-pointer text-[#c8d8e8] font-bold text-xs mono">
+          <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
+          <span>Personal</span>
+        </label>
 
-      <!-- Search Station Box -->
-      <div class="flex items-center space-x-1 flex-1 min-w-[200px]">
-        <input type="text" id="location-filter-search" autocomplete="off" placeholder="Search station..." oninput="filterLocationDropdownOptions()" 
-          class="w-32 bg-[#070b0f] border border-[#1e3348] rounded-md p-1.5 text-slate-200 text-xs mono outline-none focus:border-cyan-500">
+        <label class="flex items-center space-x-1 cursor-pointer text-[#c8d8e8] font-bold text-xs mono">
+          <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
+          <span>Corp</span>
+        </label>
+
+        <!-- Search Station / Container Box -->
+        <input type="text" id="location-filter-search" autocomplete="off" placeholder="Search station / container..." oninput="filterLocationDropdownOptions()" 
+          class="w-36 bg-[#070b0f] border border-[#1e3348] rounded-md p-1.5 text-slate-200 text-xs mono outline-none focus:border-cyan-500">
+
+        <!-- Station & Container Dropdown -->
         <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded-md p-1.5 text-amber-300 font-bold text-xs outline-none truncate">
-          <option value="all" selected>All Locations (Combined)</option>
+          <option value="all" selected>All Locations (Combined Assets)</option>
           <option value="industry_system">Current System Only (JITA)</option>
         </select>
       </div>
-
-      <!-- Real-Time Location Search Feedback Badge -->
-      <span id="location-search-feedback" class="text-[10px] text-cyan-400 font-mono font-bold whitespace-nowrap hidden"></span>
     </div>
 
     <!-- Live System SCI Status Pill -->
@@ -254,7 +256,7 @@
   </section>
 
   <!-- Controls Navigation Hint Bar -->
-  <div class="bg-[#070b0f] border-t border-[#1e3348] px-6 py-1 text.5 mono text-slate-400 flex justify-between z-10 text-xs">
+  <div class="bg-[#070b0f] border-t border-[#1e3348] px-6 py-1 mono text-slate-400 flex justify-between z-10 text-xs">
     <span>💡 <b>Click Card:</b> Highlight Inputs &amp; Output | <b>Hover [EIV]:</b> View Estimated Item Value | <b>Press [F]:</b> Center Main Output Card</span>
     <span id="zoom-level-text">Zoom: 100%</span>
   </div>
