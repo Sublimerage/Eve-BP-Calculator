@@ -17,12 +17,16 @@ function isShipLocationFlag(flag) {
          f.includes('autofit');
 }
 
-// Helper to check if a type name indicates a ship hull rather than a container
-function isShipTypeName(typeName) {
+// Comprehensive check for Rookie Ships and all EVE ship hull types
+function isShipType(typeId, typeName) {
+  // Explicit Rookie Ship Type IDs
+  const rookieShipIds = new Set([601, 606, 608, 596, 33079, 33081, 33083, 33085]);
+  if (rookieShipIds.has(typeId)) return true;
+
   if (!typeName) return false;
   const t = typeName.toLowerCase();
 
-  // Explicit non-ship container keywords
+  // Known container keywords - if it matches these, it is a container and NOT a ship
   if (t.includes('container') || t.includes('canister') || t.includes('vault') || 
       t.includes('freight') || t.includes('plastic wrap') || t.includes('box') || 
       t.includes('crate') || t.includes('chest') || t.includes('audit log') ||
@@ -31,14 +35,15 @@ function isShipTypeName(typeName) {
     return false;
   }
 
-  // Ship hull / ship class keywords
+  // Common ship hull / class keywords including rookie ships
   return t.includes('frigate') || t.includes('destroyer') || t.includes('cruiser') ||
          t.includes('battlecruiser') || t.includes('battleship') || t.includes('dreadnought') ||
          t.includes('carrier') || t.includes('titan') || t.includes('corvette') ||
          t.includes('industrial') || t.includes('freighter') || t.includes('barge') ||
          t.includes('exhumer') || t.includes('shuttle') || t.includes('interdictor') ||
          t.includes('covert ops') || t.includes('logistics') || t.includes('ship') ||
-         t.includes('transport') || t.includes('barge');
+         t.includes('transport') || t.includes('ibis') || t.includes('reaper') ||
+         t.includes('velator') || t.includes('impairor') || t.includes('taipan');
 }
 
 // Strict ESI Adjusted Price Fetcher (STRICT CCP ADJUSTED_PRICE ONLY)
@@ -326,7 +331,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     }
 
-    // Map item_id -> asset record
+    // Map item_id -> asset
     const itemIdToAssetMap = {};
     rawAssetItems.forEach(ast => {
       if (ast.item_id) {
@@ -334,7 +339,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     });
 
-    // Trace asset hierarchy up to root station/structure and identify ALL actual containers (excluding ships)
+    // Trace asset hierarchy up to root station/structure and identify ALL actual containers (strictly excluding ships)
     const charContainerIds = [];
     const corpContainerIds = [];
 
@@ -350,9 +355,9 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
         const parentTypeObj = IDX[Object.keys(IDX).find(k => IDX[k].id === parentAsset.type_id)];
         const parentTypeName = parentTypeObj ? parentTypeObj.name : (window.EVE_ITEMS && window.EVE_ITEMS[parentAsset.type_id] ? window.EVE_ITEMS[parentAsset.type_id] : '');
 
-        // STRICT SHIP EXCLUSION: If parent or flag belongs to a ship, bypass it!
+        // STRICT SHIP EXCLUSION: Check both location flag AND parent type name
         const isShipSlot = isShipLocationFlag(ast.location_flag) || isShipLocationFlag(parentAsset.location_flag);
-        const isShip = isShipTypeName(parentTypeName);
+        const isShip = isShipType(parentAsset.type_id, parentTypeName);
 
         if (!isShipSlot && !isShip) {
           // Parent item is a non-ship holding sub-assets -> IT IS A CONTAINER!
@@ -558,7 +563,7 @@ function populateLocationDropdown() {
     <option value="industry_system" style="color: #38bdf8; background-color: #0c1318; font-weight: bold;">Current System Only (${currentSystemName})</option>
   `;
 
-  // Aggregate assets by root station/structure AND track containers
+  // Aggregate assets by root station/structure AND track actual containers
   const locCounts = {};
   rawAssetItems.forEach(item => {
     const locId = item.root_location_id || item.location_id;
@@ -619,7 +624,7 @@ function populateLocationDropdown() {
       containerOpt.value = `container_${cId}`;
       containerOpt.style.color = '#f8fafc';
       containerOpt.style.backgroundColor = '#070b0f';
-      containerOpt.textContent = `   └─ 📦 Container: ${cData.name} (${cData.count.toLocaleString()} items)`;
+      containerOpt.textContent = `  └─ 📦 Container: ${cData.name} (${cData.count.toLocaleString()} items)`;
       filterSelect.appendChild(containerOpt);
     }
   }
@@ -901,7 +906,7 @@ async function fetchMarketPrices(typeIds) {
               if (entry && (entry.sell || entry.buy)) {
                 priceCache[id] = {
                   sell: entry.sell ? parseFloat(entry.sell.min) || 0 : 0,
-                  buy: entry.buy ? parseFloat(entry.buy.max) || 0 : 0,
+                  buy: entry.buy ? parseFloat(entry.buy.max) || 0 : 0
                 };
                 foundPrices = true;
               }

@@ -227,6 +227,32 @@ async function selectItem(typeId, name, preserveView = false) {
   });
 }
 
+// Global Pooled Demand Collector (Aggregates required quantities across all tree branches)
+function collectGlobalDemand(node, demandMap = {}) {
+  if (!node) return demandMap;
+
+  const typeId = node.displayTypeId || node.typeId;
+  if (!demandMap[typeId]) {
+    demandMap[typeId] = {
+      typeId: typeId,
+      name: node.name,
+      totalQtyNeeded: 0,
+      isBuildingSelf: node.isBuildingSelf,
+      batchYield: node.batchYield || 1,
+      nodes: []
+    };
+  }
+
+  demandMap[typeId].totalQtyNeeded += node.qtyNeeded;
+  demandMap[typeId].nodes.push(node);
+
+  if (node.isBuildingSelf && node.children) {
+    node.children.forEach(child => collectGlobalDemand(child, demandMap));
+  }
+
+  return demandMap;
+}
+
 function recalculate() {
   if (!recipeTreeRoot) return;
 
@@ -264,6 +290,25 @@ function recalculate() {
   scaleTreeQuantities(recipeTreeRoot, facility);
   calculateNodeEIV(recipeTreeRoot);
 
+  // 1. Collect global pooled demand across all branches
+  const globalDemand = collectGlobalDemand(recipeTreeRoot);
+  let totalSurplusMaterialValue = 0;
+
+  // 2. Calculate surplus re-sale credit for batch leftovers across all manufacturing & reaction steps
+  Object.values(globalDemand).forEach(item => {
+    if (item.isBuildingSelf && item.batchYield > 1) {
+      const runs = Math.ceil(item.totalQtyNeeded / item.batchYield);
+      const totalProduced = runs * item.batchYield;
+      const netSurplusQty = totalProduced - item.totalQtyNeeded;
+
+      if (netSurplusQty > 0) {
+        const prices = priceCache[item.typeId] || { sell: 0, buy: 0 };
+        const unitPrice = prices.sell || prices.buy || getEIV(item.typeId) || 0;
+        totalSurplusMaterialValue += netSurplusQty * unitPrice;
+      }
+    }
+  });
+
   let rawMaterialCost = 0;
   if (recipeTreeRoot.isBuildingSelf && recipeTreeRoot.children && recipeTreeRoot.children.length > 0) {
     recipeTreeRoot.children.forEach(child => {
@@ -299,8 +344,9 @@ function recalculate() {
   const netSellRevenue = grossSellRevenue * (1 - salesTax - brokerFee);
   const netBuyRevenue = grossBuyRevenue * (1 - salesTax);
 
-  const profitSell = netSellRevenue - totalProductionCost;
-  const profitBuy = netBuyRevenue - totalProductionCost;
+  // Net Profit formula includes Surplus Re-sale Credit
+  const profitSell = netSellRevenue + totalSurplusMaterialValue - totalProductionCost;
+  const profitBuy = netBuyRevenue + totalSurplusMaterialValue - totalProductionCost;
   
   const roiSell = totalProductionCost > 0 ? ((profitSell / totalProductionCost) * 100).toFixed(1) : 0;
   const roiBuy = totalProductionCost > 0 ? ((profitBuy / totalProductionCost) * 100).toFixed(1) : 0;
@@ -311,6 +357,9 @@ function recalculate() {
   const summarySubtextEl = document.getElementById('summary-runs-subtext');
   if (summarySubtextEl) summarySubtextEl.textContent = `Mat: ${Math.round(effectiveMaterialCost).toLocaleString()} ISK + Job Fee: ${Math.round(totalJobFees).toLocaleString()} ISK`;
 
+  const summarySurplusEl = document.getElementById('summary-surplus-credit');
+  if (summarySurplusEl) summarySurplusEl.textContent = `+${Math.round(totalSurplusMaterialValue).toLocaleString()} ISK`;
+
   const summaryOutSellEl = document.getElementById('summary-output-sell');
   if (summaryOutSellEl) summaryOutSellEl.textContent = Math.round(netSellRevenue).toLocaleString() + ' ISK';
 
@@ -320,20 +369,20 @@ function recalculate() {
   const pSellEl = document.getElementById('summary-profit-sell');
   if (pSellEl) {
     pSellEl.textContent = Math.round(profitSell).toLocaleString() + ' ISK';
-    pSellEl.className = `text-xl font-bold mt-1 mono ${profitSell >= 0 ? 'text-green-400' : 'text-red-500'}`;
+    pSellEl.className = `text-lg font-bold mt-0.5 mono ${profitSell >= 0 ? 'text-green-400' : 'text-red-500'}`;
   }
 
   const roiSellEl = document.getElementById('summary-roi-sell');
-  if (roiSellEl) roiSellEl.textContent = `Net ROI: ${roiSell}%`;
+  if (roiSellEl) roiSellEl.textContent = `Net ROI: ${roiSell}% (Inc. Surplus)`;
 
   const pBuyEl = document.getElementById('summary-profit-buy');
   if (pBuyEl) {
     pBuyEl.textContent = Math.round(profitBuy).toLocaleString() + ' ISK';
-    pBuyEl.className = `text-xl font-bold mt-1 mono ${profitBuy >= 0 ? 'text-green-400' : 'text-red-500'}`;
+    pBuyEl.className = `text-lg font-bold mt-0.5 mono ${profitBuy >= 0 ? 'text-green-400' : 'text-red-500'}`;
   }
 
   const roiBuyEl = document.getElementById('summary-roi-buy');
-  if (roiBuyEl) roiBuyEl.textContent = `Net ROI: ${roiBuy}%`;
+  if (roiBuyEl) roiBuyEl.textContent = `Net ROI: ${roiBuy}% (Inc. Surplus)`;
 
   if (isolatedInstanceId) {
     const isoNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
