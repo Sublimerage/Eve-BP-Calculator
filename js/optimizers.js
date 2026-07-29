@@ -63,7 +63,7 @@ function resetSmartBuyModes() {
   recalculate();
 }
 
-// Optimizer 1: Component Spread Optimizer
+// Optimizer 1: Component Market Spread Threshold
 function applyComponentSpreadOptimizer() {
   const threshold = parseFloat(document.getElementById('buy-savings-threshold')?.value) || 0;
 
@@ -77,9 +77,9 @@ function applyComponentSpreadOptimizer() {
       if (prices.sell > 0 && prices.buy > 0 && prices.sell > prices.buy) {
         const spreadPct = ((prices.sell - prices.buy) / prices.sell) * 100;
         if (spreadPct >= threshold) {
-          customBuyModes[typeId] = 'buy';  // Worth placing a Buy Order!
+          customBuyModes[typeId] = 'buy';  // Market spread is large enough: place a Buy Order!
         } else {
-          customBuyModes[typeId] = 'sell'; // Spread too small, buy instant off Sell Orders!
+          customBuyModes[typeId] = 'sell'; // Market spread is small: buy instantly off Sell Orders!
         }
       } else {
         customBuyModes[typeId] = 'sell'; 
@@ -97,7 +97,7 @@ function applyComponentSpreadOptimizer() {
   }
 }
 
-// Optimizer 2: Budget Impact Optimizer
+// Optimizer 2: Build Cost Savings Impact Threshold
 function applyBudgetImpactOptimizer() {
   const threshold = parseFloat(document.getElementById('total-cost-savings-threshold')?.value) || 0;
 
@@ -121,9 +121,9 @@ function applyBudgetImpactOptimizer() {
         const budgetImpactPct = rootTotalCost > 0 ? ((sellTotal - buyTotal) / rootTotalCost) * 100 : 0;
 
         if (budgetImpactPct >= threshold) {
-          customBuyModes[typeId] = 'buy';  // Moves the needle on total budget!
+          customBuyModes[typeId] = 'buy';  // Saves enough on overall budget: place a Buy Order!
         } else {
-          customBuyModes[typeId] = 'sell'; // Minor impact, buy instant off Sell Orders!
+          customBuyModes[typeId] = 'sell'; // Minor impact on total budget: buy off Sell Orders!
         }
       } else {
         customBuyModes[typeId] = 'sell';

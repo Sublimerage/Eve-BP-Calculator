@@ -117,7 +117,8 @@ async function startEsiSSOLogin() {
   const challenge = base64urlEncode(hashed);
 
   const redirectUri = window.location.origin + window.location.pathname;
-  const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1';
+  // Added esi-universe.read_structures.v1 scope to authorize Upwell structure name lookups
+  const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1';
   const state = generateRandomString(16);
   sessionStorage.setItem('esi_auth_state', state);
 
@@ -240,6 +241,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
           data.forEach(ast => {
             if (ast.type_id && ast.quantity) {
               rawAssetItems.push({
+                item_id: ast.item_id,
                 type_id: ast.type_id,
                 quantity: ast.quantity,
                 location_id: ast.location_id,
@@ -270,6 +272,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
             data.forEach(ast => {
               if (ast.type_id && ast.quantity) {
                 rawAssetItems.push({
+                  item_id: ast.item_id,
                   type_id: ast.type_id,
                   quantity: ast.quantity,
                   location_id: ast.location_id,
@@ -287,6 +290,25 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     }
 
+    // Build hierarchy map (trace nested items/containers to root location)
+    const itemIdToLoc = {};
+    rawAssetItems.forEach(ast => {
+      if (ast.item_id) {
+        itemIdToLoc[ast.item_id] = ast.location_id;
+      }
+    });
+
+    rawAssetItems.forEach(ast => {
+      let currentLoc = ast.location_id;
+      let depth = 0;
+      while (itemIdToLoc[currentLoc] && depth < 10) {
+        currentLoc = itemIdToLoc[currentLoc];
+        depth++;
+      }
+      ast.root_location_id = currentLoc;
+      ast.location_id = currentLoc; // Standardize location_id to top-level station/structure
+    });
+
     await resolveAndPopulateLocationFilter(accessToken);
 
   } catch (err) {
@@ -300,7 +322,7 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
   if (uniqueLocIds.length > 0) {
     const missingIds = uniqueLocIds.filter(id => !resolvedLocationNames[id]);
 
-    // 1. Batch POST /universe/names/ for all unresolved location IDs
+    // 1. Batch POST /universe/names/ for standard IDs and stations
     if (missingIds.length > 0) {
       const chunks = [];
       for (let i = 0; i < missingIds.length; i += 500) {
@@ -327,7 +349,7 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
       }
     }
 
-    // 2. Resolve Upwell Structure IDs (> 1,000,000,000,000) not resolved by universe/names
+    // 2. Resolve Upwell Structure IDs (> 1,000,000,000,000) using authenticated structure endpoint
     const token = accessToken || localStorage.getItem('esi_access_token');
     const unresolvedStructureIds = uniqueLocIds.filter(id => id > 1000000000000 && !resolvedLocationNames[id]);
     
@@ -341,10 +363,24 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
           if (res.ok) {
             const structData = await res.json();
             if (structData && structData.name) {
-              resolvedLocationNames[structId] = structData.name.toUpperCase();
+              let sysName = systemNameCache[structData.solar_system_id] || '';
+              if (!sysName && structData.solar_system_id) {
+                // Fetch solar system name
+                try {
+                  const sysRes = await fetch(`https://esi.evetech.net/latest/universe/systems/${structData.solar_system_id}/?datasource=tranquility`);
+                  if (sysRes.ok) {
+                    const sysData = await sysRes.json();
+                    sysName = sysData.name.toUpperCase();
+                    systemNameCache[structData.solar_system_id] = sysName;
+                  }
+                } catch (e) {}
+              }
+
+              const fullName = structData.name.toUpperCase();
+              resolvedLocationNames[structId] = sysName ? `${fullName} (${sysName})` : fullName;
             }
           } else if (res.status === 403) {
-            resolvedLocationNames[structId] = `UPWELL STRUCTURE (${structId.toString().slice(-6)}) [NO ACL DOCK ACCESS]`;
+            resolvedLocationNames[structId] = `UPWELL STRUCTURE (${structId.toString().slice(-6)}) [PRIVATE/RESTRICTED]`;
           }
         } catch (e) {}
       }));

@@ -215,13 +215,13 @@ async function selectItem(typeId, name, preserveView = false) {
   const statusText = document.getElementById('status-text');
   const statusDot = document.getElementById('status-dot');
   if (statusText) statusText.textContent = 'TREE READY | UPDATING MARKET PRICES...';
-  if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-amber-400';
+  if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
 
   const allTypeIds = new Set();
   collectAllTypeIds(recipeTreeRoot, allTypeIds);
 
   fetchMarketPrices(Array.from(allTypeIds)).finally(() => {
-    if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-green-400';
+    if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
     if (statusText) statusText.textContent = 'RECIPES & PRICES LOADED';
     recalculate();
   });
@@ -979,10 +979,10 @@ function copyMultibuyText() {
     if (btn) {
       const orig = btn.textContent;
       btn.textContent = 'Copied!';
-      btn.className = 'px-3 py-1 bg-green-600 text-white font-bold text-xs rounded mono transition';
+      btn.className = 'px-3.5 py-1.5 bg-green-600 text-white font-bold text-xs rounded mono transition';
       setTimeout(() => {
         btn.textContent = orig;
-        btn.className = 'px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded mono transition';
+        btn.className = 'px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded mono transition shadow';
       }, 1500);
     }
   });
