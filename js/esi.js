@@ -188,10 +188,10 @@ function updateEsiUserUI(charName, charId) {
   const safeName = esc(charName);
   if (container) {
     container.innerHTML = `
-      <div class="flex items-center space-x-2 text-xs mono bg-[#0d1922] px-2.5 py-1 rounded border border-cyan-500/50 shadow">
+      <div class="flex items-center space-x-2 text-xs mono bg-[#0d1922] px-3 py-1.5 rounded-md border border-cyan-500/50 shadow">
         <img src="https://images.evetech.net/characters/${charId}/portrait?size=32" class="w-5 h-5 rounded-full border border-cyan-400">
         <span class="text-cyan-300 font-bold">${safeName}</span>
-        <button onclick="logoutEsiSSO()" class="text-slate-400 hover:text-red-400 font-bold ml-1" title="Log out ESI Character">✖</button>
+        <button onclick="logoutEsiSSO()" class="text-slate-400 hover:text-red-400 font-bold ml-1.5" title="Log out ESI Character">✖</button>
       </div>
     `;
   }
@@ -206,12 +206,13 @@ function logoutEsiSSO() {
   const container = document.getElementById('esi-login-container');
   if (container) {
     container.innerHTML = `
-      <button onclick="startEsiSSOLogin()" class="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded transition flex items-center gap-1.5 shadow" title="Login with EVE Online to import your character assets">
+      <button onclick="startEsiSSOLogin()" class="px-4 py-2 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-md transition flex items-center gap-2 shadow text-xs" title="Login with EVE Online to import your character assets">
         🔐 EVE SSO Login
       </button>
     `;
   }
   updateStockDisplayCount();
+  populateLocationDropdown();
   recalculate();
 }
 
@@ -287,7 +288,6 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
     }
 
     await resolveAndPopulateLocationFilter(accessToken);
-    applyStockLocationFilter();
 
   } catch (err) {
     console.warn('Assets fetch error:', err);
@@ -296,14 +296,15 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
 
 async function resolveAndPopulateLocationFilter(accessToken = null) {
   const uniqueLocIds = Array.from(new Set(rawAssetItems.map(a => a.location_id).filter(id => id && id !== 99999999)));
+  
   if (uniqueLocIds.length > 0) {
     const missingIds = uniqueLocIds.filter(id => !resolvedLocationNames[id]);
-    
-    const standardIds = missingIds.filter(id => id < 1000000000000);
-    if (standardIds.length > 0) {
+
+    // 1. Batch POST /universe/names/ for all unresolved location IDs
+    if (missingIds.length > 0) {
       const chunks = [];
-      for (let i = 0; i < standardIds.length; i += 500) {
-        chunks.push(standardIds.slice(i, i + 500));
+      for (let i = 0; i < missingIds.length; i += 500) {
+        chunks.push(missingIds.slice(i, i + 500));
       }
 
       for (const chunk of chunks) {
@@ -326,10 +327,12 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
       }
     }
 
+    // 2. Resolve Upwell Structure IDs (> 1,000,000,000,000) not resolved by universe/names
     const token = accessToken || localStorage.getItem('esi_access_token');
-    const structureIds = missingIds.filter(id => id > 1000000000000);
-    if (structureIds.length > 0 && token) {
-      for (const structId of structureIds) {
+    const unresolvedStructureIds = uniqueLocIds.filter(id => id > 1000000000000 && !resolvedLocationNames[id]);
+    
+    if (unresolvedStructureIds.length > 0 && token) {
+      await Promise.all(unresolvedStructureIds.map(async (structId) => {
         try {
           const res = await fetch(`https://esi.evetech.net/latest/universe/structures/${structId}/?datasource=tranquility`, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -340,12 +343,15 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
             if (structData && structData.name) {
               resolvedLocationNames[structId] = structData.name.toUpperCase();
             }
+          } else if (res.status === 403) {
+            resolvedLocationNames[structId] = `UPWELL STRUCTURE (${structId.toString().slice(-6)}) [NO ACL DOCK ACCESS]`;
           }
         } catch (e) {}
-      }
+      }));
     }
   }
 
+  // 3. Fallback assignments for remaining unmapped IDs
   rawAssetItems.forEach(item => {
     const id = item.location_id;
     if (!resolvedLocationNames[id]) {
@@ -354,18 +360,19 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
       } else if (systemNameCache[id]) {
         resolvedLocationNames[id] = systemNameCache[id];
       } else if (id >= 30000000 && id < 34000000) {
-        resolvedLocationNames[id] = `SYSTEM #${id}`;
+        resolvedLocationNames[id] = `SOLAR SYSTEM #${id}`;
       } else if (id >= 60000000 && id < 64000000) {
-        resolvedLocationNames[id] = `STATION #${id}`;
+        resolvedLocationNames[id] = `NPC STATION #${id}`;
       } else if (id > 1000000000000) {
-        resolvedLocationNames[id] = `UPWELL STRUCTURE #${id.toString().slice(-6)}`;
+        resolvedLocationNames[id] = `UPWELL STRUCTURE (${id.toString().slice(-6)})`;
       } else {
-        resolvedLocationNames[id] = `CONTAINER #${id}`;
+        resolvedLocationNames[id] = `CONTAINER / HANGAR #${id}`;
       }
     }
   });
 
   populateLocationDropdown();
+  applyStockLocationFilter();
 }
 
 function populateLocationDropdown() {
@@ -373,9 +380,10 @@ function populateLocationDropdown() {
   if (!filterSelect) return;
 
   const currentSystemName = (document.getElementById('system-search')?.value || 'JITA').toUpperCase();
+  const currentValue = filterSelect.value || 'all';
 
   filterSelect.innerHTML = `
-    <option value="all" selected>All Locations (Combined)</option>
+    <option value="all">All Locations (Combined Assets)</option>
     <option value="industry_system">Current System Only (${currentSystemName})</option>
   `;
 
@@ -383,10 +391,13 @@ function populateLocationDropdown() {
   rawAssetItems.forEach(item => {
     const locId = item.location_id;
     const locName = resolvedLocationNames[locId] || `Location #${locId}`;
-    locCounts[locId] = {
-      name: locName,
-      count: (locCounts[locId]?.count || 0) + item.quantity
-    };
+    if (!locCounts[locId]) {
+      locCounts[locId] = {
+        name: locName,
+        count: 0
+      };
+    }
+    locCounts[locId].count += item.quantity;
   });
 
   for (const [locId, data] of Object.entries(locCounts)) {
@@ -395,25 +406,45 @@ function populateLocationDropdown() {
     opt.textContent = `${data.name} (${data.count.toLocaleString()} items)`;
     filterSelect.appendChild(opt);
   }
+
+  if (filterSelect.querySelector(`option[value="${currentValue}"]`)) {
+    filterSelect.value = currentValue;
+  } else {
+    filterSelect.value = 'all';
+  }
 }
 
 function filterLocationDropdownOptions() {
   const query = (document.getElementById('location-filter-search')?.value || '').trim().toUpperCase();
   const filterSelect = document.getElementById('stock-location-filter');
+  const feedbackBadge = document.getElementById('location-search-feedback');
   if (!filterSelect) return;
 
   const options = filterSelect.querySelectorAll('option');
+  let visibleCount = 0;
+
   options.forEach(opt => {
     if (opt.value === 'all' || opt.value === 'industry_system') {
       opt.style.display = '';
     } else {
       if (!query || opt.textContent.toUpperCase().includes(query)) {
         opt.style.display = '';
+        visibleCount++;
       } else {
         opt.style.display = 'none';
       }
     }
   });
+
+  if (feedbackBadge) {
+    if (query) {
+      feedbackBadge.textContent = `Found: ${visibleCount} location(s)`;
+      feedbackBadge.classList.remove('hidden');
+    } else {
+      feedbackBadge.textContent = '';
+      feedbackBadge.classList.add('hidden');
+    }
+  }
 }
 
 function updateStockDisplayCount() {
