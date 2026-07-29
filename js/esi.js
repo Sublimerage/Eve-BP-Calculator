@@ -17,14 +17,28 @@ function isShipLocationFlag(flag) {
          f.includes('autofit');
 }
 
-// Helper to check if an item type name indicates an actual container (and NOT a ship)
-function isActualContainerType(typeName) {
+// Helper to check if a type name indicates a ship hull rather than a container
+function isShipTypeName(typeName) {
   if (!typeName) return false;
   const t = typeName.toLowerCase();
-  return t.includes('container') || t.includes('canister') || t.includes('vault') || 
-         t.includes('freight') || t.includes('plastic wrap') || t.includes('box') || 
-         t.includes('crate') || t.includes('chest') || t.includes('audit log') ||
-         t.includes('hangar');
+
+  // Explicit non-ship container keywords
+  if (t.includes('container') || t.includes('canister') || t.includes('vault') || 
+      t.includes('freight') || t.includes('plastic wrap') || t.includes('box') || 
+      t.includes('crate') || t.includes('chest') || t.includes('audit log') ||
+      t.includes('array') || t.includes('depot') || t.includes('silo') ||
+      t.includes('compressor') || t.includes('assembly') || t.includes('structure')) {
+    return false;
+  }
+
+  // Ship hull / ship class keywords
+  return t.includes('frigate') || t.includes('destroyer') || t.includes('cruiser') ||
+         t.includes('battlecruiser') || t.includes('battleship') || t.includes('dreadnought') ||
+         t.includes('carrier') || t.includes('titan') || t.includes('corvette') ||
+         t.includes('industrial') || t.includes('freighter') || t.includes('barge') ||
+         t.includes('exhumer') || t.includes('shuttle') || t.includes('interdictor') ||
+         t.includes('covert ops') || t.includes('logistics') || t.includes('ship') ||
+         t.includes('transport') || t.includes('barge');
 }
 
 // Strict ESI Adjusted Price Fetcher (STRICT CCP ADJUSTED_PRICE ONLY)
@@ -312,7 +326,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     }
 
-    // Map item_id -> asset
+    // Map item_id -> asset record
     const itemIdToAssetMap = {};
     rawAssetItems.forEach(ast => {
       if (ast.item_id) {
@@ -320,7 +334,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     });
 
-    // Trace asset hierarchy up to root station/structure and identify ACTUAL containers (strictly excluding ships)
+    // Trace asset hierarchy up to root station/structure and identify ALL actual containers (excluding ships)
     const charContainerIds = [];
     const corpContainerIds = [];
 
@@ -337,10 +351,11 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
         const parentTypeName = parentTypeObj ? parentTypeObj.name : (window.EVE_ITEMS && window.EVE_ITEMS[parentAsset.type_id] ? window.EVE_ITEMS[parentAsset.type_id] : '');
 
         // STRICT SHIP EXCLUSION: If parent or flag belongs to a ship, bypass it!
-        const isParentShipSlot = isShipLocationFlag(ast.location_flag) || isShipLocationFlag(parentAsset.location_flag);
-        const isContainerType = isActualContainerType(parentTypeName);
+        const isShipSlot = isShipLocationFlag(ast.location_flag) || isShipLocationFlag(parentAsset.location_flag);
+        const isShip = isShipTypeName(parentTypeName);
 
-        if (!isParentShipSlot && isContainerType) {
+        if (!isShipSlot && !isShip) {
+          // Parent item is a non-ship holding sub-assets -> IT IS A CONTAINER!
           if (!containerId) {
             containerId = currentLoc;
             if (ast.owner_type === 'char' && !charContainerIds.includes(containerId)) {
@@ -539,11 +554,11 @@ function populateLocationDropdown() {
   const currentValue = filterSelect.value || 'all';
 
   filterSelect.innerHTML = `
-    <option value="all">All Locations (Combined Assets)</option>
-    <option value="industry_system">Current System Only (${currentSystemName})</option>
+    <option value="all" style="color: #38bdf8; background-color: #0c1318; font-weight: bold;">All Locations (Combined Assets)</option>
+    <option value="industry_system" style="color: #38bdf8; background-color: #0c1318; font-weight: bold;">Current System Only (${currentSystemName})</option>
   `;
 
-  // Aggregate assets by root station/structure AND track actual containers
+  // Aggregate assets by root station/structure AND track containers
   const locCounts = {};
   rawAssetItems.forEach(item => {
     const locId = item.root_location_id || item.location_id;
@@ -571,18 +586,40 @@ function populateLocationDropdown() {
     }
   });
 
-  // Render top-level station options + indented container sub-options
+  // Render COLOR-CODED location options:
+  // 🟩 NPC Stations = Green (#4caf6f)
+  // 🟧 Player Structures = Orange (#f97316)
+  // 📦 Containers = White (#f8fafc)
   for (const [locId, data] of Object.entries(locCounts)) {
     const mainOpt = document.createElement('option');
     mainOpt.value = `loc_${locId}`;
-    mainOpt.textContent = `${data.name} (${data.count.toLocaleString()} items)`;
+    
+    const numericLocId = parseInt(locId);
+    const isUpwellStructure = numericLocId > 1000000000000;
+
+    if (isUpwellStructure) {
+      // Player Station / Upwell Structure = ORANGE
+      mainOpt.style.color = '#f97316';
+      mainOpt.style.backgroundColor = '#0c1318';
+      mainOpt.style.fontWeight = 'bold';
+      mainOpt.textContent = `🟧 ${data.name} (${data.count.toLocaleString()} items)`;
+    } else {
+      // NPC Station = GREEN
+      mainOpt.style.color = '#4caf6f';
+      mainOpt.style.backgroundColor = '#0c1318';
+      mainOpt.style.fontWeight = 'bold';
+      mainOpt.textContent = `🟩 ${data.name} (${data.count.toLocaleString()} items)`;
+    }
+
     filterSelect.appendChild(mainOpt);
 
-    // Render container sub-objects under this station with custom names
+    // Render container sub-objects under this station in WHITE
     for (const [cId, cData] of Object.entries(data.containers)) {
       const containerOpt = document.createElement('option');
       containerOpt.value = `container_${cId}`;
-      containerOpt.textContent = `  └─ Container: ${cData.name} (${cData.count.toLocaleString()} items)`;
+      containerOpt.style.color = '#f8fafc';
+      containerOpt.style.backgroundColor = '#070b0f';
+      containerOpt.textContent = `   └─ 📦 Container: ${cData.name} (${cData.count.toLocaleString()} items)`;
       filterSelect.appendChild(containerOpt);
     }
   }
@@ -864,7 +901,7 @@ async function fetchMarketPrices(typeIds) {
               if (entry && (entry.sell || entry.buy)) {
                 priceCache[id] = {
                   sell: entry.sell ? parseFloat(entry.sell.min) || 0 : 0,
-                  buy: entry.buy ? parseFloat(entry.buy.max) || 0 : 0
+                  buy: entry.buy ? parseFloat(entry.buy.max) || 0 : 0,
                 };
                 foundPrices = true;
               }
