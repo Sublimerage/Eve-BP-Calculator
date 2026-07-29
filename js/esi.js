@@ -117,7 +117,7 @@ async function startEsiSSOLogin() {
   const challenge = base64urlEncode(hashed);
 
   const redirectUri = window.location.origin + window.location.pathname;
-  // Added esi-universe.read_structures.v1 scope to authorize Upwell structure name lookups
+  // Includes structure scope for Upwell structure name resolution
   const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1';
   const state = generateRandomString(16);
   sessionStorage.setItem('esi_auth_state', state);
@@ -290,23 +290,30 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     }
 
-    // Build hierarchy map (trace nested items/containers to root location)
-    const itemIdToLoc = {};
+    // Build item_id -> item asset map for container & hierarchy resolution
+    const itemIdToAssetMap = {};
     rawAssetItems.forEach(ast => {
       if (ast.item_id) {
-        itemIdToLoc[ast.item_id] = ast.location_id;
+        itemIdToAssetMap[ast.item_id] = ast;
       }
     });
 
+    // Trace asset hierarchy up to root station/structure and identify containers
     rawAssetItems.forEach(ast => {
       let currentLoc = ast.location_id;
       let depth = 0;
-      while (itemIdToLoc[currentLoc] && depth < 10) {
-        currentLoc = itemIdToLoc[currentLoc];
+      let containerId = null;
+
+      while (itemIdToAssetMap[currentLoc] && depth < 10) {
+        if (!containerId) {
+          containerId = currentLoc; // First parent asset is the immediate container
+        }
+        currentLoc = itemIdToAssetMap[currentLoc].location_id;
         depth++;
       }
+
       ast.root_location_id = currentLoc;
-      ast.location_id = currentLoc; // Standardize location_id to top-level station/structure
+      ast.container_id = containerId;
     });
 
     await resolveAndPopulateLocationFilter(accessToken);
@@ -317,16 +324,21 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
 }
 
 async function resolveAndPopulateLocationFilter(accessToken = null) {
-  const uniqueLocIds = Array.from(new Set(rawAssetItems.map(a => a.location_id).filter(id => id && id !== 99999999)));
-  
-  if (uniqueLocIds.length > 0) {
-    const missingIds = uniqueLocIds.filter(id => !resolvedLocationNames[id]);
+  // Collect all unique top-level location IDs and container item IDs
+  const uniqueRootLocIds = Array.from(new Set(rawAssetItems.map(a => a.root_location_id || a.location_id).filter(id => id && id !== 99999999)));
+  const uniqueContainerIds = Array.from(new Set(rawAssetItems.map(a => a.container_id).filter(id => id)));
 
-    // 1. Batch POST /universe/names/ for standard IDs and stations
-    if (missingIds.length > 0) {
+  if (uniqueRootLocIds.length > 0) {
+    const missingRootIds = uniqueRootLocIds.filter(id => !resolvedLocationNames[id]);
+
+    // 1. CRITICAL FIX: Only POST standard universe IDs (< 1,000,000,000) to /universe/names/
+    // Passing structure IDs (> 10^12) causes /universe/names/ to reject the ENTIRE batch with 404!
+    const standardUniverseIds = missingRootIds.filter(id => id < 1000000000);
+
+    if (standardUniverseIds.length > 0) {
       const chunks = [];
-      for (let i = 0; i < missingIds.length; i += 500) {
-        chunks.push(missingIds.slice(i, i + 500));
+      for (let i = 0; i < standardUniverseIds.length; i += 500) {
+        chunks.push(standardUniverseIds.slice(i, i + 500));
       }
 
       for (const chunk of chunks) {
@@ -351,7 +363,7 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
 
     // 2. Resolve Upwell Structure IDs (> 1,000,000,000,000) using authenticated structure endpoint
     const token = accessToken || localStorage.getItem('esi_access_token');
-    const unresolvedStructureIds = uniqueLocIds.filter(id => id > 1000000000000 && !resolvedLocationNames[id]);
+    const unresolvedStructureIds = uniqueRootLocIds.filter(id => id > 1000000000000 && !resolvedLocationNames[id]);
     
     if (unresolvedStructureIds.length > 0 && token) {
       await Promise.all(unresolvedStructureIds.map(async (structId) => {
@@ -365,7 +377,6 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
             if (structData && structData.name) {
               let sysName = systemNameCache[structData.solar_system_id] || '';
               if (!sysName && structData.solar_system_id) {
-                // Fetch solar system name
                 try {
                   const sysRes = await fetch(`https://esi.evetech.net/latest/universe/systems/${structData.solar_system_id}/?datasource=tranquility`);
                   if (sysRes.ok) {
@@ -380,16 +391,16 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
               resolvedLocationNames[structId] = sysName ? `${fullName} (${sysName})` : fullName;
             }
           } else if (res.status === 403) {
-            resolvedLocationNames[structId] = `UPWELL STRUCTURE (${structId.toString().slice(-6)}) [PRIVATE/RESTRICTED]`;
+            resolvedLocationNames[structId] = `UPWELL STRUCTURE (${structId.toString().slice(-6)}) [NO ACL DOCK ACCESS]`;
           }
         } catch (e) {}
       }));
     }
   }
 
-  // 3. Fallback assignments for remaining unmapped IDs
+  // 3. Fallback name assignments for unmapped station / structure IDs
   rawAssetItems.forEach(item => {
-    const id = item.location_id;
+    const id = item.root_location_id || item.location_id;
     if (!resolvedLocationNames[id]) {
       if (id === 99999999) {
         resolvedLocationNames[id] = 'CLIPBOARD / MANUAL IMPORT';
@@ -403,6 +414,20 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
         resolvedLocationNames[id] = `UPWELL STRUCTURE (${id.toString().slice(-6)})`;
       } else {
         resolvedLocationNames[id] = `CONTAINER / HANGAR #${id}`;
+      }
+    }
+  });
+
+  // 4. Resolve container item names based on inventory type
+  uniqueContainerIds.forEach(containerId => {
+    if (!resolvedLocationNames[containerId]) {
+      const containerItem = rawAssetItems.find(a => a.item_id === containerId);
+      if (containerItem) {
+        const typeObj = IDX[Object.keys(IDX).find(k => IDX[k].id === containerItem.type_id)];
+        const typeName = typeObj ? typeObj.name : (window.EVE_ITEMS && window.EVE_ITEMS[containerItem.type_id] ? window.EVE_ITEMS[containerItem.type_id] : 'Container');
+        resolvedLocationNames[containerId] = `${typeName} (#${containerId.toString().slice(-5)})`;
+      } else {
+        resolvedLocationNames[containerId] = `Container (#${containerId.toString().slice(-5)})`;
       }
     }
   });
@@ -423,24 +448,48 @@ function populateLocationDropdown() {
     <option value="industry_system">Current System Only (${currentSystemName})</option>
   `;
 
+  // Aggregate assets by root station/structure AND track containers
   const locCounts = {};
   rawAssetItems.forEach(item => {
-    const locId = item.location_id;
+    const locId = item.root_location_id || item.location_id;
     const locName = resolvedLocationNames[locId] || `Location #${locId}`;
+
     if (!locCounts[locId]) {
       locCounts[locId] = {
         name: locName,
-        count: 0
+        count: 0,
+        containers: {}
       };
     }
     locCounts[locId].count += item.quantity;
+
+    if (item.container_id) {
+      const cId = item.container_id;
+      const cName = resolvedLocationNames[cId] || `Container #${cId}`;
+      if (!locCounts[locId].containers[cId]) {
+        locCounts[locId].containers[cId] = {
+          name: cName,
+          count: 0
+        };
+      }
+      locCounts[locId].containers[cId].count += item.quantity;
+    }
   });
 
+  // Render top-level station options + indented container sub-options
   for (const [locId, data] of Object.entries(locCounts)) {
-    const opt = document.createElement('option');
-    opt.value = `loc_${locId}`;
-    opt.textContent = `${data.name} (${data.count.toLocaleString()} items)`;
-    filterSelect.appendChild(opt);
+    const mainOpt = document.createElement('option');
+    mainOpt.value = `loc_${locId}`;
+    mainOpt.textContent = `${data.name} (${data.count.toLocaleString()} items)`;
+    filterSelect.appendChild(mainOpt);
+
+    // Render container sub-objects under this station
+    for (const [cId, cData] of Object.entries(data.containers)) {
+      const containerOpt = document.createElement('option');
+      containerOpt.value = `container_${cId}`;
+      containerOpt.textContent = `  └─ Container: ${cData.name} (${cData.count.toLocaleString()} items)`;
+      filterSelect.appendChild(containerOpt);
+    }
   }
 
   if (filterSelect.querySelector(`option[value="${currentValue}"]`)) {
@@ -474,7 +523,7 @@ function filterLocationDropdownOptions() {
 
   if (feedbackBadge) {
     if (query) {
-      feedbackBadge.textContent = `Found: ${visibleCount} location(s)`;
+      feedbackBadge.textContent = `Found: ${visibleCount} location(s) / container(s)`;
       feedbackBadge.classList.remove('hidden');
     } else {
       feedbackBadge.textContent = '';
@@ -504,7 +553,8 @@ function applyStockLocationFilter() {
     if (item.owner_type === 'corp' && !useCorp) return;
 
     let include = false;
-    const itemLocName = resolvedLocationNames[item.location_id] || '';
+    const rootLocId = item.root_location_id || item.location_id;
+    const itemLocName = resolvedLocationNames[rootLocId] || '';
 
     if (filterVal === 'all') {
       include = true;
@@ -512,7 +562,10 @@ function applyStockLocationFilter() {
       include = itemLocName.includes(activeSystemName);
     } else if (filterVal.startsWith('loc_')) {
       const targetLocId = parseInt(filterVal.replace('loc_', ''));
-      include = item.location_id === targetLocId;
+      include = rootLocId === targetLocId;
+    } else if (filterVal.startsWith('container_')) {
+      const targetContainerId = parseInt(filterVal.replace('container_', ''));
+      include = item.container_id === targetContainerId;
     }
 
     if (include) {
@@ -596,6 +649,7 @@ function processPastedStock() {
           type_id: matchedItem.id,
           quantity: qtyCandidate,
           location_id: 99999999,
+          root_location_id: 99999999,
           owner_type: 'char'
         });
       }
