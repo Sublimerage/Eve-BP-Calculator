@@ -150,7 +150,7 @@
   </header>
 
   <!-- Main Controls Panel -->
-  <section class="bg-[#0d1922] border-b border-[#1e3348] p-4 grid grid-cols-1 md:grid-cols-10 gap-3 text-xs relative z-50">
+  <section class="bg-[#0d1922] border-b border-[#1e3348] p-4 grid grid-cols-1 md:grid-cols-11 gap-3 text-xs relative z-50">
     
     <!-- Item Autocomplete Search -->
     <div class="md:col-span-2 relative z-50">
@@ -198,6 +198,17 @@
       </select>
     </div>
 
+    <!-- Stock Location Filter -->
+    <div class="md:col-span-2">
+      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">Stock Location Filter</label>
+      <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-2 text-amber-300 font-bold focus:border-cyan-500 outline-none truncate">
+        <option value="all" selected>All Locations (Char + Corp)</option>
+        <option value="industry_system">Current System Only (JITA)</option>
+        <option value="char_only">Character Assets Only</option>
+        <option value="corp_only">Corporation Assets Only</option>
+      </select>
+    </div>
+
     <!-- Target Quantity vs Runs Toggle -->
     <div>
       <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">Input Mode</label>
@@ -220,6 +231,16 @@
       <select id="include-reactions" onchange="onDepthOrCategoryChange()" class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-2 text-purple-300 font-bold focus:border-cyan-500 outline-none">
         <option value="true" selected>Decompose (ON)</option>
         <option value="false">Buy Reaction (OFF)</option>
+      </select>
+    </div>
+
+    <!-- Facility Bonus -->
+    <div>
+      <label class="block text-slate-400 mb-1 font-semibold uppercase tracking-wider">Facility Type</label>
+      <select id="facility-select" onchange="recalculate()" class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-2 text-white focus:border-cyan-500 outline-none">
+        <option value="0.0">NPC Station (0% Bonus)</option>
+        <option value="0.01">Raitaru / Azbel (1% Bonus)</option>
+        <option value="0.01" selected>Sotiyo (1% Bonus)</option>
       </select>
     </div>
 
@@ -578,8 +599,10 @@
     let blueprintCache = {};        
     let priceCache = {};            
     let eivCache = {};              
-    let userStockMap = {};          // { typeId: quantity }
+    let rawAssetItems = [];         // Raw ESI / Pasted asset records [{ type_id, qty, location_id, ownerType }]
+    let userStockMap = {};          // Filtered { typeId: quantity }
     let systemNameCache = {};       
+    let resolvedLocationNames = {}; // { location_id: name }
 
     // Cherry-pick Overrides State
     let buildSelfOverrides = {};    
@@ -731,7 +754,7 @@
       }
     }
 
-    // --- EVE ESI SSO LOGIN & ASSET IMPORT ENGINE (PKCE FLOW) ---
+    // --- EVE ESI SSO LOGIN & CHARACTER + CORP ASSETS ENGINE ---
     function generateRandomString(length) {
       const array = new Uint8Array(length);
       window.crypto.getRandomValues(array);
@@ -769,7 +792,7 @@
       const challenge = base64urlEncode(hashed);
 
       const redirectUri = window.location.origin + window.location.pathname;
-      const scope = 'esi-assets.read_assets.v1';
+      const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1';
       const state = generateRandomString(16);
       sessionStorage.setItem('esi_auth_state', state);
 
@@ -788,7 +811,7 @@
         const token = localStorage.getItem('esi_access_token');
         if (charName && charId && token) {
           updateEsiUserUI(charName, charId);
-          fetchUserAssets(charId, token);
+          fetchUserAndCorpAssets(charId, token);
         }
         return;
       }
@@ -830,7 +853,7 @@
           localStorage.setItem('esi_char_name', charName);
 
           updateEsiUserUI(charName, charId);
-          await fetchUserAssets(charId, accessToken);
+          await fetchUserAndCorpAssets(charId, accessToken);
         }
       } catch (err) {
         console.error('ESI SSO Token Error:', err);
@@ -852,6 +875,7 @@
       localStorage.removeItem('esi_access_token');
       localStorage.removeItem('esi_char_id');
       localStorage.removeItem('esi_char_name');
+      rawAssetItems = [];
       userStockMap = {};
       document.getElementById('esi-login-container').innerHTML = `
         <button onclick="startEsiSSOLogin()" class="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded transition flex items-center gap-1.5 shadow" title="Login with EVE Online to import your character assets">
@@ -862,12 +886,22 @@
       recalculate();
     }
 
-    async function fetchUserAssets(charId, accessToken) {
+    // Fetch Both Personal Character Assets & Corporation Hangar Assets
+    async function fetchUserAndCorpAssets(charId, accessToken) {
       try {
-        let page = 1;
-        let allAssets = [];
-        let hasMore = true;
+        rawAssetItems = [];
 
+        // 1. Fetch Character Public Info to get Corporation ID
+        let corpId = null;
+        const charRes = await fetch(`https://esi.evetech.net/latest/characters/${charId}/?datasource=tranquility`);
+        if (charRes.ok) {
+          const charData = await charRes.json();
+          corpId = charData.corporation_id;
+        }
+
+        // 2. Fetch Character Personal Assets
+        let page = 1;
+        let hasMore = true;
         while (hasMore) {
           const res = await fetch(`https://esi.evetech.net/latest/characters/${charId}/assets/?datasource=tranquility&page=${page}`, {
             headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -876,7 +910,16 @@
           if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data) && data.length > 0) {
-              allAssets = allAssets.concat(data);
+              data.forEach(ast => {
+                if (ast.type_id && ast.quantity) {
+                  rawAssetItems.push({
+                    type_id: ast.type_id,
+                    quantity: ast.quantity,
+                    location_id: ast.location_id,
+                    owner_type: 'char'
+                  });
+                }
+              });
               page++;
             } else {
               hasMore = false;
@@ -886,18 +929,142 @@
           }
         }
 
-        userStockMap = {};
-        allAssets.forEach(ast => {
-          if (ast.quantity && ast.type_id) {
-            userStockMap[ast.type_id] = (userStockMap[ast.type_id] || 0) + ast.quantity;
-          }
-        });
+        // 3. Fetch Corporation Assets (If Corp ID exists and player has Corp Director/Accountant roles)
+        if (corpId) {
+          page = 1;
+          hasMore = true;
+          while (hasMore) {
+            const res = await fetch(`https://esi.evetech.net/latest/corporations/${corpId}/assets/?datasource=tranquility&page=${page}`, {
+              headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
 
-        updateStockDisplayCount();
-        recalculate();
+            if (res.ok) {
+              const data = await res.json();
+              if (Array.isArray(data) && data.length > 0) {
+                data.forEach(ast => {
+                  if (ast.type_id && ast.quantity) {
+                    rawAssetItems.push({
+                      type_id: ast.type_id,
+                      quantity: ast.quantity,
+                      location_id: ast.location_id,
+                      owner_type: 'corp'
+                    });
+                  }
+                });
+                page++;
+              } else {
+                hasMore = false;
+              }
+            } else {
+              hasMore = false; // 403 Forbidden or no permissions
+            }
+          }
+        }
+
+        // 4. Resolve Location Names and Populate Location Dropdown
+        await resolveAndPopulateLocationFilter();
+        applyStockLocationFilter();
+
       } catch (err) {
         console.warn('Assets fetch error:', err);
       }
+    }
+
+    // Resolve Location IDs to Names using ESI Universe Names
+    async function resolveAndPopulateLocationFilter() {
+      const uniqueLocIds = Array.from(new Set(rawAssetItems.map(a => a.location_id).filter(id => id)));
+      if (uniqueLocIds.length > 0) {
+        const missingIds = uniqueLocIds.filter(id => !resolvedLocationNames[id]);
+        if (missingIds.length > 0) {
+          const chunks = [];
+          for (let i = 0; i < missingIds.length; i += 500) {
+            chunks.push(missingIds.slice(i, i + 500));
+          }
+
+          for (const chunk of chunks) {
+            try {
+              const res = await fetch('https://esi.evetech.net/latest/universe/names/?datasource=tranquility', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(chunk)
+              });
+
+              if (res.ok) {
+                const nameData = await res.json();
+                if (Array.isArray(nameData)) {
+                  nameData.forEach(item => {
+                    resolvedLocationNames[item.id] = item.name.toUpperCase();
+                  });
+                }
+              }
+            } catch (e) {
+              // Ignore
+            }
+          }
+        }
+      }
+
+      // Populate #stock-location-filter dropdown options
+      const filterSelect = document.getElementById('stock-location-filter');
+      const currentSystemName = (document.getElementById('system-search')?.value || 'JITA').toUpperCase();
+
+      filterSelect.innerHTML = `
+        <option value="all" selected>All Locations (Char + Corp)</option>
+        <option value="industry_system">Current System Only (${currentSystemName})</option>
+        <option value="char_only">Character Assets Only</option>
+        <option value="corp_only">Corporation Assets Only</option>
+      `;
+
+      // Build specific location options
+      const locCounts = {};
+      rawAssetItems.forEach(item => {
+        const locId = item.location_id;
+        const locName = resolvedLocationNames[locId] || (systemNameCache[locId] ? systemNameCache[locId] : `Location #${locId}`);
+        locCounts[locId] = {
+          name: locName,
+          count: (locCounts[locId]?.count || 0) + item.quantity
+        };
+      });
+
+      for (const [locId, data] of Object.entries(locCounts)) {
+        const opt = document.createElement('option');
+        opt.value = `loc_${locId}`;
+        opt.textContent = `${data.name} (${data.count.toLocaleString()} items)`;
+        filterSelect.appendChild(opt);
+      }
+    }
+
+    // Apply Location Filter to userStockMap
+    function applyStockLocationFilter() {
+      const filterVal = document.getElementById('stock-location-filter')?.value || 'all';
+      const activeSystemName = (document.getElementById('system-search')?.value || 'JITA').toUpperCase();
+
+      userStockMap = {};
+
+      rawAssetItems.forEach(item => {
+        let include = false;
+        const itemLocName = resolvedLocationNames[item.location_id] || systemNameCache[item.location_id] || '';
+
+        if (filterVal === 'all') {
+          include = true;
+        } else if (filterVal === 'char_only') {
+          include = item.owner_type === 'char';
+        } else if (filterVal === 'corp_only') {
+          include = item.owner_type === 'corp';
+        } else if (filterVal === 'industry_system') {
+          include = itemLocName.includes(activeSystemName);
+        } else if (filterVal.startsWith('loc_')) {
+          const targetLocId = parseInt(filterVal.replace('loc_', ''));
+          include = item.location_id === targetLocId;
+        }
+
+        if (include) {
+          userStockMap[item.type_id] = (userStockMap[item.type_id] || 0) + item.quantity;
+        }
+      });
+
+      updateStockDisplayCount();
+      recalculate();
     }
 
     // --- CLIPBOARD INVENTORY IMPORT ENGINE ---
@@ -931,19 +1098,26 @@
             if (IDX[name]) matchedId = IDX[name].id;
 
             if (matchedId) {
-              userStockMap[matchedId] = (userStockMap[matchedId] || 0) + qty;
+              rawAssetItems.push({
+                type_id: matchedId,
+                quantity: qty,
+                location_id: 99999999,
+                owner_type: 'clipboard'
+              });
+              resolvedLocationNames[99999999] = 'Clipboard / Manual Import';
               addedCount++;
             }
           }
         }
       });
 
-      updateStockDisplayCount();
+      resolveAndPopulateLocationFilter();
+      applyStockLocationFilter();
       closePasteModal();
-      recalculate();
     }
 
     function clearUserStock() {
+      rawAssetItems = [];
       userStockMap = {};
       document.getElementById('paste-stock-input').value = '';
       updateStockDisplayCount();
