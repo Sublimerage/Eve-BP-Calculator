@@ -1,8 +1,5 @@
 'use strict';
 
-// Global State
-let instanceCounter = 0;
-
 function searchItems(query) {
   const q = query.toLowerCase().trim();
   if (!q) return [];
@@ -92,7 +89,7 @@ if (searchInput) {
   searchInput.addEventListener('input', async () => {
     const q = searchInput.value.trim();
     if (!q) {
-      searchResults.classList.add('hidden');
+      if (searchResults) searchResults.classList.add('hidden');
       return;
     }
 
@@ -107,19 +104,23 @@ if (searchInput) {
     }
 
     if (!hits.length) {
-      searchResults.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">No matching items found for "${esc(q)}"</div>`;
-      searchResults.classList.remove('hidden');
+      if (searchResults) {
+        searchResults.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">No matching items found for "${esc(q)}"</div>`;
+        searchResults.classList.remove('hidden');
+      }
       return;
     }
 
-    searchResults.innerHTML = hits.map(item => `
-      <div class="px-3 py-2 hover:bg-[#1e3348] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#1e3348]/40"
-           onclick="selectItem(${item.id}, '${esc(item.name)}')">
-        <img src="https://images.evetech.net/types/${item.id}/icon?size=32" class="w-6 h-6 rounded" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.id}/render?size=32';">
-        <span class="font-semibold text-slate-200">${esc(item.name)}</span>
-      </div>
-    `).join('');
-    searchResults.classList.remove('hidden');
+    if (searchResults) {
+      searchResults.innerHTML = hits.map(item => `
+        <div class="px-3 py-2 hover:bg-[#1e3348] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#1e3348]/40"
+             onclick="selectItem(${item.id}, '${esc(item.name)}')">
+          <img src="https://images.evetech.net/types/${item.id}/icon?size=32" class="w-6 h-6 rounded" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.id}/render?size=32';">
+          <span class="font-semibold text-slate-200">${esc(item.name)}</span>
+        </div>
+      `).join('');
+      searchResults.classList.remove('hidden');
+    }
   });
 }
 
@@ -243,22 +244,35 @@ function recalculate() {
   const roiSell = totalProductionCost > 0 ? ((profitSell / totalProductionCost) * 100).toFixed(1) : 0;
   const roiBuy = totalProductionCost > 0 ? ((profitBuy / totalProductionCost) * 100).toFixed(1) : 0;
 
-  document.getElementById('summary-build-cost').textContent = Math.round(totalProductionCost).toLocaleString() + ' ISK';
-  document.getElementById('summary-runs-subtext').textContent = 
-    `Mat: ${Math.round(effectiveMaterialCost).toLocaleString()} ISK + Job Fee: ${Math.round(totalJobFees).toLocaleString()} ISK`;
+  const summaryCostEl = document.getElementById('summary-build-cost');
+  if (summaryCostEl) summaryCostEl.textContent = Math.round(totalProductionCost).toLocaleString() + ' ISK';
 
-  document.getElementById('summary-output-sell').textContent = Math.round(netSellRevenue).toLocaleString() + ' ISK';
-  document.getElementById('summary-output-buy').textContent = `Net Instant Buy: ${Math.round(netBuyRevenue).toLocaleString()} ISK`;
+  const summarySubtextEl = document.getElementById('summary-runs-subtext');
+  if (summarySubtextEl) summarySubtextEl.textContent = `Mat: ${Math.round(effectiveMaterialCost).toLocaleString()} ISK + Job Fee: ${Math.round(totalJobFees).toLocaleString()} ISK`;
+
+  const summaryOutSellEl = document.getElementById('summary-output-sell');
+  if (summaryOutSellEl) summaryOutSellEl.textContent = Math.round(netSellRevenue).toLocaleString() + ' ISK';
+
+  const summaryOutBuyEl = document.getElementById('summary-output-buy');
+  if (summaryOutBuyEl) summaryOutBuyEl.textContent = `Net Instant Buy: ${Math.round(netBuyRevenue).toLocaleString()} ISK`;
 
   const pSellEl = document.getElementById('summary-profit-sell');
-  pSellEl.textContent = Math.round(profitSell).toLocaleString() + ' ISK';
-  pSellEl.className = `text-xl font-bold mt-1 mono ${profitSell >= 0 ? 'text-green-400' : 'text-red-500'}`;
-  document.getElementById('summary-roi-sell').textContent = `Net ROI: ${roiSell}%`;
+  if (pSellEl) {
+    pSellEl.textContent = Math.round(profitSell).toLocaleString() + ' ISK';
+    pSellEl.className = `text-xl font-bold mt-1 mono ${profitSell >= 0 ? 'text-green-400' : 'text-red-500'}`;
+  }
+
+  const roiSellEl = document.getElementById('summary-roi-sell');
+  if (roiSellEl) roiSellEl.textContent = `Net ROI: ${roiSell}%`;
 
   const pBuyEl = document.getElementById('summary-profit-buy');
-  pBuyEl.textContent = Math.round(profitBuy).toLocaleString() + ' ISK';
-  pBuyEl.className = `text-xl font-bold mt-1 mono ${profitBuy >= 0 ? 'text-green-400' : 'text-red-500'}`;
-  document.getElementById('summary-roi-buy').textContent = `Net ROI: ${roiBuy}%`;
+  if (pBuyEl) {
+    pBuyEl.textContent = Math.round(profitBuy).toLocaleString() + ' ISK';
+    pBuyEl.className = `text-xl font-bold mt-1 mono ${profitBuy >= 0 ? 'text-green-400' : 'text-red-500'}`;
+  }
+
+  const roiBuyEl = document.getElementById('summary-roi-buy');
+  if (roiBuyEl) roiBuyEl.textContent = `Net ROI: ${roiBuy}%`;
 
   if (isolatedInstanceId) {
     const isoNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
@@ -278,6 +292,7 @@ function recalculate() {
 
 function renderTreeDiagram(rootNode, priceStrategy, profitSell, roiSell) {
   const container = document.getElementById('tree-container');
+  if (!container) return;
   container.innerHTML = '';
 
   if (!rootNode) return;
@@ -585,6 +600,7 @@ function exitIsolation(e) {
 
 function renderIsolatedDiagram() {
   const container = document.getElementById('tree-container');
+  if (!container) return;
   container.innerHTML = '';
 
   const isolatedNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
@@ -676,6 +692,7 @@ function centerOnSelectedNode() {
 function drawConnectingLines() {
   const svg = document.getElementById('tree-svg');
   const container = document.getElementById('tree-container');
+  if (!svg || !container) return;
   
   svg.setAttribute('width', container.scrollWidth);
   svg.setAttribute('height', container.scrollHeight);

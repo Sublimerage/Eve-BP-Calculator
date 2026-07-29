@@ -3,6 +3,40 @@
 // Hardcoded EVE Developer Application Client ID for instant 1-click SSO
 const HARDCODED_CLIENT_ID = '20e4087a1f564a3e897aaaa6daebbecd';
 
+// Global Caches & Indexes (Shared across all JS modules)
+let IDX = {};                  // Full Item Index
+let SYSTEM_IDX = {};           // Full Solar System Index
+let recipeMap = {};            // Dual-Key Recipe Map
+let currentProduct = null;      // Selected root item metadata
+let recipeTreeRoot = null;      // Recursive blueprint tree
+let blueprintCache = {};        // Cached blueprint responses
+let priceCache = {};            // Cached Jita 4-4 prices
+let eivCache = {};              // Cached EVE ESI Adjusted Prices
+let rawAssetItems = [];         // Raw ESI / Pasted asset records
+let userStockMap = {};          // Filtered stock quantities
+let systemNameCache = {};       // Cached system names
+let resolvedLocationNames = {}; // Cached location names
+let instanceCounter = 0;        // Node instance ID counter
+
+// User Overrides State
+let buildSelfOverrides = {};    // { typeId: boolean }
+let customBuyModes = {};        // { typeId: 'sell' | 'buy' }
+let customMEOverrides = {};     // { typeId: number }
+let customTEOverrides = {};     // { typeId: number }
+
+let selectedInstanceId = null;  
+let isolatedInstanceId = null;  
+
+// Live ESI System Cost Indices
+let activeMfgSCI = 0.0425;
+let activeReactSCI = 0.0110;
+
+// Pan & Zoom State
+let zoomScale = 1.0;
+let panX = 0, panY = 0;
+let isPanning = false;
+let startX = 0, startY = 0;
+
 // Known Base Raw Materials
 const RAW_BASE_MATERIALS = new Set([
   34, 35, 36, 37, 38, 39, 40, 11399, // Minerals
@@ -105,14 +139,14 @@ const BUILTIN_RECIPES = {
       { typeId: 52311, name: "Zero-Point Condensate", baseQty: 850 }
     ]
   },
-  // Auto-Integrity Preservation Seal (Correct Type ID 2463 for Nanites & Batch of 3)
+  // Auto-Integrity Preservation Seal
   57478: {
     blueprintTypeID: 57515, productTypeID: 57478, productName: "Auto-Integrity Preservation Seal", mfgQtyPerRun: 3, productQtyPerRun: 3,
     mfgMaterials: [
       { typeId: 2312, name: "Supertensile Plastics", baseQty: 4 },
       { typeId: 2463, name: "Nanites", baseQty: 4 },
       { typeId: 57457, name: "Reinforced Carbon Fiber", baseQty: 10 }
-    ]
+        ]
   },
   57515: {
     blueprintTypeID: 57515, productTypeID: 57478, productName: "Auto-Integrity Preservation Seal", mfgQtyPerRun: 3, productQtyPerRun: 3,
@@ -122,7 +156,7 @@ const BUILTIN_RECIPES = {
       { typeId: 57457, name: "Reinforced Carbon Fiber", baseQty: 10 }
     ]
   },
-  // Life Support Backup Unit (Correct Type IDs: Test Cultures 2319, Viral Agent 3775 & Batch of 3)
+  // Life Support Backup Unit
   57486: {
     blueprintTypeID: 57523, productTypeID: 57486, productName: "Life Support Backup Unit", mfgQtyPerRun: 3, productQtyPerRun: 3,
     mfgMaterials: [
