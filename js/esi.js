@@ -6,6 +6,16 @@ function esc(s) {
 }
 if (!window.esc) window.esc = esc;
 
+// Helper to detect if an asset location flag is a ship slot or ship cargo bay
+function isShipLocationFlag(flag) {
+  if (!flag) return false;
+  const f = flag.toLowerCase();
+  return f.includes('cargo') || f.includes('dronebay') || f.includes('shiphangar') || 
+         f.includes('fleethangar') || f.includes('subsystem') || f.includes('fighter') || 
+         f.includes('highslot') || f.includes('medslot') || f.includes('lowslot') || 
+         f.includes('rigslot') || f.includes('specialized') || f.includes('fuelbay');
+}
+
 // Strict ESI Adjusted Price Fetcher (STRICT CCP ADJUSTED_PRICE ONLY)
 async function fetchAdjustedPrices() {
   const statusEl = document.getElementById('eiv-status-text');
@@ -117,7 +127,6 @@ async function startEsiSSOLogin() {
   const challenge = base64urlEncode(hashed);
 
   const redirectUri = window.location.origin + window.location.pathname;
-  // Includes structure scope for Upwell structure name resolution
   const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1';
   const state = generateRandomString(16);
   sessionStorage.setItem('esi_auth_state', state);
@@ -245,6 +254,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
                 type_id: ast.type_id,
                 quantity: ast.quantity,
                 location_id: ast.location_id,
+                location_flag: ast.location_flag,
                 owner_type: 'char'
               });
             }
@@ -276,6 +286,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
                   type_id: ast.type_id,
                   quantity: ast.quantity,
                   location_id: ast.location_id,
+                  location_flag: ast.location_flag,
                   owner_type: 'corp'
                 });
               }
@@ -290,7 +301,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     }
 
-    // Build item_id -> item asset map for container & hierarchy resolution
+    // Build item_id -> item asset map
     const itemIdToAssetMap = {};
     rawAssetItems.forEach(ast => {
       if (ast.item_id) {
@@ -298,23 +309,90 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     });
 
-    // Trace asset hierarchy up to root station/structure and identify containers
+    // Trace asset hierarchy up to root station/structure and identify containers (excluding ships)
+    const charContainerIds = [];
+    const corpContainerIds = [];
+
     rawAssetItems.forEach(ast => {
       let currentLoc = ast.location_id;
       let depth = 0;
       let containerId = null;
 
       while (itemIdToAssetMap[currentLoc] && depth < 10) {
-        if (!containerId) {
-          containerId = currentLoc; // First parent asset is the immediate container
+        const parentAsset = itemIdToAssetMap[currentLoc];
+        
+        // Bypasses ships as containers! Only treat non-ship items as valid containers.
+        if (!isShipLocationFlag(ast.location_flag) && !isShipLocationFlag(parentAsset.location_flag)) {
+          if (!containerId) {
+            containerId = currentLoc;
+            if (ast.owner_type === 'char' && !charContainerIds.includes(containerId)) {
+              charContainerIds.push(containerId);
+            } else if (ast.owner_type === 'corp' && !corpContainerIds.includes(containerId)) {
+              corpContainerIds.push(containerId);
+            }
+          }
         }
-        currentLoc = itemIdToAssetMap[currentLoc].location_id;
+
+        currentLoc = parentAsset.location_id;
         depth++;
       }
 
       ast.root_location_id = currentLoc;
       ast.container_id = containerId;
     });
+
+    // Fetch custom container names via ESI assets/names endpoint
+    if (charContainerIds.length > 0) {
+      for (let i = 0; i < charContainerIds.length; i += 500) {
+        const chunk = charContainerIds.slice(i, i + 500);
+        try {
+          const nameRes = await fetch(`https://esi.evetech.net/latest/characters/${charId}/assets/names/?datasource=tranquility`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify(chunk)
+          });
+          if (nameRes.ok) {
+            const customNames = await nameRes.json();
+            if (Array.isArray(customNames)) {
+              customNames.forEach(cn => {
+                if (cn.item_id && cn.name && cn.name !== 'None' && cn.name.trim() !== '') {
+                  resolvedLocationNames[cn.item_id] = cn.name.toUpperCase();
+                }
+              });
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (corpId && corpContainerIds.length > 0) {
+      for (let i = 0; i < corpContainerIds.length; i += 500) {
+        const chunk = corpContainerIds.slice(i, i + 500);
+        try {
+          const nameRes = await fetch(`https://esi.evetech.net/latest/corporations/${corpId}/assets/names/?datasource=tranquility`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify(chunk)
+          });
+          if (nameRes.ok) {
+            const customNames = await nameRes.json();
+            if (Array.isArray(customNames)) {
+              customNames.forEach(cn => {
+                if (cn.item_id && cn.name && cn.name !== 'None' && cn.name.trim() !== '') {
+                  resolvedLocationNames[cn.item_id] = cn.name.toUpperCase();
+                }
+              });
+            }
+          }
+        } catch (e) {}
+      }
+    }
 
     await resolveAndPopulateLocationFilter(accessToken);
 
@@ -324,14 +402,13 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
 }
 
 async function resolveAndPopulateLocationFilter(accessToken = null) {
-  // Collect all unique top-level location IDs and container item IDs
   const uniqueRootLocIds = Array.from(new Set(rawAssetItems.map(a => a.root_location_id || a.location_id).filter(id => id && id !== 99999999)));
   const uniqueContainerIds = Array.from(new Set(rawAssetItems.map(a => a.container_id).filter(id => id)));
 
   if (uniqueRootLocIds.length > 0) {
     const missingRootIds = uniqueRootLocIds.filter(id => !resolvedLocationNames[id]);
 
-    // 1. CRITICAL FIX: Only POST standard universe IDs (< 1,000,000,000) to /universe/names/
+    // 1. CRITICAL FIX: Only POST standard CCP universe IDs (< 1,000,000,000) to /universe/names/
     // Passing structure IDs (> 10^12) causes /universe/names/ to reject the ENTIRE batch with 404!
     const standardUniverseIds = missingRootIds.filter(id => id < 1000000000);
 
@@ -391,7 +468,7 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
               resolvedLocationNames[structId] = sysName ? `${fullName} (${sysName})` : fullName;
             }
           } else if (res.status === 403) {
-            resolvedLocationNames[structId] = `UPWELL STRUCTURE (${structId.toString().slice(-6)}) [NO ACL DOCK ACCESS]`;
+            resolvedLocationNames[structId] = `UPWELL STRUCTURE (${structId.toString().slice(-6)}) [PRIVATE/RESTRICTED]`;
           }
         } catch (e) {}
       }));
@@ -418,7 +495,7 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
     }
   });
 
-  // 4. Resolve container item names based on inventory type
+  // 4. Resolve container item names if custom names were not set
   uniqueContainerIds.forEach(containerId => {
     if (!resolvedLocationNames[containerId]) {
       const containerItem = rawAssetItems.find(a => a.item_id === containerId);
@@ -483,7 +560,7 @@ function populateLocationDropdown() {
     mainOpt.textContent = `${data.name} (${data.count.toLocaleString()} items)`;
     filterSelect.appendChild(mainOpt);
 
-    // Render container sub-objects under this station
+    // Render container sub-objects under this station with custom names
     for (const [cId, cData] of Object.entries(data.containers)) {
       const containerOpt = document.createElement('option');
       containerOpt.value = `container_${cId}`;
