@@ -45,13 +45,17 @@ window.isPanning = false;
 window.startX = 0;
 window.startY = 0;
 
-// Global Prepacked Index Builder
+// Global Prepacked Index Builder (Resolves EVE_ITEMS & EVE_RECIPES from eve_db.js)
 window.buildPrepackedIndexes = function() {
   const statusText = document.getElementById('status-text');
   const statusDot = document.getElementById('status-dot');
 
-  if (window.EVE_ITEMS && Object.keys(window.EVE_ITEMS).length > 10) {
-    for (const [id, name] of Object.entries(window.EVE_ITEMS)) {
+  const itemsObj = (typeof EVE_ITEMS !== 'undefined') ? EVE_ITEMS : (window.EVE_ITEMS || null);
+  const recipesObj = (typeof EVE_RECIPES !== 'undefined') ? EVE_RECIPES : (window.EVE_RECIPES || null);
+  const systemsObj = (typeof EVE_SYSTEMS !== 'undefined') ? EVE_SYSTEMS : (window.EVE_SYSTEMS || null);
+
+  if (itemsObj && Object.keys(itemsObj).length > 10) {
+    for (const [id, name] of Object.entries(itemsObj)) {
       window.IDX[name.toLowerCase()] = { id: parseInt(id), name: name };
     }
   } else {
@@ -60,8 +64,8 @@ window.buildPrepackedIndexes = function() {
     });
   }
 
-  if (window.EVE_SYSTEMS && Object.keys(window.EVE_SYSTEMS).length > 10) {
-    for (const [id, name] of Object.entries(window.EVE_SYSTEMS)) {
+  if (systemsObj && Object.keys(systemsObj).length > 10) {
+    for (const [id, name] of Object.entries(systemsObj)) {
       window.SYSTEM_IDX[name.toLowerCase()] = { id: parseInt(id), name: name.toUpperCase() };
       window.systemNameCache[id] = name.toUpperCase();
     }
@@ -72,8 +76,8 @@ window.buildPrepackedIndexes = function() {
     });
   }
 
-  if (window.EVE_RECIPES && typeof window.EVE_RECIPES === 'object') {
-    for (const [idStr, recipe] of Object.entries(window.EVE_RECIPES)) {
+  if (recipesObj && typeof recipesObj === 'object') {
+    for (const [idStr, recipe] of Object.entries(recipesObj)) {
       const keyId = parseInt(idStr);
       window.recipeMap[keyId] = recipe;
       if (recipe.blueprintTypeID) window.recipeMap[recipe.blueprintTypeID] = recipe;
