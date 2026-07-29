@@ -57,10 +57,13 @@
       </div>
     </div>
 
-    <!-- Tree Build / Buy Actions Card -->
+    <!-- Tree Build / Buy Actions Card (WITH RESET BUTTON & MARGIN OPTIMIZER) -->
     <div class="md:col-span-3 bg-[#0c1318] p-3 rounded-lg border border-[#1e3348] flex flex-col justify-between shadow-md space-y-2">
       <div class="flex justify-between items-center border-b border-[#1e3348] pb-1">
         <label class="block text-green-400 font-bold uppercase tracking-wider text-[11px] rajdhani">Sub-Component Build Mode</label>
+        <button onclick="buyAllSubComponents()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-2 py-0.5 rounded text-[10px] mono transition border border-slate-600" title="Reset all sub-components back to Buy off Market">
+          🔄 Reset Build
+        </button>
       </div>
 
       <div class="flex space-x-2">
@@ -77,10 +80,10 @@
         <div class="flex items-center space-x-1.5 flex-1 mono text-xs">
           <span class="text-slate-300 font-bold text-[11px]">Min Build Margin:</span>
           <input type="number" id="build-profit-threshold" value="5.0" step="0.5" min="0" max="100" 
-            class="w-20 bg-[#0d1922] border border-green-500/60 text-center text-green-300 font-bold rounded-md p-1 outline-none text-xs">
+            class="w-16 bg-[#0d1922] border border-green-500/60 text-center text-green-300 font-bold rounded-md p-1 outline-none text-xs">
           <span class="text-slate-400 font-bold text-xs">%</span>
         </div>
-        <button onclick="applyBuildProfitOptimizer()" class="bg-green-800 hover:bg-green-700 text-white font-bold py-1 px-2.5 rounded-md text-[11px] transition shadow flex-shrink-0 mono" title="Switches sub-components to Build if building saves >= Threshold % over market buy">
+        <button onclick="applyBuildProfitOptimizer()" class="bg-green-800 hover:bg-green-700 text-white font-bold py-1 px-2.5 rounded-md text-[11px] transition shadow flex-shrink-0 mono" title="Switches sub-components to Build if building increases total net profit by >= Threshold %">
           ⚡ Build Opt
         </button>
       </div>
@@ -93,7 +96,7 @@
           ⚡ SMART ORDER OPTIMIZERS
         </span>
         <button onclick="resetSmartBuyModes()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-2 py-0.5 rounded text-[10px] mono transition border border-slate-600" title="Reset component buy modes back to global dropdown setting">
-          🔄 Reset
+          🔄 Reset Orders
         </button>
       </div>
 
