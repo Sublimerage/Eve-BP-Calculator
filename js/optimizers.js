@@ -69,13 +69,20 @@ async function applyBuildProfitOptimizer() {
 
   if (!recipeTreeRoot) return;
 
+  // Pre-fetch market prices for all type IDs before evaluating build margins
+  const allTypeIds = new Set();
+  if (typeof collectAllTypeIds === 'function') {
+    collectAllTypeIds(recipeTreeRoot, allTypeIds);
+    await fetchMarketPrices(Array.from(allTypeIds));
+  }
+
   function evaluateBuildNode(node) {
     if (!node) return;
 
     if (node.depth > 0 && node.isManufacturable) {
       const typeId = node.displayTypeId || node.typeId;
       const prices = priceCache[typeId] || { sell: 0, buy: 0 };
-      const marketPrice = prices.sell || prices.buy || 0;
+      const marketPrice = prices.sell || prices.buy || getEIV(typeId) || 0;
 
       const deductModeInput = document.getElementById('deduct-stock-mode');
       const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
@@ -89,7 +96,7 @@ async function applyBuildProfitOptimizer() {
       if (node.recipe && node.recipe.materials) {
         node.recipe.materials.forEach(mat => {
           const matPrices = priceCache[mat.typeId] || { sell: 0, buy: 0 };
-          const matUnitPrice = matPrices.sell || matPrices.buy || 0;
+          const matUnitPrice = matPrices.sell || matPrices.buy || getEIV(mat.typeId) || 0;
           const meFactor = node.isReaction ? 1.0 : (1 - (node.customME || 0) / 100);
           const facFactor = (1 - parseFloat(document.getElementById('facility-select')?.value || '0.01'));
           const matQty = Math.max(node.runsNeeded, Math.ceil(node.runsNeeded * mat.baseQty * meFactor * facFactor));
@@ -107,7 +114,7 @@ async function applyBuildProfitOptimizer() {
           buildSelfOverrides[typeId] = false; // Building saves < threshold %: buy off Market!
         }
       } else {
-        buildSelfOverrides[typeId] = false;
+        buildSelfOverrides[typeId] = true;
       }
     }
 

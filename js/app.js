@@ -1,5 +1,34 @@
 'use strict';
 
+function saveTaxSettings() {
+  try {
+    const settings = {
+      facilityTax: document.getElementById('facility-tax')?.value,
+      sccSurcharge: document.getElementById('scc-surcharge')?.value,
+      salesTax: document.getElementById('sales-tax')?.value,
+      brokerFee: document.getElementById('broker-fee')?.value,
+      facilitySelect: document.getElementById('facility-select')?.value,
+      structureRoleBonus: document.getElementById('structure-role-bonus')?.value
+    };
+    localStorage.setItem('eve_tax_settings', JSON.stringify(settings));
+  } catch (e) {}
+}
+
+function loadTaxSettings() {
+  try {
+    const saved = localStorage.getItem('eve_tax_settings');
+    if (saved) {
+      const settings = JSON.parse(saved);
+      if (settings.facilityTax !== undefined && document.getElementById('facility-tax')) document.getElementById('facility-tax').value = settings.facilityTax;
+      if (settings.sccSurcharge !== undefined && document.getElementById('scc-surcharge')) document.getElementById('scc-surcharge').value = settings.sccSurcharge;
+      if (settings.salesTax !== undefined && document.getElementById('sales-tax')) document.getElementById('sales-tax').value = settings.salesTax;
+      if (settings.brokerFee !== undefined && document.getElementById('broker-fee')) document.getElementById('broker-fee').value = settings.brokerFee;
+      if (settings.facilitySelect !== undefined && document.getElementById('facility-select')) document.getElementById('facility-select').value = settings.facilitySelect;
+      if (settings.structureRoleBonus !== undefined && document.getElementById('structure-role-bonus')) document.getElementById('structure-role-bonus').value = settings.structureRoleBonus;
+    }
+  } catch (e) {}
+}
+
 function searchItems(query) {
   const q = query.toLowerCase().trim();
   if (!q) return [];
@@ -539,7 +568,8 @@ function createNodeCard(node) {
         <span class="text-slate-300 font-bold">Runs:</span>
         <div class="flex items-center space-x-1">
           <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" 
-            oninput="syncCardRunsToGlobal(event)" 
+            onchange="syncCardRunsToGlobal(event)" 
+            onkeydown="if(event.key==='Enter') this.blur()"
             class="w-16 bg-[#0c1318] border border-cyan-500/60 text-center text-amber-300 font-bold rounded p-0.5 outline-none">
           <span class="text-slate-400 text-[10px]">Runs</span>
         </div>
@@ -1148,6 +1178,8 @@ window.onload = async () => {
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
+
+  loadTaxSettings(); // Load custom taxes from localStorage!
 
   // 1. Render default item
   try {
