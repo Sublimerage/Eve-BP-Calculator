@@ -114,34 +114,34 @@
 <body class="flex flex-col min-h-screen">
 
   <!-- Header -->
-  <header class="bg-[#0c1318] border-b border-[#1e3348] px-4 py-2.5 flex flex-wrap justify-between items-center shadow-lg z-30">
-    <div class="flex items-center space-x-2.5">
-      <div class="w-7 h-7 bg-cyan-500 rounded flex items-center justify-center font-bold text-black text-lg rajdhani">E</div>
+  <header class="bg-[#0c1318] border-b border-[#1e3348] px-6 py-3 flex flex-wrap justify-between items-center shadow-lg z-30">
+    <div class="flex items-center space-x-3">
+      <div class="w-8 h-8 bg-cyan-500 rounded flex items-center justify-center font-bold text-black text-xl rajdhani">E</div>
       <div>
-        <h1 class="text-base font-bold tracking-widest text-white rajdhani">EVE DEEP-INDUSTRY ENGINE</h1>
+        <h1 class="text-lg font-bold tracking-widest text-white rajdhani">EVE DEEP-INDUSTRY ENGINE</h1>
       </div>
     </div>
     
-    <div class="flex items-center space-x-2 text-xs mono">
+    <div class="flex items-center space-x-2.5 text-xs mono">
       <!-- ESI SSO Character Status / Login Button -->
       <div id="esi-login-container">
-        <button onclick="startEsiSSOLogin()" class="px-2.5 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded transition flex items-center gap-1.5 shadow text-[11px]" title="Login with EVE Online to import your character assets">
+        <button onclick="startEsiSSOLogin()" class="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded transition flex items-center gap-1.5 shadow text-xs" title="Login with EVE Online to import your character assets">
           🔐 EVE SSO Login
         </button>
       </div>
 
       <!-- Clipboard Hangar Stock Import Button -->
-      <button onclick="openPasteModal()" class="px-2.5 py-1 bg-[#1e3348] hover:bg-slate-600 text-slate-200 font-bold rounded transition text-[11px]" title="Paste in-game inventory text to import stock">
+      <button onclick="openPasteModal()" class="px-3 py-1 bg-[#1e3348] hover:bg-slate-600 text-slate-200 font-bold rounded transition text-xs" title="Paste in-game inventory text to import stock">
         📋 Paste Hangar
       </button>
 
-      <button onclick="centerOnSelectedNode()" class="px-2.5 py-1 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded transition text-[11px]">
+      <button onclick="centerOnSelectedNode()" class="px-3 py-1 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded transition text-xs">
         Center [F]
       </button>
-      <button onclick="resetPanZoom()" class="px-2.5 py-1 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded transition text-[11px]">
+      <button onclick="resetPanZoom()" class="px-3 py-1 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded transition text-xs">
         Reset View
       </button>
-      <div id="status-badge" class="px-2 py-0.5 bg-[#0d1922] border border-[#1e3348] rounded flex items-center gap-1.5 text-[11px]">
+      <div id="status-badge" class="px-2.5 py-1 bg-[#0d1922] border border-[#1e3348] rounded flex items-center gap-1.5 text-xs">
         <span id="status-dot" class="w-2 h-2 rounded-full bg-green-400"></span>
         <span id="status-text" class="text-slate-300">INDEX READY</span>
       </div>
@@ -149,128 +149,126 @@
   </header>
 
   <!-- Compact Multi-Control Toolbar Row 1 -->
-  <section class="bg-[#0d1922] border-b border-[#1e3348] p-2 flex flex-wrap items-center gap-2 text-xs relative z-50">
+  <section class="bg-[#0d1922] border-b border-[#1e3348] p-2.5 grid grid-cols-1 md:grid-cols-12 gap-2.5 text-xs relative z-50">
     
     <!-- Item Autocomplete Search -->
-    <div class="relative z-50 w-48 flex-shrink-0">
-      <input type="text" id="item-search" autocomplete="off" placeholder="Search Item / Blueprint..." 
+    <div class="md:col-span-2 relative z-50">
+      <label class="block text-slate-400 mb-0.5 font-semibold uppercase tracking-wider text-[10px]">Search Item / Blueprint</label>
+      <input type="text" id="item-search" autocomplete="off" placeholder="Type e.g. Drekavac, Leshak..." 
         class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-1.5 text-white font-bold focus:border-cyan-500 outline-none mono text-xs">
       <div id="search-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
     </div>
 
     <!-- Build All / Buy All Actions -->
-    <div class="flex items-center space-x-1 bg-[#0c1318] p-1 rounded border border-[#1e3348]">
-      <button onclick="buildAllComponents()" class="bg-green-700 hover:bg-green-600 text-white font-bold py-1 px-2 rounded text-[11px] mono transition shadow" title="Set all sub-components to Build">
-        🔨 Build All
-      </button>
-      <button onclick="buyAllSubComponents()" class="bg-[#1e3348] hover:bg-slate-600 text-slate-200 font-bold py-1 px-2 rounded text-[11px] mono transition" title="Reset all sub-components to Buy off Market">
-        🛒 Buy All
-      </button>
+    <div class="md:col-span-1 flex flex-col justify-end">
+      <label class="block text-slate-400 mb-0.5 font-semibold uppercase tracking-wider text-[10px]">Tree Build</label>
+      <div class="flex space-x-1">
+        <button onclick="buildAllComponents()" class="bg-green-700 hover:bg-green-600 text-white font-bold py-1.5 px-2 rounded text-[11px] mono transition shadow flex-1" title="Set all sub-components to Build">
+          🔨 All
+        </button>
+        <button onclick="buyAllSubComponents()" class="bg-[#1e3348] hover:bg-slate-600 text-slate-200 font-bold py-1.5 px-2 rounded text-[11px] mono transition flex-1" title="Reset all sub-components to Buy off Market">
+          🛒 Buy
+        </button>
+      </div>
     </div>
 
-    <!-- Dedicated Smart Order Optimizers Panel -->
-    <div class="bg-[#0c1318] p-1 rounded border border-[#1e3348] flex items-center space-x-2">
-      <!-- Optimizer 1: Component Spread -->
-      <div class="flex items-center space-x-1 text-[10px] mono" title="Spread % = (Sell - Buy) / Sell. Switch to Buy Order if >= threshold %">
-        <span class="text-amber-300 font-bold">Comp %:</span>
-        <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100" 
-          class="w-9 bg-[#070b0f] border border-[#1e3348] text-center text-amber-300 font-bold mono outline-none text-[11px] rounded p-0.5">
-        <button onclick="applyComponentSpreadOptimizer()" class="bg-amber-800 hover:bg-amber-700 text-white font-bold px-1.5 py-0.5 rounded text-[10px] mono transition" title="Apply Component Spread threshold">
-          ⚡ Spread
+    <!-- PROMINENT FOCUSED SMART ORDER OPTIMIZERS CARD -->
+    <div class="md:col-span-5 bg-[#0c1318] p-2 rounded border-2 border-amber-500/70 shadow-xl flex flex-col justify-between space-y-1.5">
+      <div class="flex justify-between items-center border-b border-[#1e3348] pb-1">
+        <span class="text-amber-300 font-bold rajdhani text-xs tracking-wider flex items-center gap-1">
+          ⚡ SMART ORDER OPTIMIZERS
+        </span>
+        <button onclick="resetSmartBuyModes()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-2 py-0.5 rounded text-[10px] mono transition border border-slate-600" title="Reset all cards back to the Global Pricing dropdown">
+          🔄 Reset All
         </button>
       </div>
 
-      <span class="text-slate-600">|</span>
+      <div class="grid grid-cols-2 gap-2 text-[11px] mono">
+        <!-- Optimizer 1: Component Spread -->
+        <div class="bg-[#070b0f] p-1.5 rounded border border-[#1e3348] flex items-center justify-between space-x-2">
+          <div class="flex items-center space-x-1.5">
+            <span class="text-slate-300 font-bold">Comp Spread:</span>
+            <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100" 
+              class="w-12 bg-[#0d1922] border border-amber-500/50 text-center text-amber-300 font-bold rounded p-1 outline-none text-xs">
+            <span class="text-slate-400 text-[10px]">%</span>
+          </div>
+          <button onclick="applyComponentSpreadOptimizer()" class="bg-amber-700 hover:bg-amber-600 text-white font-bold py-1 px-2.5 rounded text-[11px] transition shadow" title="Switch items to Buy Order if Spread % is >= threshold">
+            ⚡ Apply
+          </button>
+        </div>
 
-      <!-- Optimizer 2: Budget Impact -->
-      <div class="flex items-center space-x-1 text-[10px] mono" title="Budget Impact % = ISK Saved / Total Build Cost. Switch to Buy Order if saves >= threshold % of overall budget">
-        <span class="text-cyan-300 font-bold">Budget %:</span>
-        <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100" 
-          class="w-9 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-300 font-bold mono outline-none text-[11px] rounded p-0.5">
-        <button onclick="applyBudgetImpactOptimizer()" class="bg-cyan-700 hover:bg-cyan-600 text-white font-bold px-1.5 py-0.5 rounded text-[10px] mono transition" title="Apply Total Budget Impact threshold">
-          ⚡ Budget
-        </button>
+        <!-- Optimizer 2: Total Budget Impact -->
+        <div class="bg-[#070b0f] p-1.5 rounded border border-[#1e3348] flex items-center justify-between space-x-2">
+          <div class="flex items-center space-x-1.5">
+            <span class="text-slate-300 font-bold">Total Budget:</span>
+            <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100" 
+              class="w-12 bg-[#0d1922] border border-cyan-500/50 text-center text-cyan-300 font-bold rounded p-1 outline-none text-xs">
+            <span class="text-slate-400 text-[10px]">%</span>
+          </div>
+          <button onclick="applyBudgetImpactOptimizer()" class="bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-1 px-2.5 rounded text-[11px] transition shadow" title="Switch items to Buy Order if saves >= threshold % of overall build budget">
+            ⚡ Apply
+          </button>
+        </div>
       </div>
-
-      <button onclick="resetSmartBuyModes()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold px-1.5 py-0.5 rounded text-[10px] mono transition" title="Reset all cards back to Global Pricing dropdown">
-        🔄 Reset
-      </button>
     </div>
 
     <!-- Stock Deduct & Checkboxes -->
-    <div class="flex items-center space-x-2 bg-[#0c1318] p-1 rounded border border-[#1e3348]">
-      <select id="deduct-stock-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-bold text-[11px] outline-none">
-        <option value="true" selected>Deduct Stock (ON)</option>
-        <option value="false">Ignore Stock (OFF)</option>
-      </select>
+    <div class="md:col-span-2 flex flex-col justify-end">
+      <label class="block text-slate-400 mb-0.5 font-semibold uppercase tracking-wider text-[10px]">Stock Deduct</label>
+      <div class="flex items-center space-x-2 bg-[#0c1318] p-1 rounded border border-[#1e3348]">
+        <select id="deduct-stock-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-bold text-[11px] outline-none">
+          <option value="true" selected>Deduct (ON)</option>
+          <option value="false">Off</option>
+        </select>
 
-      <label class="flex items-center space-x-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
-        <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="accent-cyan-500">
-        <span>Personal</span>
-      </label>
+        <label class="flex items-center space-x-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+          <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="accent-cyan-500">
+          <span>Personal</span>
+        </label>
 
-      <label class="flex items-center space-x-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
-        <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()" class="accent-cyan-500">
-        <span>Corp</span>
-      </label>
+        <label class="flex items-center space-x-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+          <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()" class="accent-cyan-500">
+          <span>Corp</span>
+        </label>
+      </div>
     </div>
 
-    <!-- Location Dropdown -->
-    <div class="w-56 flex-shrink-0">
-      <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-1.5 text-amber-300 font-bold text-[11px] outline-none truncate">
-        <option value="all" selected>All Locations (Char + Corp)</option>
-        <option value="industry_system">Current System Only (JITA)</option>
-      </select>
-    </div>
-
-    <!-- Target Units / Runs -->
-    <div class="flex items-center space-x-1.5 bg-[#0c1318] p-1 rounded border border-[#1e3348]">
-      <select id="run-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-amber-300 font-bold text-[11px] outline-none">
-        <option value="qty" selected>Units</option>
-        <option value="runs">Runs</option>
-      </select>
-      <input type="number" id="bp-runs" value="1" min="1" max="1000000" oninput="recalculate()" 
-        class="w-12 bg-[#070b0f] border border-[#1e3348] rounded p-1 text-center text-amber-300 font-bold mono text-[11px]">
-    </div>
-
-    <!-- Global Pricing Strategy -->
-    <div class="flex-shrink-0">
-      <select id="input-price-mode" onchange="recalculate()" class="bg-[#0c1318] border border-[#1e3348] rounded p-1.5 text-white text-[11px] outline-none">
-        <option value="sell" selected>Sell Orders (Instant)</option>
-        <option value="buy">Buy Orders (Placing)</option>
-      </select>
-    </div>
-
-    <!-- Reactions Toggle -->
-    <div class="flex-shrink-0">
-      <select id="include-reactions" onchange="onDepthOrCategoryChange()" class="bg-[#0c1318] border border-[#1e3348] rounded p-1.5 text-purple-300 font-bold text-[11px] outline-none">
-        <option value="true" selected>Reactions (ON)</option>
-        <option value="false">Buy Reaction (OFF)</option>
-      </select>
+    <!-- Global Pricing Strategy & Reactions -->
+    <div class="md:col-span-2 flex flex-col justify-end space-y-1">
+      <div class="flex space-x-1">
+        <select id="input-price-mode" onchange="recalculate()" class="w-1/2 bg-[#0c1318] border border-[#1e3348] rounded p-1.5 text-white text-[11px] outline-none">
+          <option value="sell" selected>Sell (Instant)</option>
+          <option value="buy">Buy Orders</option>
+        </select>
+        <select id="include-reactions" onchange="onDepthOrCategoryChange()" class="w-1/2 bg-[#0c1318] border border-[#1e3348] rounded p-1.5 text-purple-300 font-bold text-[11px] outline-none">
+          <option value="true" selected>Reactions ON</option>
+          <option value="false">Reactions OFF</option>
+        </select>
+      </div>
     </div>
 
   </section>
 
-  <!-- Compact Taxes & Industry System Bar Row 2 -->
+  <!-- Compact Taxes, Searchable Location Filter & System Bar Row 2 -->
   <section class="bg-[#0c1318] border-b border-[#1e3348] p-2 flex flex-wrap items-center gap-2 text-xs relative z-40">
     
     <!-- Full-Universe System Search -->
-    <div class="relative z-50 w-40 flex-shrink-0">
-      <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="Industry System..." 
+    <div class="relative z-50 w-36 flex-shrink-0">
+      <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="System..." 
         class="w-full bg-[#0d1922] border border-[#1e3348] rounded p-1 text-cyan-300 font-bold mono uppercase focus:border-cyan-500 outline-none text-[11px]">
       <div id="system-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
     </div>
 
     <!-- Facility Select -->
     <select id="facility-select" onchange="recalculate()" class="bg-[#0d1922] border border-[#1e3348] rounded p-1 text-white text-[11px] outline-none">
-      <option value="0.0">NPC Station (0% Bonus)</option>
+      <option value="0.0">NPC Station (0%)</option>
       <option value="0.01">Raitaru / Azbel (1%)</option>
       <option value="0.01" selected>Sotiyo (1% Bonus)</option>
     </select>
 
     <!-- Role Bonus -->
     <select id="structure-role-bonus" onchange="recalculate()" class="bg-[#0d1922] border border-[#1e3348] rounded p-1 text-amber-300 font-bold text-[11px] outline-none">
-      <option value="0.03" selected>Sotiyo / Azbel (-3% Job Cost)</option>
+      <option value="0.03" selected>Sotiyo / Azbel (-3% Job Fee)</option>
       <option value="0.0">NPC Station / None (0%)</option>
     </select>
 
@@ -299,6 +297,17 @@
         <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="recalculate()" class="w-9 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-0.5 outline-none">
         <span class="text-slate-500">%</span>
       </div>
+    </div>
+
+    <!-- Searchable Location Filter -->
+    <div class="flex items-center space-x-1 bg-[#0d1922] p-1 rounded border border-[#1e3348] flex-1 max-w-md">
+      <span class="text-slate-400 text-[10px] mono ml-1">Location:</span>
+      <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter Station / Structure..." oninput="filterLocationDropdownOptions()" 
+        class="w-32 bg-[#070b0f] border border-[#1e3348] rounded p-0.5 text-slate-200 text-[11px] mono outline-none">
+      <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded p-0.5 text-amber-300 font-bold text-[11px] outline-none truncate">
+        <option value="all" selected>All Locations (Combined)</option>
+        <option value="industry_system">Current System Only (JITA)</option>
+      </select>
     </div>
 
     <!-- Live System SCI Status Pill -->
@@ -339,7 +348,7 @@
 
   <!-- Controls Navigation Hint Bar -->
   <div class="bg-[#070b0f] border-t border-[#1e3348] px-6 py-1 text-[11px] mono text-slate-400 flex justify-between z-10">
-    <span>💡 <b>Click Card:</b> Highlight Inputs &amp; Output | <b>Hover [EIV]:</b> View Estimated Item Value | <b>Press [F]:</b> Center Selected Card</span>
+    <span>💡 <b>Click Card:</b> Highlight Inputs &amp; Output | <b>Hover [EIV]:</b> View Estimated Item Value | <b>Press [F]:</b> Center Main Output Card</span>
     <span id="zoom-level-text">Zoom: 100%</span>
   </div>
 
@@ -520,7 +529,7 @@
           { typeId: 52311, name: "Zero-Point Condensate", baseQty: 850 }
         ]
       },
-      // Auto-Integrity Preservation Seal (Correct Type ID 2463 for Nanites & Batch of 3)
+      // Auto-Integrity Preservation Seal
       57478: {
         blueprintTypeID: 57515, productTypeID: 57478, productName: "Auto-Integrity Preservation Seal", mfgQtyPerRun: 3, productQtyPerRun: 3,
         mfgMaterials: [
@@ -537,7 +546,7 @@
           { typeId: 57457, name: "Reinforced Carbon Fiber", baseQty: 10 }
         ]
       },
-      // Life Support Backup Unit (Correct Type IDs: Test Cultures 2319, Viral Agent 3775 & Batch of 3)
+      // Life Support Backup Unit
       57486: {
         blueprintTypeID: 57523, productTypeID: 57486, productName: "Life Support Backup Unit", mfgQtyPerRun: 3, productQtyPerRun: 3,
         mfgMaterials: [
@@ -966,7 +975,7 @@
 
     // Resolve Location IDs (NPC Stations, Systems, Upwell Player Structures) to Clean Names
     async function resolveAndPopulateLocationFilter(accessToken = null) {
-      const uniqueLocIds = Array.from(new Set(rawAssetItems.map(a => a.location_id).filter(id => id)));
+      const uniqueLocIds = Array.from(new Set(rawAssetItems.map(a => a.location_id).filter(id => id && id !== 99999999)));
       if (uniqueLocIds.length > 0) {
         const missingIds = uniqueLocIds.filter(id => !resolvedLocationNames[id]);
         
@@ -1023,7 +1032,9 @@
       rawAssetItems.forEach(item => {
         const id = item.location_id;
         if (!resolvedLocationNames[id]) {
-          if (systemNameCache[id]) {
+          if (id === 99999999) {
+            resolvedLocationNames[id] = 'CLIPBOARD / MANUAL IMPORT';
+          } else if (systemNameCache[id]) {
             resolvedLocationNames[id] = systemNameCache[id];
           } else if (id >= 30000000 && id < 34000000) {
             resolvedLocationNames[id] = `SYSTEM #${id}`;
@@ -1067,6 +1078,25 @@
         opt.textContent = `${data.name} (${data.count.toLocaleString()} items)`;
         filterSelect.appendChild(opt);
       }
+    }
+
+    function filterLocationDropdownOptions() {
+      const query = (document.getElementById('location-filter-search')?.value || '').trim().toUpperCase();
+      const filterSelect = document.getElementById('stock-location-filter');
+      if (!filterSelect) return;
+
+      const options = filterSelect.querySelectorAll('option');
+      options.forEach(opt => {
+        if (opt.value === 'all' || opt.value === 'industry_system') {
+          opt.style.display = '';
+        } else {
+          if (!query || opt.textContent.toUpperCase().includes(query)) {
+            opt.style.display = '';
+          } else {
+            opt.style.display = 'none';
+          }
+        }
+      });
     }
 
     // Apply Location & Checkbox Filter to userStockMap
@@ -1388,7 +1418,7 @@
       searchResults.innerHTML = hits.map(item => `
         <div class="px-3 py-2 hover:bg-[#1e3348] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#1e3348]/40"
              onclick="selectItem(${item.id}, '${esc(item.name)}')">
-          <img src="https://images.evetech.net/types/${item.id}/icon?size=32" class="w-6 h-6 rounded" onerror="this.style.opacity=0.2">
+          <img src="https://images.evetech.net/types/${item.id}/icon?size=32" class="w-6 h-6 rounded" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.id}/render?size=32';">
           <span class="font-semibold text-slate-200">${esc(item.name)}</span>
         </div>
       `).join('');
@@ -1703,8 +1733,9 @@
       const defaultBuildState = (currentDepth === 0) ? true : false;
       const isBuildingSelf = (buildSelfOverrides[typeId] !== undefined) ? buildSelfOverrides[typeId] : defaultBuildState;
 
-      const defaultME = 10;
-      const defaultTE = 20;
+      // Default ME and TE set strictly to 0% and 0%
+      const defaultME = 0;
+      const defaultTE = 0;
 
       const node = {
         instanceId: ++instanceCounter,
@@ -2021,8 +2052,9 @@
       const grossSellRevenue = outputPrices.sell * totalRootOutputQty;
       const grossBuyRevenue = outputPrices.buy * totalRootOutputQty;
 
-      // Populate Root Card Cost Value so it is never 0
+      // Populate Root Card Cost Values
       recipeTreeRoot.calculatedCost = totalProductionCost;
+      recipeTreeRoot.outputMarketValue = grossSellRevenue;
 
       const netSellRevenue = grossSellRevenue * (1 - salesTax - brokerFee);
       const netBuyRevenue = grossBuyRevenue * (1 - salesTax);
@@ -2135,7 +2167,7 @@
 
       let cardStyle = 'bg-[#0c1318] border border-[#1e3348] w-64';
       if (isRoot) {
-        cardStyle = 'bg-[#0d1922] border-2 border-cyan-500 w-72';
+        cardStyle = 'bg-[#0d1922] border-2 border-cyan-500 w-80';
       } else if (!node.isBuildingSelf) {
         cardStyle = 'bg-[#0a1017] border border-slate-700/80 w-64';
       } else if (node.isReaction) {
@@ -2167,7 +2199,7 @@
 
       card.innerHTML = `
         <div class="flex items-center space-x-3 border-b border-[#1e3348] pb-2 mb-2">
-          <img src="https://images.evetech.net/types/${iconTypeId}/icon?size=64" class="w-10 h-10 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0">
+          <img src="https://images.evetech.net/types/${iconTypeId}/icon?size=64" class="w-10 h-10 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
           <div class="min-w-0 flex-1">
             <div class="font-bold text-sm text-white truncate flex items-center justify-between">
               <span class="truncate">${node.name}</span>
@@ -2208,6 +2240,19 @@
           </div>
         </div>
 
+        <!-- Target Units / Runs Controller (MOVED DIRECTLY TO MAIN ROOT CARD) -->
+        ${isRoot ? `
+          <div class="mb-2 p-1.5 bg-[#070b0f] rounded border border-cyan-500/40 flex items-center justify-between text-[11px] mono" onclick="event.stopPropagation()">
+            <span class="text-slate-300 font-bold">Target Quantity:</span>
+            <div class="flex items-center space-x-1">
+              <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" 
+                oninput="syncCardRunsToGlobal(event)" 
+                class="w-16 bg-[#0c1318] border border-cyan-500/60 text-center text-amber-300 font-bold rounded p-0.5 outline-none">
+              <span class="text-slate-400 text-[10px]">Units</span>
+            </div>
+          </div>
+        ` : ''}
+
         <!-- Cherry-Pick Make vs Buy Toggle -->
         ${!isRoot && node.isManufacturable ? `
           <div class="mb-2 flex items-center justify-between bg-[#070b0f] p-1 rounded border border-[#1e3348]/60 text-[10px] mono">
@@ -2224,7 +2269,7 @@
         ` : ''}
 
         <!-- Per-Component Sell Orders vs Buy Orders Toggle (When in Buy Mode) -->
-        ${!node.isBuildingSelf || !node.children || node.children.length === 0 ? `
+        ${!isRoot && (!node.isBuildingSelf || !node.children || node.children.length === 0) ? `
           <div class="mb-2 flex items-center justify-between bg-[#070b0f] p-1 rounded border border-[#1e3348]/60 text-[10px] mono">
             <span class="text-slate-400 font-semibold ml-1">Buy via:</span>
             <div class="flex space-x-1" onclick="event.stopPropagation()">
@@ -2258,17 +2303,17 @@
         ` : ''}
 
         <div class="text-[11px] mono space-y-1">
-          <div class="flex justify-between text-slate-400">
-            <span>Lowest Sell:</span>
-            <span class="text-amber-300">${prices.sell.toLocaleString()} ISK</span>
+          <div class="flex justify-between font-semibold">
+            <span class="text-slate-400">Lowest Sell:</span>
+            <span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK</span>
           </div>
           <div class="flex justify-between text-slate-400">
             <span>Highest Buy:</span>
             <span class="text-slate-300">${prices.buy.toLocaleString()} ISK</span>
           </div>
           
-          <!-- Order Savings Percentage Display -->
-          ${savingsPct !== null ? `
+          <!-- Order Savings Percentage Display (Only on Child Input Cards) -->
+          ${!isRoot && savingsPct !== null ? `
             <div class="flex justify-between text-green-400 font-semibold text-[10px]">
               <span>Order Savings:</span>
               <span>${savingsPct}%</span>
@@ -2276,20 +2321,39 @@
           ` : ''}
 
           ${node.jobFee > 0 && node.isBuildingSelf ? `
-            <div class="flex justify-between text-amber-400/90 font-semibold border-t border-[#1e3348]/40 pt-1">
+            <div class="flex justify-between text-purple-300 font-semibold border-t border-[#1e3348]/40 pt-1">
               <span>Job Inst. Fee:</span>
               <span>+${Math.round(node.jobFee).toLocaleString()} ISK</span>
             </div>
           ` : ''}
 
-          <div class="flex justify-between text-slate-200 font-bold border-t border-[#1e3348]/60 pt-1 mt-1">
-            <span>${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span>
-            <span class="text-cyan-400">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span>
+          <div class="flex justify-between font-bold border-t border-[#1e3348]/60 pt-1 mt-1">
+            <span class="text-slate-300">${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span>
+            <span class="text-cyan-300 font-bold">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span>
           </div>
+
+          <!-- Total Net Profit Display on Root Output Card -->
+          ${isRoot ? `
+            <div class="flex justify-between font-bold border-t border-green-500/40 pt-1 mt-1 bg-green-950/30 p-1 rounded">
+              <span class="text-slate-300">Net Profit (Sell Output):</span>
+              <span class="${(recipeTreeRoot.outputMarketValue - node.calculatedCost) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">
+                ${Math.round(recipeTreeRoot.outputMarketValue - node.calculatedCost).toLocaleString()} ISK
+              </span>
+            </div>
+          ` : ''}
         </div>
       `;
 
       return card;
+    }
+
+    function syncCardRunsToGlobal(e) {
+      const val = Math.max(1, parseInt(e.target.value) || 1);
+      const globalInput = document.getElementById('bp-runs');
+      if (globalInput) {
+        globalInput.value = val;
+      }
+      recalculate();
     }
 
     // --- Interactive Component Highlighting Engine ---
@@ -2418,7 +2482,7 @@
       applyNodeHighlightClasses();
     }
 
-    // --- Center on Selected Node via [F] Key ---
+    // --- Center on Selected Node via [F] Key (Defaults to Main Root Card if none selected) ---
     document.addEventListener('keydown', (e) => {
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
         return;
@@ -2431,7 +2495,13 @@
     });
 
     function centerOnSelectedNode() {
-      const targetId = isolatedInstanceId || selectedInstanceId;
+      let targetId = isolatedInstanceId || selectedInstanceId;
+      
+      // Default to Main Target Output Card if no card is currently selected
+      if (!targetId && recipeTreeRoot) {
+        targetId = recipeTreeRoot.instanceId;
+      }
+
       if (!targetId) return;
 
       const card = document.getElementById(`node-card-${targetId}`);
