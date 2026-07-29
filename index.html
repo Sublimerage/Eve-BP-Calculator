@@ -125,7 +125,7 @@
     <div class="flex items-center space-x-2 text-xs mono">
       <!-- ESI SSO Character Status / Login Button -->
       <div id="esi-login-container">
-        <button onclick="startEsiSSOLogin()" class="px-2.5 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded transition flex items-center gap-1 shadow text-[11px]" title="Login with EVE Online to import your character assets">
+        <button onclick="startEsiSSOLogin()" class="px-2.5 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded transition flex items-center gap-1.5 shadow text-[11px]" title="Login with EVE Online to import your character assets">
           🔐 EVE SSO Login
         </button>
       </div>
@@ -152,40 +152,49 @@
   <section class="bg-[#0d1922] border-b border-[#1e3348] p-2 flex flex-wrap items-center gap-2 text-xs relative z-50">
     
     <!-- Item Autocomplete Search -->
-    <div class="relative z-50 w-52 flex-shrink-0">
+    <div class="relative z-50 w-48 flex-shrink-0">
       <input type="text" id="item-search" autocomplete="off" placeholder="Search Item / Blueprint..." 
         class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-1.5 text-white font-bold focus:border-cyan-500 outline-none mono text-xs">
       <div id="search-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
     </div>
 
-    <!-- Build All / Buy All Actions & Smart Savings Thresholds -->
-    <div class="flex items-center space-x-1.5 bg-[#0c1318] p-1 rounded border border-[#1e3348]">
+    <!-- Build All / Buy All Actions -->
+    <div class="flex items-center space-x-1 bg-[#0c1318] p-1 rounded border border-[#1e3348]">
       <button onclick="buildAllComponents()" class="bg-green-700 hover:bg-green-600 text-white font-bold py-1 px-2 rounded text-[11px] mono transition shadow" title="Set all sub-components to Build">
         🔨 Build All
       </button>
       <button onclick="buyAllSubComponents()" class="bg-[#1e3348] hover:bg-slate-600 text-slate-200 font-bold py-1 px-2 rounded text-[11px] mono transition" title="Reset all sub-components to Buy off Market">
         🛒 Buy All
       </button>
+    </div>
 
-      <span class="text-slate-500 text-[10px] mono">|</span>
-
-      <!-- Smart Threshold Inputs -->
-      <div class="flex items-center space-x-1" title="Threshold % for item order savings vs total budget savings">
-        <span class="text-slate-400 text-[10px] mono">Comp %:</span>
-        <input type="number" id="buy-savings-threshold" value="3.0" step="0.5" min="0" max="100" oninput="applySmartBuyThreshold()" 
-          class="w-8 bg-[#070b0f] border border-[#1e3348] text-center text-amber-300 font-bold mono outline-none text-[11px] rounded p-0.5" title="Component order savings threshold %">
-        
-        <span class="text-slate-400 text-[10px] mono ml-1">Total %:</span>
-        <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100" oninput="applySmartBuyThreshold()" 
-          class="w-8 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-300 font-bold mono outline-none text-[11px] rounded p-0.5" title="Total project cost savings threshold %">
-
-        <button onclick="applySmartBuyThreshold()" class="bg-cyan-700 hover:bg-cyan-600 text-white font-bold px-1.5 py-0.5 rounded text-[10px] mono transition" title="Apply % Savings Thresholds to all Buy items">
-          ⚡ Smart
-        </button>
-        <button onclick="resetSmartBuyModes()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold px-1.5 py-0.5 rounded text-[10px] mono transition" title="Reset all cards to Global Pricing strategy">
-          🔄 Reset
+    <!-- Dedicated Smart Order Optimizers Panel -->
+    <div class="bg-[#0c1318] p-1 rounded border border-[#1e3348] flex items-center space-x-2">
+      <!-- Optimizer 1: Component Spread -->
+      <div class="flex items-center space-x-1 text-[10px] mono" title="Spread % = (Sell - Buy) / Sell. Switch to Buy Order if >= threshold %">
+        <span class="text-amber-300 font-bold">Comp %:</span>
+        <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100" 
+          class="w-9 bg-[#070b0f] border border-[#1e3348] text-center text-amber-300 font-bold mono outline-none text-[11px] rounded p-0.5">
+        <button onclick="applyComponentSpreadOptimizer()" class="bg-amber-800 hover:bg-amber-700 text-white font-bold px-1.5 py-0.5 rounded text-[10px] mono transition" title="Apply Component Spread threshold">
+          ⚡ Spread
         </button>
       </div>
+
+      <span class="text-slate-600">|</span>
+
+      <!-- Optimizer 2: Budget Impact -->
+      <div class="flex items-center space-x-1 text-[10px] mono" title="Budget Impact % = ISK Saved / Total Build Cost. Switch to Buy Order if saves >= threshold % of overall budget">
+        <span class="text-cyan-300 font-bold">Budget %:</span>
+        <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100" 
+          class="w-9 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-300 font-bold mono outline-none text-[11px] rounded p-0.5">
+        <button onclick="applyBudgetImpactOptimizer()" class="bg-cyan-700 hover:bg-cyan-600 text-white font-bold px-1.5 py-0.5 rounded text-[10px] mono transition" title="Apply Total Budget Impact threshold">
+          ⚡ Budget
+        </button>
+      </div>
+
+      <button onclick="resetSmartBuyModes()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold px-1.5 py-0.5 rounded text-[10px] mono transition" title="Reset all cards back to Global Pricing dropdown">
+        🔄 Reset
+      </button>
     </div>
 
     <!-- Stock Deduct & Checkboxes -->
@@ -207,7 +216,7 @@
     </div>
 
     <!-- Location Dropdown -->
-    <div class="w-64 flex-shrink-0">
+    <div class="w-56 flex-shrink-0">
       <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-[#0c1318] border border-[#1e3348] rounded p-1.5 text-amber-300 font-bold text-[11px] outline-none truncate">
         <option value="all" selected>All Locations (Char + Corp)</option>
         <option value="industry_system">Current System Only (JITA)</option>
@@ -792,7 +801,6 @@
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       if (!code) {
-        // Check if previously logged in
         const charName = localStorage.getItem('esi_char_name');
         const charId = localStorage.getItem('esi_char_id');
         const token = localStorage.getItem('esi_access_token');
@@ -808,7 +816,6 @@
 
       if (!verifier || !clientId) return;
 
-      // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
 
       try {
@@ -949,7 +956,7 @@
         }
 
         // 4. Resolve Location Names and Populate Location Dropdown
-        await resolveAndPopulateLocationFilter();
+        await resolveAndPopulateLocationFilter(accessToken);
         applyStockLocationFilter();
 
       } catch (err) {
@@ -957,15 +964,18 @@
       }
     }
 
-    // Resolve Location IDs to Clean Names using ESI Universe Names
-    async function resolveAndPopulateLocationFilter() {
+    // Resolve Location IDs (NPC Stations, Systems, Upwell Player Structures) to Clean Names
+    async function resolveAndPopulateLocationFilter(accessToken = null) {
       const uniqueLocIds = Array.from(new Set(rawAssetItems.map(a => a.location_id).filter(id => id)));
       if (uniqueLocIds.length > 0) {
         const missingIds = uniqueLocIds.filter(id => !resolvedLocationNames[id]);
-        if (missingIds.length > 0) {
+        
+        // 1. Batch resolve NPC Stations & Solar Systems via ESI universe/names
+        const standardIds = missingIds.filter(id => id < 1000000000000);
+        if (standardIds.length > 0) {
           const chunks = [];
-          for (let i = 0; i < missingIds.length; i += 500) {
-            chunks.push(missingIds.slice(i, i + 500));
+          for (let i = 0; i < standardIds.length; i += 500) {
+            chunks.push(standardIds.slice(i, i + 500));
           }
 
           for (const chunk of chunks) {
@@ -987,9 +997,29 @@
             } catch (e) {}
           }
         }
+
+        // 2. Resolve Upwell Player Structures via ESI universe/structures (Requires Bearer token)
+        const token = accessToken || localStorage.getItem('esi_access_token');
+        const structureIds = missingIds.filter(id => id > 1000000000000);
+        if (structureIds.length > 0 && token) {
+          for (const structId of structureIds) {
+            try {
+              const res = await fetch(`https://esi.evetech.net/latest/universe/structures/${structId}/?datasource=tranquility`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+
+              if (res.ok) {
+                const structData = await res.json();
+                if (structData && structData.name) {
+                  resolvedLocationNames[structId] = structData.name.toUpperCase();
+                }
+              }
+            } catch (e) {}
+          }
+        }
       }
 
-      // Formatting fallback for locations that ESI names didn't resolve directly
+      // Formatting fallback for locations
       rawAssetItems.forEach(item => {
         const id = item.location_id;
         if (!resolvedLocationNames[id]) {
@@ -1017,10 +1047,8 @@
       const currentSystemName = (document.getElementById('system-search')?.value || 'JITA').toUpperCase();
 
       filterSelect.innerHTML = `
-        <option value="all" selected>All Locations (Char + Corp)</option>
+        <option value="all" selected>All Locations (Combined)</option>
         <option value="industry_system">Current System Only (${currentSystemName})</option>
-        <option value="char_only">Character Assets Only</option>
-        <option value="corp_only">Corporation Assets Only</option>
       `;
 
       const locCounts = {};
@@ -1060,10 +1088,6 @@
 
         if (filterVal === 'all') {
           include = true;
-        } else if (filterVal === 'char_only') {
-          include = item.owner_type === 'char';
-        } else if (filterVal === 'corp_only') {
-          include = item.owner_type === 'corp';
         } else if (filterVal === 'industry_system') {
           include = itemLocName.includes(activeSystemName);
         } else if (filterVal.startsWith('loc_')) {
@@ -1410,7 +1434,7 @@
       if (currentProduct) {
         await selectItem(currentProduct.id, currentProduct.name, true);
       }
-      applySmartBuyThreshold();
+      applyComponentSpreadOptimizer();
     }
 
     // --- Action: Reset Smart Buy Override Modes ---
@@ -1419,10 +1443,9 @@
       recalculate();
     }
 
-    // Action: Apply Smart % Savings Threshold (Component % & Total Cost %) to all Buy Items
-    function applySmartBuyThreshold() {
-      const compThreshold = parseFloat(document.getElementById('buy-savings-threshold')?.value) || 0;
-      const totalCostThreshold = parseFloat(document.getElementById('total-cost-savings-threshold')?.value) || 0;
+    // Optimizer 1: Component Spread Optimizer
+    function applyComponentSpreadOptimizer() {
+      const threshold = parseFloat(document.getElementById('buy-savings-threshold')?.value) || 0;
 
       function optimizeNode(node) {
         if (!node) return;
@@ -1430,24 +1453,60 @@
         if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
           const typeId = node.displayTypeId || node.typeId;
           const prices = priceCache[typeId] || { sell: 0, buy: 0 };
-          const qty = node.qtyNeeded || 1;
           
-          const sellTotal = prices.sell * qty;
-          const buyTotal = prices.buy * qty;
-
-          if (sellTotal > 0 && buyTotal > 0 && sellTotal > buyTotal) {
-            const compSavingsPct = ((prices.sell - prices.buy) / prices.sell) * 100;
-            
-            const rootTotalCost = recipeTreeRoot?.calculatedCost || 1;
-            const totalCostSavingsPct = rootTotalCost > 0 ? ((sellTotal - buyTotal) / rootTotalCost) * 100 : 0;
-
-            if (compSavingsPct >= compThreshold || totalCostSavingsPct >= totalCostThreshold) {
-              customBuyModes[typeId] = 'buy';  // Worth placing Buy order!
+          if (prices.sell > 0 && prices.buy > 0 && prices.sell > prices.buy) {
+            const spreadPct = ((prices.sell - prices.buy) / prices.sell) * 100;
+            if (spreadPct >= threshold) {
+              customBuyModes[typeId] = 'buy';  // Worth placing a Buy Order!
             } else {
-              customBuyModes[typeId] = 'sell'; // Savings below threshold, instant Buy off Sell order!
+              customBuyModes[typeId] = 'sell'; // Spread too small, buy instant off Sell Orders!
             }
           } else {
             customBuyModes[typeId] = 'sell'; 
+          }
+        }
+
+        if (node.children) {
+          node.children.forEach(child => optimizeNode(child));
+        }
+      }
+
+      if (recipeTreeRoot) {
+        optimizeNode(recipeTreeRoot);
+        recalculate();
+      }
+    }
+
+    // Optimizer 2: Budget Impact Optimizer
+    function applyBudgetImpactOptimizer() {
+      const threshold = parseFloat(document.getElementById('total-cost-savings-threshold')?.value) || 0;
+
+      function optimizeNode(node) {
+        if (!node) return;
+        
+        if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
+          const typeId = node.displayTypeId || node.typeId;
+          const prices = priceCache[typeId] || { sell: 0, buy: 0 };
+          
+          const deductModeInput = document.getElementById('deduct-stock-mode');
+          const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+          const stockQty = isStockDeductEnabled ? (userStockMap[typeId] || userStockMap[node.typeId] || 0) : 0;
+          const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
+
+          const sellTotal = prices.sell * netQtyNeeded;
+          const buyTotal = prices.buy * netQtyNeeded;
+
+          if (sellTotal > 0 && buyTotal > 0 && sellTotal > buyTotal) {
+            const rootTotalCost = recipeTreeRoot?.calculatedCost || 1;
+            const budgetImpactPct = rootTotalCost > 0 ? ((sellTotal - buyTotal) / rootTotalCost) * 100 : 0;
+
+            if (budgetImpactPct >= threshold) {
+              customBuyModes[typeId] = 'buy';  // Moves the needle on total budget!
+            } else {
+              customBuyModes[typeId] = 'sell'; // Minor impact, buy instant off Sell Orders!
+            }
+          } else {
+            customBuyModes[typeId] = 'sell';
           }
         }
 
