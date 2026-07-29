@@ -1,5 +1,11 @@
 'use strict';
 
+// Global HTML Escaper Helper Function
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+window.esc = esc;
+
 // Hardcoded EVE Developer Application Client ID for instant 1-click SSO
 window.HARDCODED_CLIENT_ID = '20e4087a1f564a3e897aaaa6daebbecd';
 
@@ -38,11 +44,6 @@ window.panY = 0;
 window.isPanning = false;
 window.startX = 0;
 window.startY = 0;
-
-// Global HTML Escaper Helper Function
-window.esc = function(s) {
-  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-};
 
 // Global Prepacked Index Builder
 window.buildPrepackedIndexes = function() {

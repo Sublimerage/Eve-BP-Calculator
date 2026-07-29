@@ -1001,7 +1001,11 @@ window.onload = async () => {
   await fetchAdjustedPrices();
   
   // Handle ESI SSO Login Callback if returning from OAuth
-  await handleEsiSSOCallback();
+  try {
+    await handleEsiSSOCallback();
+  } catch (err) {
+    console.warn('SSO Callback Error:', err);
+  }
 
   // Load saved Solar System choice or default to Jita
   await loadSavedSystem();
