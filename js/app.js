@@ -285,7 +285,6 @@ function collectGlobalDemand(node, demandMap = {}) {
 function recalculate() {
   if (!recipeTreeRoot) return;
 
-  // Preserve input focus state to prevent multi-digit typing bugs on runs input
   const activeEl = document.activeElement;
   const isCardRunsFocused = activeEl && activeEl.id === 'card-bp-runs';
   const selStart = isCardRunsFocused ? activeEl.selectionStart : null;
@@ -733,7 +732,7 @@ function applyNodeHighlightClasses() {
   });
 }
 
-// Selects and centers camera on a diagram node when clicking a row in the Bill of Materials sidebar
+// Selects and centers camera dead-center on a diagram node when clicking a row in the Bill of Materials sidebar
 function highlightNodeByTypeId(typeId) {
   function findMatchingNode(node) {
     if (!node) return null;
@@ -830,6 +829,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// Accurate Camera Centering using getBoundingClientRect() relative to pan-zoom-content
 function centerOnSelectedNode() {
   let targetId = isolatedInstanceId || selectedInstanceId;
   
@@ -840,26 +840,22 @@ function centerOnSelectedNode() {
   if (!targetId) return;
 
   const card = document.getElementById(`node-card-${targetId}`);
-  if (!card) return;
-
   const viewport = document.getElementById('viewport');
   const content = document.getElementById('pan-zoom-content');
 
-  let currentEl = card;
-  let cardX = 0;
-  let cardY = 0;
+  if (!card || !viewport || !content) return;
 
-  while (currentEl && currentEl !== content) {
-    cardX += currentEl.offsetLeft;
-    cardY += currentEl.offsetTop;
-    currentEl = currentEl.offsetParent;
-  }
+  const cardRect = card.getBoundingClientRect();
+  const contentRect = content.getBoundingClientRect();
+  const viewportRect = viewport.getBoundingClientRect();
 
-  cardX += card.offsetWidth / 2;
-  cardY += card.offsetHeight / 2;
+  // Unscaled card center relative to pan-zoom-content top-left origin
+  const cardCenterX = (cardRect.left + cardRect.width / 2 - contentRect.left) / zoomScale;
+  const cardCenterY = (cardRect.top + cardRect.height / 2 - contentRect.top) / zoomScale;
 
-  panX = (viewport.clientWidth / 2) - (cardX * zoomScale);
-  panY = (viewport.clientHeight / 2) - (cardY * zoomScale);
+  // Calculate panX/panY to center cardCenterX/cardCenterY dead-center in the viewport
+  panX = (viewportRect.width / 2) - (cardCenterX * zoomScale);
+  panY = (viewportRect.height / 2) - (cardCenterY * zoomScale);
 
   updateTransform();
   drawConnectingLines();

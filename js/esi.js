@@ -43,7 +43,8 @@ function isShipType(typeId, typeName) {
          t.includes('exhumer') || t.includes('shuttle') || t.includes('interdictor') ||
          t.includes('covert ops') || t.includes('logistics') || t.includes('ship') ||
          t.includes('transport') || t.includes('ibis') || t.includes('reaper') ||
-         t.includes('velator') || t.includes('impairor') || t.includes('taipan');
+         t.includes('velator') || t.includes('impairor') || t.includes('taipan') ||
+         t.includes('hematite') || t.includes('violator') || t.includes('echo');
 }
 
 // Strict ESI Adjusted Price Fetcher (STRICT CCP ADJUSTED_PRICE ONLY)
@@ -355,7 +356,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
         const parentTypeObj = IDX[Object.keys(IDX).find(k => IDX[k].id === parentAsset.type_id)];
         const parentTypeName = parentTypeObj ? parentTypeObj.name : (window.EVE_ITEMS && window.EVE_ITEMS[parentAsset.type_id] ? window.EVE_ITEMS[parentAsset.type_id] : '');
 
-        // STRICT SHIP EXCLUSION: Check both location flag AND parent type name
+        // STRICT SHIP EXCLUSION: Check both location flag AND parent type ID / name
         const isShipSlot = isShipLocationFlag(ast.location_flag) || isShipLocationFlag(parentAsset.location_flag);
         const isShip = isShipType(parentAsset.type_id, parentTypeName);
 
