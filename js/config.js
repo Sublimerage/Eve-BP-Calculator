@@ -3,39 +3,41 @@
 // Hardcoded EVE Developer Application Client ID for instant 1-click SSO
 const HARDCODED_CLIENT_ID = '20e4087a1f564a3e897aaaa6daebbecd';
 
-// Global Caches & Indexes (Shared across all JS modules)
-let IDX = {};                  // Full Item Index
-let SYSTEM_IDX = {};           // Full Solar System Index
-let recipeMap = {};            // Dual-Key Recipe Map
-let currentProduct = null;      // Selected root item metadata
-let recipeTreeRoot = null;      // Recursive blueprint tree
-let blueprintCache = {};        // Cached blueprint responses
-let priceCache = {};            // Cached Jita 4-4 prices
-let eivCache = {};              // Cached EVE ESI Adjusted Prices
-let rawAssetItems = [];         // Raw ESI / Pasted asset records
-let userStockMap = {};          // Filtered stock quantities
-let systemNameCache = {};       // Cached system names
-let resolvedLocationNames = {}; // Cached location names
-let instanceCounter = 0;        // Node instance ID counter
+// Global State Caches & Indexes (Explicitly attached to window)
+window.IDX = {};                  // Full Item Index
+window.SYSTEM_IDX = {};           // Full Solar System Index
+window.recipeMap = {};            // Dual-Key Recipe Map
+window.currentProduct = null;      // Selected root item metadata
+window.recipeTreeRoot = null;      // Recursive blueprint tree
+window.blueprintCache = {};        // Cached blueprint responses
+window.priceCache = {};            // Cached Jita 4-4 prices
+window.eivCache = {};              // Cached EVE ESI Adjusted Prices
+window.rawAssetItems = [];         // Raw ESI / Pasted asset records
+window.userStockMap = {};          // Filtered stock quantities
+window.systemNameCache = {};       // Cached system names
+window.resolvedLocationNames = {}; // Cached location names
+window.instanceCounter = 0;        // Node instance ID counter
 
 // User Overrides State
-let buildSelfOverrides = {};    // { typeId: boolean }
-let customBuyModes = {};        // { typeId: 'sell' | 'buy' }
-let customMEOverrides = {};     // { typeId: number }
-let customTEOverrides = {};     // { typeId: number }
+window.buildSelfOverrides = {};    // { typeId: boolean }
+window.customBuyModes = {};        // { typeId: 'sell' | 'buy' }
+window.customMEOverrides = {};     // { typeId: number }
+window.customTEOverrides = {};     // { typeId: number }
 
-let selectedInstanceId = null;  
-let isolatedInstanceId = null;  
+window.selectedInstanceId = null;  
+window.isolatedInstanceId = null;  
 
 // Live ESI System Cost Indices
-let activeMfgSCI = 0.0425;
-let activeReactSCI = 0.0110;
+window.activeMfgSCI = 0.0425;
+window.activeReactSCI = 0.0110;
 
 // Pan & Zoom State
-let zoomScale = 1.0;
-let panX = 0, panY = 0;
-let isPanning = false;
-let startX = 0, startY = 0;
+window.zoomScale = 1.0;
+window.panX = 0;
+window.panY = 0;
+window.isPanning = false;
+window.startX = 0;
+window.startY = 0;
 
 // Known Base Raw Materials
 const RAW_BASE_MATERIALS = new Set([
@@ -146,7 +148,7 @@ const BUILTIN_RECIPES = {
       { typeId: 2312, name: "Supertensile Plastics", baseQty: 4 },
       { typeId: 2463, name: "Nanites", baseQty: 4 },
       { typeId: 57457, name: "Reinforced Carbon Fiber", baseQty: 10 }
-        ]
+    ]
   },
   57515: {
     blueprintTypeID: 57515, productTypeID: 57478, productName: "Auto-Integrity Preservation Seal", mfgQtyPerRun: 3, productQtyPerRun: 3,

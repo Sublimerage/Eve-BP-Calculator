@@ -1,5 +1,52 @@
 'use strict';
 
+function buildPrepackedIndexes() {
+  const statusText = document.getElementById('status-text');
+  const statusDot = document.getElementById('status-dot');
+
+  if (window.EVE_ITEMS && Object.keys(window.EVE_ITEMS).length > 10) {
+    for (const [id, name] of Object.entries(window.EVE_ITEMS)) {
+      IDX[name.toLowerCase()] = { id: parseInt(id), name: name };
+    }
+  } else {
+    POPULAR_ITEMS.forEach(r => {
+      IDX[r.name.toLowerCase()] = { id: r.id, name: r.name };
+    });
+  }
+
+  if (window.EVE_SYSTEMS && Object.keys(window.EVE_SYSTEMS).length > 10) {
+    for (const [id, name] of Object.entries(window.EVE_SYSTEMS)) {
+      SYSTEM_IDX[name.toLowerCase()] = { id: parseInt(id), name: name.toUpperCase() };
+      systemNameCache[id] = name.toUpperCase();
+    }
+  } else {
+    POPULAR_SYSTEMS.forEach(sys => {
+      SYSTEM_IDX[sys.name.toLowerCase()] = { id: sys.id, name: sys.name.toUpperCase() };
+      systemNameCache[sys.id] = sys.name.toUpperCase();
+    });
+  }
+
+  if (window.EVE_RECIPES && typeof window.EVE_RECIPES === 'object') {
+    for (const [idStr, recipe] of Object.entries(window.EVE_RECIPES)) {
+      const keyId = parseInt(idStr);
+      recipeMap[keyId] = recipe;
+      if (recipe.blueprintTypeID) recipeMap[recipe.blueprintTypeID] = recipe;
+      if (recipe.productTypeID) recipeMap[recipe.productTypeID] = recipe;
+    }
+  }
+
+  // Explicitly override stale recipes with live verified SDE quantities
+  for (const [idStr, recipe] of Object.entries(BUILTIN_RECIPES)) {
+    const keyId = parseInt(idStr);
+    recipeMap[keyId] = recipe;
+    if (recipe.blueprintTypeID) recipeMap[recipe.blueprintTypeID] = recipe;
+    if (recipe.productTypeID) recipeMap[recipe.productTypeID] = recipe;
+  }
+
+  if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-green-400';
+  if (statusText) statusText.textContent = `INDEX READY (${Object.keys(IDX).length.toLocaleString()} ITEMS | ${Object.keys(recipeMap).length.toLocaleString()} RECIPES)`;
+}
+
 function searchItems(query) {
   const q = query.toLowerCase().trim();
   if (!q) return [];
