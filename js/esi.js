@@ -6,14 +6,28 @@ function esc(s) {
 }
 if (!window.esc) window.esc = esc;
 
-// Helper to detect if an asset location flag is a ship slot or ship cargo bay
+// Helper to detect if an asset location flag belongs to a ship slot or ship cargo bay
 function isShipLocationFlag(flag) {
   if (!flag) return false;
   const f = flag.toLowerCase();
   return f.includes('cargo') || f.includes('dronebay') || f.includes('shiphangar') || 
          f.includes('fleethangar') || f.includes('subsystem') || f.includes('fighter') || 
          f.includes('highslot') || f.includes('medslot') || f.includes('lowslot') || 
-         f.includes('rigslot') || f.includes('specialized') || f.includes('fuelbay');
+         f.includes('rigslot') || f.includes('specialized') || f.includes('fuelbay') ||
+         f.includes('autofit');
+}
+
+// Helper to check if an item type name indicates a ship rather than a cargo container
+function isShipTypeName(typeName) {
+  if (!typeName) return false;
+  const t = typeName.toLowerCase();
+  // If the type explicitly mentions container, canister, vault, freight, or plastic wrap, it is NOT a ship
+  if (t.includes('container') || t.includes('canister') || t.includes('vault') || 
+      t.includes('freight') || t.includes('plastic wrap') || t.includes('box') || 
+      t.includes('crate') || t.includes('chest') || t.includes('audit log')) {
+    return false;
+  }
+  return true;
 }
 
 // Strict ESI Adjusted Price Fetcher (STRICT CCP ADJUSTED_PRICE ONLY)
@@ -301,7 +315,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     }
 
-    // Build item_id -> item asset map
+    // Map item_id -> asset
     const itemIdToAssetMap = {};
     rawAssetItems.forEach(ast => {
       if (ast.item_id) {
@@ -309,7 +323,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     });
 
-    // Trace asset hierarchy up to root station/structure and identify containers (excluding ships)
+    // Trace asset hierarchy up to root station/structure and identify containers (strictly excluding ships)
     const charContainerIds = [];
     const corpContainerIds = [];
 
@@ -321,8 +335,14 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       while (itemIdToAssetMap[currentLoc] && depth < 10) {
         const parentAsset = itemIdToAssetMap[currentLoc];
         
-        // Bypasses ships as containers! Only treat non-ship items as valid containers.
-        if (!isShipLocationFlag(ast.location_flag) && !isShipLocationFlag(parentAsset.location_flag)) {
+        // Resolve parent type name
+        const parentTypeObj = IDX[Object.keys(IDX).find(k => IDX[k].id === parentAsset.type_id)];
+        const parentTypeName = parentTypeObj ? parentTypeObj.name : (window.EVE_ITEMS && window.EVE_ITEMS[parentAsset.type_id] ? window.EVE_ITEMS[parentAsset.type_id] : '');
+
+        // EXCLUDE SHIPS: Only treat as container if parent is NOT in a ship slot and NOT a ship type
+        const isParentShip = isShipLocationFlag(ast.location_flag) || isShipLocationFlag(parentAsset.location_flag) || isShipTypeName(parentTypeName);
+
+        if (!isParentShip) {
           if (!containerId) {
             containerId = currentLoc;
             if (ast.owner_type === 'char' && !charContainerIds.includes(containerId)) {
