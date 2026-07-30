@@ -29,10 +29,10 @@ function isShipLocationFlag(flag) {
          f.includes('fleethangar') || f.includes('subsystem') || f.includes('fighter') || 
          f.includes('highslot') || f.includes('medslot') || f.includes('lowslot') || 
          f.includes('rigslot') || f.includes('specialized') || f.includes('fuelbay') ||
-         f.includes('autofit');
+         f.includes('autofit') || f.includes('corpsebay');
 }
 
-// Helper to check if a type ID corresponds to a known container type
+// Check if a type ID corresponds to a known container type name
 function isKnownContainerType(typeId, typeName) {
   if (!typeName) typeName = getItemTypeName(typeId);
   if (!typeName) return false;
@@ -54,9 +54,8 @@ function isKnownContainerType(typeId, typeName) {
          t.includes('depot');
 }
 
-// Comprehensive check for Rookie Ships and all EVE ship hull types
+// Check for Rookie Ships and all EVE ship hull types
 function isShipType(typeId) {
-  // Explicit Rookie Ship Type IDs
   const rookieShipIds = new Set([
     601, 606, 608, 596, 33079, 33081, 33083, 33085, // Rookie ships (Ibis, Reaper, Velator, Impairor, Taipan, etc.)
     621, 622, 12005, 587, 24698, 644, 642, 643, 12015, 11987, 11989 // Popular ships
@@ -67,12 +66,10 @@ function isShipType(typeId) {
   if (!typeName) return false;
   const t = typeName.toLowerCase();
 
-  // Known container keywords - if it matches these, it is a container and NOT a ship
   if (isKnownContainerType(typeId, typeName)) {
     return false;
   }
 
-  // Common ship hull / class keywords including rookie ships
   const shipTerms = [
     'frigate', 'destroyer', 'cruiser', 'battlecruiser', 'battleship', 'dreadnought',
     'carrier', 'supercarrier', 'titan', 'corvette', 'industrial', 'freighter',
@@ -310,7 +307,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       corpId = charData.corporation_id;
     }
 
-    // Fetch custom Corporation Hangar Division names if corpId is present
+    // Fetch custom Corporation Hangar Division names
     if (corpId && accessToken) {
       try {
         const divRes = await fetch(`https://esi.evetech.net/latest/corporations/${corpId}/divisions/?datasource=tranquility`, {
@@ -413,7 +410,10 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       while (itemIdToAssetMap[currentLoc] && depth < 10) {
         const parentAsset = itemIdToAssetMap[currentLoc];
         
-        // STRICT CONTAINER CHECK: Check location flag, ship category, AND container verification
+        // WATERPROOF CONTAINER CHECK:
+        // 1) Child asset location_flag must NOT be a ship slot/bay
+        // 2) Parent asset type must NOT be a ship
+        // 3) Parent asset type MUST be a recognized container or hold container flags
         const isShipSlot = isShipLocationFlag(ast.location_flag) || isShipLocationFlag(parentAsset.location_flag);
         const isShip = isShipType(parentAsset.type_id);
         const isContainer = isKnownContainerType(parentAsset.type_id);
