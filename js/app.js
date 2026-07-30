@@ -1149,7 +1149,77 @@ function drawConnectingLines() {
     });
   }
 
-  drawLinesForNode(recipeTreeRoot);
+  drawConnectingLinesForTree(recipeTreeRoot);
+}
+
+function drawConnectingLinesForTree(root) {
+  if (!root) return;
+  
+  const container = document.getElementById('tree-container');
+  const svg = document.getElementById('tree-svg');
+  if (!svg || !container) return;
+
+  const containerRect = container.getBoundingClientRect();
+  const selectedNode = selectedInstanceId ? findNodeByInstanceId(recipeTreeRoot, selectedInstanceId) : null;
+  const activeChildIds = new Set(selectedNode ? selectedNode.children.map(c => c.instanceId) : []);
+  const parentInstanceId = selectedNode ? selectedNode.parentInstanceId : null;
+
+  function drawLinesForNode(node) {
+    if (!node.isBuildingSelf || !node.children || node.children.length === 0) return;
+
+    const parentEl = document.getElementById(`node-card-${node.instanceId}`);
+    if (!parentEl) return;
+
+    const parentRect = parentEl.getBoundingClientRect();
+    
+    const endX = (parentRect.left - containerRect.left) / zoomScale;
+    const endY = (parentRect.top + parentRect.height / 2 - containerRect.top) / zoomScale;
+
+    node.children.forEach(child => {
+      const childEl = document.getElementById(`node-card-${child.instanceId}`);
+      if (childEl) {
+        const childRect = childEl.getBoundingClientRect();
+        
+        const startX = (childRect.right - containerRect.left) / zoomScale;
+        const startY = (childRect.top + childRect.height / 2 - containerRect.top) / zoomScale;
+
+        const controlX1 = startX + 40;
+        const controlX2 = endX - 40;
+
+        const isInputConnection = (selectedInstanceId !== null) && 
+          (node.instanceId === selectedInstanceId && activeChildIds.has(child.instanceId));
+
+        const isOutputConnection = (selectedInstanceId !== null) && 
+          (child.instanceId === selectedInstanceId && node.instanceId === parentInstanceId);
+
+        const isHighlightedConnection = isInputConnection || isOutputConnection;
+        const isDimmedConnection = (selectedInstanceId !== null) && !isHighlightedConnection;
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M ${startX} ${startY} C ${controlX1} ${startY}, ${controlX2} ${endY}, ${endX} ${endY}`);
+        
+        if (isHighlightedConnection) {
+          path.setAttribute('stroke', isOutputConnection ? '#e8c96a' : '#4caf6f');
+          path.setAttribute('stroke-width', '3.5');
+          path.setAttribute('stroke-opacity', '1.0');
+        } else if (isDimmedConnection) {
+          path.setAttribute('stroke', '#06b6d4');
+          path.setAttribute('stroke-width', '1.5');
+          path.setAttribute('stroke-opacity', '0.12');
+        } else {
+          path.setAttribute('stroke', '#06b6d4');
+          path.setAttribute('stroke-width', '2');
+          path.setAttribute('stroke-opacity', '0.75');
+        }
+
+        path.setAttribute('fill', 'none');
+        svg.appendChild(path);
+      }
+      drawLinesForNode(child);
+    });
+  }
+
+  drawLinesForNode(root);
 }
 
 function renderBillOfMaterials(rootNode, brokerFee = 0) {
