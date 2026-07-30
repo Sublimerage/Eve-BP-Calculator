@@ -28,6 +28,17 @@ function loadJournalState() {
     buildHistory = [];
   }
 
+  // Load custom location names and assets
+  try {
+    window.rawAssetItems = JSON.parse(localStorage.getItem('eve_raw_assets')) || [];
+    window.resolvedLocationNames = JSON.parse(localStorage.getItem('eve_resolved_location_names')) || {};
+    window.corpDivisionNames = JSON.parse(localStorage.getItem('eve_corp_division_names')) || {};
+  } catch (e) {
+    window.rawAssetItems = [];
+    window.resolvedLocationNames = {};
+    window.corpDivisionNames = {};
+  }
+
   try {
     const savedStocks = localStorage.getItem('eve_user_stock_map');
     userStockMap = savedStocks ? JSON.parse(savedStocks) : {};
@@ -78,8 +89,11 @@ function renderJournalPage() {
   const bomItems = Object.values(consolidatedBOM);
   let aggregatedMissingCost = 0;
 
+  const deductModeInput = document.getElementById('deduct-stock-mode');
+  const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+
   bomItems.forEach(item => {
-    const stockQty = userStockMap[item.typeId] || 0;
+    const stockQty = isStockDeductEnabled ? (userStockMap[item.typeId] || 0) : 0;
     const netMissing = Math.max(0, item.totalQtyNeeded - stockQty);
     item.stockQty = stockQty;
     item.netMissingQty = netMissing;
@@ -112,13 +126,41 @@ function renderActiveJobsList() {
     return;
   }
 
+  const deductModeInput = document.getElementById('deduct-stock-mode');
+  const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+
   container.innerHTML = activeJobs.map(job => {
     const iconTypeId = job.typeId;
-    const sellLabel = job.sellStrategy === 'custom-contract' ? 'Contract' : 'Market Sell';
     const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
 
+    // Generate individual BOM breakdown with stock deduction mapping
+    const individualBOMHTML = job.materials.map(mat => {
+      const stockQty = isStockDeductEnabled ? (userStockMap[mat.typeId] || 0) : 0;
+      const netMissing = Math.max(0, mat.qtyNeeded - stockQty);
+      const isAcquired = netMissing === 0;
+
+      return `
+        <div class="flex justify-between items-center text-[10px] mono py-0.5 border-b border-[#1e3348]/20 ${isAcquired ? 'text-green-400' : 'text-slate-400'}">
+          <span class="truncate pr-4">${esc(mat.name)}</span>
+          <span class="flex-shrink-0">${isAcquired ? `✔ ${mat.qtyNeeded}` : `x${mat.qtyNeeded} (Deficit: ${netMissing})`}</span>
+        </div>
+      `;
+    }).join('');
+
+    // Format individual job deficit text list for multibuy clipboard pasting
+    const cardBOMMultibuyText = job.materials
+      .filter(m => {
+        const stockQty = isStockDeductEnabled ? (userStockMap[m.typeId] || 0) : 0;
+        return (m.qtyNeeded - stockQty) > 0;
+      })
+      .map(m => {
+        const stockQty = isStockDeductEnabled ? (userStockMap[m.typeId] || 0) : 0;
+        return `${m.name} x${m.qtyNeeded - stockQty}`;
+      })
+      .join('\n');
+
     return `
-      <div class="bg-[#0c1318] border border-[#1e3348] hover:border-purple-500/40 rounded p-4 flex flex-col justify-between shadow-md transition space-y-4">
+      <div class="bg-[#0c1318] border border-[#1e3348] hover:border-purple-500/40 rounded p-4 flex flex-col justify-between shadow-md transition space-y-3">
         <div class="flex items-start space-x-3">
           <img src="https://images.evetech.net/types/${iconTypeId}/icon?size=64" class="w-12 h-12 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
           <div class="min-w-0 flex-1">
@@ -130,18 +172,24 @@ function renderActiveJobsList() {
           </div>
         </div>
 
-        <div class="text-xs mono space-y-1 bg-[#070b0f] p-2 rounded border border-[#1e3348]/40">
-          <div class="flex justify-between">
-            <span class="text-slate-400">Sell Channel:</span>
-            <span class="text-purple-300 font-bold">${sellLabel}</span>
+        <!-- Individual Material BOM breakdown area -->
+        <div class="p-2 bg-[#070b0f] rounded border border-[#1e3348]/40">
+          <div class="flex justify-between items-center mb-1.5 pb-1 border-b border-[#1e3348]/40">
+            <span class="text-[10px] text-cyan-400 font-bold uppercase tracking-wider rajdhani">Job Materials (BOM)</span>
+            <button onclick="copyIndividualJobMultibuy(event, \`${esc(cardBOMMultibuyText)}\`)" class="text-[9px] bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-1.5 py-0.5 rounded mono transition">
+              📋 Copy BOM
+            </button>
           </div>
-          <div class="flex justify-between border-t border-[#1e3348]/40 pt-1 mt-1 font-bold">
+          <div class="max-h-28 overflow-y-auto scrollbar-thin">
+            ${individualBOMHTML}
+          </div>
+          <div class="flex justify-between items-center text-[10px] mono font-bold pt-1.5 border-t border-[#1e3348]/40 mt-1">
             <span class="text-slate-300">Total Build Cost:</span>
             <span class="text-cyan-400">${Math.round(job.calculatedCost).toLocaleString()} ISK</span>
           </div>
         </div>
 
-        <div class="flex items-center space-x-2 pt-1.5">
+        <div class="flex items-center space-x-2 pt-1">
           <button onclick="markJobAsBuilt(${job.id})" class="flex-1 py-1.5 bg-green-800/80 hover:bg-green-700 text-white font-bold rounded text-[11px] mono transition border border-green-600/30 flex items-center justify-center gap-1">
             ✔ Built
           </button>
@@ -152,6 +200,25 @@ function renderActiveJobsList() {
       </div>
     `;
   }).join('');
+}
+
+// Copy single card deficit components to clipboard in EVE Online Multibuy format
+function copyIndividualJobMultibuy(e, textList) {
+  if (e) e.stopPropagation();
+  if (!textList || textList.trim() === '') return;
+
+  navigator.clipboard.writeText(textList).then(() => {
+    const btn = e.target;
+    if (btn) {
+      const origText = btn.innerHTML;
+      btn.innerHTML = 'Copied!';
+      btn.className = 'text-[9px] bg-green-600 text-white font-bold px-1.5 py-0.5 rounded mono transition';
+      setTimeout(() => {
+        btn.innerHTML = origText;
+        btn.className = 'text-[9px] bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-1.5 py-0.5 rounded mono transition';
+      }, 1500);
+    }
+  });
 }
 
 // Render Consolidated BOM Sidebar
@@ -254,10 +321,12 @@ function markJobAsBuilt(jobId) {
   // 2. Ledger Logging: Archive job records into completed build history array
   const record = {
     id: job.id,
+    typeId: job.typeId,
     name: job.name,
     runsNeeded: job.runsNeeded,
     qtyNeeded: job.qtyNeeded,
     calculatedCost: job.calculatedCost,
+    materials: job.materials, // Saved BOM
     completedAt: new Date().toISOString()
   };
 
@@ -266,6 +335,32 @@ function markJobAsBuilt(jobId) {
 
   // 3. Remove job from the active manufacturing queue
   activeJobs.splice(jobIndex, 1);
+  localStorage.setItem('eve_journal_jobs', JSON.stringify(activeJobs));
+
+  renderJournalPage();
+}
+
+// Re-queue completed job back into active queue
+function requeueCompletedJob(recordId) {
+  loadJournalState();
+
+  const recordIndex = buildHistory.findIndex(r => r.id === recordId);
+  if (recordIndex === -1) return;
+
+  const record = buildHistory[recordIndex];
+
+  const job = {
+    id: ++instanceCounter + Date.now(),
+    typeId: record.typeId,
+    name: record.name,
+    runsNeeded: record.runsNeeded,
+    qtyNeeded: record.qtyNeeded,
+    calculatedCost: record.calculatedCost,
+    materials: record.materials || [],
+    addedAt: new Date().toISOString()
+  };
+
+  activeJobs.push(job);
   localStorage.setItem('eve_journal_jobs', JSON.stringify(activeJobs));
 
   renderJournalPage();
@@ -308,7 +403,14 @@ function renderBuildHistoryLedger() {
         <td class="p-1.5 py-2 text-right">${record.runsNeeded.toLocaleString()}</td>
         <td class="p-1.5 py-2 text-right text-purple-300 font-bold">${record.qtyNeeded.toLocaleString()}</td>
         <td class="p-1.5 py-2 text-right text-cyan-400 font-bold">${Math.round(record.calculatedCost || 0).toLocaleString()} ISK</td>
-        <td class="p-1.5 py-2"><span class="text-green-400 font-bold uppercase text-[9px] bg-green-950 px-1 py-0.5 rounded">✔ Built</span></td>
+        <td class="p-1.5 py-2">
+          <div class="flex items-center space-x-2">
+            <span class="text-green-400 font-bold uppercase text-[9px] bg-green-950 px-1 py-0.5 rounded">✔ Built</span>
+            <button onclick="requeueCompletedJob(${record.id})" class="px-2 py-0.5 bg-purple-950/60 hover:bg-purple-800 text-purple-300 font-semibold rounded text-[9px] mono border border-purple-800/40 transition">
+              🔄 Re-queue
+            </button>
+          </div>
+        </td>
       </tr>
     `;
   }).join('');
@@ -320,13 +422,219 @@ function clearJournalHistory() {
   renderJournalPage();
 }
 
+// --- Live stock location / Container filter panel ---
+function populateJournalLocationDropdown() {
+  const filterSelect = document.getElementById('stock-location-filter');
+  if (!filterSelect) return;
+
+  const currentValue = filterSelect.value || 'all';
+
+  filterSelect.innerHTML = `
+    <option value="all" style="color: #38bdf8; background-color: #0c1318; font-weight: bold;">All Locations (Combined Assets)</option>
+    <option value="industry_system" style="color: #38bdf8; background-color: #0c1318; font-weight: bold;">Current System Only (JITA)</option>
+  `;
+
+  const sagNameMap = {
+    'CorpSAG1': window.corpDivisionNames[1] || 'DIVISION 1',
+    'CorpSAG2': window.corpDivisionNames[2] || 'DIVISION 2',
+    'CorpSAG3': window.corpDivisionNames[3] || 'DIVISION 3',
+    'CorpSAG4': window.corpDivisionNames[4] || 'DIVISION 4',
+    'CorpSAG5': window.corpDivisionNames[5] || 'DIVISION 5',
+    'CorpSAG6': window.corpDivisionNames[6] || 'DIVISION 6',
+    'CorpSAG7': window.corpDivisionNames[7] || 'DIVISION 7',
+    'CorpDeliveries': 'CORP DELIVERIES'
+  };
+
+  const locCounts = {};
+  window.rawAssetItems.forEach(item => {
+    const locId = item.root_location_id || item.location_id;
+    const locName = window.resolvedLocationNames[locId] || `Location #${locId}`;
+
+    if (!locCounts[locId]) {
+      locCounts[locId] = {
+        name: locName,
+        count: 0,
+        corpDivisions: {},
+        containers: {}
+      };
+    }
+    locCounts[locId].count += item.quantity;
+
+    if (item.owner_type === 'corp' && item.location_flag && item.location_flag.startsWith('Corp')) {
+      const sagFlag = item.location_flag;
+      if (!locCounts[locId].corpDivisions[sagFlag]) {
+        locCounts[locId].corpDivisions[sagFlag] = {
+          name: sagNameMap[sagFlag] || sagFlag,
+          count: 0
+        };
+      }
+      locCounts[locId].corpDivisions[sagFlag].count += item.quantity;
+    }
+
+    if (item.container_id) {
+      const cId = item.container_id;
+      const cName = window.resolvedLocationNames[cId] || `Container #${cId}`;
+      if (!locCounts[locId].containers[cId]) {
+        locCounts[locId].containers[cId] = {
+          name: cName,
+          count: 0
+        };
+      }
+      locCounts[locId].containers[cId].count += item.quantity;
+    }
+  });
+
+  for (const [locId, data] of Object.entries(locCounts)) {
+    const mainOpt = document.createElement('option');
+    mainOpt.value = `loc_${locId}`;
+    
+    const numericLocId = parseInt(locId);
+    const isUpwellStructure = numericLocId > 1000000000000;
+
+    if (isUpwellStructure) {
+      mainOpt.style.color = '#f97316';
+      mainOpt.style.backgroundColor = '#0c1318';
+      mainOpt.style.fontWeight = 'bold';
+      mainOpt.textContent = `🟧 ${data.name} (${data.count.toLocaleString()} items)`;
+    } else {
+      mainOpt.style.color = '#4caf6f';
+      mainOpt.style.backgroundColor = '#0c1318';
+      mainOpt.style.fontWeight = 'bold';
+      mainOpt.textContent = `🟩 ${data.name} (${data.count.toLocaleString()} items)`;
+    }
+
+    filterSelect.appendChild(mainOpt);
+
+    for (const [sagFlag, sagData] of Object.entries(data.corpDivisions)) {
+      const sagOpt = document.createElement('option');
+      sagOpt.value = `corpsag_${locId}_${sagFlag}`;
+      sagOpt.style.color = '#c084fc';
+      sagOpt.style.backgroundColor = '#070b0f';
+      sagOpt.style.fontWeight = 'bold';
+      sagOpt.textContent = `  └─ 🟪 Corp Hangar: ${sagData.name} (${sagData.count.toLocaleString()} items)`;
+      filterSelect.appendChild(sagOpt);
+    }
+
+    for (const [cId, cData] of Object.entries(data.containers)) {
+      const containerOpt = document.createElement('option');
+      containerOpt.value = `container_${cId}`;
+      containerOpt.style.color = '#f8fafc';
+      containerOpt.style.backgroundColor = '#070b0f';
+      containerOpt.textContent = `  └─ 📦 Container: ${cData.name} (${cData.count.toLocaleString()} items)`;
+      filterSelect.appendChild(containerOpt);
+    }
+  }
+
+  if (filterSelect.querySelector(`option[value="${currentValue}"]`)) {
+    filterSelect.value = currentValue;
+  } else {
+    filterSelect.value = 'all';
+  }
+}
+
+function filterJournalLocationOptions() {
+  const query = (document.getElementById('location-filter-search')?.value || '').trim().toUpperCase();
+  const filterSelect = document.getElementById('stock-location-filter');
+  const feedbackBadge = document.getElementById('location-search-feedback');
+  if (!filterSelect) return;
+
+  const options = filterSelect.querySelectorAll('option');
+  let visibleCount = 0;
+
+  options.forEach(opt => {
+    if (opt.value === 'all' || opt.value === 'industry_system') {
+      opt.style.display = '';
+    } else {
+      if (!query || opt.textContent.toUpperCase().includes(query)) {
+        opt.style.display = '';
+        visibleCount++;
+      } else {
+        opt.style.display = 'none';
+      }
+    }
+  });
+
+  if (feedbackBadge) {
+    if (query) {
+      feedbackBadge.textContent = `Found: ${visibleCount} location(s) / container(s)`;
+      feedbackBadge.classList.remove('hidden');
+    } else {
+      feedbackBadge.textContent = '';
+      feedbackBadge.classList.add('hidden');
+    }
+  }
+}
+
+function updateJournalStockCountBadge() {
+  const el = document.getElementById('stock-count-display');
+  if (!el) return;
+  const totalItems = Object.values(window.userStockMap || {}).reduce((acc, q) => acc + q, 0);
+  el.textContent = `${totalItems.toLocaleString()} items`;
+}
+
+function applyJournalStockFilter() {
+  const filterVal = document.getElementById('stock-location-filter')?.value || 'all';
+  const useChar = document.getElementById('use-char-assets')?.checked ?? true;
+  const useCorp = document.getElementById('use-corp-assets')?.checked ?? true;
+
+  window.userStockMap = {};
+
+  window.rawAssetItems.forEach(item => {
+    if (item.owner_type === 'char' && !useChar) return;
+    if (item.owner_type === 'corp' && !useCorp) return;
+
+    let include = false;
+    const rootLocId = item.root_location_id || item.location_id;
+    const itemLocName = window.resolvedLocationNames[rootLocId] || '';
+
+    if (filterVal === 'all') {
+      include = true;
+    } else if (filterVal === 'industry_system') {
+      include = itemLocName.includes('JITA');
+    } else if (filterVal.startsWith('loc_')) {
+      const targetLocId = parseInt(filterVal.replace('loc_', ''));
+      include = rootLocId === targetLocId;
+    } else if (filterVal.startsWith('corpsag_')) {
+      const parts = filterVal.split('_');
+      const targetLocId = parseInt(parts[1]);
+      const targetSag = parts[2];
+      include = (rootLocId === targetLocId) && (item.location_flag === targetSag);
+    } else if (filterVal.startsWith('container_')) {
+      const targetContainerId = parseInt(filterVal.replace('container_', ''));
+      include = item.container_id === targetContainerId;
+    }
+
+    if (include) {
+      window.userStockMap[item.type_id] = (window.userStockMap[item.type_id] || 0) + item.quantity;
+    }
+  });
+
+  // Sync to shared memory
+  localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap));
+
+  updateJournalStockCountBadge();
+  renderJournalPage();
+}
+
+function recalculateJournalStock() {
+  applyJournalStockFilter();
+}
+
 // Expose actions globally to windows environment
 window.copyJournalMultibuy = copyJournalMultibuy;
+window.copyIndividualJobMultibuy = copyIndividualJobMultibuy;
 window.markJobAsBuilt = markJobAsBuilt;
+window.requeueCompletedJob = requeueCompletedJob;
 window.deleteJobFromQueue = deleteJobFromQueue;
 window.clearJournalHistory = clearJournalHistory;
+window.applyJournalStockFilter = applyJournalStockFilter;
+window.filterJournalLocationOptions = filterJournalLocationOptions;
+window.recalculateJournalStock = recalculateJournalStock;
 
 // Initialize Journal page on window load
 window.onload = () => {
+  loadJournalState();
+  populateJournalLocationDropdown();
+  updateJournalStockCountBadge();
   renderJournalPage();
 };

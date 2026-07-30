@@ -301,8 +301,8 @@ function recalculate() {
   const isCardRunsFocused = activeEl && activeEl.id === 'card-bp-runs';
   const isCardCustomPriceFocused = activeEl && activeEl.id === 'card-custom-price';
 
-  const runModeInput = document.getElementById('run-mode');
-  const isRunsMode = runModeInput ? runModeInput.value === 'runs' : false;
+  // Hardcode as true to bypass any HTML file cache restrictions in standard browsers
+  const isRunsMode = true;
 
   const bpRunsInput = document.getElementById('bp-runs');
   const inputVal = Math.max(1, parseInt(bpRunsInput ? bpRunsInput.value : 1) || 1);
@@ -506,6 +506,14 @@ function recalculate() {
   
   renderBillOfMaterials(recipeTreeRoot, brokerFee);
   setTimeout(drawConnectingLines, 50);
+
+  // Synchronize raw inventory parameters to LocalStorage for cross-page companion access
+  try {
+    localStorage.setItem('eve_raw_assets', JSON.stringify(window.rawAssetItems || []));
+    localStorage.setItem('eve_resolved_location_names', JSON.stringify(window.resolvedLocationNames || {}));
+    localStorage.setItem('eve_corp_division_names', JSON.stringify(window.corpDivisionNames || {}));
+    localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap || {}));
+  } catch (err) {}
 
   // Restore active input focus and cursor selection dynamically
   if (isCardRunsFocused) {
