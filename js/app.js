@@ -490,7 +490,19 @@ function recalculate() {
   const roiBuyEl = document.getElementById('summary-roi-buy');
   if (roiBuyEl) roiBuyEl.textContent = `ROI: ${roiBuy}%`;
 
-  renderTreeDiagram(recipeTreeRoot, priceStrategy, profitSell, roiSell);
+  const curStrategy = window.rootSellStrategy || 'market-sell';
+
+  if (isolatedInstanceId) {
+    const isoNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
+    if (isoNode) {
+      renderIsolatedDiagram();
+    } else {
+      isolatedInstanceId = null;
+      renderTreeDiagram(recipeTreeRoot, priceStrategy, profitSell, roiSell);
+    }
+  } else {
+    renderTreeDiagram(recipeTreeRoot, priceStrategy, profitSell, roiSell);
+  }
   
   renderBillOfMaterials(recipeTreeRoot, brokerFee);
   setTimeout(drawConnectingLines, 50);
@@ -1158,4 +1170,190 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
       const strategy = getNodePriceStrategy(node);
       
       const stockQty = isStockDeductEnabled ? (userStockMap[typeId] || userStockMap[node.typeId] || 0) : 0;
-      const netQtyNeeded = Ma
+      const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
+
+      if (!bomMap[typeId]) {
+        bomMap[typeId] = {
+          typeId: typeId,
+          name: node.name,
+          qty: 0,
+          strategy: strategy
+        };
+      }
+      bomMap[typeId].qty += netQtyNeeded;
+    } else {
+      node.children.forEach(child => generateBOM(child));
+    }
+  }
+
+  if (rootNode.isBuildingSelf && rootNode.children && rootNode.children.length > 0) {
+    rootNode.children.forEach(c => generateBOM(c));
+  } else {
+    const rootTypeId = rootNode.displayTypeId || rootNode.typeId;
+    const strategy = getNodePriceStrategy(rootNode);
+    const stockQty = isStockDeductEnabled ? (userStockMap[rootTypeId] || userStockMap[rootNode.typeId] || 0) : 0;
+    const netQtyNeeded = Math.max(0, rootNode.qtyNeeded - stockQty);
+
+    bomMap[rootTypeId] = { typeId: rootTypeId, name: rootNode.name, qty: netQtyNeeded, strategy: strategy };
+  }
+
+  const bomItems = Object.values(bomMap);
+  let totalBOMCost = 0;
+
+  bomItems.forEach(item => {
+    const prices = priceCache[item.typeId] || { sell: 0, buy: 0 };
+    let unitPrice = item.strategy === 'sell' ? prices.sell : prices.buy;
+    if (item.strategy === 'buy') {
+      unitPrice = unitPrice * (1 + brokerFee);
+    }
+    item.unitPrice = unitPrice;
+    item.lineCost = unitPrice * item.qty;
+    totalBOMCost += item.lineCost;
+  });
+
+  bomItems.sort((a, b) => b.lineCost - a.lineCost);
+
+  bomItems.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'bg-[#0c1318] border border-[#1e3348] hover:border-cyan-500 hover:bg-[#101d2a] rounded p-2 flex items-center justify-between cursor-pointer transition shadow-sm';
+    row.title = 'Click to find and focus this material in the build diagram';
+    row.onclick = () => highlightNodeByTypeId(item.typeId);
+
+    row.innerHTML = `
+      <div class="flex items-center space-x-2.5 min-w-0">
+        <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-7 h-7 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
+        <div class="min-w-0 flex-1">
+          <div class="font-semibold text-slate-200 truncate flex items-center gap-1.5">
+            <span class="truncate">${item.name}</span>
+            <span class="text-[9px] px-1 rounded font-bold mono ${item.strategy === 'sell' ? 'bg-amber-900/60 text-amber-300' : 'bg-cyan-900/60 text-cyan-300'}">
+              ${item.strategy === 'sell' ? 'SELL' : 'BUY'}
+            </span>
+          </div>
+          <div class="text-[10px] text-slate-400 mono font-semibold">Qty: ${item.qty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK</div>
+        </div>
+      </div>
+      <div class="text-right mono font-bold text-cyan-400 flex-shrink-0 ml-2">
+        ${Math.round(item.lineCost).toLocaleString()} ISK
+      </div>
+    `;
+
+    listContainer.appendChild(row);
+  });
+
+  const countEl = document.getElementById('bom-type-count');
+  if (countEl) countEl.textContent = bomItems.length.toString();
+
+  const totalEl = document.getElementById('bom-total-isk');
+  if (totalEl) totalEl.textContent = Math.round(totalBOMCost).toLocaleString() + ' ISK';
+
+  window.currentBOMText = bomItems.map(i => `${i.name} x${i.qty}`).join('\n');
+}
+
+function copyMultibuyText() {
+  if (!window.currentBOMText) return;
+  navigator.clipboard.writeText(window.currentBOMText).then(() => {
+    const btn = document.querySelector('button[onclick="copyMultibuyText()"]');
+    if (btn) {
+      const orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      btn.className = 'px-3.5 py-1.5 bg-green-600 text-white font-bold text-xs rounded mono transition';
+      setTimeout(() => {
+        btn.textContent = orig;
+        btn.className = 'px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded mono transition shadow';
+      }, 1500);
+    }
+  });
+}
+
+// Smooth Pan and Zoom Engine
+const viewport = document.getElementById('viewport');
+const content = document.getElementById('pan-zoom-content');
+
+if (viewport) {
+  viewport.addEventListener('mousedown', (e) => {
+    if (e.button === 1) {
+      e.preventDefault();
+      isPanning = true;
+      startX = e.clientX - panX;
+      startY = e.clientY - panY;
+      viewport.style.cursor = 'grabbing';
+    }
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (isPanning) {
+      panX = e.clientX - startX;
+      panY = e.clientY - startY;
+      updateTransform();
+    }
+  });
+
+  window.addEventListener('mouseup', (e) => {
+    if (e.button === 1 && isPanning) {
+      isPanning = false;
+      viewport.style.cursor = 'grab';
+    }
+  });
+
+  viewport.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
+    const newScale = Math.min(Math.max(0.2, zoomScale * zoomFactor), 3.0);
+
+    const rect = viewport.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    panX = mouseX - (mouseX - panX) * (newScale / zoomScale);
+    panY = mouseY - (mouseY - panY) * (newScale / zoomScale);
+    zoomScale = newScale;
+
+    updateTransform();
+    drawConnectingLines();
+  }, { passive: false });
+}
+
+function updateTransform() {
+  const roundedPanX = Math.round(panX);
+  const roundedPanY = Math.round(panY);
+  if (content) content.style.transform = `translate(${roundedPanX}px, ${roundedPanY}px) scale(${zoomScale})`;
+  const zoomText = document.getElementById('zoom-level-text');
+  if (zoomText) zoomText.textContent = `Zoom: ${Math.round(zoomScale * 100)}%`;
+}
+
+function resetPanZoom() {
+  zoomScale = 1.0;
+  panX = 0;
+  panY = 0;
+  updateTransform();
+  drawConnectingLines();
+}
+
+// Initialize Application
+window.onload = async () => {
+  if (typeof window.buildPrepackedIndexes === 'function') {
+    window.buildPrepackedIndexes();
+  }
+
+  loadTaxSettings(); // Load custom taxes from localStorage!
+
+  // 1. Render default item
+  try {
+    if (window.IDX && window.IDX['drekavac']) {
+      await selectItem(48519, 'Drekavac');
+    } else if (window.IDX && window.IDX['caracal']) {
+      await selectItem(621, 'Caracal');
+    } else {
+      await selectItem(48519, 'Drekavac');
+    }
+  } catch (e) {
+    console.error('Initial selectItem error:', e);
+  }
+
+  // 2. Fetch background prices & SSO in parallel
+  fetchAdjustedPrices().catch(e => console.warn('Adjusted prices error:', e));
+  handleEsiSSOCallback().catch(e => console.warn('SSO Callback Error:', e));
+  loadSavedSystem().catch(e => console.warn('Load system error:', e));
+
+  window.addEventListener('resize', drawConnectingLines);
+};
