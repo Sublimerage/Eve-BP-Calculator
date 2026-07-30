@@ -7,9 +7,9 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>EVE Online Blueprint & Multi-Layer Industry Calculator</title>
+<title>EVE Online Industry Ledger</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=3.0.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=3.0.1">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -40,9 +40,9 @@
         📋 Paste Hangar
       </button>
 
-      <!-- NEW: Consolidated Manufacturing Queue (Journal) Header Button -->
-      <a href="journal.html" class="px-4 py-2 bg-purple-700 hover:bg-purple-600 text-purple-100 font-bold rounded-md transition text-xs shadow flex items-center gap-1.5" title="View your consolidated manufacturing jobs queue">
-        📖 View Journal <span id="header-journal-count" class="bg-purple-950 text-purple-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">0</span>
+      <!-- Consolidated Manufacturing Queue (Ledger) Header Button -->
+      <a href="ledger.html" class="px-4 py-2 bg-purple-700 hover:bg-purple-600 text-purple-100 font-bold rounded-md transition text-xs shadow flex items-center gap-1.5" title="View your consolidated manufacturing jobs queue">
+        📖 View Ledger <span id="header-journal-count" class="bg-purple-950 text-purple-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">0</span>
       </a>
 
       <button onclick="centerOnSelectedNode()" class="px-3.5 py-2 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded-md transition text-xs shadow">
@@ -61,7 +61,7 @@
   <!-- Toolbar Row 1: Primary Search, Build Actions, Smart Optimizers, Pricing Strategy -->
   <section class="bg-[#0d1922] border-b border-[#1e3348] p-1.5 flex flex-wrap items-center gap-2 text-xs relative z-50">
     
-    <!-- Item Search & Global Pricing Combined (Highly Compact) -->
+    <!-- Item Search & Global Pricing Combined (Highly Compact - Narrower!) -->
     <div class="bg-[#0c1318] p-1.5 rounded border border-[#1e3348] relative z-50 flex items-center space-x-1.5 shadow">
       <span class="text-cyan-400 font-bold uppercase text-[9px] rajdhani leading-none">Search &amp; Price:</span>
       <div class="relative w-44">
@@ -368,11 +368,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=3.0.0"></script>
-  <script src="js/config.js?v=3.0.0"></script>
-  <script src="js/esi.js?v=3.0.0"></script>
-  <script src="js/tree.js?v=3.0.0"></script>
-  <script src="js/optimizers.js?v=3.0.0"></script>
-  <script src="js/app.js?v=3.0.0"></script>
+  <script src="eve_db.js?v=3.0.1"></script>
+  <script src="js/config.js?v=3.0.1"></script>
+  <script src="js/esi.js?v=3.0.1"></script>
+  <script src="js/tree.js?v=3.0.1"></script>
+  <script src="js/optimizers.js?v=3.0.1"></script>
+  <script src="js/app.js?v=3.0.1"></script>
 </body>
 </html>
