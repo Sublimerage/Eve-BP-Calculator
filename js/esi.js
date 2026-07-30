@@ -1,5 +1,8 @@
 'use strict';
 
+// Global cache for corporation division names
+window.corpDivisionNames = {};
+
 // Local HTML Escaper Helper
 function esc(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -18,13 +21,23 @@ function getItemTypeName(typeId) {
   return '';
 }
 
-// Strict check: Returns true ONLY if the item type is an actual inventory container
-function isContainerAsset(typeId) {
-  const typeName = getItemTypeName(typeId);
+// Helper to detect if an asset location flag belongs to a ship slot or ship cargo bay
+function isShipLocationFlag(flag) {
+  if (!flag) return false;
+  const f = flag.toLowerCase();
+  return f.includes('cargo') || f.includes('dronebay') || f.includes('shiphangar') || 
+         f.includes('fleethangar') || f.includes('subsystem') || f.includes('fighter') || 
+         f.includes('highslot') || f.includes('medslot') || f.includes('lowslot') || 
+         f.includes('rigslot') || f.includes('specialized') || f.includes('fuelbay') ||
+         f.includes('autofit');
+}
+
+// Helper to check if a type ID corresponds to a known container type
+function isKnownContainerType(typeId, typeName) {
+  if (!typeName) typeName = getItemTypeName(typeId);
   if (!typeName) return false;
   const t = typeName.toLowerCase();
 
-  // Explicit keywords covering all EVE Online container classes
   return t.includes('container') || 
          t.includes('canister') || 
          t.includes('vault') || 
@@ -39,6 +52,40 @@ function isContainerAsset(typeId) {
          t.includes('silo') ||
          t.includes('storage') ||
          t.includes('depot');
+}
+
+// Comprehensive check for Rookie Ships and all EVE ship hull types
+function isShipType(typeId) {
+  // Explicit Rookie Ship Type IDs
+  const rookieShipIds = new Set([
+    601, 606, 608, 596, 33079, 33081, 33083, 33085, // Rookie ships (Ibis, Reaper, Velator, Impairor, Taipan, etc.)
+    621, 622, 12005, 587, 24698, 644, 642, 643, 12015, 11987, 11989 // Popular ships
+  ]);
+  if (rookieShipIds.has(typeId)) return true;
+
+  const typeName = getItemTypeName(typeId);
+  if (!typeName) return false;
+  const t = typeName.toLowerCase();
+
+  // Known container keywords - if it matches these, it is a container and NOT a ship
+  if (isKnownContainerType(typeId, typeName)) {
+    return false;
+  }
+
+  // Common ship hull / class keywords including rookie ships
+  const shipTerms = [
+    'frigate', 'destroyer', 'cruiser', 'battlecruiser', 'battleship', 'dreadnought',
+    'carrier', 'supercarrier', 'titan', 'corvette', 'industrial', 'freighter',
+    'mining barge', 'exhumer', 'shuttle', 'interdictor', 'covert ops', 'stealth bomber',
+    'logistics', 'assault', 'recon', 'command ship', 'heavy assault', 'blockade runner',
+    'deep space', 'jump freighter', 'tactical destroyer', 'strategic cruiser',
+    'ibis', 'reaper', 'velator', 'impairor', 'taipan', 'hematite', 'violator', 'echo',
+    'venture', 'procurer', 'retriever', 'covetor', 'orca', 'rorqual', 'bowhead',
+    'heron', 'magnate', 'imicus', 'probe', 'condor', 'slicer', 'executioner', 'tormentor',
+    'punisher', 'kestrel', 'merlin', 'tristan', 'inquisitor', 'navitas', 'bantam', 'ship'
+  ];
+
+  return shipTerms.some(term => t.includes(term));
 }
 
 // Strict ESI Adjusted Price Fetcher (STRICT CCP ADJUSTED_PRICE ONLY)
@@ -238,6 +285,7 @@ function logoutEsiSSO() {
   localStorage.removeItem('esi_char_name');
   rawAssetItems = [];
   userStockMap = {};
+  corpDivisionNames = {};
   const container = document.getElementById('esi-login-container');
   if (container) {
     container.innerHTML = `
@@ -260,6 +308,25 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
     if (charRes.ok) {
       const charData = await charRes.json();
       corpId = charData.corporation_id;
+    }
+
+    // Fetch custom Corporation Hangar Division names if corpId is present
+    if (corpId && accessToken) {
+      try {
+        const divRes = await fetch(`https://esi.evetech.net/latest/corporations/${corpId}/divisions/?datasource=tranquility`, {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (divRes.ok) {
+          const divData = await divRes.json();
+          if (divData && Array.isArray(divData.hangar)) {
+            divData.hangar.forEach(d => {
+              if (d.division && d.name) {
+                corpDivisionNames[d.division] = d.name.toUpperCase();
+              }
+            });
+          }
+        }
+      } catch (e) {}
     }
 
     let page = 1;
@@ -346,10 +413,13 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       while (itemIdToAssetMap[currentLoc] && depth < 10) {
         const parentAsset = itemIdToAssetMap[currentLoc];
         
-        // STRICT CONTAINER CHECK: Must be a verified container type (and NOT a ship)
-        if (isContainerAsset(parentAsset.type_id)) {
+        // STRICT CONTAINER CHECK: Must be a verified container type AND not in a ship slot
+        const isShipSlot = isShipLocationFlag(ast.location_flag) || isShipLocationFlag(parentAsset.location_flag);
+        const isContainer = isKnownContainerType(parentAsset.type_id);
+
+        if (!isShipSlot && isContainer) {
           if (!containerId) {
-            containerId = currentLoc; // Assign container ID to this parent asset!
+            containerId = currentLoc;
             if (ast.owner_type === 'char' && !charContainerIds.includes(containerId)) {
               charContainerIds.push(containerId);
             } else if (ast.owner_type === 'corp' && !corpContainerIds.includes(containerId)) {
@@ -549,7 +619,18 @@ function populateLocationDropdown() {
     <option value="industry_system" style="color: #38bdf8; background-color: #0c1318; font-weight: bold;">Current System Only (${currentSystemName})</option>
   `;
 
-  // Aggregate assets by root station/structure AND track actual containers
+  const sagNameMap = {
+    'CorpSAG1': corpDivisionNames[1] || 'DIVISION 1',
+    'CorpSAG2': corpDivisionNames[2] || 'DIVISION 2',
+    'CorpSAG3': corpDivisionNames[3] || 'DIVISION 3',
+    'CorpSAG4': corpDivisionNames[4] || 'DIVISION 4',
+    'CorpSAG5': corpDivisionNames[5] || 'DIVISION 5',
+    'CorpSAG6': corpDivisionNames[6] || 'DIVISION 6',
+    'CorpSAG7': corpDivisionNames[7] || 'DIVISION 7',
+    'CorpDeliveries': 'CORP DELIVERIES'
+  };
+
+  // Aggregate assets by root station/structure, Corp Divisions, and Containers
   const locCounts = {};
   rawAssetItems.forEach(item => {
     const locId = item.root_location_id || item.location_id;
@@ -559,11 +640,25 @@ function populateLocationDropdown() {
       locCounts[locId] = {
         name: locName,
         count: 0,
+        corpDivisions: {},
         containers: {}
       };
     }
     locCounts[locId].count += item.quantity;
 
+    // Track Corp Hangar Divisions
+    if (item.owner_type === 'corp' && item.location_flag && item.location_flag.startsWith('Corp')) {
+      const sagFlag = item.location_flag;
+      if (!locCounts[locId].corpDivisions[sagFlag]) {
+        locCounts[locId].corpDivisions[sagFlag] = {
+          name: sagNameMap[sagFlag] || sagFlag,
+          count: 0
+        };
+      }
+      locCounts[locId].corpDivisions[sagFlag].count += item.quantity;
+    }
+
+    // Track Containers
     if (item.container_id) {
       const cId = item.container_id;
       const cName = resolvedLocationNames[cId] || `Container #${cId}`;
@@ -580,6 +675,7 @@ function populateLocationDropdown() {
   // Render COLOR-CODED location options:
   // 🟩 NPC Stations = Green (#4caf6f)
   // 🟧 Player Structures = Orange (#f97316)
+  // 🟪 Corp Divisions = Purple (#c084fc)
   // 📦 Containers = White (#f8fafc)
   for (const [locId, data] of Object.entries(locCounts)) {
     const mainOpt = document.createElement('option');
@@ -604,7 +700,18 @@ function populateLocationDropdown() {
 
     filterSelect.appendChild(mainOpt);
 
-    // Render container sub-objects under this station in WHITE
+    // Render Corp Division sub-options under this station in PURPLE
+    for (const [sagFlag, sagData] of Object.entries(data.corpDivisions)) {
+      const sagOpt = document.createElement('option');
+      sagOpt.value = `corpsag_${locId}_${sagFlag}`;
+      sagOpt.style.color = '#c084fc';
+      sagOpt.style.backgroundColor = '#070b0f';
+      sagOpt.style.fontWeight = 'bold';
+      sagOpt.textContent = `  └─ 🟪 Corp Hangar: ${sagData.name} (${sagData.count.toLocaleString()} items)`;
+      filterSelect.appendChild(sagOpt);
+    }
+
+    // Render Container sub-options under this station in WHITE
     for (const [cId, cData] of Object.entries(data.containers)) {
       const containerOpt = document.createElement('option');
       containerOpt.value = `container_${cId}`;
@@ -686,6 +793,11 @@ function applyStockLocationFilter() {
     } else if (filterVal.startsWith('loc_')) {
       const targetLocId = parseInt(filterVal.replace('loc_', ''));
       include = rootLocId === targetLocId;
+    } else if (filterVal.startsWith('corpsag_')) {
+      const parts = filterVal.split('_');
+      const targetLocId = parseInt(parts[1]);
+      const targetSag = parts[2];
+      include = (rootLocId === targetLocId) && (item.location_flag === targetSag);
     } else if (filterVal.startsWith('container_')) {
       const targetContainerId = parseInt(filterVal.replace('container_', ''));
       include = item.container_id === targetContainerId;
