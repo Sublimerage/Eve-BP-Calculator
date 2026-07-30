@@ -18,19 +18,8 @@ function getItemTypeName(typeId) {
   return '';
 }
 
-// Helper to detect if an asset location flag belongs to a ship slot or ship cargo bay
-function isShipLocationFlag(flag) {
-  if (!flag) return false;
-  const f = flag.toLowerCase();
-  return f.includes('cargo') || f.includes('dronebay') || f.includes('shiphangar') || 
-         f.includes('fleethangar') || f.includes('subsystem') || f.includes('fighter') || 
-         f.includes('highslot') || f.includes('medslot') || f.includes('lowslot') || 
-         f.includes('rigslot') || f.includes('specialized') || f.includes('fuelbay') ||
-         f.includes('autofit');
-}
-
-// Strict check: Returns true ONLY if the type is an actual inventory container
-function isActualContainerType(typeId) {
+// Strict check: Returns true ONLY if the item type is an actual inventory container
+function isContainerAsset(typeId) {
   const typeName = getItemTypeName(typeId);
   if (!typeName) return false;
   const t = typeName.toLowerCase();
@@ -345,7 +334,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     });
 
-    // Trace asset hierarchy up to root station/structure and identify ACTUAL containers (strictly excluding ships)
+    // Trace asset hierarchy up to root station/structure and identify ALL actual containers (strictly excluding ships)
     const charContainerIds = [];
     const corpContainerIds = [];
 
@@ -357,13 +346,10 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       while (itemIdToAssetMap[currentLoc] && depth < 10) {
         const parentAsset = itemIdToAssetMap[currentLoc];
         
-        // STRICT CONTAINER CHECK: Must be an actual container type AND not in a ship slot
-        const isShipSlot = isShipLocationFlag(ast.location_flag) || isShipLocationFlag(parentAsset.location_flag);
-        const isContainer = isActualContainerType(parentAsset.type_id);
-
-        if (!isShipSlot && isContainer) {
+        // STRICT CONTAINER CHECK: Must be a verified container type (and NOT a ship)
+        if (isContainerAsset(parentAsset.type_id)) {
           if (!containerId) {
-            containerId = currentLoc;
+            containerId = currentLoc; // Assign container ID to this parent asset!
             if (ast.owner_type === 'char' && !charContainerIds.includes(containerId)) {
               charContainerIds.push(containerId);
             } else if (ast.owner_type === 'corp' && !corpContainerIds.includes(containerId)) {
