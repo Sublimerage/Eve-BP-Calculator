@@ -522,14 +522,11 @@ function recalculate() {
     localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap || {}));
   } catch (err) {}
 
-  // Restore active input focus and cursor selection dynamically
+  // Restore active input focus dynamically (without value clearing that triggers recursion)
   if (isCardRunsFocused) {
     const newRunsInput = document.getElementById('card-bp-runs');
     if (newRunsInput) {
       newRunsInput.focus();
-      const val = newRunsInput.value;
-      newRunsInput.value = '';
-      newRunsInput.value = val;
     }
   }
 
@@ -537,9 +534,6 @@ function recalculate() {
     const newPriceInput = document.getElementById('card-custom-price');
     if (newPriceInput) {
       newPriceInput.focus();
-      const val = newPriceInput.value;
-      newPriceInput.value = '';
-      newPriceInput.value = val;
     }
   }
 }
