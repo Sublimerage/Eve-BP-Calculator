@@ -635,6 +635,11 @@ function createNodeCard(node) {
             </div>
           </div>
         ` : ''}
+        
+        <!-- Add to Journal Queue Trigger -->
+        <button onclick="addCurrentJobToJournal(event)" class="w-full mt-2 py-1.5 bg-purple-800 hover:bg-purple-700 text-purple-100 font-bold rounded transition text-[11px] mono flex items-center justify-center gap-1 border border-purple-500/30 shadow-md" title="Add this build job with its compiled materials to your manufacturing queue">
+          ➕ ADD TO JOURNAL
+        </button>
       </div>
     `;
   }
@@ -1399,6 +1404,136 @@ function resetPanZoom() {
   drawConnectingLines();
 }
 
+function addCurrentJobToJournal(e) {
+  if (e) e.stopPropagation();
+  if (!recipeTreeRoot) return;
+
+  recalculate();
+
+  let queue = [];
+  try {
+    const saved = localStorage.getItem('eve_journal_jobs');
+    if (saved) {
+      queue = JSON.parse(saved);
+    }
+  } catch (err) {
+    queue = [];
+  }
+
+  const selectedStrategy = window.rootSellStrategy || 'market-sell';
+  const outputPrices = priceCache[recipeTreeRoot.typeId] || { sell: 0, buy: 0 };
+  let customPrice = window.rootCustomPrice || 0;
+  let unitSellPrice = selectedStrategy.startsWith('custom-') ? customPrice : outputPrices.sell;
+
+  const materials = [];
+  function extractBOM(node) {
+    if (!node) return;
+    if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
+      const typeId = node.displayTypeId || node.typeId;
+      const strategy = getNodePriceStrategy(node);
+      
+      const deductModeInput = document.getElementById('deduct-stock-mode');
+      const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+      const stockQty = isStockDeductEnabled ? (userStockMap[typeId] || userStockMap[node.typeId] || 0) : 0;
+      const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
+
+      const prices = priceCache[typeId] || { sell: 0, buy: 0 };
+      let unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
+      
+      materials.push({
+        typeId: typeId,
+        name: node.name,
+        qtyNeeded: node.qtyNeeded,
+        stockQty: stockQty,
+        netQtyNeeded: netQtyNeeded,
+        strategy: strategy,
+        unitPrice: unitPrice,
+        lineCost: unitPrice * netQtyNeeded
+      });
+    } else {
+      node.children.forEach(child => extractBOM(child));
+    }
+  }
+
+  if (recipeTreeRoot.isBuildingSelf && recipeTreeRoot.children && recipeTreeRoot.children.length > 0) {
+    recipeTreeRoot.children.forEach(c => extractBOM(c));
+  } else {
+    const rootTypeId = recipeTreeRoot.displayTypeId || recipeTreeRoot.typeId;
+    const strategy = getNodePriceStrategy(recipeTreeRoot);
+    const deductModeInput = document.getElementById('deduct-stock-mode');
+    const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+    const stockQty = isStockDeductEnabled ? (userStockMap[rootTypeId] || userStockMap[recipeTreeRoot.typeId] || 0) : 0;
+    const netQtyNeeded = Math.max(0, recipeTreeRoot.qtyNeeded - stockQty);
+    const prices = priceCache[rootTypeId] || { sell: 0, buy: 0 };
+    let unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
+
+    materials.push({
+      typeId: rootTypeId,
+      name: recipeTreeRoot.name,
+      qtyNeeded: recipeTreeRoot.qtyNeeded,
+      stockQty: stockQty,
+      netQtyNeeded: netQtyNeeded,
+      strategy: strategy,
+      unitPrice: unitPrice,
+      lineCost: unitPrice * netQtyNeeded
+    });
+  }
+
+  const job = {
+    id: ++instanceCounter + Date.now(),
+    typeId: recipeTreeRoot.displayTypeId || recipeTreeRoot.typeId,
+    name: recipeTreeRoot.name,
+    runsNeeded: recipeTreeRoot.runsNeeded,
+    qtyNeeded: recipeTreeRoot.qtyNeeded,
+    calculatedCost: recipeTreeRoot.calculatedCost || 0,
+    sellStrategy: selectedStrategy,
+    unitSellPrice: unitSellPrice,
+    materials: materials,
+    addedAt: new Date().toISOString()
+  };
+
+  queue.push(job);
+  localStorage.setItem('eve_journal_jobs', JSON.stringify(queue));
+
+  // Sync active stock map to localStorage so the journal page can read it too
+  localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap || {}));
+
+  updateHeaderJournalCount();
+
+  const btn = e.target.closest('button');
+  if (btn) {
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '✔ ADDED TO JOURNAL';
+    btn.classList.remove('bg-purple-800', 'hover:bg-purple-700', 'text-purple-100');
+    btn.classList.add('bg-green-700', 'text-white');
+    setTimeout(() => {
+      btn.innerHTML = originalText;
+      btn.classList.remove('bg-green-700', 'text-white');
+      btn.classList.add('bg-purple-800', 'hover:bg-purple-700', 'text-purple-100');
+    }, 1500);
+  }
+}
+
+function updateHeaderJournalCount() {
+  const badge = document.getElementById('header-journal-count');
+  if (!badge) return;
+  try {
+    const saved = localStorage.getItem('eve_journal_jobs');
+    if (saved) {
+      const queue = JSON.parse(saved);
+      badge.textContent = Array.isArray(queue) ? queue.length.toString() : '0';
+    } else {
+      badge.textContent = '0';
+    }
+  } catch (e) {
+    badge.textContent = '0';
+  }
+}
+
+// Bind to window for HTML accessibility
+window.addCurrentJobToJournal = addCurrentJobToJournal;
+window.updateHeaderJournalCount = updateHeaderJournalCount;
+
 // Initialize Application
 window.onload = async () => {
   if (typeof window.buildPrepackedIndexes === 'function') {
@@ -1406,6 +1541,7 @@ window.onload = async () => {
   }
 
   loadTaxSettings(); // Load custom taxes from localStorage!
+  updateHeaderJournalCount(); // Update badge on load!
 
   // 1. Render default item
   try {
