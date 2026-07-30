@@ -1,22 +1,16 @@
 'use strict';
 
+// Strict SDE Batch Yield Extractor (Uses exact database output quantity)
 function getBatchYield(recipe, isReaction) {
   if (!recipe) return 1;
 
-  const explicitQty = recipe.productQtyPerRun || recipe.mfgQtyPerRun || recipe.reactionQtyPerRun || recipe.outputQty || recipe.portionSize || recipe.quantity;
-  if (explicitQty && parseInt(explicitQty) > 1) {
+  // Read explicit yield directly from the database record
+  const explicitQty = recipe.productQtyPerRun || recipe.mfgQtyPerRun || recipe.reactionQtyPerRun || recipe.outputQty || recipe.portionSize || recipe.quantity || recipe.products?.[0]?.quantity;
+  if (explicitQty && parseInt(explicitQty) > 0) {
     return parseInt(explicitQty);
   }
 
-  const name = ((recipe.productName || '') + ' ' + (recipe.blueprintTypeName || '')).toLowerCase();
-
-  if (name.includes('auto-integrity preservation seal') || name.includes('life support backup unit')) return 3;
-  if (name.includes('fuel block')) return 40;
-  if (name.includes('nanite repair paste')) return 500;
-  if (name.includes('cap booster') || name.includes('interdiction probe') || name.includes('scanner probe')) return 10;
-  if (name.includes('charge') || name.includes('frequency crystal') || name.includes('missile') || name.includes('torpedo') || name.includes('rocket') || name.includes('ammo')) return 100;
-  if (isReaction || name.includes('reaction') || name.includes('polymer') || name.includes('carbide') || name.includes('ferrogel')) return 200;
-
+  // Fallback ONLY if the database record lacks an output quantity
   return 1;
 }
 
@@ -168,15 +162,37 @@ async function buildRecursiveRecipeTree(typeId, name, qtyNeeded, currentDepth, m
       
       const allowReactions = document.getElementById('include-reactions')?.value === 'true';
 
-      let activeMaterials = recipe.mfgMaterials || recipe.materials;
+      let rawMaterials = recipe.mfgMaterials || recipe.materials;
       let isReaction = false;
 
-      if (!activeMaterials && allowReactions && recipe.reactionMaterials) {
-        activeMaterials = recipe.reactionMaterials;
+      if (!rawMaterials && allowReactions && recipe.reactionMaterials) {
+        rawMaterials = recipe.reactionMaterials;
         isReaction = true;
       }
 
-      if (activeMaterials && activeMaterials.length > 0) {
+      if (rawMaterials && rawMaterials.length > 0) {
+        // CONSOLIDATE & DE-DUPLICATE SDE RECIPE MATERIALS:
+        // Keeps unique typeIDs with their true single quantity (e.g. 11), preventing double-counting to 22
+        const activeMaterials = [];
+        const matMap = {};
+
+        rawMaterials.forEach(m => {
+          const tId = parseInt(m.typeId || m.typeid);
+          const qty = parseInt(m.baseQty || m.quantity || 1);
+          const matName = m.name || (window.TYPE_ID_TO_NAME ? window.TYPE_ID_TO_NAME[tId] : '') || 'Material';
+
+          if (matMap[tId]) {
+            matMap[tId].baseQty = Math.max(matMap[tId].baseQty, qty); // Keeps single true quantity (11)
+          } else {
+            matMap[tId] = {
+              typeId: tId,
+              name: matName,
+              baseQty: qty
+            };
+            activeMaterials.push(matMap[tId]);
+          }
+        });
+
         const batchYield = getBatchYield(recipe, isReaction);
 
         node.recipe = { ...recipe, materials: activeMaterials };

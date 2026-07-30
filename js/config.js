@@ -147,6 +147,7 @@ const BUILTIN_RECIPES = {
       { typeId: 37, name: "Isogen", baseQty: 186361 },
       { typeId: 38, name: "Nocxium", baseQty: 46200 },
       { typeId: 39, name: "Zydrine", baseQty: 15400 },
+      { typeId: 40, name: "Megacyte", baseQty: 6575 },
       { typeId: 52310, name: "Crystalline Isogen-10", baseQty: 845 },
       { typeId: 52311, name: "Zero-Point Condensate", baseQty: 850 }
     ]
