@@ -324,22 +324,9 @@ function markJobAsBuilt(jobId) {
 
   const job = activeJobs[jobIndex];
 
-  // 1. MRP Material Consumption: Subtract required quantities from stock ledger
-  if (Array.isArray(job.materials)) {
-    job.materials.forEach(mat => {
-      if (!mat) return;
-      const id = mat.typeId;
-      const consumedQty = mat.qtyNeeded || 0;
-      if (userStockMap[id] !== undefined) {
-        userStockMap[id] = Math.max(0, userStockMap[id] - consumedQty);
-      }
-    });
-  }
+  // Stockpile quantities are left untouched as requested to ensure stock data relies strictly on ESI API and clipboard imports.
 
-  // Save updated stock map back to shared localStorage
-  localStorage.setItem('eve_user_stock_map', JSON.stringify(userStockMap));
-
-  // 2. Ledger Logging: Archive job records into completed build history array
+  // 1. Ledger Logging: Archive job records into completed build history array
   const record = {
     id: job.id,
     typeId: job.typeId,
@@ -354,7 +341,7 @@ function markJobAsBuilt(jobId) {
   buildHistory.unshift(record); // Insert completed job as first record
   localStorage.setItem('eve_ledger_history', JSON.stringify(buildHistory));
 
-  // 3. Remove job from the active manufacturing queue
+  // 2. Remove job from the active manufacturing queue
   activeJobs.splice(jobIndex, 1);
   localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
 
