@@ -29,6 +29,28 @@ function isShipLocationFlag(flag) {
          f.includes('autofit');
 }
 
+// Helper to check if a type ID corresponds to a known container type
+function isKnownContainerType(typeId, typeName) {
+  if (!typeName) typeName = getItemTypeName(typeId);
+  if (!typeName) return false;
+  const t = typeName.toLowerCase();
+
+  return t.includes('container') || 
+         t.includes('canister') || 
+         t.includes('vault') || 
+         t.includes('freight') || 
+         t.includes('plastic wrap') || 
+         t.includes('audit log') || 
+         t.includes('box') || 
+         t.includes('crate') || 
+         t.includes('chest') || 
+         t.includes('can') ||
+         t.includes('hangar array') ||
+         t.includes('silo') ||
+         t.includes('storage') ||
+         t.includes('depot');
+}
+
 // Comprehensive check for Rookie Ships and all EVE ship hull types
 function isShipType(typeId) {
   // Explicit Rookie Ship Type IDs
@@ -43,11 +65,7 @@ function isShipType(typeId) {
   const t = typeName.toLowerCase();
 
   // Known container keywords - if it matches these, it is a container and NOT a ship
-  if (t.includes('container') || t.includes('canister') || t.includes('vault') || 
-      t.includes('freight') || t.includes('plastic wrap') || t.includes('box') || 
-      t.includes('crate') || t.includes('chest') || t.includes('audit log') ||
-      t.includes('array') || t.includes('depot') || t.includes('silo') ||
-      t.includes('compressor') || t.includes('assembly') || t.includes('structure')) {
+  if (isKnownContainerType(typeId, typeName)) {
     return false;
   }
 
@@ -372,12 +390,13 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       while (itemIdToAssetMap[currentLoc] && depth < 10) {
         const parentAsset = itemIdToAssetMap[currentLoc];
         
-        // STRICT SHIP EXCLUSION: Check both location flag AND parent type ID / name
+        // STRICT SHIP EXCLUSION: Check location flag, ship category, AND container verification
         const isShipSlot = isShipLocationFlag(ast.location_flag) || isShipLocationFlag(parentAsset.location_flag);
         const isShip = isShipType(parentAsset.type_id);
+        const isContainer = isKnownContainerType(parentAsset.type_id);
 
-        if (!isShipSlot && !isShip) {
-          // Parent item is a non-ship holding sub-assets -> IT IS A CONTAINER!
+        if (!isShipSlot && !isShip && isContainer) {
+          // Parent item is a verified non-ship container holding sub-assets -> IT IS A CONTAINER!
           if (!containerId) {
             containerId = currentLoc;
             if (ast.owner_type === 'char' && !charContainerIds.includes(containerId)) {
