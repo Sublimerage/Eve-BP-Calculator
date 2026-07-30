@@ -507,7 +507,7 @@ function recalculate() {
   renderBillOfMaterials(recipeTreeRoot, brokerFee);
   setTimeout(drawConnectingLines, 50);
 
-  // Synchronize raw inventory parameters to LocalStorage for cross-page companion access
+  // Synchronize raw inventory parameters to LocalStorage for cross-page ledger access
   try {
     localStorage.setItem('eve_raw_assets', JSON.stringify(window.rawAssetItems || []));
     localStorage.setItem('eve_resolved_location_names', JSON.stringify(window.resolvedLocationNames || {}));
@@ -644,9 +644,9 @@ function createNodeCard(node) {
           </div>
         ` : ''}
         
-        <!-- Add to Journal Queue Trigger -->
-        <button onclick="addCurrentJobToJournal(event)" class="w-full mt-2 py-1.5 bg-purple-800 hover:bg-purple-700 text-purple-100 font-bold rounded transition text-[11px] mono flex items-center justify-center gap-1 border border-purple-500/30 shadow-md" title="Add this build job with its compiled materials to your manufacturing queue">
-          ➕ ADD TO JOURNAL
+        <!-- Add to Ledger (Job Queue) Trigger -->
+        <button onclick="addCurrentJobToLedger(event)" class="w-full mt-2 py-1.5 bg-purple-800 hover:bg-purple-700 text-purple-100 font-bold rounded transition text-[11px] mono flex items-center justify-center gap-1 border border-purple-500/30 shadow-md" title="Add this build job with its compiled materials to your manufacturing queue">
+          ➕ ADD TO JOB QUEUE
         </button>
       </div>
     `;
@@ -1054,10 +1054,10 @@ function drawConnectingLines() {
     const isolatedNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
     if (!isolatedNode) return;
 
-    const isolatedEl = document.getElementById(`node-card-${isolatedNode.instanceId}`);
-    if (!isolatedEl) return;
+    const MathEl = document.getElementById(`node-card-${isolatedNode.instanceId}`);
+    if (!MathEl) return;
 
-    const isoRect = isolatedEl.getBoundingClientRect();
+    const isoRect = MathEl.getBoundingClientRect();
     const isoLeftX = (isoRect.left - containerRect.left) / zoomScale;
     const isoRightX = (isoRect.right - containerRect.left) / zoomScale;
     const isoCenterY = (isoRect.top + isoRect.height / 2 - containerRect.top) / zoomScale;
@@ -1412,7 +1412,7 @@ function resetPanZoom() {
   drawConnectingLines();
 }
 
-function addCurrentJobToJournal(e) {
+function addCurrentJobToLedger(e) {
   if (e) e.stopPropagation();
   if (!recipeTreeRoot) return;
 
@@ -1420,7 +1420,7 @@ function addCurrentJobToJournal(e) {
 
   let queue = [];
   try {
-    const saved = localStorage.getItem('eve_journal_jobs');
+    const saved = localStorage.getItem('eve_ledger_jobs');
     if (saved) {
       queue = JSON.parse(saved);
     }
@@ -1501,17 +1501,17 @@ function addCurrentJobToJournal(e) {
   };
 
   queue.push(job);
-  localStorage.setItem('eve_journal_jobs', JSON.stringify(queue));
+  localStorage.setItem('eve_ledger_jobs', JSON.stringify(queue));
 
-  // Sync active stock map to localStorage so the journal page can read it too
+  // Sync active stock map to localStorage so the ledger page can read it too
   localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap || {}));
 
-  updateHeaderJournalCount();
+  updateHeaderLedgerCount();
 
   const btn = e.target.closest('button');
   if (btn) {
     const originalText = btn.innerHTML;
-    btn.innerHTML = '✔ ADDED TO JOURNAL';
+    btn.innerHTML = '✔ ADDED TO QUEUE';
     btn.classList.remove('bg-purple-800', 'hover:bg-purple-700', 'text-purple-100');
     btn.classList.add('bg-green-700', 'text-white');
     setTimeout(() => {
@@ -1522,11 +1522,11 @@ function addCurrentJobToJournal(e) {
   }
 }
 
-function updateHeaderJournalCount() {
+function updateHeaderLedgerCount() {
   const badge = document.getElementById('header-journal-count');
   if (!badge) return;
   try {
-    const saved = localStorage.getItem('eve_journal_jobs');
+    const saved = localStorage.getItem('eve_ledger_jobs');
     if (saved) {
       const queue = JSON.parse(saved);
       badge.textContent = Array.isArray(queue) ? queue.length.toString() : '0';
@@ -1539,8 +1539,8 @@ function updateHeaderJournalCount() {
 }
 
 // Bind to window for HTML accessibility
-window.addCurrentJobToJournal = addCurrentJobToJournal;
-window.updateHeaderJournalCount = updateHeaderJournalCount;
+window.addCurrentJobToLedger = addCurrentJobToLedger;
+window.updateHeaderLedgerCount = updateHeaderLedgerCount;
 
 // Initialize Application
 window.onload = async () => {
@@ -1549,7 +1549,7 @@ window.onload = async () => {
   }
 
   loadTaxSettings(); // Load custom taxes from localStorage!
-  updateHeaderJournalCount(); // Update badge on load!
+  updateHeaderLedgerCount(); // Update badge on load!
 
   // 1. Render default item
   try {
