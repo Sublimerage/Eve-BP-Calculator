@@ -1,5 +1,143 @@
 'use strict';
 
+// Structural helper to recursively search and extract the output batch yield/quantity of a product in any recipe format
+function extractSdeYield(recipe, targetProductTypeId) {
+  if (!recipe) return 1;
+
+  const pId = parseInt(targetProductTypeId);
+  if (isNaN(pId)) return 1;
+
+  // 1. Direct root-level yield property candidates
+  const rootCandidates = [
+    recipe.productQtyPerRun,
+    recipe.mfgQtyPerRun,
+    recipe.reactionQtyPerRun,
+    recipe.outputQty,
+    recipe.portionSize,
+    recipe.qty,
+    recipe.productQty,
+    recipe.pQty,
+    recipe.yield,
+    recipe.batchYield,
+    recipe.amount,
+    recipe.qtyPerRun
+  ];
+  for (const c of rootCandidates) {
+    const val = parseInt(c);
+    if (!isNaN(val) && val > 1) return val;
+  }
+
+  // 2. If recipe contains a "products" block (array or dictionary)
+  if (recipe.products) {
+    if (Array.isArray(recipe.products)) {
+      for (const p of recipe.products) {
+        const itemType = parseInt(p.typeID || p.typeId || p.id || p.productTypeID);
+        if (itemType === pId) {
+          const val = parseInt(p.quantity || p.qty || p.amount || p.yield);
+          if (!isNaN(val) && val > 0) return val;
+        }
+      }
+    } else if (typeof recipe.products === 'object') {
+      const directVal = recipe.products[pId] || recipe.products[String(pId)];
+      if (directVal !== undefined) {
+        if (typeof directVal === 'number') return directVal;
+        if (typeof directVal === 'object' && directVal !== null) {
+          const val = parseInt(directVal.quantity || directVal.qty || directVal.amount);
+          if (!isNaN(val) && val > 0) return val;
+        }
+      }
+      for (const key of Object.keys(recipe.products)) {
+        const p = recipe.products[key];
+        if (p && typeof p === 'object') {
+          const itemType = parseInt(p.typeID || p.typeId || p.id || p.productTypeID || key);
+          if (itemType === pId) {
+            const val = parseInt(p.quantity || p.qty || p.amount);
+            if (!isNaN(val) && val > 0) return val;
+          }
+        }
+      }
+    }
+  }
+
+  // 3. If recipe contains an "activityProducts" block (common database/fuzzwork schema)
+  if (recipe.activityProducts && typeof recipe.activityProducts === 'object') {
+    for (const actKey of Object.keys(recipe.activityProducts)) {
+      const products = recipe.activityProducts[actKey];
+      if (Array.isArray(products)) {
+        for (const p of products) {
+          const itemType = parseInt(p.typeID || p.typeId || p.id || p.productTypeID);
+          if (itemType === pId) {
+            const val = parseInt(p.quantity || p.qty || p.amount);
+            if (!isNaN(val) && val > 0) return val;
+          }
+        }
+      } else if (products && typeof products === 'object') {
+        const directVal = products[pId] || products[String(pId)];
+        if (directVal !== undefined) {
+          if (typeof directVal === 'number') return directVal;
+          if (typeof directVal === 'object' && directVal !== null) {
+            const val = parseInt(directVal.quantity || directVal.qty || directVal.amount);
+            if (!isNaN(val) && val > 0) return val;
+          }
+        }
+      }
+    }
+  }
+
+  // 4. Fallback: Deep search the entire object structure for references to targetProductTypeId
+  let foundYield = null;
+  function deepSearch(obj) {
+    if (foundYield !== null) return;
+    if (!obj || typeof obj !== 'object') return;
+
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        deepSearch(item);
+      }
+    } else {
+      const itemType = parseInt(obj.typeID || obj.typeId || obj.id || obj.productTypeID);
+      if (itemType === pId) {
+        const val = parseInt(obj.quantity || obj.qty || obj.amount || obj.yield);
+        if (!isNaN(val) && val > 0) {
+          foundYield = val;
+          return;
+        }
+      }
+
+      const directVal = obj[pId] || obj[String(pId)];
+      if (directVal !== undefined) {
+        if (typeof directVal === 'number' && directVal > 1) { // Greater than 1 to avoid matching Type IDs
+          foundYield = directVal;
+          return;
+        } else if (typeof directVal === 'object' && directVal !== null) {
+          const val = parseInt(directVal.quantity || directVal.qty || directVal.amount);
+          if (!isNaN(val) && val > 0) {
+            foundYield = val;
+            return;
+          }
+        }
+      }
+
+      for (const key of Object.keys(obj)) {
+        // Skip scanning materials to avoid picking up input requirements instead of output quantities
+        if (key === 'materials' || key === 'mfgMaterials' || key === 'reactionMaterials' || key === 'mats' || key === 'm') {
+          continue;
+        }
+        deepSearch(obj[key]);
+      }
+    }
+  }
+
+  deepSearch(recipe);
+  if (foundYield !== null) return foundYield;
+
+  // 5. Final fallback to any root quantity field
+  const fallbackVal = parseInt(recipe.quantity);
+  if (!isNaN(fallbackVal) && fallbackVal > 0) return fallbackVal;
+
+  return 1;
+}
+
 // Strict SDE Batch Yield Extractor (Uses exact database output quantity)
 function getBatchYield(recipe, isReaction) {
   if (!recipe) return 1;
@@ -9,39 +147,14 @@ function getBatchYield(recipe, isReaction) {
     if (explicit > 1) return explicit;
   }
 
-  // 1. Read explicit yield directly from all possible database record properties (Read-Only)
-  const candidates = [
-    recipe.productQtyPerRun,
-    recipe.mfgQtyPerRun,
-    recipe.reactionQtyPerRun,
-    recipe.outputQty,
-    recipe.portionSize,
-    recipe.quantity,
-    recipe.qty,
-    recipe.productQty,
-    recipe.pQty,
-    recipe.yield,
-    recipe.batchYield,
-    recipe.amount,
-    recipe.qtyPerRun,
-    recipe.products?.[0]?.quantity,
-    recipe.products?.[0]?.qty,
-    recipe.activityProducts?.[1]?.[0]?.quantity,
-    recipe.activityProducts?.[11]?.[0]?.quantity,
-    recipe.activityProducts?.['1']?.[0]?.quantity,
-    recipe.activityProducts?.['11']?.[0]?.quantity
-  ];
-
-  for (const c of candidates) {
-    const parsed = parseInt(c);
-    if (!isNaN(parsed) && parsed > 0) {
-      return parsed;
-    }
+  const typeId = recipe.productTypeID || recipe.product || recipe.p || recipe.typeID;
+  const sdeYield = extractSdeYield(recipe, typeId);
+  if (sdeYield > 1) {
+    return sdeYield;
   }
 
-  // 2. Fallback check on item names / IDs for known SDE batch yield standards
+  // Fallback check on item names / IDs for known SDE batch yield standards
   const name = ((recipe.productName || '') + ' ' + (recipe.blueprintTypeName || '')).toLowerCase();
-  const typeId = recipe.productTypeID || recipe.product || recipe.p || recipe.typeID;
 
   if (typeId === 16681 || typeId === 16680 || typeId === 16679 || name.includes('carbide')) {
     return 10000;
@@ -77,23 +190,23 @@ async function fetchBlueprintData(typeId) {
     return null;
   }
 
-  // 1. Check BUILTIN_RECIPES
-  if (BUILTIN_RECIPES && BUILTIN_RECIPES[typeId]) {
-    blueprintCache[typeId] = BUILTIN_RECIPES[typeId];
-    return BUILTIN_RECIPES[typeId];
-  }
-
-  // 2. Check direct key in recipeMap
+  // 1. Check direct key in recipeMap (LOCAL SDE DATABASE)
   if (recipeMap && recipeMap[typeId]) {
     blueprintCache[typeId] = recipeMap[typeId];
     return recipeMap[typeId];
   }
 
-  // 3. Check direct key in window.EVE_RECIPES
+  // 2. Check direct key in window.EVE_RECIPES
   if (window.EVE_RECIPES && window.EVE_RECIPES[typeId]) {
     const recipe = window.EVE_RECIPES[typeId];
     blueprintCache[typeId] = recipe;
     return recipe;
+  }
+
+  // 3. Check direct key in BUILTIN_RECIPES (Fallback stubs)
+  if (BUILTIN_RECIPES && BUILTIN_RECIPES[typeId]) {
+    blueprintCache[typeId] = BUILTIN_RECIPES[typeId];
+    return BUILTIN_RECIPES[typeId];
   }
 
   // 4. Search recipeMap for matching product or blueprint type ID
@@ -264,7 +377,7 @@ async function buildRecursiveRecipeTree(typeId, name, qtyNeeded, currentDepth, m
         const matMap = {};
 
         rawMaterials.forEach(m => {
-          const tId = parseInt(m.typeId || m.typeid || m.id);
+          const tId = parseInt(m.typeId || m.typeid || m.id || m.materialTypeID);
           const qty = parseInt(m.baseQty || m.quantity || m.qty || 1);
           const matName = m.name || (window.TYPE_ID_TO_NAME ? window.TYPE_ID_TO_NAME[tId] : '') || 'Material';
 
