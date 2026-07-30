@@ -93,7 +93,7 @@ const POPULAR_SYSTEMS = [
 ];
 window.POPULAR_SYSTEMS = POPULAR_SYSTEMS;
 
-// Structural Helper Function to extract yield from any recipe object format
+// Safe Read-Only Helper to extract yield from any recipe object format without mutating it
 function extractRecipeYield(recipe) {
   if (!recipe) return 1;
   const candidates = [
@@ -315,71 +315,65 @@ window.buildPrepackedIndexes = function() {
   const statusText = document.getElementById('status-text');
   const statusDot = document.getElementById('status-dot');
 
-  const itemsObj = (typeof EVE_ITEMS !== 'undefined') ? EVE_ITEMS : (window.EVE_ITEMS || null);
-  const recipesObj = (typeof EVE_RECIPES !== 'undefined') ? EVE_RECIPES : (window.EVE_RECIPES || null);
-  const systemsObj = (typeof EVE_SYSTEMS !== 'undefined') ? EVE_SYSTEMS : (window.EVE_SYSTEMS || null);
+  try {
+    const itemsObj = (typeof EVE_ITEMS !== 'undefined') ? EVE_ITEMS : (window.EVE_ITEMS || null);
+    const recipesObj = (typeof EVE_RECIPES !== 'undefined') ? EVE_RECIPES : (window.EVE_RECIPES || null);
+    const systemsObj = (typeof EVE_SYSTEMS !== 'undefined') ? EVE_SYSTEMS : (window.EVE_SYSTEMS || null);
 
-  if (itemsObj && Object.keys(itemsObj).length > 10) {
-    for (const [idStr, name] of Object.entries(itemsObj)) {
-      const numericId = parseInt(idStr);
-      window.IDX[name.toLowerCase()] = { id: numericId, name: name };
-      window.TYPE_ID_TO_NAME[numericId] = name; // FAST O(1) DIRECT LOOKUP MAP
+    if (itemsObj && Object.keys(itemsObj).length > 10) {
+      for (const [idStr, name] of Object.entries(itemsObj)) {
+        const numericId = parseInt(idStr);
+        window.IDX[name.toLowerCase()] = { id: numericId, name: name };
+        window.TYPE_ID_TO_NAME[numericId] = name; // FAST O(1) DIRECT LOOKUP MAP
+      }
+    } else {
+      POPULAR_ITEMS.forEach(r => {
+        window.IDX[r.name.toLowerCase()] = { id: r.id, name: r.name };
+        window.TYPE_ID_TO_NAME[r.id] = r.name;
+      });
     }
-  } else {
-    POPULAR_ITEMS.forEach(r => {
-      window.IDX[r.name.toLowerCase()] = { id: r.id, name: r.name };
-      window.TYPE_ID_TO_NAME[r.id] = r.name;
-    });
-  }
 
-  if (systemsObj && Object.keys(systemsObj).length > 10) {
-    for (const [id, name] of Object.entries(systemsObj)) {
-      window.SYSTEM_IDX[name.toLowerCase()] = { id: parseInt(id), name: name.toUpperCase() };
-      window.systemNameCache[id] = name.toUpperCase();
+    if (systemsObj && Object.keys(systemsObj).length > 10) {
+      for (const [id, name] of Object.entries(systemsObj)) {
+        window.SYSTEM_IDX[name.toLowerCase()] = { id: parseInt(id), name: name.toUpperCase() };
+        window.systemNameCache[id] = name.toUpperCase();
+      }
+    } else {
+      POPULAR_SYSTEMS.forEach(sys => {
+        window.SYSTEM_IDX[sys.name.toLowerCase()] = { id: sys.id, name: sys.name.toUpperCase() };
+        window.systemNameCache[sys.id] = sys.name.toUpperCase();
+      });
     }
-  } else {
-    POPULAR_SYSTEMS.forEach(sys => {
-      window.SYSTEM_IDX[sys.name.toLowerCase()] = { id: sys.id, name: sys.name.toUpperCase() };
-      window.systemNameCache[sys.id] = sys.name.toUpperCase();
-    });
-  }
 
-  if (recipesObj && typeof recipesObj === 'object') {
-    for (const [idStr, recipe] of Object.entries(recipesObj)) {
+    if (recipesObj && typeof recipesObj === 'object') {
+      for (const [idStr, recipe] of Object.entries(recipesObj)) {
+        if (!recipe) continue;
+        const keyId = parseInt(idStr);
+        window.recipeMap[keyId] = recipe;
+        
+        // Map all candidate key fields without mutating recipe object directly
+        const bpId = recipe.blueprintTypeID || recipe.bp || recipe.bpId;
+        const pId = recipe.productTypeID || recipe.product || recipe.p || recipe.pId;
+
+        if (bpId) window.recipeMap[parseInt(bpId)] = recipe;
+        if (pId) window.recipeMap[parseInt(pId)] = recipe;
+      }
+    }
+
+    // Explicitly override built-in recipes
+    for (const [idStr, recipe] of Object.entries(BUILTIN_RECIPES)) {
       const keyId = parseInt(idStr);
-      
-      // STRUCTURAL YIELD NORMALIZATION:
-      // Extract yield across all property formats in EVE_RECIPES DB
-      const extractedYield = extractRecipeYield(recipe);
-      recipe.productQtyPerRun = extractedYield;
-      recipe.mfgQtyPerRun = extractedYield;
-      recipe.portionSize = extractedYield;
-      recipe.batchYield = extractedYield;
-
       window.recipeMap[keyId] = recipe;
       if (recipe.blueprintTypeID) window.recipeMap[recipe.blueprintTypeID] = recipe;
       if (recipe.productTypeID) window.recipeMap[recipe.productTypeID] = recipe;
-      if (recipe.bp) window.recipeMap[recipe.bp] = recipe;
-      if (recipe.product) window.recipeMap[recipe.product] = recipe;
-      if (recipe.p) window.recipeMap[recipe.p] = recipe;
     }
+
+    if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
+    if (statusText) statusText.textContent = `INDEX READY (${Object.keys(window.IDX).length.toLocaleString()} ITEMS | ${Object.keys(window.recipeMap).length.toLocaleString()} RECIPES)`;
+  } catch (err) {
+    console.error('buildPrepackedIndexes error:', err);
+    if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-red-500';
+    if (statusText) statusText.textContent = 'INDEX LOAD ERROR: ' + err.message;
   }
-
-  // Explicitly override stale recipes with live verified SDE quantities
-  for (const [idStr, recipe] of Object.entries(BUILTIN_RECIPES)) {
-    const keyId = parseInt(idStr);
-    const extractedYield = extractRecipeYield(recipe);
-    recipe.productQtyPerRun = extractedYield;
-    recipe.mfgQtyPerRun = extractedYield;
-    recipe.portionSize = extractedYield;
-    recipe.batchYield = extractedYield;
-
-    window.recipeMap[keyId] = recipe;
-    if (recipe.blueprintTypeID) window.recipeMap[recipe.blueprintTypeID] = recipe;
-    if (recipe.productTypeID) window.recipeMap[recipe.productTypeID] = recipe;
-  }
-
-  if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
-  if (statusText) statusText.textContent = `INDEX READY (${Object.keys(window.IDX).length.toLocaleString()} ITEMS | ${Object.keys(window.recipeMap).length.toLocaleString()} RECIPES)`;
 };
 ```.
