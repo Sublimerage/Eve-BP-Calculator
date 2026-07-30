@@ -14,8 +14,7 @@ function saveTaxSettings() {
       facilitySelect: document.getElementById('facility-select')?.value,
       structureRoleBonus: document.getElementById('structure-role-bonus')?.value,
       contractTax: document.getElementById('contract-tax')?.value,
-      contractBroker: document.getElementById('contract-broker')?.value,
-      contractDeposit: document.getElementById('contract-deposit')?.value
+      contractBroker: document.getElementById('contract-broker')?.value
     };
     localStorage.setItem('eve_tax_settings', JSON.stringify(settings));
   } catch (e) {}
@@ -34,7 +33,6 @@ function loadTaxSettings() {
       if (settings.structureRoleBonus !== undefined && document.getElementById('structure-role-bonus')) document.getElementById('structure-role-bonus').value = settings.structureRoleBonus;
       if (settings.contractTax !== undefined && document.getElementById('contract-tax')) document.getElementById('contract-tax').value = settings.contractTax;
       if (settings.contractBroker !== undefined && document.getElementById('contract-broker')) document.getElementById('contract-broker').value = settings.contractBroker;
-      if (settings.contractDeposit !== undefined && document.getElementById('contract-deposit')) document.getElementById('contract-deposit').value = settings.contractDeposit;
     }
   } catch (e) {}
 }
@@ -239,6 +237,9 @@ async function selectItem(typeId, name, preserveView = false) {
   if (!preserveView) {
     selectedInstanceId = null;
     isolatedInstanceId = null;
+    // Revert selling strategy and custom price to default on fresh item select
+    window.rootSellStrategy = 'market-sell';
+    window.rootCustomPrice = 0;
   }
 
   const maxDepth = 10;
@@ -298,8 +299,7 @@ function recalculate() {
 
   const activeEl = document.activeElement;
   const isCardRunsFocused = activeEl && activeEl.id === 'card-bp-runs';
-  const selStart = isCardRunsFocused ? activeEl.selectionStart : null;
-  const selEnd = isCardRunsFocused ? activeEl.selectionEnd : null;
+  const isCardCustomPriceFocused = activeEl && activeEl.id === 'card-custom-price';
 
   const runModeInput = document.getElementById('run-mode');
   const isRunsMode = runModeInput ? runModeInput.value === 'runs' : false;
@@ -316,11 +316,9 @@ function recalculate() {
   // Retrieve global contract configurations
   const contractTaxPercent = parseFloat(document.getElementById('contract-tax')?.value) || 0.5;
   const contractBrokerPercent = parseFloat(document.getElementById('contract-broker')?.value) || 0.5;
-  const contractDepositPercent = parseFloat(document.getElementById('contract-deposit')?.value) || 1.0;
 
   const contractTaxRate = contractTaxPercent / 100;
   const contractBrokerRate = contractBrokerPercent / 100;
-  const contractDepositRate = contractDepositPercent / 100;
 
   const facility = document.getElementById('facility-select')?.value || '0.01';
   const priceStrategy = document.getElementById('input-price-mode')?.value || 'sell';
@@ -413,17 +411,15 @@ function recalculate() {
   let netBuyRevenue = grossBuyRevenue * (1 - salesTax); // standard buy fallback (accounting for sales tax)
 
   if (isContractMode) {
-    // Contract Sale: Broker fee (% + 10k flat), Sales Tax, and Deposit
+    // Contract Sale: Broker fee (% + 10k flat) and Sales Tax
     const cSalesTax = grossSellRevenue * contractTaxRate;
     const cBrokerFee = (grossSellRevenue * contractBrokerRate) + 10000;
-    const cDeposit = Math.max(100000, grossSellRevenue * contractDepositRate);
 
     netSellRevenue = grossSellRevenue - cSalesTax - cBrokerFee;
     
-    // Save to root node for card UI rendering
+    // Save to root node for calculations
     recipeTreeRoot.contractSalesTax = cSalesTax;
     recipeTreeRoot.contractBrokerFee = cBrokerFee;
-    recipeTreeRoot.contractDeposit = cDeposit;
   } else {
     // Market Sell: standard sales tax and broker fee
     netSellRevenue = grossSellRevenue * (1 - salesTax - brokerFee);
@@ -444,10 +440,10 @@ function recalculate() {
   if (summaryCostEl) summaryCostEl.textContent = Math.round(totalProductionCost).toLocaleString() + ' ISK';
 
   const summarySubtextEl = document.getElementById('summary-runs-subtext');
-  if (summarySubtextEl) summarySubtextEl.textContent = `Mat: ${Math.round(effectiveMaterialCost).toLocaleString()} ISK + Job Fee: ${Math.round(totalJobFees).toLocaleString()} ISK`;
+  if (summarySubtextEl) summarySubtextEl.textContent = `Mat: ${Math.round(effectiveMaterialCost).toLocaleString()} + Fee: ${Math.round(totalJobFees).toLocaleString()}`;
 
   const summarySurplusEl = document.getElementById('summary-surplus-credit');
-  if (summarySurplusEl) summarySurplusEl.textContent = `+${Math.round(totalSurplusMaterialValue).toLocaleString()} ISK`;
+  if (summarySurplusEl) summarySurplusEl.textContent = Math.round(totalSurplusMaterialValue).toLocaleString() + ' ISK';
 
   const summaryOutSellEl = document.getElementById('summary-output-sell');
   if (summaryOutSellEl) {
@@ -459,59 +455,64 @@ function recalculate() {
     if (isContractMode) {
       summaryOutBuyEl.textContent = 'Net Contract: ' + Math.round(netSellRevenue).toLocaleString() + ' ISK';
     } else {
-      summaryOutBuyEl.textContent = `Net Instant Buy: ${Math.round(netBuyRevenue).toLocaleString()} ISK`;
+      summaryOutBuyEl.textContent = `Instant Buy: ${Math.round(netBuyRevenue).toLocaleString()} ISK`;
     }
   }
 
   const pSellEl = document.getElementById('summary-profit-sell');
   if (pSellEl) {
     pSellEl.textContent = Math.round(profitSell).toLocaleString() + ' ISK';
-    pSellEl.className = `text-lg font-bold mt-0.5 mono ${profitSell >= 0 ? 'text-green-400' : 'text-red-500'}`;
+    pSellEl.className = `text-sm font-bold mt-0.5 mono ${profitSell >= 0 ? 'text-green-400' : 'text-red-500'}`;
+  }
+
+  const pSellLabelEl = document.getElementById('summary-profit-sell-label');
+  if (pSellLabelEl) {
+    pSellLabelEl.textContent = isContractMode ? 'Net Profit (Contract Output)' : 'Net Profit (Sell Output)';
   }
 
   const roiSellEl = document.getElementById('summary-roi-sell');
   if (roiSellEl) {
     const finalRoi = totalProductionCost > 0 ? ((profitSell / totalProductionCost) * 100).toFixed(1) : 0;
     
-    let label = 'Net ROI';
+    let label = 'ROI';
     if (selectedStrategy === 'custom-contract') label = 'Contract ROI';
-    else label = 'Sell Order ROI';
+    else label = 'Sell ROI';
 
-    roiSellEl.textContent = `${label}: ${finalRoi}% (Inc. Surplus)`;
+    roiSellEl.textContent = `${label}: ${finalRoi}%`;
   }
 
   const pBuyEl = document.getElementById('summary-profit-buy');
   if (pBuyEl) {
     pBuyEl.textContent = Math.round(profitBuy).toLocaleString() + ' ISK';
-    pBuyEl.className = `text-lg font-bold mt-0.5 mono ${profitBuy >= 0 ? 'text-green-400' : 'text-red-500'}`;
+    pBuyEl.className = `text-sm font-bold mt-0.5 mono ${profitBuy >= 0 ? 'text-green-400' : 'text-red-500'}`;
   }
 
   const roiBuyEl = document.getElementById('summary-roi-buy');
-  if (roiBuyEl) roiBuyEl.textContent = `Net ROI: ${roiBuy}% (Inc. Surplus)`;
+  if (roiBuyEl) roiBuyEl.textContent = `ROI: ${roiBuy}%`;
 
-  if (isolatedInstanceId) {
-    const isoNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
-    if (isoNode) {
-      renderIsolatedDiagram();
-    } else {
-      isolatedInstanceId = null;
-      renderTreeDiagram(recipeTreeRoot, priceStrategy, profitSell, roiSell);
-    }
-  } else {
-    renderTreeDiagram(recipeTreeRoot, priceStrategy, profitSell, roiSell);
-  }
+  renderTreeDiagram(recipeTreeRoot, priceStrategy, profitSell, roiSell);
   
   renderBillOfMaterials(recipeTreeRoot, brokerFee);
   setTimeout(drawConnectingLines, 50);
 
-  // Restore active input focus and cursor selection if user was typing in runs box
+  // Restore active input focus and cursor selection dynamically
   if (isCardRunsFocused) {
     const newRunsInput = document.getElementById('card-bp-runs');
     if (newRunsInput) {
       newRunsInput.focus();
-      if (selStart !== null && selEnd !== null) {
-        try { newRunsInput.setSelectionRange(selStart, selEnd); } catch (e) {}
-      }
+      const val = newRunsInput.value;
+      newRunsInput.value = '';
+      newRunsInput.value = val;
+    }
+  }
+
+  if (isCardCustomPriceFocused) {
+    const newPriceInput = document.getElementById('card-custom-price');
+    if (newPriceInput) {
+      newPriceInput.focus();
+      const val = newPriceInput.value;
+      newPriceInput.value = '';
+      newPriceInput.value = val;
     }
   }
 }
@@ -589,8 +590,6 @@ function createNodeCard(node) {
   const currentBuyStrategy = getNodePriceStrategy(node);
 
   let sellStrategyUI = '';
-  let contractBreakdownUI = '';
-
   if (isRoot) {
     const curStrategy = window.rootSellStrategy || 'market-sell';
     const curCustomPrice = window.rootCustomPrice || '';
@@ -609,33 +608,23 @@ function createNodeCard(node) {
         </div>
         
         ${isCustomPriceNeeded ? `
-          <div class="flex justify-between items-center text-[10px] mono">
-            <span class="text-purple-300 font-bold">Custom Sell Price:</span>
-            <div class="flex items-center space-x-1">
-              <input type="number" id="card-custom-price" value="${curCustomPrice}" placeholder="Unit Price"
-                oninput="syncCustomPrice(event)"
-                class="w-24 bg-[#0c1318] border border-[#1e3348] text-center text-green-400 font-bold rounded p-0.5 outline-none text-[10px]">
-              <span class="text-slate-500 text-[9px]">ISK</span>
+          <div class="flex flex-col text-[10px] mono">
+            <div class="flex justify-between items-center">
+              <span class="text-purple-300 font-bold">Custom Sell Price:</span>
+              <div class="flex items-center space-x-1">
+                <input type="number" id="card-custom-price" value="${curCustomPrice}" placeholder="Unit Price"
+                  oninput="syncCustomPrice(event)"
+                  class="w-24 bg-[#0c1318] border border-[#1e3348] text-center text-green-400 font-bold rounded p-0.5 outline-none text-[10px]">
+                <span class="text-slate-500 text-[9px]">ISK</span>
+              </div>
+            </div>
+            <div class="text-[9px] text-green-400 text-right font-bold mt-1">
+              ${Math.round(window.rootCustomPrice || 0).toLocaleString()} ISK
             </div>
           </div>
         ` : ''}
       </div>
     `;
-
-    if (curStrategy === 'custom-contract') {
-      const cBroker = node.contractBrokerFee || 0;
-      const cDeposit = node.contractDeposit || 0;
-      const cSalesTax = node.contractSalesTax || 0;
-
-      contractBreakdownUI = `
-        <div class="text-[10px] mono text-purple-300 border-t border-[#1e3348]/40 pt-1 mt-1 space-y-0.5" onclick="event.stopPropagation()">
-          <div class="flex justify-between"><span>Contract Broker:</span> <span>+${Math.round(cBroker).toLocaleString()} ISK</span></div>
-          <div class="flex justify-between"><span>Contract Sales Tax:</span> <span>+${Math.round(cSalesTax).toLocaleString()} ISK</span></div>
-          <div class="flex justify-between text-amber-400 font-semibold"><span>Refundable Deposit:</span> <span>${Math.round(cDeposit).toLocaleString()} ISK</span></div>
-          <div class="flex justify-between text-[#e85555] font-semibold"><span>Upfront Listing Cost:</span> <span>${Math.round(cBroker + cDeposit).toLocaleString()} ISK</span></div>
-        </div>
-      `;
-    }
   }
 
   card.className = `diagram-node rounded p-3 shadow-2xl transition-all ${cardStyle}`;
@@ -772,8 +761,6 @@ function createNodeCard(node) {
         <span class="text-slate-300">${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span>
         <span class="text-amber-400 font-bold">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span>
       </div>
-
-      ${contractBreakdownUI}
 
       ${isRoot ? `
         <div class="flex justify-between font-bold border-t border-green-500/40 pt-1 mt-1 bg-green-950/30 p-1 rounded">
@@ -1171,190 +1158,4 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
       const strategy = getNodePriceStrategy(node);
       
       const stockQty = isStockDeductEnabled ? (userStockMap[typeId] || userStockMap[node.typeId] || 0) : 0;
-      const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
-
-      if (!bomMap[typeId]) {
-        bomMap[typeId] = {
-          typeId: typeId,
-          name: node.name,
-          qty: 0,
-          strategy: strategy
-        };
-      }
-      bomMap[typeId].qty += netQtyNeeded;
-    } else {
-      node.children.forEach(child => generateBOM(child));
-    }
-  }
-
-  if (rootNode.isBuildingSelf && rootNode.children && rootNode.children.length > 0) {
-    rootNode.children.forEach(c => generateBOM(c));
-  } else {
-    const rootTypeId = rootNode.displayTypeId || rootNode.typeId;
-    const strategy = getNodePriceStrategy(rootNode);
-    const stockQty = isStockDeductEnabled ? (userStockMap[rootTypeId] || userStockMap[rootNode.typeId] || 0) : 0;
-    const netQtyNeeded = Math.max(0, rootNode.qtyNeeded - stockQty);
-
-    bomMap[rootTypeId] = { typeId: rootTypeId, name: rootNode.name, qty: netQtyNeeded, strategy: strategy };
-  }
-
-  const bomItems = Object.values(bomMap);
-  let totalBOMCost = 0;
-
-  bomItems.forEach(item => {
-    const prices = priceCache[item.typeId] || { sell: 0, buy: 0 };
-    let unitPrice = item.strategy === 'sell' ? prices.sell : prices.buy;
-    if (item.strategy === 'buy') {
-      unitPrice = unitPrice * (1 + brokerFee);
-    }
-    item.unitPrice = unitPrice;
-    item.lineCost = unitPrice * item.qty;
-    totalBOMCost += item.lineCost;
-  });
-
-  bomItems.sort((a, b) => b.lineCost - a.lineCost);
-
-  bomItems.forEach(item => {
-    const row = document.createElement('div');
-    row.className = 'bg-[#0c1318] border border-[#1e3348] hover:border-cyan-500 hover:bg-[#101d2a] rounded p-2 flex items-center justify-between cursor-pointer transition shadow-sm';
-    row.title = 'Click to find and focus this material in the build diagram';
-    row.onclick = () => highlightNodeByTypeId(item.typeId);
-
-    row.innerHTML = `
-      <div class="flex items-center space-x-2.5 min-w-0">
-        <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-7 h-7 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
-        <div class="min-w-0 flex-1">
-          <div class="font-semibold text-slate-200 truncate flex items-center gap-1.5">
-            <span class="truncate">${item.name}</span>
-            <span class="text-[9px] px-1 rounded font-bold mono ${item.strategy === 'sell' ? 'bg-amber-900/60 text-amber-300' : 'bg-cyan-900/60 text-cyan-300'}">
-              ${item.strategy === 'sell' ? 'SELL' : 'BUY'}
-            </span>
-          </div>
-          <div class="text-[10px] text-slate-400 mono font-semibold">Qty: ${item.qty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK</div>
-        </div>
-      </div>
-      <div class="text-right mono font-bold text-cyan-400 flex-shrink-0 ml-2">
-        ${Math.round(item.lineCost).toLocaleString()} ISK
-      </div>
-    `;
-
-    listContainer.appendChild(row);
-  });
-
-  const countEl = document.getElementById('bom-type-count');
-  if (countEl) countEl.textContent = bomItems.length.toString();
-
-  const totalEl = document.getElementById('bom-total-isk');
-  if (totalEl) totalEl.textContent = Math.round(totalBOMCost).toLocaleString() + ' ISK';
-
-  window.currentBOMText = bomItems.map(i => `${i.name} x${i.qty}`).join('\n');
-}
-
-function copyMultibuyText() {
-  if (!window.currentBOMText) return;
-  navigator.clipboard.writeText(window.currentBOMText).then(() => {
-    const btn = document.querySelector('button[onclick="copyMultibuyText()"]');
-    if (btn) {
-      const orig = btn.textContent;
-      btn.textContent = 'Copied!';
-      btn.className = 'px-3.5 py-1.5 bg-green-600 text-white font-bold text-xs rounded mono transition';
-      setTimeout(() => {
-        btn.textContent = orig;
-        btn.className = 'px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded mono transition shadow';
-      }, 1500);
-    }
-  });
-}
-
-// Smooth Pan and Zoom Engine
-const viewport = document.getElementById('viewport');
-const content = document.getElementById('pan-zoom-content');
-
-if (viewport) {
-  viewport.addEventListener('mousedown', (e) => {
-    if (e.button === 1) {
-      e.preventDefault();
-      isPanning = true;
-      startX = e.clientX - panX;
-      startY = e.clientY - panY;
-      viewport.style.cursor = 'grabbing';
-    }
-  });
-
-  window.addEventListener('mousemove', (e) => {
-    if (isPanning) {
-      panX = e.clientX - startX;
-      panY = e.clientY - startY;
-      updateTransform();
-    }
-  });
-
-  window.addEventListener('mouseup', (e) => {
-    if (e.button === 1 && isPanning) {
-      isPanning = false;
-      viewport.style.cursor = 'grab';
-    }
-  });
-
-  viewport.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
-    const newScale = Math.min(Math.max(0.2, zoomScale * zoomFactor), 3.0);
-
-    const rect = viewport.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    panX = mouseX - (mouseX - panX) * (newScale / zoomScale);
-    panY = mouseY - (mouseY - panY) * (newScale / zoomScale);
-    zoomScale = newScale;
-
-    updateTransform();
-    drawConnectingLines();
-  }, { passive: false });
-}
-
-function updateTransform() {
-  const roundedPanX = Math.round(panX);
-  const roundedPanY = Math.round(panY);
-  if (content) content.style.transform = `translate(${roundedPanX}px, ${roundedPanY}px) scale(${zoomScale})`;
-  const zoomText = document.getElementById('zoom-level-text');
-  if (zoomText) zoomText.textContent = `Zoom: ${Math.round(zoomScale * 100)}%`;
-}
-
-function resetPanZoom() {
-  zoomScale = 1.0;
-  panX = 0;
-  panY = 0;
-  updateTransform();
-  drawConnectingLines();
-}
-
-// Initialize Application
-window.onload = async () => {
-  if (typeof window.buildPrepackedIndexes === 'function') {
-    window.buildPrepackedIndexes();
-  }
-
-  loadTaxSettings(); // Load custom taxes from localStorage!
-
-  // 1. Render default item
-  try {
-    if (window.IDX && window.IDX['drekavac']) {
-      await selectItem(48519, 'Drekavac');
-    } else if (window.IDX && window.IDX['caracal']) {
-      await selectItem(621, 'Caracal');
-    } else {
-      await selectItem(48519, 'Drekavac');
-    }
-  } catch (e) {
-    console.error('Initial selectItem error:', e);
-  }
-
-  // 2. Fetch background prices & SSO in parallel
-  fetchAdjustedPrices().catch(e => console.warn('Adjusted prices error:', e));
-  handleEsiSSOCallback().catch(e => console.warn('SSO Callback Error:', e));
-  loadSavedSystem().catch(e => console.warn('Load system error:', e));
-
-  window.addEventListener('resize', drawConnectingLines);
-};
+      const netQtyNeeded = Ma
