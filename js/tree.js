@@ -9,7 +9,7 @@ function getBatchYield(recipe, isReaction) {
     if (explicit > 1) return explicit;
   }
 
-  // 1. Read explicit yield directly from all possible database record properties
+  // 1. Read explicit yield directly from all possible database record properties (Read-Only)
   const candidates = [
     recipe.productQtyPerRun,
     recipe.mfgQtyPerRun,
@@ -41,7 +41,7 @@ function getBatchYield(recipe, isReaction) {
 
   // 2. Fallback check on item names / IDs for known SDE batch yield standards
   const name = ((recipe.productName || '') + ' ' + (recipe.blueprintTypeName || '')).toLowerCase();
-  const typeId = recipe.productTypeID || recipe.typeID;
+  const typeId = recipe.productTypeID || recipe.product || recipe.p || recipe.typeID;
 
   if (typeId === 16681 || typeId === 16680 || typeId === 16679 || name.includes('carbide')) {
     return 10000;
@@ -77,23 +77,135 @@ async function fetchBlueprintData(typeId) {
     return null;
   }
 
+  // 1. Check BUILTIN_RECIPES
   if (BUILTIN_RECIPES && BUILTIN_RECIPES[typeId]) {
     blueprintCache[typeId] = BUILTIN_RECIPES[typeId];
     return BUILTIN_RECIPES[typeId];
   }
 
+  // 2. Check direct key in recipeMap
   if (recipeMap && recipeMap[typeId]) {
     blueprintCache[typeId] = recipeMap[typeId];
     return recipeMap[typeId];
   }
 
+  // 3. Check direct key in window.EVE_RECIPES
   if (window.EVE_RECIPES && window.EVE_RECIPES[typeId]) {
     const recipe = window.EVE_RECIPES[typeId];
     blueprintCache[typeId] = recipe;
     return recipe;
   }
 
-  // Pure Offline DB Lookup: If item is not in local EVE_RECIPES/recipeMap, it is a raw base material
+  // 4. Search recipeMap for matching product or blueprint type ID
+  if (window.recipeMap) {
+    for (const r of Object.values(window.recipeMap)) {
+      if (r && (r.productTypeID === typeId || r.blueprintTypeID === typeId || 
+                r.product === typeId || r.bp === typeId || r.p === typeId ||
+                r.result === typeId || r.output === typeId)) {
+        blueprintCache[typeId] = r;
+        return r;
+      }
+    }
+  }
+
+  // 5. Search window.EVE_RECIPES for matching product or blueprint type ID
+  if (window.EVE_RECIPES) {
+    for (const r of Object.values(window.EVE_RECIPES)) {
+      if (r && (r.productTypeID === typeId || r.blueprintTypeID === typeId || 
+                r.product === typeId || r.bp === typeId || r.p === typeId ||
+                r.result === typeId || r.output === typeId)) {
+        blueprintCache[typeId] = r;
+        return r;
+      }
+    }
+  }
+
+  // 6. Check POPULAR_ITEMS cross-reference
+  const popMatch = POPULAR_ITEMS ? POPULAR_ITEMS.find(p => p.id === typeId || p.bpId === typeId) : null;
+  if (popMatch) {
+    const otherId = (popMatch.id === typeId) ? popMatch.bpId : popMatch.id;
+    if (otherId && recipeMap[otherId]) {
+      blueprintCache[typeId] = recipeMap[otherId];
+      return recipeMap[otherId];
+    }
+  }
+
+  // 7. Fallback to external API (with exact activityProducts batch yield extraction)
+  const tryTypeIds = [typeId];
+  if (popMatch && popMatch.bpId && !tryTypeIds.includes(popMatch.bpId)) {
+    tryTypeIds.unshift(popMatch.bpId);
+  }
+
+  for (const targetId of tryTypeIds) {
+    const fuzzworkUrl = `https://www.fuzzwork.co.uk/blueprint/api/blueprint.php?typeid=${targetId}`;
+    const tryUrls = [
+      fuzzworkUrl,
+      `https://corsproxy.io/?${encodeURIComponent(fuzzworkUrl)}`
+    ];
+
+    for (const url of tryUrls) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.activityMaterials && typeof data.activityMaterials === 'object') {
+            const mfgMat = data.activityMaterials['1'] ? data.activityMaterials['1'].map(m => ({
+              typeId: parseInt(m.typeid),
+              name: m.name,
+              baseQty: parseInt(m.quantity)
+            })) : null;
+
+            const reactionMat = data.activityMaterials['11'] ? data.activityMaterials['11'].map(m => ({
+              typeId: parseInt(m.typeid),
+              name: m.name,
+              baseQty: parseInt(m.quantity)
+            })) : null;
+
+            let outputBatchYield = parseInt(data.productQtyPerRun) || parseInt(data.portionSize) || 1;
+            if (data.activityProducts && typeof data.activityProducts === 'object') {
+              const act1 = data.activityProducts['1'] || data.activityProducts[1];
+              const act11 = data.activityProducts['11'] || data.activityProducts[11];
+              if (act1 && act1[0] && act1[0].quantity) {
+                outputBatchYield = parseInt(act1[0].quantity);
+              } else if (act11 && act11[0] && act11[0].quantity) {
+                outputBatchYield = parseInt(act11[0].quantity);
+              }
+            }
+
+            if (mfgMat || reactionMat) {
+              const parsed = {
+                blueprintTypeID: data.blueprintTypeID,
+                blueprintTypeName: data.blueprintTypeName || '',
+                productTypeID: parseInt(data.productTypeID) || typeId,
+                productName: data.productTypeName || '',
+                activityProducts: data.activityProducts || null,
+                productQtyPerRun: outputBatchYield,
+                mfgQtyPerRun: outputBatchYield,
+                portionSize: outputBatchYield,
+                batchYield: outputBatchYield,
+                time: data.time || 0,
+                mfgMaterials: mfgMat,
+                reactionMaterials: reactionMat
+              };
+
+              blueprintCache[typeId] = parsed;
+              if (parsed.productTypeID) blueprintCache[parsed.productTypeID] = parsed;
+              if (parsed.blueprintTypeID) blueprintCache[parsed.blueprintTypeID] = parsed;
+              return parsed;
+            }
+          }
+        }
+      } catch (e) {
+        // Try next
+      }
+    }
+  }
+
   blueprintCache[typeId] = null;
   return null;
 }
