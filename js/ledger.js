@@ -16,10 +16,9 @@ function safeParseJSON(str, fallback) {
   }
 }
 
-// Global Ledger Queue State
+// Global Ledger Queue State (relying on global userStockMap from config.js)
 let activeJobs = [];
 let buildHistory = [];
-let userStockMap = {};
 
 // Load states from shared LocalStorage
 function loadJournalState() {
