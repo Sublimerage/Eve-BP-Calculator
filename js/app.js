@@ -3,7 +3,6 @@
 // Initialize root pricing strategy states if not already defined
 if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sell';
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
-if (window.rootCustomTax === undefined) window.rootCustomTax = 0.5;
 
 function saveTaxSettings() {
   try {
@@ -13,7 +12,10 @@ function saveTaxSettings() {
       salesTax: document.getElementById('sales-tax')?.value,
       brokerFee: document.getElementById('broker-fee')?.value,
       facilitySelect: document.getElementById('facility-select')?.value,
-      structureRoleBonus: document.getElementById('structure-role-bonus')?.value
+      structureRoleBonus: document.getElementById('structure-role-bonus')?.value,
+      contractTax: document.getElementById('contract-tax')?.value,
+      contractBroker: document.getElementById('contract-broker')?.value,
+      contractDeposit: document.getElementById('contract-deposit')?.value
     };
     localStorage.setItem('eve_tax_settings', JSON.stringify(settings));
   } catch (e) {}
@@ -30,6 +32,9 @@ function loadTaxSettings() {
       if (settings.brokerFee !== undefined && document.getElementById('broker-fee')) document.getElementById('broker-fee').value = settings.brokerFee;
       if (settings.facilitySelect !== undefined && document.getElementById('facility-select')) document.getElementById('facility-select').value = settings.facilitySelect;
       if (settings.structureRoleBonus !== undefined && document.getElementById('structure-role-bonus')) document.getElementById('structure-role-bonus').value = settings.structureRoleBonus;
+      if (settings.contractTax !== undefined && document.getElementById('contract-tax')) document.getElementById('contract-tax').value = settings.contractTax;
+      if (settings.contractBroker !== undefined && document.getElementById('contract-broker')) document.getElementById('contract-broker').value = settings.contractBroker;
+      if (settings.contractDeposit !== undefined && document.getElementById('contract-deposit')) document.getElementById('contract-deposit').value = settings.contractDeposit;
     }
   } catch (e) {}
 }
@@ -308,6 +313,15 @@ function recalculate() {
   const sccSurcharge = (parseFloat(document.getElementById('scc-surcharge')?.value) || 4.0) / 100;
   const structureRoleBonus = parseFloat(document.getElementById('structure-role-bonus')?.value) || 0.03;
 
+  // Retrieve global contract configurations
+  const contractTaxPercent = parseFloat(document.getElementById('contract-tax')?.value) || 0.5;
+  const contractBrokerPercent = parseFloat(document.getElementById('contract-broker')?.value) || 0.5;
+  const contractDepositPercent = parseFloat(document.getElementById('contract-deposit')?.value) || 1.0;
+
+  const contractTaxRate = contractTaxPercent / 100;
+  const contractBrokerRate = contractBrokerPercent / 100;
+  const contractDepositRate = contractDepositPercent / 100;
+
   const facility = document.getElementById('facility-select')?.value || '0.01';
   const priceStrategy = document.getElementById('input-price-mode')?.value || 'sell';
 
@@ -378,24 +392,14 @@ function recalculate() {
   const selectedStrategy = window.rootSellStrategy || 'market-sell';
 
   let unitSellPrice = 0;
-  let isBuyMode = false;
-  let isContractMode = false;
+  let isContractMode = selectedStrategy === 'custom-contract';
 
   if (selectedStrategy === 'market-sell') {
     unitSellPrice = outputPrices.sell;
-    isBuyMode = false;
-  } else if (selectedStrategy === 'market-buy') {
-    unitSellPrice = outputPrices.buy;
-    isBuyMode = true;
   } else if (selectedStrategy === 'custom-market-sell') {
     unitSellPrice = window.rootCustomPrice || 0;
-    isBuyMode = false;
-  } else if (selectedStrategy === 'custom-market-buy') {
-    unitSellPrice = window.rootCustomPrice || 0;
-    isBuyMode = true;
   } else if (selectedStrategy === 'custom-contract') {
     unitSellPrice = window.rootCustomPrice || 0;
-    isContractMode = true;
   }
 
   const grossSellRevenue = unitSellPrice * totalRootOutputQty;
@@ -406,29 +410,28 @@ function recalculate() {
 
   // Compute final net revenue based on chosen channel strategy
   let netSellRevenue = grossSellRevenue;
-  let netBuyRevenue = grossBuyRevenue;
+  let netBuyRevenue = grossBuyRevenue * (1 - salesTax); // standard buy fallback (accounting for sales tax)
 
   if (isContractMode) {
-    // Contract Sale: uses custom contract tax % and flat 10k ISK fee
-    const contractTaxRate = (window.rootCustomTax || 0) / 100;
-    const contractBrokerFee = 10000;
-    const baseRevenue = unitSellPrice * totalRootOutputQty;
-    const netContractRevenue = baseRevenue - (baseRevenue * contractTaxRate) - contractBrokerFee;
-    netSellRevenue = netContractRevenue;
-    netBuyRevenue = netContractRevenue;
-  } else if (isBuyMode) {
-    // Market Buy: uses settings' Sales Tax
-    netBuyRevenue = grossSellRevenue * (1 - salesTax);
-    netSellRevenue = grossSellRevenue * (1 - salesTax - brokerFee);
+    // Contract Sale: Broker fee (% + 10k flat), Sales Tax, and Deposit
+    const cSalesTax = grossSellRevenue * contractTaxRate;
+    const cBrokerFee = (grossSellRevenue * contractBrokerRate) + 10000;
+    const cDeposit = Math.max(100000, grossSellRevenue * contractDepositRate);
+
+    netSellRevenue = grossSellRevenue - cSalesTax - cBrokerFee;
+    
+    // Save to root node for card UI rendering
+    recipeTreeRoot.contractSalesTax = cSalesTax;
+    recipeTreeRoot.contractBrokerFee = cBrokerFee;
+    recipeTreeRoot.contractDeposit = cDeposit;
   } else {
-    // Market Sell: uses settings' Sales Tax + Broker Fee
+    // Market Sell: standard sales tax and broker fee
     netSellRevenue = grossSellRevenue * (1 - salesTax - brokerFee);
-    netBuyRevenue = grossBuyRevenue * (1 - salesTax);
   }
 
   // Net Profit formula includes Surplus Re-sale Credit
   const profitSell = netSellRevenue + totalSurplusMaterialValue - totalProductionCost;
-  const profitBuy = isBuyMode ? profitSell : (netBuyRevenue + totalSurplusMaterialValue - totalProductionCost);
+  const profitBuy = netBuyRevenue + totalSurplusMaterialValue - totalProductionCost;
   
   // Attach final aligned profit and revenue calculations to root node structure
   recipeTreeRoot.netProfitSell = profitSell;
@@ -454,7 +457,7 @@ function recalculate() {
   const summaryOutBuyEl = document.getElementById('summary-output-buy');
   if (summaryOutBuyEl) {
     if (isContractMode) {
-      summaryOutBuyEl.textContent = 'Net Contract: ' + Math.round(netBuyRevenue).toLocaleString() + ' ISK';
+      summaryOutBuyEl.textContent = 'Net Contract: ' + Math.round(netSellRevenue).toLocaleString() + ' ISK';
     } else {
       summaryOutBuyEl.textContent = `Net Instant Buy: ${Math.round(netBuyRevenue).toLocaleString()} ISK`;
     }
@@ -462,19 +465,16 @@ function recalculate() {
 
   const pSellEl = document.getElementById('summary-profit-sell');
   if (pSellEl) {
-    const finalProfit = isBuyMode ? profitBuy : profitSell;
-    pSellEl.textContent = Math.round(finalProfit).toLocaleString() + ' ISK';
-    pSellEl.className = `text-lg font-bold mt-0.5 mono ${finalProfit >= 0 ? 'text-green-400' : 'text-red-500'}`;
+    pSellEl.textContent = Math.round(profitSell).toLocaleString() + ' ISK';
+    pSellEl.className = `text-lg font-bold mt-0.5 mono ${profitSell >= 0 ? 'text-green-400' : 'text-red-500'}`;
   }
 
   const roiSellEl = document.getElementById('summary-roi-sell');
   if (roiSellEl) {
-    const finalProfit = isBuyMode ? profitBuy : profitSell;
-    const finalRoi = totalProductionCost > 0 ? ((finalProfit / totalProductionCost) * 100).toFixed(1) : 0;
+    const finalRoi = totalProductionCost > 0 ? ((profitSell / totalProductionCost) * 100).toFixed(1) : 0;
     
     let label = 'Net ROI';
     if (selectedStrategy === 'custom-contract') label = 'Contract ROI';
-    else if (isBuyMode) label = 'Buy Order ROI';
     else label = 'Sell Order ROI';
 
     roiSellEl.textContent = `${label}: ${finalRoi}% (Inc. Surplus)`;
@@ -589,28 +589,26 @@ function createNodeCard(node) {
   const currentBuyStrategy = getNodePriceStrategy(node);
 
   let sellStrategyUI = '';
+  let contractBreakdownUI = '';
+
   if (isRoot) {
     const curStrategy = window.rootSellStrategy || 'market-sell';
     const curCustomPrice = window.rootCustomPrice || '';
-    const curCustomTax = window.rootCustomTax !== undefined ? window.rootCustomTax : 0.5;
 
-    const isCustomStrategy = curStrategy.startsWith('custom-');
-    const isContractStrategy = curStrategy === 'custom-contract';
+    const isCustomPriceNeeded = curStrategy === 'custom-market-sell' || curStrategy === 'custom-contract';
 
     sellStrategyUI = `
       <div class="mb-2 p-1.5 bg-[#070b0f] rounded border border-purple-500/40 space-y-1.5" onclick="event.stopPropagation()">
         <div class="flex justify-between items-center text-[10px] mono">
           <span class="text-purple-300 font-bold">Sell Channel:</span>
           <select id="card-sell-strategy" onchange="syncSellStrategy(event)" class="bg-[#0c1318] text-white rounded p-0.5 border border-[#1e3348] text-[10px] outline-none">
-            <option value="market-sell" ${curStrategy === 'market-sell' ? 'selected' : ''}>Auto (Jita Sell)</option>
-            <option value="market-buy" ${curStrategy === 'market-buy' ? 'selected' : ''}>Auto (Jita Buy)</option>
+            <option value="market-sell" ${curStrategy === 'market-sell' ? 'selected' : ''}>Auto</option>
             <option value="custom-market-sell" ${curStrategy === 'custom-market-sell' ? 'selected' : ''}>Custom Market Sell</option>
-            <option value="custom-market-buy" ${curStrategy === 'custom-market-buy' ? 'selected' : ''}>Custom Market Buy</option>
-            <option value="custom-contract" ${curStrategy === 'custom-contract' ? 'selected' : ''}>Custom Contract Sale</option>
+            <option value="custom-contract" ${curStrategy === 'custom-contract' ? 'selected' : ''}>Custom Contract</option>
           </select>
         </div>
         
-        ${isCustomStrategy ? `
+        ${isCustomPriceNeeded ? `
           <div class="flex justify-between items-center text-[10px] mono">
             <span class="text-purple-300 font-bold">Custom Sell Price:</span>
             <div class="flex items-center space-x-1">
@@ -621,25 +619,26 @@ function createNodeCard(node) {
             </div>
           </div>
         ` : ''}
-
-        ${isContractStrategy ? `
-          <div class="flex justify-between items-center text-[10px] mono">
-            <span class="text-purple-300 font-bold">Custom Contract Tax:</span>
-            <div class="flex items-center space-x-1">
-              <input type="number" id="card-custom-tax" value="${curCustomTax}" placeholder="0.5" step="0.1" min="0" max="100"
-                oninput="syncCustomTax(event)"
-                class="w-24 bg-[#0c1318] border border-[#1e3348] text-center text-amber-300 font-bold rounded p-0.5 outline-none text-[10px]">
-              <span class="text-slate-500 text-[9px]">%</span>
-            </div>
-          </div>
-        ` : ''}
       </div>
     `;
+
+    if (curStrategy === 'custom-contract') {
+      const cBroker = node.contractBrokerFee || 0;
+      const cDeposit = node.contractDeposit || 0;
+      const cSalesTax = node.contractSalesTax || 0;
+
+      contractBreakdownUI = `
+        <div class="text-[10px] mono text-purple-300 border-t border-[#1e3348]/40 pt-1 mt-1 space-y-0.5" onclick="event.stopPropagation()">
+          <div class="flex justify-between"><span>Contract Broker:</span> <span>+${Math.round(cBroker).toLocaleString()} ISK</span></div>
+          <div class="flex justify-between"><span>Contract Sales Tax:</span> <span>+${Math.round(cSalesTax).toLocaleString()} ISK</span></div>
+          <div class="flex justify-between text-amber-400 font-semibold"><span>Refundable Deposit:</span> <span>${Math.round(cDeposit).toLocaleString()} ISK</span></div>
+          <div class="flex justify-between text-[#e85555] font-semibold"><span>Upfront Listing Cost:</span> <span>${Math.round(cBroker + cDeposit).toLocaleString()} ISK</span></div>
+        </div>
+      `;
+    }
   }
 
   card.className = `diagram-node rounded p-3 shadow-2xl transition-all ${cardStyle}`;
-
-  const isBuyModeSelected = window.rootSellStrategy === 'market-buy' || window.rootSellStrategy === 'custom-market-buy';
 
   card.innerHTML = `
     <div class="flex items-center space-x-3 border-b border-[#1e3348] pb-2 mb-2">
@@ -774,13 +773,15 @@ function createNodeCard(node) {
         <span class="text-amber-400 font-bold">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span>
       </div>
 
+      ${contractBreakdownUI}
+
       ${isRoot ? `
         <div class="flex justify-between font-bold border-t border-green-500/40 pt-1 mt-1 bg-green-950/30 p-1 rounded">
           <span class="text-slate-300">
-            ${window.rootSellStrategy === 'custom-contract' ? 'Net Profit (Contract Output):' : isBuyModeSelected ? 'Net Profit (Buy Output):' : 'Net Profit (Sell Output):'}
+            ${window.rootSellStrategy === 'custom-contract' ? 'Net Profit (Contract Output):' : 'Net Profit (Sell Output):'}
           </span>
-          <span class="${(isBuyModeSelected ? node.netProfitBuy : node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">
-            ${Math.round(isBuyModeSelected ? (node.netProfitBuy || 0) : (node.netProfitSell || 0)).toLocaleString()} ISK
+          <span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">
+            ${Math.round(node.netProfitSell || 0).toLocaleString()} ISK
           </span>
         </div>
       ` : ''}
