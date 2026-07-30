@@ -16,6 +16,22 @@ function safeParseJSON(str, fallback) {
   }
 }
 
+// Convert seconds into human-readable EVE duration format (e.g. 1d 4h 12m)
+function formatDuration(seconds) {
+  if (!seconds || isNaN(seconds) || seconds <= 0) return 'N/A';
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0) parts.push(`${mins}m`);
+  if (parts.length === 0) parts.push(`${secs}s`);
+  return parts.join(' ');
+}
+
 function saveTaxSettings() {
   try {
     const settings = {
@@ -522,11 +538,17 @@ function recalculate() {
     localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap || {}));
   } catch (err) {}
 
-  // Restore active input focus dynamically (without value clearing that triggers recursion)
+  // Restore active input focus dynamically, using temporary type conversion to prevent cursor jumping
   if (isCardRunsFocused) {
     const newRunsInput = document.getElementById('card-bp-runs');
     if (newRunsInput) {
       newRunsInput.focus();
+      try {
+        const temp = newRunsInput.type;
+        newRunsInput.type = 'text';
+        newRunsInput.setSelectionRange(newRunsInput.value.length, newRunsInput.value.length);
+        newRunsInput.type = temp;
+      } catch (e) {}
     }
   }
 
@@ -534,6 +556,12 @@ function recalculate() {
     const newPriceInput = document.getElementById('card-custom-price');
     if (newPriceInput) {
       newPriceInput.focus();
+      try {
+        const temp = newPriceInput.type;
+        newPriceInput.type = 'text';
+        newPriceInput.setSelectionRange(newPriceInput.value.length, newPriceInput.value.length);
+        newPriceInput.type = temp;
+      } catch (e) {}
     }
   }
 }
@@ -656,6 +684,31 @@ function createNodeCard(node) {
         <button onclick="addCurrentJobToLedger(event)" class="w-full mt-2 py-1.5 bg-purple-800 hover:bg-purple-700 text-purple-100 font-bold rounded transition text-[11px] mono flex items-center justify-center gap-1 border border-purple-500/30 shadow-md" title="Add this build job with its compiled materials to your manufacturing queue">
           ➕ ADD TO JOB QUEUE
         </button>
+      </div>
+    `;
+  }
+
+  // Calculate Est. Build Time defensively (Accounting for skills, facility type, TE)
+  let buildTimeUI = '';
+  if (node.isBuildingSelf && node.recipe && node.recipe.time) {
+    const baseTime = node.recipe.time || 0;
+    const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 0, advIndustry: 0 });
+    const indFactor = 1 - (0.04 * (skills.industry || 0));
+    const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
+    const skillFactor = indFactor * advIndFactor;
+
+    const te = node.customTE || 0;
+    const teFactor = 1 - (te / 100);
+
+    const facility = document.getElementById('facility-select')?.value || '0.01';
+    const facilityTimeBonus = (facility === '0.01') ? 0.05 : 0; // Sotiyo offers 5% base manufacturing time reduction
+    const facilityFactor = 1 - facilityTimeBonus;
+
+    const totalSeconds = baseTime * teFactor * skillFactor * facilityFactor * node.runsNeeded;
+    buildTimeUI = `
+      <div class="flex justify-between text-[10px] text-slate-400 mono border-t border-[#1e3348]/40 pt-1 mt-1">
+        <span>Est. Build Time:</span>
+        <span class="text-slate-300 font-semibold">${formatDuration(totalSeconds)}</span>
       </div>
     `;
   }
@@ -794,6 +847,8 @@ function createNodeCard(node) {
         <span class="text-slate-300">${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span>
         <span class="text-amber-400 font-bold">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span>
       </div>
+
+      ${buildTimeUI}
 
       ${isRoot ? `
         <div class="flex justify-between font-bold border-t border-green-500/40 pt-1 mt-1 bg-green-950/30 p-1 rounded">

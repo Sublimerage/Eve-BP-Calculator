@@ -32,7 +32,7 @@ function loadJournalState() {
 
   try {
     const savedHistory = localStorage.getItem('eve_ledger_history');
-    buildHistory = savedHistory ? JSON.parse(savedHistory) : [];
+    buildHistory = safeParseJSON(savedHistory, []);
     if (!Array.isArray(buildHistory)) buildHistory = [];
   } catch (e) {
     buildHistory = [];
@@ -315,7 +315,7 @@ function copyJournalMultibuy() {
   });
 }
 
-// Mark queued job as "built": Consumes materials from active stock map and logs to History
+// Mark queued job as "built": Logs to History without deducting from active API stock map
 function markJobAsBuilt(jobId) {
   loadJournalState();
 
@@ -324,7 +324,7 @@ function markJobAsBuilt(jobId) {
 
   const job = activeJobs[jobIndex];
 
-  // Stockpile quantities are left untouched as requested to ensure stock data relies strictly on ESI API and clipboard imports.
+  // Hangar stockpile quantities are left completely untouched, relying strictly on ESI API and clipboard hangar pastes.
 
   // 1. Ledger Logging: Archive job records into completed build history array
   const record = {
