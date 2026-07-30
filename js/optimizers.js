@@ -63,7 +63,7 @@ function resetSmartBuyModes() {
   recalculate();
 }
 
-// Optimizer 1: Build vs Buy Profit Margin Optimizer
+// Optimizer 1: True Greedy Build vs Buy Profit Margin Optimizer
 async function applyBuildProfitOptimizer() {
   const threshold = parseFloat(document.getElementById('build-profit-threshold')?.value) || 0;
 
@@ -76,55 +76,81 @@ async function applyBuildProfitOptimizer() {
     await fetchMarketPrices(Array.from(allTypeIds));
   }
 
-  function evaluateBuildNode(node) {
+  // Collect all manufacturable sub-component type IDs in the recipe tree
+  const manufacturableTypeIds = new Set();
+  function collectManufacturableNodes(node) {
     if (!node) return;
-
     if (node.depth > 0 && node.isManufacturable) {
-      const typeId = node.displayTypeId || node.typeId;
-      const prices = priceCache[typeId] || { sell: 0, buy: 0 };
-      const marketPrice = prices.sell || prices.buy || getEIV(typeId) || 0;
+      manufacturableTypeIds.add(node.displayTypeId || node.typeId);
+    }
+    if (node.children) {
+      node.children.forEach(child => collectManufacturableNodes(child));
+    }
+  }
+  collectManufacturableNodes(recipeTreeRoot);
 
-      const deductModeInput = document.getElementById('deduct-stock-mode');
-      const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-      const stockQty = isStockDeductEnabled ? (userStockMap[typeId] || userStockMap[node.typeId] || 0) : 0;
-      const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
+  const facilityTax = (parseFloat(document.getElementById('facility-tax')?.value) || 1.0) / 100;
+  const sccSurcharge = (parseFloat(document.getElementById('scc-surcharge')?.value) || 4.0) / 100;
+  const structureRoleBonus = parseFloat(document.getElementById('structure-role-bonus')?.value) || 0.03;
+  const facility = document.getElementById('facility-select')?.value || '0.01';
+  const brokerFee = (parseFloat(document.getElementById('broker-fee')?.value) || 1.0) / 100;
 
-      const marketBuyCost = marketPrice * netQtyNeeded;
+  // Helper to run a silent simulation test for profit under given build overrides
+  function simulateProfit(overrideState) {
+    const tempOverrides = { ...overrideState };
+    
+    // Scale tree quantities
+    scaleTreeQuantities(recipeTreeRoot, facility);
+    calculateNodeEIV(recipeTreeRoot);
 
-      // Estimate build cost from recipe materials + job fees
-      let estimatedBuildCost = 0;
-      if (node.recipe && node.recipe.materials) {
-        node.recipe.materials.forEach(mat => {
-          const matPrices = priceCache[mat.typeId] || { sell: 0, buy: 0 };
-          const matUnitPrice = matPrices.sell || matPrices.buy || getEIV(mat.typeId) || 0;
-          const meFactor = node.isReaction ? 1.0 : (1 - (node.customME || 0) / 100);
-          const facFactor = (1 - parseFloat(document.getElementById('facility-select')?.value || '0.01'));
-          const matQty = Math.max(node.runsNeeded, Math.ceil(node.runsNeeded * mat.baseQty * meFactor * facFactor));
-          estimatedBuildCost += matUnitPrice * matQty;
-        });
-      }
-
-      estimatedBuildCost += (node.jobFee || 0);
-
-      if (marketBuyCost > 0 && estimatedBuildCost > 0) {
-        const buildSavingsPct = ((marketBuyCost - estimatedBuildCost) / marketBuyCost) * 100;
-        if (buildSavingsPct >= threshold) {
-          buildSelfOverrides[typeId] = true;  // Building saves >= threshold %: switch to Build!
-        } else {
-          buildSelfOverrides[typeId] = false; // Building saves < threshold %: buy off Market!
-        }
-      } else {
-        buildSelfOverrides[typeId] = true;
-      }
+    // Calculate material cost and job fees
+    let matCost = 0;
+    if (recipeTreeRoot.isBuildingSelf && recipeTreeRoot.children && recipeTreeRoot.children.length > 0) {
+      recipeTreeRoot.children.forEach(child => {
+        matCost += calculateTreeNodeCost(child);
+      });
+    } else {
+      const rootPrices = priceCache[recipeTreeRoot.typeId] || { sell: 0, buy: 0 };
+      matCost = (rootPrices.sell || rootPrices.buy || 0) * recipeTreeRoot.qtyNeeded;
     }
 
-    if (node.children) {
-      node.children.forEach(child => evaluateBuildNode(child));
+    const jobFees = calculateNodeJobFee(recipeTreeRoot, facilityTax, sccSurcharge, structureRoleBonus);
+    const totalCost = matCost + jobFees;
+
+    const outputPrices = priceCache[recipeTreeRoot.typeId] || { sell: 0, buy: 0 };
+    const grossSell = outputPrices.sell * recipeTreeRoot.qtyNeeded;
+    const salesTax = (parseFloat(document.getElementById('sales-tax')?.value) || 3.6) / 100;
+    const netSell = grossSell * (1 - salesTax - brokerFee);
+
+    return netSell - totalCost;
+  }
+
+  // Test building vs buying for each sub-component from bottom-up
+  for (const typeId of Array.from(manufacturableTypeIds)) {
+    // Scenario A: Test with component set to BUY
+    buildSelfOverrides[typeId] = false;
+    const profitBuy = simulateProfit(buildSelfOverrides);
+
+    // Scenario B: Test with component set to BUILD
+    buildSelfOverrides[typeId] = true;
+    const profitBuild = simulateProfit(buildSelfOverrides);
+
+    const prices = priceCache[typeId] || { sell: 0, buy: 0 };
+    const unitPrice = prices.sell || prices.buy || getEIV(typeId) || 1;
+    const baseCost = unitPrice * (recipeTreeRoot.qtyNeeded || 1);
+
+    const profitGain = profitBuild - profitBuy;
+    const marginGainPct = baseCost > 0 ? (profitGain / baseCost) * 100 : 0;
+
+    // Only keep BUILD mode if building actually INCREASES net profit by >= threshold %
+    if (profitBuild > profitBuy && marginGainPct >= threshold) {
+      buildSelfOverrides[typeId] = true;
+    } else {
+      buildSelfOverrides[typeId] = false;
     }
   }
 
-  evaluateBuildNode(recipeTreeRoot);
-
+  // Re-apply final optimal tree state
   if (currentProduct) {
     await selectItem(currentProduct.id, currentProduct.name, true);
   }

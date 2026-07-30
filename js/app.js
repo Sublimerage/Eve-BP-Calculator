@@ -829,7 +829,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Accurate Camera Centering using getBoundingClientRect() relative to pan-zoom-content
+// Accurate Camera Centering using screen pixel deltas relative to viewport
 function centerOnSelectedNode() {
   let targetId = isolatedInstanceId || selectedInstanceId;
   
@@ -841,21 +841,22 @@ function centerOnSelectedNode() {
 
   const card = document.getElementById(`node-card-${targetId}`);
   const viewport = document.getElementById('viewport');
-  const content = document.getElementById('pan-zoom-content');
 
-  if (!card || !viewport || !content) return;
+  if (!card || !viewport) return;
 
   const cardRect = card.getBoundingClientRect();
-  const contentRect = content.getBoundingClientRect();
   const viewportRect = viewport.getBoundingClientRect();
 
-  // Unscaled card center relative to pan-zoom-content top-left origin
-  const cardCenterX = (cardRect.left + cardRect.width / 2 - contentRect.left) / zoomScale;
-  const cardCenterY = (cardRect.top + cardRect.height / 2 - contentRect.top) / zoomScale;
+  // Screen-space center coordinates
+  const viewportCenterX = viewportRect.left + viewportRect.width / 2;
+  const viewportCenterY = viewportRect.top + viewportRect.height / 2;
 
-  // Calculate panX/panY to center cardCenterX/cardCenterY dead-center in the viewport
-  panX = (viewportRect.width / 2) - (cardCenterX * zoomScale);
-  panY = (viewportRect.height / 2) - (cardCenterY * zoomScale);
+  const cardCenterX = cardRect.left + cardRect.width / 2;
+  const cardCenterY = cardRect.top + cardRect.height / 2;
+
+  // Shift panX and panY by exact screen-space deltas
+  panX += (viewportCenterX - cardCenterX);
+  panY += (viewportCenterY - cardCenterY);
 
   updateTransform();
   drawConnectingLines();
