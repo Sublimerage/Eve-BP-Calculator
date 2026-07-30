@@ -1,8 +1,5 @@
 'use strict';
 
-// Global cache for corporation division names
-window.corpDivisionNames = {};
-
 // Local HTML Escaper Helper
 function esc(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -38,7 +35,6 @@ function isContainerAsset(typeId) {
   if (!typeName) return false;
   const t = typeName.toLowerCase();
 
-  // 1. MUST match container keywords
   const isContainer = t.includes('container') || 
                       t.includes('canister') || 
                       t.includes('vault') || 
@@ -54,7 +50,6 @@ function isContainerAsset(typeId) {
                       t.includes('storage') ||
                       t.includes('depot');
 
-  // 2. MUST NOT match ship hull keywords
   const isShip = t.includes('frigate') || t.includes('destroyer') || t.includes('cruiser') ||
                  t.includes('battlecruiser') || t.includes('battleship') || t.includes('dreadnought') ||
                  t.includes('carrier') || t.includes('titan') || t.includes('corvette') ||
@@ -71,8 +66,8 @@ function isContainerAsset(typeId) {
 // Check for Rookie Ships and all EVE ship hull types
 function isShipType(typeId) {
   const rookieShipIds = new Set([
-    601, 606, 608, 596, 33079, 33081, 33083, 33085, // Rookie ships (Ibis, Reaper, Velator, Impairor, Taipan, etc.)
-    621, 622, 12005, 587, 24698, 644, 642, 643, 12015, 11987, 11989 // Popular ships
+    601, 606, 608, 596, 33079, 33081, 33083, 33085,
+    621, 622, 12005, 587, 24698, 644, 642, 643, 12015, 11987, 11989
   ]);
   if (rookieShipIds.has(typeId)) return true;
 
@@ -99,7 +94,7 @@ function isShipType(typeId) {
   return shipTerms.some(term => t.includes(term));
 }
 
-// Strict ESI Adjusted Price Fetcher (STRICT CCP ADJUSTED_PRICE ONLY)
+// Strict ESI Adjusted Price Fetcher
 async function fetchAdjustedPrices() {
   const statusEl = document.getElementById('eiv-status-text');
   if (statusEl) statusEl.innerHTML = `EIV Prices: <span class="text-amber-400 font-bold">Fetching...</span>`;
@@ -114,26 +109,29 @@ async function fetchAdjustedPrices() {
   for (const url of tryUrls) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       const res = await fetch(url, { signal: controller.signal });
       clearTimeout(timeoutId);
 
       if (res.ok) {
-        const data = await res.json();
+        let data = await res.json();
+        if (data && data.contents && typeof data.contents === 'string') {
+          try { data = JSON.parse(data.contents); } catch(e){}
+        }
         if (Array.isArray(data) && data.length > 0) {
           let loadedCount = 0;
-          eivCache = {};
+          window.eivCache = {};
           data.forEach(item => {
             if (item.adjusted_price !== undefined && item.adjusted_price !== null) {
-              eivCache[item.type_id] = parseFloat(item.adjusted_price);
+              window.eivCache[item.type_id] = parseFloat(item.adjusted_price);
               loadedCount++;
             }
           });
           
           if (statusEl) statusEl.innerHTML = `EIV Prices: <span class="text-green-400 font-bold">Loaded (${loadedCount.toLocaleString()})</span>`;
           
-          if (recipeTreeRoot) {
+          if (window.recipeTreeRoot) {
             recalculate();
           }
           return;
@@ -148,10 +146,10 @@ async function fetchAdjustedPrices() {
 }
 
 function getEIV(typeId) {
-  if (eivCache[typeId] !== undefined && eivCache[typeId] !== null) {
-    return eivCache[typeId];
+  if (window.eivCache && window.eivCache[typeId] !== undefined && window.eivCache[typeId] !== null) {
+    return window.eivCache[typeId];
   }
-  return 0; // CCP Rule: Unlisted items contribute 0 ISK to job EIV
+  return 0;
 }
 
 function calculateNodeEIV(node) {
@@ -294,9 +292,9 @@ function logoutEsiSSO() {
   localStorage.removeItem('esi_access_token');
   localStorage.removeItem('esi_char_id');
   localStorage.removeItem('esi_char_name');
-  rawAssetItems = [];
-  userStockMap = {};
-  corpDivisionNames = {};
+  window.rawAssetItems = [];
+  window.userStockMap = {};
+  window.corpDivisionNames = {};
   const container = document.getElementById('esi-login-container');
   if (container) {
     container.innerHTML = `
@@ -310,7 +308,6 @@ function logoutEsiSSO() {
   recalculate();
 }
 
-// Live Asset Refresh Action Triggered from Top Bar Button
 async function refreshLiveAssets() {
   const charId = localStorage.getItem('esi_char_id');
   const token = localStorage.getItem('esi_access_token');
@@ -324,9 +321,8 @@ async function refreshLiveAssets() {
   if (statusText) statusText.textContent = 'REFRESHING LIVE ESI ASSETS...';
   if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
 
-  // Wipe old location & stock maps for clean re-parse
-  resolvedLocationNames = {};
-  userStockMap = {};
+  window.resolvedLocationNames = {};
+  window.userStockMap = {};
 
   await fetchUserAndCorpAssets(charId, token);
 
@@ -336,7 +332,7 @@ async function refreshLiveAssets() {
 
 async function fetchUserAndCorpAssets(charId, accessToken) {
   try {
-    rawAssetItems = [];
+    window.rawAssetItems = [];
 
     let corpId = null;
     const charRes = await fetch(`https://esi.evetech.net/latest/characters/${charId}/?datasource=tranquility`);
@@ -345,7 +341,6 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       corpId = charData.corporation_id;
     }
 
-    // Fetch custom Corporation Hangar Division names
     if (corpId && accessToken) {
       try {
         const divRes = await fetch(`https://esi.evetech.net/latest/corporations/${corpId}/divisions/?datasource=tranquility`, {
@@ -356,7 +351,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
           if (divData && Array.isArray(divData.hangar)) {
             divData.hangar.forEach(d => {
               if (d.division && d.name) {
-                corpDivisionNames[d.division] = d.name.toUpperCase();
+                window.corpDivisionNames[d.division] = d.name.toUpperCase();
               }
             });
           }
@@ -376,7 +371,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
         if (Array.isArray(data) && data.length > 0) {
           data.forEach(ast => {
             if (ast.type_id && ast.quantity) {
-              rawAssetItems.push({
+              window.rawAssetItems.push({
                 item_id: ast.item_id,
                 type_id: ast.type_id,
                 quantity: ast.quantity,
@@ -408,7 +403,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
           if (Array.isArray(data) && data.length > 0) {
             data.forEach(ast => {
               if (ast.type_id && ast.quantity) {
-                rawAssetItems.push({
+                window.rawAssetItems.push({
                   item_id: ast.item_id,
                   type_id: ast.type_id,
                   quantity: ast.quantity,
@@ -428,28 +423,23 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     }
 
-    // Map item_id -> asset
     const itemIdToAssetMap = {};
-    rawAssetItems.forEach(ast => {
+    window.rawAssetItems.forEach(ast => {
       if (ast.item_id) {
         itemIdToAssetMap[ast.item_id] = ast;
       }
     });
 
-    // Trace asset hierarchy up to root station/structure and identify ALL actual containers (strictly excluding ships)
     const charContainerIds = [];
     const corpContainerIds = [];
 
-    rawAssetItems.forEach(ast => {
+    window.rawAssetItems.forEach(ast => {
       let currentLoc = ast.location_id;
       let depth = 0;
       let containerId = null;
 
       while (itemIdToAssetMap[currentLoc] && depth < 10) {
         const parentAsset = itemIdToAssetMap[currentLoc];
-        
-        // WATERPROOF CONTAINER CHECK:
-        // An asset is a container IF AND ONLY IF parentAsset.type_id is an actual container type!
         if (isContainerAsset(parentAsset.type_id)) {
           if (!containerId) {
             containerId = currentLoc;
@@ -469,7 +459,6 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       ast.container_id = containerId;
     });
 
-    // Fetch custom in-game container names via ESI assets/names endpoint
     if (charContainerIds.length > 0) {
       for (let i = 0; i < charContainerIds.length; i += 500) {
         const chunk = charContainerIds.slice(i, i + 500);
@@ -487,7 +476,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
             if (Array.isArray(customNames)) {
               customNames.forEach(cn => {
                 if (cn.item_id && cn.name && cn.name !== 'None' && cn.name.trim() !== '') {
-                  resolvedLocationNames[cn.item_id] = cn.name.toUpperCase();
+                  window.resolvedLocationNames[cn.item_id] = cn.name.toUpperCase();
                 }
               });
             }
@@ -513,7 +502,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
             if (Array.isArray(customNames)) {
               customNames.forEach(cn => {
                 if (cn.item_id && cn.name && cn.name !== 'None' && cn.name.trim() !== '') {
-                  resolvedLocationNames[cn.item_id] = cn.name.toUpperCase();
+                  window.resolvedLocationNames[cn.item_id] = cn.name.toUpperCase();
                 }
               });
             }
@@ -530,14 +519,11 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
 }
 
 async function resolveAndPopulateLocationFilter(accessToken = null) {
-  const uniqueRootLocIds = Array.from(new Set(rawAssetItems.map(a => a.root_location_id || a.location_id).filter(id => id && id !== 99999999)));
-  const uniqueContainerIds = Array.from(new Set(rawAssetItems.map(a => a.container_id).filter(id => id)));
+  const uniqueRootLocIds = Array.from(new Set(window.rawAssetItems.map(a => a.root_location_id || a.location_id).filter(id => id && id !== 99999999)));
+  const uniqueContainerIds = Array.from(new Set(window.rawAssetItems.map(a => a.container_id).filter(id => id)));
 
   if (uniqueRootLocIds.length > 0) {
-    const missingRootIds = uniqueRootLocIds.filter(id => !resolvedLocationNames[id]);
-
-    // 1. CRITICAL FIX FOR NPC STATIONS: Only POST standard CCP universe IDs (< 1,000,000,000) to /universe/names/
-    // Passing structure IDs (> 10^12) causes /universe/names/ to reject the ENTIRE batch with 404!
+    const missingRootIds = uniqueRootLocIds.filter(id => !window.resolvedLocationNames[id]);
     const standardUniverseIds = missingRootIds.filter(id => id < 1000000000);
 
     if (standardUniverseIds.length > 0) {
@@ -558,7 +544,7 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
             const nameData = await res.json();
             if (Array.isArray(nameData)) {
               nameData.forEach(item => {
-                resolvedLocationNames[item.id] = item.name.toUpperCase();
+                window.resolvedLocationNames[item.id] = item.name.toUpperCase();
               });
             }
           }
@@ -566,9 +552,8 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
       }
     }
 
-    // 2. Resolve Upwell Structure IDs (> 1,000,000,000,000) using authenticated structure endpoint
     const token = accessToken || localStorage.getItem('esi_access_token');
-    const unresolvedStructureIds = uniqueRootLocIds.filter(id => id > 1000000000000 && !resolvedLocationNames[id]);
+    const unresolvedStructureIds = uniqueRootLocIds.filter(id => id > 1000000000000 && !window.resolvedLocationNames[id]);
     
     if (unresolvedStructureIds.length > 0 && token) {
       await Promise.all(unresolvedStructureIds.map(async (structId) => {
@@ -580,58 +565,56 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
           if (res.ok) {
             const structData = await res.json();
             if (structData && structData.name) {
-              let sysName = systemNameCache[structData.solar_system_id] || '';
+              let sysName = window.systemNameCache[structData.solar_system_id] || '';
               if (!sysName && structData.solar_system_id) {
                 try {
                   const sysRes = await fetch(`https://esi.evetech.net/latest/universe/systems/${structData.solar_system_id}/?datasource=tranquility`);
                   if (sysRes.ok) {
                     const sysData = await sysRes.json();
                     sysName = sysData.name.toUpperCase();
-                    systemNameCache[structData.solar_system_id] = sysName;
+                    window.systemNameCache[structData.solar_system_id] = sysName;
                   }
                 } catch (e) {}
               }
 
               const fullName = structData.name.toUpperCase();
-              resolvedLocationNames[structId] = sysName ? `${fullName} (${sysName})` : fullName;
+              window.resolvedLocationNames[structId] = sysName ? `${fullName} (${sysName})` : fullName;
             }
           } else if (res.status === 403) {
-            resolvedLocationNames[structId] = `UPWELL STRUCTURE (${structId.toString().slice(-6)}) [PRIVATE/RESTRICTED]`;
+            window.resolvedLocationNames[structId] = `UPWELL STRUCTURE (${structId.toString().slice(-6)}) [PRIVATE/RESTRICTED]`;
           }
         } catch (e) {}
       }));
     }
   }
 
-  // 3. Fallback name assignments for unmapped station / structure IDs
-  rawAssetItems.forEach(item => {
+  window.rawAssetItems.forEach(item => {
     const id = item.root_location_id || item.location_id;
-    if (!resolvedLocationNames[id]) {
+    if (!window.resolvedLocationNames[id]) {
       if (id === 99999999) {
-        resolvedLocationNames[id] = 'CLIPBOARD / MANUAL IMPORT';
-      } else if (systemNameCache[id]) {
-        resolvedLocationNames[id] = systemNameCache[id];
+        window.resolvedLocationNames[id] = 'CLIPBOARD / MANUAL IMPORT';
+      } else if (window.systemNameCache[id]) {
+        window.resolvedLocationNames[id] = window.systemNameCache[id];
       } else if (id >= 30000000 && id < 34000000) {
-        resolvedLocationNames[id] = `SOLAR SYSTEM #${id}`;
+        window.resolvedLocationNames[id] = `SOLAR SYSTEM #${id}`;
       } else if (id >= 60000000 && id < 64000000) {
-        resolvedLocationNames[id] = `NPC STATION #${id}`;
+        window.resolvedLocationNames[id] = `NPC STATION #${id}`;
       } else if (id > 1000000000000) {
-        resolvedLocationNames[id] = `UPWELL STRUCTURE (${id.toString().slice(-6)})`;
+        window.resolvedLocationNames[id] = `UPWELL STRUCTURE (${id.toString().slice(-6)})`;
       } else {
-        resolvedLocationNames[id] = `CONTAINER / HANGAR #${id}`;
+        window.resolvedLocationNames[id] = `CONTAINER / HANGAR #${id}`;
       }
     }
   });
 
-  // 4. Resolve container item names if custom names were not set
   uniqueContainerIds.forEach(containerId => {
-    if (!resolvedLocationNames[containerId]) {
-      const containerItem = rawAssetItems.find(a => a.item_id === containerId);
+    if (!window.resolvedLocationNames[containerId]) {
+      const containerItem = window.rawAssetItems.find(a => a.item_id === containerId);
       if (containerItem) {
         const typeName = getItemTypeName(containerItem.type_id) || 'Container';
-        resolvedLocationNames[containerId] = `${typeName.toUpperCase()} (#${containerId.toString().slice(-5)})`;
+        window.resolvedLocationNames[containerId] = `${typeName.toUpperCase()} (#${containerId.toString().slice(-5)})`;
       } else {
-        resolvedLocationNames[containerId] = `CONTAINER (#${containerId.toString().slice(-5)})`;
+        window.resolvedLocationNames[containerId] = `CONTAINER (#${containerId.toString().slice(-5)})`;
       }
     }
   });
@@ -653,21 +636,20 @@ function populateLocationDropdown() {
   `;
 
   const sagNameMap = {
-    'CorpSAG1': corpDivisionNames[1] || 'DIVISION 1',
-    'CorpSAG2': corpDivisionNames[2] || 'DIVISION 2',
-    'CorpSAG3': corpDivisionNames[3] || 'DIVISION 3',
-    'CorpSAG4': corpDivisionNames[4] || 'DIVISION 4',
-    'CorpSAG5': corpDivisionNames[5] || 'DIVISION 5',
-    'CorpSAG6': corpDivisionNames[6] || 'DIVISION 6',
-    'CorpSAG7': corpDivisionNames[7] || 'DIVISION 7',
+    'CorpSAG1': window.corpDivisionNames[1] || 'DIVISION 1',
+    'CorpSAG2': window.corpDivisionNames[2] || 'DIVISION 2',
+    'CorpSAG3': window.corpDivisionNames[3] || 'DIVISION 3',
+    'CorpSAG4': window.corpDivisionNames[4] || 'DIVISION 4',
+    'CorpSAG5': window.corpDivisionNames[5] || 'DIVISION 5',
+    'CorpSAG6': window.corpDivisionNames[6] || 'DIVISION 6',
+    'CorpSAG7': window.corpDivisionNames[7] || 'DIVISION 7',
     'CorpDeliveries': 'CORP DELIVERIES'
   };
 
-  // Aggregate assets by root station/structure AND track actual containers
   const locCounts = {};
-  rawAssetItems.forEach(item => {
+  window.rawAssetItems.forEach(item => {
     const locId = item.root_location_id || item.location_id;
-    const locName = resolvedLocationNames[locId] || `Location #${locId}`;
+    const locName = window.resolvedLocationNames[locId] || `Location #${locId}`;
 
     if (!locCounts[locId]) {
       locCounts[locId] = {
@@ -679,7 +661,6 @@ function populateLocationDropdown() {
     }
     locCounts[locId].count += item.quantity;
 
-    // Track Corp Hangar Divisions
     if (item.owner_type === 'corp' && item.location_flag && item.location_flag.startsWith('Corp')) {
       const sagFlag = item.location_flag;
       if (!locCounts[locId].corpDivisions[sagFlag]) {
@@ -691,10 +672,9 @@ function populateLocationDropdown() {
       locCounts[locId].corpDivisions[sagFlag].count += item.quantity;
     }
 
-    // Track Containers
     if (item.container_id) {
       const cId = item.container_id;
-      const cName = resolvedLocationNames[cId] || `Container #${cId}`;
+      const cName = window.resolvedLocationNames[cId] || `Container #${cId}`;
       if (!locCounts[locId].containers[cId]) {
         locCounts[locId].containers[cId] = {
           name: cName,
@@ -705,11 +685,6 @@ function populateLocationDropdown() {
     }
   });
 
-  // Render COLOR-CODED location options:
-  // 🟩 NPC Stations = Green (#4caf6f)
-  // 🟧 Player Structures = Orange (#f97316)
-  // 🟪 Corp Divisions = Purple (#c084fc)
-  // 📦 Containers = White (#f8fafc)
   for (const [locId, data] of Object.entries(locCounts)) {
     const mainOpt = document.createElement('option');
     mainOpt.value = `loc_${locId}`;
@@ -718,13 +693,11 @@ function populateLocationDropdown() {
     const isUpwellStructure = numericLocId > 1000000000000;
 
     if (isUpwellStructure) {
-      // Player Station / Upwell Structure = ORANGE
       mainOpt.style.color = '#f97316';
       mainOpt.style.backgroundColor = '#0c1318';
       mainOpt.style.fontWeight = 'bold';
       mainOpt.textContent = `🟧 ${data.name} (${data.count.toLocaleString()} items)`;
     } else {
-      // NPC Station = GREEN
       mainOpt.style.color = '#4caf6f';
       mainOpt.style.backgroundColor = '#0c1318';
       mainOpt.style.fontWeight = 'bold';
@@ -733,7 +706,6 @@ function populateLocationDropdown() {
 
     filterSelect.appendChild(mainOpt);
 
-    // Render Corp Division sub-options under this station in PURPLE
     for (const [sagFlag, sagData] of Object.entries(data.corpDivisions)) {
       const sagOpt = document.createElement('option');
       sagOpt.value = `corpsag_${locId}_${sagFlag}`;
@@ -744,7 +716,6 @@ function populateLocationDropdown() {
       filterSelect.appendChild(sagOpt);
     }
 
-    // Render Container sub-options under this station in WHITE
     for (const [cId, cData] of Object.entries(data.containers)) {
       const containerOpt = document.createElement('option');
       containerOpt.value = `container_${cId}`;
@@ -798,7 +769,7 @@ function filterLocationDropdownOptions() {
 function updateStockDisplayCount() {
   const el = document.getElementById('stock-count-display');
   if (!el) return;
-  const totalItems = Object.values(userStockMap).reduce((acc, q) => acc + q, 0);
+  const totalItems = Object.values(window.userStockMap).reduce((acc, q) => acc + q, 0);
   el.textContent = `${totalItems.toLocaleString()} items`;
 }
 
@@ -809,15 +780,15 @@ function applyStockLocationFilter() {
   const useChar = document.getElementById('use-char-assets')?.checked ?? true;
   const useCorp = document.getElementById('use-corp-assets')?.checked ?? true;
 
-  userStockMap = {};
+  window.userStockMap = {};
 
-  rawAssetItems.forEach(item => {
+  window.rawAssetItems.forEach(item => {
     if (item.owner_type === 'char' && !useChar) return;
     if (item.owner_type === 'corp' && !useCorp) return;
 
     let include = false;
     const rootLocId = item.root_location_id || item.location_id;
-    const itemLocName = resolvedLocationNames[rootLocId] || '';
+    const itemLocName = window.resolvedLocationNames[rootLocId] || '';
 
     if (filterVal === 'all') {
       include = true;
@@ -837,7 +808,7 @@ function applyStockLocationFilter() {
     }
 
     if (include) {
-      userStockMap[item.type_id] = (userStockMap[item.type_id] || 0) + item.quantity;
+      window.userStockMap[item.type_id] = (window.userStockMap[item.type_id] || 0) + item.quantity;
     }
   });
 
@@ -856,8 +827,8 @@ function closePasteModal() {
 }
 
 function clearUserStock() {
-  rawAssetItems = rawAssetItems.filter(item => item.location_id !== 99999999);
-  userStockMap = {};
+  window.rawAssetItems = window.rawAssetItems.filter(item => item.location_id !== 99999999);
+  window.userStockMap = {};
   updateStockDisplayCount();
   populateLocationDropdown();
   recalculate();
@@ -902,7 +873,7 @@ function processPastedStock() {
 
     if (nameCandidate) {
       const q = nameCandidate.toLowerCase();
-      let matchedItem = IDX[q];
+      let matchedItem = window.IDX[q];
       if (!matchedItem && window.EVE_ITEMS) {
         for (const [idStr, name] of Object.entries(window.EVE_ITEMS)) {
           if (name.toLowerCase() === q) {
@@ -913,7 +884,7 @@ function processPastedStock() {
       }
 
       if (matchedItem) {
-        rawAssetItems.push({
+        window.rawAssetItems.push({
           type_id: matchedItem.id,
           quantity: qtyCandidate,
           location_id: 99999999,
@@ -924,7 +895,7 @@ function processPastedStock() {
     }
   });
 
-  resolvedLocationNames[99999999] = 'CLIPBOARD / MANUAL IMPORT';
+  window.resolvedLocationNames[99999999] = 'CLIPBOARD / MANUAL IMPORT';
   input.value = '';
   closePasteModal();
   populateLocationDropdown();
@@ -963,8 +934,8 @@ async function loadSavedSystem() {
 async function resolveSystemSCI(systemName) {
   if (!systemName || systemName.trim().length < 2) return;
   const q = systemName.trim().toLowerCase();
-  if (SYSTEM_IDX[q]) {
-    await selectSolarSystem(SYSTEM_IDX[q].id, SYSTEM_IDX[q].name);
+  if (window.SYSTEM_IDX[q]) {
+    await selectSolarSystem(window.SYSTEM_IDX[q].id, window.SYSTEM_IDX[q].name);
   } else {
     const matches = await fetchEsiSystemSearch(q);
     if (matches && matches.length > 0) {
@@ -989,8 +960,8 @@ async function fetchSystemSCIById(systemId, systemName) {
       });
     }
 
-    activeMfgSCI = mfgSCI;
-    activeReactSCI = reactSCI;
+    window.activeMfgSCI = mfgSCI;
+    window.activeReactSCI = reactSCI;
 
     const sciBadgeEl = document.getElementById('sci-badge');
     if (sciBadgeEl) {
@@ -1005,7 +976,7 @@ async function fetchSystemSCIById(systemId, systemName) {
 }
 
 async function fetchMarketPrices(typeIds) {
-  const missing = typeIds.filter(id => !priceCache[id]);
+  const missing = typeIds.filter(id => !window.priceCache[id]);
   if (!missing.length) return;
 
   const chunks = [];
@@ -1035,7 +1006,7 @@ async function fetchMarketPrices(typeIds) {
             for (const id of chunk) {
               const entry = data[String(id)];
               if (entry && (entry.sell || entry.buy)) {
-                priceCache[id] = {
+                window.priceCache[id] = {
                   sell: entry.sell ? parseFloat(entry.sell.min) || 0 : 0,
                   buy: entry.buy ? parseFloat(entry.buy.max) || 0 : 0
                 };
@@ -1051,10 +1022,11 @@ async function fetchMarketPrices(typeIds) {
     }
 
     chunk.forEach(id => {
-      if (!priceCache[id] || (!priceCache[id].sell && !priceCache[id].buy)) {
+      if (!window.priceCache[id] || (!window.priceCache[id].sell && !window.priceCache[id].buy)) {
         const eivVal = getEIV(id);
-        priceCache[id] = { sell: eivVal, buy: eivVal * 0.9 };
+        window.priceCache[id] = { sell: eivVal, buy: eivVal * 0.9 };
       }
     });
   }));
 }
+```.
