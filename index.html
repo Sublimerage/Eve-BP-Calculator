@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Blueprint & Multi-Layer Industry Calculator</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=2.0.4">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=2.0.5">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -54,125 +54,111 @@
   </header>
 
   <!-- Toolbar Row 1: Primary Search, Build Actions, Smart Optimizers, Pricing Strategy -->
-  <section class="bg-[#0d1922] border-b border-[#1e3348] p-2 grid grid-cols-1 md:grid-cols-12 gap-2 text-xs relative z-50">
+  <section class="bg-[#0d1922] border-b border-[#1e3348] p-1.5 flex flex-wrap items-center gap-2 text-xs relative z-50">
     
-    <!-- Item Search & Global Pricing Combined (Highly Compact - 4 cols) -->
-    <div class="md:col-span-4 bg-[#0c1318] p-2 rounded-lg border border-[#1e3348] relative z-50 flex flex-col justify-between space-y-1.5 shadow-md">
-      <div class="flex justify-between items-center border-b border-[#1e3348]/60 pb-1">
-        <label class="block text-cyan-400 font-bold uppercase tracking-wider text-[10px] rajdhani">Search & Global Pricing</label>
-      </div>
-      <div class="flex items-center space-x-2 relative">
+    <!-- Item Search & Global Pricing Combined (Highly Compact) -->
+    <div class="bg-[#0c1318] p-1.5 rounded border border-[#1e3348] relative z-50 flex items-center space-x-1.5 shadow">
+      <span class="text-cyan-400 font-bold uppercase text-[9px] rajdhani leading-none">Search &amp; Price:</span>
+      <div class="relative w-44">
         <!-- Compact Autocomplete Input -->
         <input type="text" id="item-search" autocomplete="off" placeholder="Search item..." 
-          class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded-md p-1.5 text-white font-bold focus:border-cyan-500 outline-none mono text-[11px] shadow-inner">
+          class="w-full bg-[#070b0f] border border-[#1e3348] rounded p-1 text-white font-bold focus:border-cyan-500 outline-none mono text-[11px] shadow-inner">
         <div id="search-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
-        
-        <!-- Pricing Mode -->
-        <select id="input-price-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded-md p-1.5 text-white font-bold text-[11px] outline-none w-24">
-          <option value="sell" selected>Sell (Inst.)</option>
-          <option value="buy">Buy Order</option>
-        </select>
-        
-        <!-- Reactions -->
-        <select id="include-reactions" onchange="if(currentProduct) selectItem(currentProduct.id, currentProduct.name, true)" class="bg-[#070b0f] border border-[#1e3348] rounded-md p-1.5 text-purple-300 font-bold text-[11px] outline-none w-20">
-          <option value="true" selected>React ON</option>
-          <option value="false">React OFF</option>
-        </select>
       </div>
+      
+      <!-- Pricing Mode -->
+      <select id="input-price-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-white font-bold text-[10px] outline-none w-20">
+        <option value="sell" selected>Sell (Inst.)</option>
+        <option value="buy">Buy Order</option>
+      </select>
+      
+      <!-- Reactions -->
+      <select id="include-reactions" onchange="if(currentProduct) selectItem(currentProduct.id, currentProduct.name, true)" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-purple-300 font-bold text-[10px] outline-none w-20">
+        <option value="true" selected>React ON</option>
+        <option value="false">React OFF</option>
+      </select>
     </div>
 
-    <!-- Tree Build / Buy Actions (Compact - 3 cols) -->
-    <div class="md:col-span-3 bg-[#0c1318] p-2 rounded-lg border border-[#1e3348] flex flex-col justify-between space-y-1.5 shadow-md">
-      <div class="flex justify-between items-center border-b border-[#1e3348]/60 pb-1">
-        <label class="block text-green-400 font-bold uppercase tracking-wider text-[10px] rajdhani">Sub-Component Build Mode</label>
-        <button onclick="buyAllSubComponents()" class="text-slate-400 hover:text-slate-300 text-[9px] mono transition" title="Reset all sub-components back to Buy off Market">
-          Reset
-        </button>
-      </div>
+    <!-- Tree Build / Buy Actions (Compact) -->
+    <div class="bg-[#0c1318] p-1.5 rounded border border-[#1e3348] flex items-center space-x-2 shadow">
+      <span class="text-green-400 font-bold uppercase text-[9px] rajdhani leading-none">Build Mode:</span>
       <div class="flex items-center space-x-1">
-        <button onclick="buildAllComponents()" class="flex-1 bg-green-800/80 hover:bg-green-700 text-white font-bold py-1 px-1.5 rounded text-[10px] mono transition shadow border border-green-600/30">
-          🔨 BUILD ALL
+        <button onclick="buildAllComponents()" class="bg-green-800/80 hover:bg-green-700 text-white font-bold py-1 px-2 rounded text-[10px] mono transition shadow border border-green-600/30">
+          🔨 Build All
         </button>
-        <button onclick="buyAllSubComponents()" class="flex-1 bg-slate-700/80 hover:bg-slate-600 text-white font-bold py-1 px-1.5 rounded text-[10px] mono transition shadow border border-slate-500/30">
-          🛒 BUY ALL
+        <button onclick="buyAllSubComponents()" class="bg-slate-700/80 hover:bg-slate-600 text-white font-bold py-1 px-2 rounded text-[10px] mono transition shadow border border-slate-500/30">
+          🛒 Buy All
         </button>
       </div>
       <!-- Built profit optimizer inline -->
-      <div class="bg-[#070b0f] px-1.5 py-0.5 rounded border border-[#1e3348] flex items-center justify-between gap-1.5" title="Switches sub-components to Build if building saves >= Threshold %">
-        <span class="text-slate-400 text-[9px] font-bold">Min Margin:</span>
-        <div class="flex items-center space-x-0.5">
-          <input type="number" id="build-profit-threshold" value="5.0" step="0.5" min="0" max="100" 
-            class="w-10 bg-[#0d1922] border border-green-500/40 text-center text-green-300 font-bold rounded p-0.5 outline-none text-[10px]">
-          <span class="text-slate-500 text-[9px] font-bold">%</span>
-        </div>
-        <button onclick="applyBuildProfitOptimizer()" class="bg-green-800 hover:bg-green-700 text-white font-semibold py-0.5 px-1.5 rounded text-[9px] transition shadow flex-shrink-0 mono">
+      <div class="bg-[#070b0f] px-1 py-0.5 rounded border border-[#1e3348] flex items-center space-x-1" title="Build Margin Threshold">
+        <span class="text-slate-400 text-[9px] font-bold">Min:</span>
+        <input type="number" id="build-profit-threshold" value="5.0" step="0.5" min="0" max="100" 
+          class="w-12 bg-[#0d1922] border border-green-500/40 text-center text-green-300 font-bold rounded p-0.5 outline-none text-[10px]">
+        <span class="text-slate-500 text-[9px] font-bold">%</span>
+        <button onclick="applyBuildProfitOptimizer()" class="bg-green-800 hover:bg-green-700 text-white font-semibold py-0.5 px-1.5 rounded text-[9px] transition shadow mono">
           ⚡ Apply
         </button>
       </div>
     </div>
 
-    <!-- SMART ORDER OPTIMIZERS CARD (Compact - 5 cols) -->
-    <div class="md:col-span-5 bg-[#0c1318] p-2 rounded-lg border border-amber-500/50 shadow-lg flex flex-col justify-between space-y-1.5">
-      <div class="flex justify-between items-center border-b border-[#1e3348]/60 pb-1">
-        <span class="text-amber-300 font-bold rajdhani text-[10px] tracking-wider">
-          ⚡ SMART ORDER OPTIMIZERS
-        </span>
-        <button onclick="resetSmartBuyModes()" class="text-slate-400 hover:text-slate-300 text-[9px] mono transition" title="Reset buy modes">
-          Reset
+    <!-- SMART ORDER OPTIMIZERS CARD (Compact Inline List) -->
+    <div class="bg-[#0c1318] p-1.5 rounded border border-amber-500/50 shadow flex items-center space-x-2">
+      <span class="text-amber-300 font-bold uppercase text-[9px] rajdhani leading-none">Smart Optimizers:</span>
+      
+      <!-- Optimizer 1: Component Spread -->
+      <div class="bg-[#070b0f] p-1 rounded border border-[#1e3348] flex items-center space-x-1" title="Spread Optimizer">
+        <span class="text-slate-400 text-[9px]">Spread:</span>
+        <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100" 
+          class="w-12 bg-[#0d1922] border border-amber-500/40 text-center text-amber-300 font-bold rounded p-0.5 outline-none text-[9px]">
+        <span class="text-slate-500 text-[9px] font-bold">%</span>
+        <button onclick="applyComponentSpreadOptimizer()" class="bg-amber-700 hover:bg-amber-600 text-white font-semibold py-0.5 px-1.5 rounded text-[9px] transition">
+          Opt
         </button>
       </div>
 
-      <div class="grid grid-cols-2 gap-2 text-[10px] mono">
-        <!-- Optimizer 1: Component Spread Threshold -->
-        <div class="bg-[#070b0f] p-1 rounded border border-[#1e3348] flex items-center justify-between gap-1" title="Places Buy Orders for components where (Sell - Buy) / Sell >= Threshold %">
-          <span class="text-slate-400 text-[9px]">Spread:</span>
-          <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100" 
-            class="w-8 bg-[#0d1922] border border-amber-500/40 text-center text-amber-300 font-bold rounded p-0.5 outline-none text-[9px]">
-          <span class="text-slate-500 text-[9px] font-bold">%</span>
-          <button onclick="applyComponentSpreadOptimizer()" class="bg-amber-700 hover:bg-amber-600 text-white font-semibold py-0.5 px-1 rounded text-[9px] transition">
-            Opt
-          </button>
-        </div>
-
-        <!-- Optimizer 2: Total Build Savings Threshold -->
-        <div class="bg-[#070b0f] p-1 rounded border border-[#1e3348] flex items-center justify-between gap-1" title="Places Buy Orders for components that save >= Threshold % of the total build budget">
-          <span class="text-slate-400 text-[9px]">Budget:</span>
-          <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100" 
-            class="w-8 bg-[#0d1922] border border-cyan-500/40 text-center text-cyan-300 font-bold rounded p-0.5 outline-none text-[9px]">
-          <span class="text-slate-500 text-[9px] font-bold">%</span>
-          <button onclick="applyBudgetImpactOptimizer()" class="bg-cyan-700 hover:bg-cyan-600 text-white font-semibold py-0.5 px-1 rounded text-[9px] transition">
-            Opt
-          </button>
-        </div>
+      <!-- Optimizer 2: Budget Impact -->
+      <div class="bg-[#070b0f] p-1 rounded border border-[#1e3348] flex items-center space-x-1" title="Budget Impact Optimizer">
+        <span class="text-slate-400 text-[9px]">Budget:</span>
+        <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100" 
+          class="w-12 bg-[#0d1922] border border-cyan-500/40 text-center text-cyan-300 font-bold rounded p-0.5 outline-none text-[9px]">
+        <span class="text-slate-500 text-[9px] font-bold">%</span>
+        <button onclick="applyBudgetImpactOptimizer()" class="bg-cyan-700 hover:bg-cyan-600 text-white font-semibold py-0.5 px-1.5 rounded text-[9px] transition">
+          Opt
+        </button>
       </div>
+
+      <button onclick="resetSmartBuyModes()" class="text-slate-400 hover:text-slate-300 text-[9px] mono transition" title="Reset buy modes">
+        Reset
+      </button>
     </div>
 
   </section>
 
   <!-- Toolbar Row 2: Compact Settings, Taxes, Hangar Stock & SCI Status -->
-  <section class="bg-[#0c1318] border-b border-[#1e3348] p-2 flex flex-wrap items-stretch gap-2.5 text-xs relative z-40">
+  <section class="bg-[#0c1318] border-b border-[#1e3348] p-1.5 flex flex-wrap items-stretch gap-2.5 text-xs relative z-40">
     
     <!-- System & Structure Panel (With inline SCI and EIV stats directly underneath!) -->
-    <div class="flex flex-col bg-[#0d1922] p-2 rounded-lg border border-[#1e3348] shadow min-w-[280px]">
-      <div class="flex items-center space-x-1.5 mb-1.5">
+    <div class="flex flex-col bg-[#0d1922] p-1.5 rounded-lg border border-[#1e3348] shadow min-w-[280px]">
+      <div class="flex items-center space-x-1.5">
         <span class="text-cyan-400 text-[10px] font-bold uppercase rajdhani flex-shrink-0">System & Structure:</span>
-        <div class="relative w-28">
+        <div class="relative w-24">
           <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="System..." 
-            class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md p-1 text-cyan-300 font-bold mono uppercase focus:border-cyan-500 outline-none text-[11px]">
+            class="w-full bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-bold mono uppercase focus:border-cyan-500 outline-none text-[11px]">
           <div id="system-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
         </div>
-        <select id="facility-select" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded-md p-1 text-white font-semibold text-[10px] outline-none w-28">
+        <select id="facility-select" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-white font-semibold text-[10px] outline-none w-24">
           <option value="0.0">NPC Station (0%)</option>
           <option value="0.01">Raitaru / Azbel (1%)</option>
           <option value="0.01" selected>Sotiyo (1% Bonus)</option>
         </select>
-        <select id="structure-role-bonus" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded-md p-1 text-amber-300 font-bold text-[10px] outline-none w-32">
+        <select id="structure-role-bonus" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-amber-300 font-bold text-[10px] outline-none w-28">
           <option value="0.03" selected>Sotiyo (-3% Fee)</option>
           <option value="0.0">NPC / None (0%)</option>
         </select>
       </div>
       <!-- SCI, Stock, and EIV Prices Status directly underneath! -->
-      <div class="flex items-center justify-between text-[9px] mono text-slate-400 border-t border-[#1e3348]/40 pt-1 mt-0.5">
+      <div class="flex items-center justify-between text-[9px] mono text-slate-400 border-t border-[#1e3348]/40 pt-1 mt-1">
         <span id="sci-badge" class="text-amber-300 font-bold">SCI: 4.25% (Mfg) / 1.10% (React)</span>
         <span class="text-slate-500 font-bold">|</span>
         <span id="stock-status-text" class="text-cyan-400 font-bold"><span id="stock-count-display">0 items</span> in Stock</span>
@@ -181,70 +167,70 @@
       </div>
     </div>
 
-    <!-- Taxes & Broker Fees (Extremely compact horizontal list) -->
-    <div class="flex items-center space-x-2.5 bg-[#0d1922] p-2 rounded-lg border border-[#1e3348] text-[10px] mono shadow">
+    <!-- Taxes & Broker Fees -->
+    <div class="flex items-center bg-[#0d1922] p-1.5 rounded-lg border border-[#1e3348] text-[10px] mono shadow">
       <div class="flex flex-col space-y-1">
-        <span class="text-amber-400 font-bold text-[9px] uppercase rajdhani leading-none">Taxes & Fees:</span>
-        <div class="flex items-center space-x-2.5">
+        <span class="text-amber-400 font-bold text-[9px] uppercase rajdhani leading-none">Taxes &amp; Fees:</span>
+        <div class="flex items-center space-x-2">
           <div class="flex items-center space-x-0.5" title="Facility Structure Tax %">
             <span class="text-slate-400 font-semibold">Fac:</span>
-            <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-10 bg-[#070b0f] border border-[#1e3348] rounded text-center text-cyan-400 font-bold p-0.5 outline-none text-[10px]">
+            <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-14 bg-[#070b0f] border border-[#1e3348] rounded text-center text-cyan-400 font-bold p-0.5 outline-none text-[10px]">
             <span class="text-slate-500">%</span>
           </div>
           <div class="flex items-center space-x-0.5" title="SCC Surcharge %">
             <span class="text-slate-400 font-semibold">SCC:</span>
-            <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-10 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-400 font-bold p-0.5 outline-none text-[10px]">
+            <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-14 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-400 font-bold p-0.5 outline-none text-[10px]">
             <span class="text-slate-500">%</span>
           </div>
           <div class="flex items-center space-x-0.5" title="Sales Tax %">
             <span class="text-slate-400 font-semibold">Sales:</span>
-            <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-10 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-0.5 outline-none text-[10px]">
+            <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-14 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-0.5 outline-none text-[10px]">
             <span class="text-slate-500">%</span>
           </div>
           <div class="flex items-center space-x-0.5" title="Broker Fee %">
             <span class="text-slate-400 font-semibold">Broker:</span>
-            <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-10 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-0.5 outline-none text-[10px]">
+            <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-14 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-0.5 outline-none text-[10px]">
             <span class="text-slate-500">%</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Contract Settings Panel (Compact inline list) -->
-    <div class="flex items-center space-x-2.5 bg-[#0d1922] p-2 rounded-lg border border-purple-500/40 text-[10px] mono shadow">
+    <!-- Contract Settings Panel -->
+    <div class="flex items-center bg-[#0d1922] p-1.5 rounded-lg border border-purple-500/40 text-[10px] mono shadow">
       <div class="flex flex-col space-y-1">
         <span class="text-purple-400 font-bold text-[9px] uppercase rajdhani leading-none">Contract Settings:</span>
-        <div class="flex items-center space-x-2.5">
+        <div class="flex items-center space-x-2">
           <div class="flex items-center space-x-0.5" title="Contract Sales Tax %">
             <span class="text-slate-400 font-semibold">C. Tax:</span>
-            <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-10 bg-[#070b0f] border border-[#1e3348] rounded text-center text-purple-400 font-bold p-0.5 outline-none text-[10px]">
+            <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-14 bg-[#070b0f] border border-[#1e3348] rounded text-center text-purple-400 font-bold p-0.5 outline-none text-[10px]">
             <span class="text-slate-500">%</span>
           </div>
           <div class="flex items-center space-x-0.5" title="Contract Broker Fee %">
             <span class="text-slate-400 font-semibold">C. Broker:</span>
-            <input type="number" id="contract-broker" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-10 bg-[#070b0f] border border-[#1e3348] rounded text-center text-purple-400 font-bold p-0.5 outline-none text-[10px]">
+            <input type="number" id="contract-broker" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-14 bg-[#070b0f] border border-[#1e3348] rounded text-center text-purple-400 font-bold p-0.5 outline-none text-[10px]">
             <span class="text-slate-500">%</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Hangar Stock Location / Container Filter Panel (Fits rest of horizontal row) -->
-    <div class="flex flex-col bg-[#0d1922] p-2 rounded-lg border border-[#1e3348] shadow flex-1 min-w-[340px]">
+    <!-- Hangar Stock Location / Container Filter Panel (Compact & Constrained) -->
+    <div class="flex flex-col bg-[#0d1922] p-1.5 rounded-lg border border-[#1e3348] shadow w-[400px]">
       <div class="flex items-center justify-between mb-1">
         <span class="text-cyan-400 text-[9px] font-bold uppercase rajdhani">Stock &amp; Location Filters:</span>
         <span id="location-search-feedback" class="text-[8px] text-amber-300 font-mono font-bold hidden"></span>
       </div>
 
       <div class="flex items-center gap-1.5">
-        <select id="deduct-stock-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded-md p-1 text-cyan-300 font-bold text-[10px] outline-none">
+        <select id="deduct-stock-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-bold text-[10px] outline-none">
           <option value="true" selected>Deduct (ON)</option>
           <option value="false">Off</option>
         </select>
 
         <label class="flex items-center space-x-0.5 cursor-pointer text-[#c8d8e8] font-bold text-[9px] mono">
           <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3 h-3 accent-cyan-500">
-          <span>Personal</span>
+          <span>Pers</span>
         </label>
 
         <label class="flex items-center space-x-0.5 cursor-pointer text-[#c8d8e8] font-bold text-[9px] mono">
@@ -253,11 +239,11 @@
         </label>
 
         <!-- Search Station Box -->
-        <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter loc..." oninput="filterLocationDropdownOptions()" 
-          class="w-20 bg-[#070b0f] border border-[#1e3348] rounded-md p-1 text-slate-200 text-[10px] mono outline-none focus:border-cyan-500">
+        <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter..." oninput="filterLocationDropdownOptions()" 
+          class="w-16 bg-[#070b0f] border border-[#1e3348] rounded p-1 text-slate-200 text-[10px] mono outline-none focus:border-cyan-500">
 
         <!-- Station Dropdown -->
-        <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded-md p-1 text-amber-300 font-bold text-[10px] outline-none truncate">
+        <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded p-1 text-amber-300 font-bold text-[10px] outline-none truncate w-32">
           <option value="all" selected>All Locations (Combined Assets)</option>
           <option value="industry_system">Current System Only (JITA)</option>
         </select>
@@ -377,11 +363,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=2.0.4"></script>
-  <script src="js/config.js?v=2.0.4"></script>
-  <script src="js/esi.js?v=2.0.4"></script>
-  <script src="js/tree.js?v=2.0.4"></script>
-  <script src="js/optimizers.js?v=2.0.4"></script>
-  <script src="js/app.js?v=2.0.4"></script>
+  <script src="eve_db.js?v=2.0.5"></script>
+  <script src="js/config.js?v=2.0.5"></script>
+  <script src="js/esi.js?v=2.0.5"></script>
+  <script src="js/tree.js?v=2.0.5"></script>
+  <script src="js/optimizers.js?v=2.0.5"></script>
+  <script src="js/app.js?v=2.0.5"></script>
 </body>
 </html>
