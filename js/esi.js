@@ -68,6 +68,38 @@ function isContainerAsset(typeId) {
   return isContainer && !isShip;
 }
 
+// Check for Rookie Ships and all EVE ship hull types
+function isShipType(typeId) {
+  const rookieShipIds = new Set([
+    601, 606, 608, 596, 33079, 33081, 33083, 33085, // Rookie ships (Ibis, Reaper, Velator, Impairor, Taipan, etc.)
+    621, 622, 12005, 587, 24698, 644, 642, 643, 12015, 11987, 11989 // Popular ships
+  ]);
+  if (rookieShipIds.has(typeId)) return true;
+
+  const typeName = getItemTypeName(typeId);
+  if (!typeName) return false;
+  const t = typeName.toLowerCase();
+
+  // FIXED: Corrected call to isContainerAsset() to prevent ReferenceError
+  if (isContainerAsset(typeId)) {
+    return false;
+  }
+
+  const shipTerms = [
+    'frigate', 'destroyer', 'cruiser', 'battlecruiser', 'battleship', 'dreadnought',
+    'carrier', 'supercarrier', 'titan', 'corvette', 'industrial', 'freighter',
+    'mining barge', 'exhumer', 'shuttle', 'interdictor', 'covert ops', 'stealth bomber',
+    'logistics', 'assault', 'recon', 'command ship', 'heavy assault', 'blockade runner',
+    'deep space', 'jump freighter', 'tactical destroyer', 'strategic cruiser',
+    'ibis', 'reaper', 'velator', 'impairor', 'taipan', 'hematite', 'violator', 'echo',
+    'venture', 'procurer', 'retriever', 'covetor', 'orca', 'rorqual', 'bowhead',
+    'heron', 'magnate', 'imicus', 'probe', 'condor', 'slicer', 'executioner', 'tormentor',
+    'punisher', 'kestrel', 'merlin', 'tristan', 'inquisitor', 'navitas', 'bantam', 'ship'
+  ];
+
+  return shipTerms.some(term => t.includes(term));
+}
+
 // Strict ESI Adjusted Price Fetcher (STRICT CCP ADJUSTED_PRICE ONLY)
 async function fetchAdjustedPrices() {
   const statusEl = document.getElementById('eiv-status-text');
