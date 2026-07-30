@@ -30,6 +30,47 @@
     </div>
   </header>
 
+  <!-- Toolbar: Compact Hangar Stock Location / Container Filter Panel -->
+  <section class="bg-[#0d1922] border-b border-[#1e3348]/60 p-2 flex flex-wrap items-center gap-3 text-xs relative z-40">
+    <div class="flex flex-col bg-[#0c1318] p-1.5 rounded-lg border border-[#1e3348] shadow w-[400px]">
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-cyan-400 text-[9px] font-bold uppercase rajdhani">Stock &amp; Location Filters:</span>
+        <span id="location-search-feedback" class="text-[8px] text-amber-300 font-mono font-bold hidden"></span>
+      </div>
+
+      <div class="flex items-center gap-1.5">
+        <select id="deduct-stock-mode" onchange="recalculateJournalStock()" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-bold text-[10px] outline-none">
+          <option value="true" selected>Deduct (ON)</option>
+          <option value="false">Off</option>
+        </select>
+
+        <label class="flex items-center space-x-0.5 cursor-pointer text-[#c8d8e8] font-bold text-[9px] mono">
+          <input type="checkbox" id="use-char-assets" checked onchange="applyJournalStockFilter()" class="w-3 h-3 accent-cyan-500">
+          <span>Pers</span>
+        </label>
+
+        <label class="flex items-center space-x-0.5 cursor-pointer text-[#c8d8e8] font-bold text-[9px] mono">
+          <input type="checkbox" id="use-corp-assets" checked onchange="applyJournalStockFilter()" class="w-3 h-3 accent-cyan-500">
+          <span>Corp</span>
+        </label>
+
+        <!-- Search Station Box -->
+        <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter..." oninput="filterJournalLocationOptions()" 
+          class="w-16 bg-[#070b0f] border border-[#1e3348] rounded p-1 text-slate-200 text-[10px] mono outline-none focus:border-cyan-500">
+
+        <!-- Station Dropdown -->
+        <select id="stock-location-filter" onchange="applyJournalStockFilter()" class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded p-1 text-amber-300 font-bold text-[10px] outline-none truncate w-32">
+          <option value="all" selected>All Locations (Combined Assets)</option>
+        </select>
+      </div>
+    </div>
+    
+    <!-- Live stats indicators -->
+    <div class="ml-auto text-[10px] mono flex items-center space-x-3 bg-[#0c1318] px-3 py-2 rounded-lg border border-[#1e3348] shadow text-slate-400">
+      <span>Filtered Stock: <span id="stock-count-display" class="text-cyan-400 font-bold">0 items</span></span>
+    </div>
+  </section>
+
   <!-- Compact Overview Dashboard Bar -->
   <section class="p-1.5 grid grid-cols-1 md:grid-cols-4 gap-2 bg-[#070b0f] relative z-10 border-b border-[#1e3348]/40">
     <div class="bg-[#0d1922] border border-[#1e3348]/60 px-3 py-1.5 rounded shadow flex flex-col justify-center">
@@ -71,9 +112,9 @@
       <div class="p-4 border-b border-[#1e3348] flex justify-between items-center bg-[#0d1922]">
         <div>
           <h2 class="font-bold text-white rajdhani tracking-wider text-lg">CONSOLIDATED BOM</h2>
-          <div class="text-[10px] mono text-slate-400">COMBINED missing ITEMS ACROSS QUEUE</div>
+          <div class="text-[10px] mono text-slate-400">COMBINED MISSING ITEMS ACROSS QUEUE</div>
         </div>
-        <button onclick="copyJournalMultibuy()" class="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded mono transition shadow">
+        <button onclick="copyJournalMultibuy()" class="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded mono transition shadow" title="Copy aggregated missing items list to clipboard">
           Copy Multibuy
         </button>
       </div>
@@ -116,7 +157,7 @@
             <th class="p-1 pb-2 text-right">Runs Built</th>
             <th class="p-1 pb-2 text-right">Quantity Produced</th>
             <th class="p-1 pb-2 text-right">Manufacturing Cost</th>
-            <th class="p-1 pb-2">Status</th>
+            <th class="p-1 pb-2">Action</th>
           </tr>
         </thead>
         <tbody id="journal-history-rows" class="divide-y divide-[#1e3348]/30">
@@ -127,6 +168,8 @@
   </section>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
+  <script src="eve_db.js?v=3.0.0"></script>
+  <script src="js/config.js?v=3.0.0"></script>
   <script src="js/journal.js?v=3.0.0"></script>
 </body>
 </html>
