@@ -6,6 +6,17 @@ function esc(s) {
 }
 if (!window.esc) window.esc = esc;
 
+// Safe JSON parser to prevent legacy data from crash-blocking script compilation
+function safeParseJSON(str, fallback) {
+  if (!str || str === 'undefined' || str === 'null') return fallback;
+  try {
+    const parsed = JSON.parse(str);
+    return parsed !== null && parsed !== undefined ? parsed : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
 // Fast O(1) Helper to look up exact item type name from TYPE_ID_TO_NAME or EVE_ITEMS database
 function getItemTypeName(typeId) {
   if (!typeId) return '';
@@ -207,7 +218,13 @@ async function startEsiSSOLogin() {
   const hashed = await sha256(verifier);
   const challenge = base64urlEncode(hashed);
 
-  const redirectUri = window.location.origin + window.location.pathname;
+  // Dynamically strip out filenames to guarantee the Redirect URI matches the directory root on GitHub Pages
+  let pathname = window.location.pathname;
+  if (pathname.endsWith('.html')) {
+    pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1);
+  }
+  const redirectUri = window.location.origin + pathname;
+
   const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1';
   const state = generateRandomString(16);
   sessionStorage.setItem('esi_auth_state', state);
@@ -239,7 +256,12 @@ async function handleEsiSSOCallback() {
   window.history.replaceState({}, document.title, window.location.pathname);
 
   try {
-    const redirectUri = window.location.origin + window.location.pathname;
+    let pathname = window.location.pathname;
+    if (pathname.endsWith('.html')) {
+      pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1);
+    }
+    const redirectUri = window.location.origin + pathname;
+
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: clientId,
@@ -946,7 +968,7 @@ async function resolveSystemSCI(systemName) {
 
 async function fetchSystemSCIById(systemId, systemName) {
   try {
-    const sysRes = await fetch(`https://esi.evetech.net/latest/industry/systems/?datasource=tranquility`);
+    const sysRes = await fetch('https://esi.evetech.net/latest/industry/systems/?datasource=tranquility');
     if (!sysRes.ok) return;
     const sysData = await sysRes.json();
 

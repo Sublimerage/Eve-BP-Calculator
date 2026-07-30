@@ -5,6 +5,17 @@ function esc(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Safe JSON parser to prevent legacy data from crash-blocking script compilation
+function safeParseJSON(str, fallback) {
+  if (!str || str === 'undefined' || str === 'null') return fallback;
+  try {
+    const parsed = JSON.parse(str);
+    return parsed !== null && parsed !== undefined ? parsed : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
 // Global Ledger Queue State
 let activeJobs = [];
 let buildHistory = [];
@@ -12,39 +23,21 @@ let userStockMap = {};
 
 // Load states from shared LocalStorage
 function loadJournalState() {
-  try {
-    const savedJobs = localStorage.getItem('eve_ledger_jobs');
-    activeJobs = savedJobs ? JSON.parse(savedJobs) : [];
-    if (!Array.isArray(activeJobs)) activeJobs = [];
-  } catch (e) {
-    activeJobs = [];
-  }
+  const savedJobs = localStorage.getItem('eve_ledger_jobs');
+  activeJobs = safeParseJSON(savedJobs, []);
+  if (!Array.isArray(activeJobs)) activeJobs = [];
 
-  try {
-    const savedHistory = localStorage.getItem('eve_ledger_history');
-    buildHistory = savedHistory ? JSON.parse(savedHistory) : [];
-    if (!Array.isArray(buildHistory)) buildHistory = [];
-  } catch (e) {
-    buildHistory = [];
-  }
+  const savedHistory = localStorage.getItem('eve_ledger_history');
+  buildHistory = safeParseJSON(savedHistory, []);
+  if (!Array.isArray(buildHistory)) buildHistory = [];
 
   // Load custom location names and assets
-  try {
-    window.rawAssetItems = JSON.parse(localStorage.getItem('eve_raw_assets')) || [];
-    window.resolvedLocationNames = JSON.parse(localStorage.getItem('eve_resolved_location_names')) || {};
-    window.corpDivisionNames = JSON.parse(localStorage.getItem('eve_corp_division_names')) || {};
-  } catch (e) {
-    window.rawAssetItems = [];
-    window.resolvedLocationNames = {};
-    window.corpDivisionNames = {};
-  }
+  window.rawAssetItems = safeParseJSON(localStorage.getItem('eve_raw_assets'), []);
+  window.resolvedLocationNames = safeParseJSON(localStorage.getItem('eve_resolved_location_names'), {});
+  window.corpDivisionNames = safeParseJSON(localStorage.getItem('eve_corp_division_names'), {});
 
-  try {
-    const savedStocks = localStorage.getItem('eve_user_stock_map');
-    userStockMap = savedStocks ? JSON.parse(savedStocks) : {};
-  } catch (e) {
-    userStockMap = {};
-  }
+  const savedStocks = localStorage.getItem('eve_user_stock_map');
+  userStockMap = safeParseJSON(savedStocks, {});
 }
 
 // Render overall dashboard KPIs and list details
@@ -349,11 +342,8 @@ function requeueCompletedJob(recordId) {
 
   const record = buildHistory[recordIndex];
 
-  // Increment instance counter safely
-  const currentCounter = window.instanceCounter !== undefined ? window.instanceCounter : 0;
-
   const job = {
-    id: currentCounter + 1 + Date.now(),
+    id: Date.now() + Math.floor(Math.random() * 1000), // watertight unique ID
     typeId: record.typeId,
     name: record.name,
     runsNeeded: record.runsNeeded,
