@@ -146,8 +146,8 @@ function renderActiveJobsList() {
     const iconTypeId = job.typeId;
     const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
 
-    // Generate individual BOM breakdown with stock deduction mapping
-    const individualBOMHTML = job.materials.map(mat => {
+    // Generate individual BOM breakdown defensively
+    const individualBOMHTML = Array.isArray(job.materials) ? job.materials.map(mat => {
       if (!mat) return '';
       const stockQty = isStockDeductEnabled ? (userStockMap[mat.typeId] || 0) : 0;
       const netMissing = Math.max(0, mat.qtyNeeded - stockQty);
@@ -159,7 +159,7 @@ function renderActiveJobsList() {
           <span class="flex-shrink-0">${isAcquired ? `✔ ${mat.qtyNeeded}` : `x${mat.qtyNeeded} (Deficit: ${netMissing})`}</span>
         </div>
       `;
-    }).join('');
+    }).join('') : '<div class="text-[10px] text-slate-500 italic py-1">No materials logged for this build.</div>';
 
     return `
       <div class="bg-[#0c1318] border border-[#1e3348] hover:border-purple-500/40 rounded p-4 flex flex-col justify-between shadow-md transition space-y-3">
