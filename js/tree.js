@@ -4,13 +4,30 @@
 function getBatchYield(recipe, isReaction) {
   if (!recipe) return 1;
 
-  // Read explicit yield directly from the database record
+  // 1. Read explicit yield directly from the database record
   const explicitQty = recipe.productQtyPerRun || recipe.mfgQtyPerRun || recipe.reactionQtyPerRun || recipe.outputQty || recipe.portionSize || recipe.quantity || recipe.products?.[0]?.quantity;
   if (explicitQty && parseInt(explicitQty) > 0) {
     return parseInt(explicitQty);
   }
 
-  // Fallback ONLY if the database record lacks an output quantity
+  // 2. Fallback check on item names for known SDE batch yield standards
+  const name = ((recipe.productName || '') + ' ' + (recipe.blueprintTypeName || '')).toLowerCase();
+  const typeId = recipe.productTypeID || recipe.typeID;
+
+  // All Carbide Reactions (Tungsten Carbide, Titanium Carbide, Fernite Carbide, Crystalline Carbonide) = 10,000
+  if (typeId === 16681 || typeId === 16680 || typeId === 16679 || name.includes('carbide')) {
+    if (isReaction || name.includes('reaction') || name.includes('formula') || name.includes('carbide')) {
+      return 10000;
+    }
+  }
+
+  if (name.includes('fuel block')) return 40;
+  if (name.includes('nanite repair paste')) return 500;
+  if (name.includes('auto-integrity preservation seal') || name.includes('life support backup unit')) return 3;
+  if (name.includes('cap booster') || name.includes('interdiction probe') || name.includes('scanner probe')) return 10;
+  if (name.includes('charge') || name.includes('frequency crystal') || name.includes('missile') || name.includes('torpedo') || name.includes('rocket') || name.includes('ammo')) return 100;
+  if (isReaction || name.includes('reaction') || name.includes('polymer') || name.includes('ferrogel')) return 200;
+
   return 1;
 }
 
@@ -165,7 +182,7 @@ async function buildRecursiveRecipeTree(typeId, name, qtyNeeded, currentDepth, m
       let rawMaterials = recipe.mfgMaterials || recipe.materials;
       let isReaction = false;
 
-      if (!rawMaterials && allowReactions && recipe.reactionMaterials) {
+      if ((!rawMaterials || rawMaterials.length === 0) && allowReactions && recipe.reactionMaterials && recipe.reactionMaterials.length > 0) {
         rawMaterials = recipe.reactionMaterials;
         isReaction = true;
       }

@@ -73,6 +73,7 @@ const POPULAR_ITEMS = [
   { id: 11989, bpId: 11990, name: "Eagle" },
   { id: 4247,  bpId: 4248,  name: "Hydrogen Fuel Block" },
   { id: 4246,  bpId: 4248,  name: "Helium Fuel Block" },
+  { id: 16681, bpId: 17730, name: "Tungsten Carbide" },
   { id: 34,    name: "Tritanium" },
   { id: 35,    name: "Pyerite" },
   { id: 36,    name: "Mexallon" },
@@ -94,6 +95,57 @@ window.POPULAR_SYSTEMS = POPULAR_SYSTEMS;
 
 // Corrected Live EVE Client SDE Material Quantities & Verified Type IDs
 const BUILTIN_RECIPES = {
+  // Tungsten Carbide Reaction (10,000 Output Yield per 1 Run Batch)
+  16681: {
+    blueprintTypeID: 17730, productTypeID: 16681, productName: "Tungsten Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000,
+    reactionMaterials: [
+      { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
+      { typeId: 16672, name: "Rolled Tungsten Alloy", baseQty: 100 },
+      { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
+    ]
+  },
+  17730: {
+    blueprintTypeID: 17730, productTypeID: 16681, productName: "Tungsten Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000,
+    reactionMaterials: [
+      { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
+      { typeId: 16672, name: "Rolled Tungsten Alloy", baseQty: 100 },
+      { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
+    ]
+  },
+  // Titanium Carbide Reaction (10,000 Output Yield)
+  16680: {
+    blueprintTypeID: 17729, productTypeID: 16680, productName: "Titanium Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000,
+    reactionMaterials: [
+      { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
+      { typeId: 16671, name: "Titanium Alloy", baseQty: 100 },
+      { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
+    ]
+  },
+  17729: {
+    blueprintTypeID: 17729, productTypeID: 16680, productName: "Titanium Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000,
+    reactionMaterials: [
+      { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
+      { typeId: 16671, name: "Titanium Alloy", baseQty: 100 },
+      { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
+    ]
+  },
+  // Crystalline Carbonide Reaction (10,000 Output Yield)
+  16679: {
+    blueprintTypeID: 17728, productTypeID: 16679, productName: "Crystalline Carbonide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000,
+    reactionMaterials: [
+      { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
+      { typeId: 16669, name: "Crystalline 3-M4", baseQty: 100 },
+      { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
+    ]
+  },
+  17728: {
+    blueprintTypeID: 17728, productTypeID: 16679, productName: "Crystalline Carbonide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000,
+    reactionMaterials: [
+      { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
+      { typeId: 16669, name: "Crystalline 3-M4", baseQty: 100 },
+      { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
+    ]
+  },
   // Drekavac
   48519: {
     blueprintTypeID: 49715, productTypeID: 48519, productName: "Drekavac", mfgQtyPerRun: 1, productQtyPerRun: 1,
@@ -263,13 +315,4 @@ window.buildPrepackedIndexes = function() {
   }
 
   // Explicitly override stale recipes with live verified SDE quantities
-  for (const [idStr, recipe] of Object.entries(BUILTIN_RECIPES)) {
-    const keyId = parseInt(idStr);
-    window.recipeMap[keyId] = recipe;
-    if (recipe.blueprintTypeID) window.recipeMap[recipe.blueprintTypeID] = recipe;
-    if (recipe.productTypeID) window.recipeMap[recipe.productTypeID] = recipe;
-  }
-
-  if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
-  if (statusText) statusText.textContent = `INDEX READY (${Object.keys(window.IDX).length.toLocaleString()} ITEMS | ${Object.keys(window.recipeMap).length.toLocaleString()} RECIPES)`;
-};
+  for (con
