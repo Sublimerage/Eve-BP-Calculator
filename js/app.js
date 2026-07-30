@@ -1,8 +1,20 @@
 'use strict';
 
-// Initialize root pricing strategy states if not already defined
+// Initialize global variables securely in memory to prevent DOM-sync issues
 if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sell';
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
+if (window.globalRuns === undefined) window.globalRuns = 1;
+
+// Safe JSON parser to prevent legacy data from crash-blocking script compilation
+function safeParseJSON(str, fallback) {
+  if (!str || str === 'undefined' || str === 'null') return fallback;
+  try {
+    const parsed = JSON.parse(str);
+    return parsed !== null && parsed !== undefined ? parsed : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
 
 function saveTaxSettings() {
   try {
@@ -24,7 +36,7 @@ function loadTaxSettings() {
   try {
     const saved = localStorage.getItem('eve_tax_settings');
     if (saved) {
-      const settings = JSON.parse(saved);
+      const settings = safeParseJSON(saved, {});
       if (settings.facilityTax !== undefined && document.getElementById('facility-tax')) document.getElementById('facility-tax').value = settings.facilityTax;
       if (settings.sccSurcharge !== undefined && document.getElementById('scc-surcharge')) document.getElementById('scc-surcharge').value = settings.sccSurcharge;
       if (settings.salesTax !== undefined && document.getElementById('sales-tax')) document.getElementById('sales-tax').value = settings.salesTax;
@@ -237,9 +249,12 @@ async function selectItem(typeId, name, preserveView = false) {
   if (!preserveView) {
     selectedInstanceId = null;
     isolatedInstanceId = null;
-    // Revert selling strategy and custom price to default on fresh item select
+    // Revert selling strategy, custom price, and global runs securely in memory
     window.rootSellStrategy = 'market-sell';
     window.rootCustomPrice = 0;
+    window.globalRuns = 1;
+    const globalInput = document.getElementById('bp-runs');
+    if (globalInput) globalInput.value = 1;
   }
 
   const maxDepth = 10;
@@ -288,7 +303,9 @@ function collectGlobalDemand(node, demandMap = {}) {
   demandMap[typeId].nodes.push(node);
 
   if (node.isBuildingSelf && node.children) {
-    node.children.forEach(child => collectGlobalDemand(child, demandMap));
+    node.children.forEach(child => {
+      if (child) collectGlobalDemand(child, demandMap); // defensive guard
+    });
   }
 
   return demandMap;
@@ -301,11 +318,8 @@ function recalculate() {
   const isCardRunsFocused = activeEl && activeEl.id === 'card-bp-runs';
   const isCardCustomPriceFocused = activeEl && activeEl.id === 'card-custom-price';
 
-  // Hardcode as true to bypass any HTML file cache restrictions in standard browsers
-  const isRunsMode = true;
-
-  const bpRunsInput = document.getElementById('bp-runs');
-  const inputVal = Math.max(1, parseInt(bpRunsInput ? bpRunsInput.value : 1) || 1);
+  // Read directly from in-memory global runs count
+  const inputVal = Math.max(1, window.globalRuns || 1);
 
   const salesTax = (parseFloat(document.getElementById('sales-tax')?.value) || 3.6) / 100;
   const brokerFee = (parseFloat(document.getElementById('broker-fee')?.value) || 1.0) / 100;
@@ -325,16 +339,9 @@ function recalculate() {
 
   const rootYield = recipeTreeRoot.batchYield || 1;
   
-  let totalRootOutputQty = 1;
-  let rootRunsNeeded = 1;
-
-  if (isRunsMode) {
-    rootRunsNeeded = inputVal;
-    totalRootOutputQty = rootYield * inputVal;
-  } else {
-    totalRootOutputQty = inputVal;
-    rootRunsNeeded = Math.ceil(inputVal / rootYield);
-  }
+  // Enforce mathematically strict runsMode by default
+  const rootRunsNeeded = inputVal;
+  const totalRootOutputQty = rootYield * inputVal;
 
   recipeTreeRoot.qtyNeeded = totalRootOutputQty;
   recipeTreeRoot.runsNeeded = rootRunsNeeded;
@@ -546,9 +553,14 @@ function renderTreeDiagram(rootNode, priceStrategy, profitSell, roiSell) {
 
   const levels = [];
   function traverse(node) {
+    if (!node) return; // Defensive guard
     if (!levels[node.depth]) levels[node.depth] = [];
     levels[node.depth].push(node);
-    node.children.forEach(child => traverse(child));
+    if (node.children) {
+      node.children.forEach(child => {
+        if (child) traverse(child); // Defensive guard
+      });
+    }
   }
   traverse(rootNode);
 
@@ -557,8 +569,10 @@ function renderTreeDiagram(rootNode, priceStrategy, profitSell, roiSell) {
     colDiv.className = 'flex flex-col space-y-6 justify-center';
 
     nodesAtDepth.forEach(node => {
-      const card = createNodeCard(node);
-      colDiv.appendChild(card);
+      if (node) { // Defensive guard
+        const card = createNodeCard(node);
+        colDiv.appendChild(card);
+      }
     });
 
     container.appendChild(colDiv);
@@ -696,13 +710,13 @@ function createNodeCard(node) {
       </div>
     </div>
 
-    <!-- Target Runs Controller -->
+    <!-- Target Runs Controller (Uses instant oninput events for real-time scaling!) -->
     ${isRoot ? `
       <div class="mb-2 p-1.5 bg-[#070b0f] rounded border border-cyan-500/40 flex items-center justify-between text-[11px] mono" onclick="event.stopPropagation()">
         <span class="text-slate-300 font-bold">Runs:</span>
         <div class="flex items-center space-x-1">
           <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" 
-            onchange="syncCardRunsToGlobal(event)" 
+            oninput="syncCardRunsToGlobal(event)" 
             onkeydown="if(event.key==='Enter') this.blur()"
             class="w-16 bg-[#0c1318] border border-cyan-500/60 text-center text-amber-300 font-bold rounded p-0.5 outline-none">
           <span class="text-slate-400 text-[10px]">Runs</span>
@@ -805,6 +819,7 @@ function createNodeCard(node) {
 
 function syncCardRunsToGlobal(e) {
   const val = Math.max(1, parseInt(e.target.value) || 1);
+  window.globalRuns = val;
   const globalInput = document.getElementById('bp-runs');
   if (globalInput) {
     globalInput.value = val;
@@ -833,6 +848,7 @@ function syncCustomTax(e) {
 window.syncSellStrategy = syncSellStrategy;
 window.syncCustomPrice = syncCustomPrice;
 window.syncCustomTax = syncCustomTax;
+window.syncCardRunsToGlobal = syncCardRunsToGlobal;
 
 function onNodeClick(e, instanceId) {
   e.stopPropagation();
@@ -856,9 +872,13 @@ function clearHighlight() {
 function findNodeByInstanceId(root, id) {
   if (!root) return null;
   if (root.instanceId === id) return root;
-  for (const child of root.children) {
-    const found = findNodeByInstanceId(child, id);
-    if (found) return found;
+  if (root.children) {
+    for (const child of root.children) {
+      if (child) {
+        const found = findNodeByInstanceId(child, id);
+        if (found) return found;
+      }
+    }
   }
   return null;
 }
@@ -900,8 +920,10 @@ function highlightNodeByTypeId(typeId) {
     if (node.typeId === typeId || node.displayTypeId === typeId) return node;
     if (node.children) {
       for (const child of node.children) {
-        const found = findMatchingNode(child);
-        if (found) return found;
+        if (child) {
+          const found = findMatchingNode(child);
+          if (found) return found;
+        }
       }
     }
     return null;
@@ -955,7 +977,7 @@ function renderIsolatedDiagram() {
     inputCol.innerHTML = `<div class="bg-[#0c1318] border border-[#1e3348] p-3 text-xs text-slate-400 mono rounded">${!isolatedNode.isBuildingSelf ? 'Purchased off Market (No decomposed inputs)' : 'No inputs (Base Material)'}</div>`;
   } else {
     isolatedNode.children.forEach(child => {
-      inputCol.appendChild(createNodeCard(child));
+      if (child) inputCol.appendChild(createNodeCard(child));
     });
   }
 
@@ -1064,19 +1086,21 @@ function drawConnectingLines() {
 
     if (isolatedNode.isBuildingSelf && isolatedNode.children) {
       isolatedNode.children.forEach(child => {
-        const childEl = document.getElementById(`node-card-${child.instanceId}`);
-        if (childEl) {
-          const childRect = childEl.getBoundingClientRect();
-          const startX = (childRect.right - containerRect.left) / zoomScale;
-          const startY = (childRect.top + childRect.height / 2 - containerRect.top) / zoomScale;
+        if (child) {
+          const childEl = document.getElementById(`node-card-${child.instanceId}`);
+          if (childEl) {
+            const childRect = childEl.getBoundingClientRect();
+            const startX = (childRect.right - containerRect.left) / zoomScale;
+            const startY = (childRect.top + childRect.height / 2 - containerRect.top) / zoomScale;
 
-          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          path.setAttribute('d', `M ${startX} ${startY} C ${startX + 40} ${startY}, ${isoLeftX - 40} ${isoCenterY}, ${isoLeftX} ${isoCenterY}`);
-          path.setAttribute('stroke', '#4caf6f');
-          path.setAttribute('stroke-width', '3.5');
-          path.setAttribute('stroke-opacity', '1.0');
-          path.setAttribute('fill', 'none');
-          svg.appendChild(path);
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', `M ${startX} ${startY} C ${startX + 40} ${startY}, ${isoLeftX - 40} ${isoCenterY}, ${isoLeftX} ${isoCenterY}`);
+            path.setAttribute('stroke', '#4caf6f');
+            path.setAttribute('stroke-width', '3.5');
+            path.setAttribute('stroke-opacity', '1.0');
+            path.setAttribute('fill', 'none');
+            svg.appendChild(path);
+          }
         }
       });
     }
@@ -1119,44 +1143,46 @@ function drawConnectingLines() {
     const endY = (parentRect.top + parentRect.height / 2 - containerRect.top) / zoomScale;
 
     node.children.forEach(child => {
-      const childEl = document.getElementById(`node-card-${child.instanceId}`);
-      if (childEl) {
-        const childRect = childEl.getBoundingClientRect();
-        
-        const startX = (childRect.right - containerRect.left) / zoomScale;
-        const startY = (childRect.top + childRect.height / 2 - containerRect.top) / zoomScale;
+      if (child) {
+        const childEl = document.getElementById(`node-card-${child.instanceId}`);
+        if (childEl) {
+          const childRect = childEl.getBoundingClientRect();
+          
+          const startX = (childRect.right - containerRect.left) / zoomScale;
+          const startY = (childRect.top + childRect.height / 2 - containerRect.top) / zoomScale;
 
-        const controlX1 = startX + 40;
-        const controlX2 = endX - 40;
+          const controlX1 = startX + 40;
+          const controlX2 = endX - 40;
 
-        const isInputConnection = (selectedInstanceId !== null) && 
-          (node.instanceId === selectedInstanceId && activeChildIds.has(child.instanceId));
+          const isInputConnection = (selectedInstanceId !== null) && 
+            (node.instanceId === selectedInstanceId && activeChildIds.has(child.instanceId));
 
-        const isOutputConnection = (selectedInstanceId !== null) && 
-          (child.instanceId === selectedInstanceId && node.instanceId === parentInstanceId);
+          const isOutputConnection = (selectedInstanceId !== null) && 
+            (child.instanceId === selectedInstanceId && node.instanceId === parentInstanceId);
 
-        const isHighlightedConnection = isInputConnection || isOutputConnection;
-        const isDimmedConnection = (selectedInstanceId !== null) && !isHighlightedConnection;
+          const isHighlightedConnection = isInputConnection || isOutputConnection;
+          const isDimmedConnection = (selectedInstanceId !== null) && !isHighlightedConnection;
 
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        path.setAttribute('d', `M ${startX} ${startY} C ${controlX1} ${startY}, ${controlX2} ${endY}, ${endX} ${endY}`);
-        
-        if (isHighlightedConnection) {
-          path.setAttribute('stroke', isOutputConnection ? '#e8c96a' : '#4caf6f');
-          path.setAttribute('stroke-width', '3.5');
-          path.setAttribute('stroke-opacity', '1.0');
-        } else if (isDimmedConnection) {
-          path.setAttribute('stroke', '#06b6d4');
-          path.setAttribute('stroke-width', '1.5');
-          path.setAttribute('stroke-opacity', '0.12');
-        } else {
-          path.setAttribute('stroke', '#06b6d4');
-          path.setAttribute('stroke-width', '2');
-          path.setAttribute('stroke-opacity', '0.75');
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', `M ${startX} ${startY} C ${controlX1} ${startY}, ${controlX2} ${endY}, ${endX} ${endY}`);
+          
+          if (isHighlightedConnection) {
+            path.setAttribute('stroke', isOutputConnection ? '#e8c96a' : '#4caf6f');
+            path.setAttribute('stroke-width', '3.5');
+            path.setAttribute('stroke-opacity', '1.0');
+          } else if (isDimmedConnection) {
+            path.setAttribute('stroke', '#06b6d4');
+            path.setAttribute('stroke-width', '1.5');
+            path.setAttribute('stroke-opacity', '0.12');
+          } else {
+            path.setAttribute('stroke', '#06b6d4');
+            path.setAttribute('stroke-width', '2');
+            path.setAttribute('stroke-opacity', '0.75');
+          }
+
+          path.setAttribute('fill', 'none');
+          svg.appendChild(path);
         }
-
-        path.setAttribute('fill', 'none');
-        svg.appendChild(path);
       }
       drawLinesForNode(child);
     });
@@ -1189,44 +1215,46 @@ function drawConnectingLinesForTree(root) {
     const endY = (parentRect.top + parentRect.height / 2 - containerRect.top) / zoomScale;
 
     node.children.forEach(child => {
-      const childEl = document.getElementById(`node-card-${child.instanceId}`);
-      if (childEl) {
-        const childRect = childEl.getBoundingClientRect();
-        
-        const startX = (childRect.right - containerRect.left) / zoomScale;
-        const startY = (childRect.top + childRect.height / 2 - containerRect.top) / zoomScale;
+      if (child) {
+        const childEl = document.getElementById(`node-card-${child.instanceId}`);
+        if (childEl) {
+          const childRect = childEl.getBoundingClientRect();
+          
+          const startX = (childRect.right - containerRect.left) / zoomScale;
+          const startY = (childRect.top + childRect.height / 2 - containerRect.top) / zoomScale;
 
-        const controlX1 = startX + 40;
-        const controlX2 = endX - 40;
+          const controlX1 = startX + 40;
+          const controlX2 = endX - 40;
 
-        const isInputConnection = (selectedInstanceId !== null) && 
-          (node.instanceId === selectedInstanceId && activeChildIds.has(child.instanceId));
+          const isInputConnection = (selectedInstanceId !== null) && 
+            (node.instanceId === selectedInstanceId && activeChildIds.has(child.instanceId));
 
-        const isOutputConnection = (selectedInstanceId !== null) && 
-          (child.instanceId === selectedInstanceId && node.instanceId === parentInstanceId);
+          const isOutputConnection = (selectedInstanceId !== null) && 
+            (child.instanceId === selectedInstanceId && node.instanceId === parentInstanceId);
 
-        const isHighlightedConnection = isInputConnection || isOutputConnection;
-        const isDimmedConnection = (selectedInstanceId !== null) && !isHighlightedConnection;
+          const isHighlightedConnection = isInputConnection || isOutputConnection;
+          const isDimmedConnection = (selectedInstanceId !== null) && !isHighlightedConnection;
 
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        path.setAttribute('d', `M ${startX} ${startY} C ${controlX1} ${startY}, ${controlX2} ${endY}, ${endX} ${endY}`);
-        
-        if (isHighlightedConnection) {
-          path.setAttribute('stroke', isOutputConnection ? '#e8c96a' : '#4caf6f');
-          path.setAttribute('stroke-width', '3.5');
-          path.setAttribute('stroke-opacity', '1.0');
-        } else if (isDimmedConnection) {
-          path.setAttribute('stroke', '#06b6d4');
-          path.setAttribute('stroke-width', '1.5');
-          path.setAttribute('stroke-opacity', '0.12');
-        } else {
-          path.setAttribute('stroke', '#06b6d4');
-          path.setAttribute('stroke-width', '2');
-          path.setAttribute('stroke-opacity', '0.75');
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', `M ${startX} ${startY} C ${controlX1} ${startY}, ${controlX2} ${endY}, ${endX} ${endY}`);
+          
+          if (isHighlightedConnection) {
+            path.setAttribute('stroke', isOutputConnection ? '#e8c96a' : '#4caf6f');
+            path.setAttribute('stroke-width', '3.5');
+            path.setAttribute('stroke-opacity', '1.0');
+          } else if (isDimmedConnection) {
+            path.setAttribute('stroke', '#06b6d4');
+            path.setAttribute('stroke-width', '1.5');
+            path.setAttribute('stroke-opacity', '0.12');
+          } else {
+            path.setAttribute('stroke', '#06b6d4');
+            path.setAttribute('stroke-width', '2');
+            path.setAttribute('stroke-opacity', '0.75');
+          }
+
+          path.setAttribute('fill', 'none');
+          svg.appendChild(path);
         }
-
-        path.setAttribute('fill', 'none');
-        svg.appendChild(path);
       }
       drawLinesForNode(child);
     });
@@ -1265,15 +1293,19 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
       }
       bomMap[typeId].qty += netQtyNeeded;
     } else {
-      node.children.forEach(child => generateBOM(child));
+      node.children.forEach(child => {
+        if (child) generateBOM(child);
+      });
     }
   }
 
   if (rootNode.isBuildingSelf && rootNode.children && rootNode.children.length > 0) {
-    rootNode.children.forEach(c => generateBOM(c));
+    rootNode.children.forEach(c => {
+      if (c) generateBOM(c);
+    });
   } else {
     const rootTypeId = rootNode.displayTypeId || rootNode.typeId;
-    const strategy = getNodePriceStrategy(rootNode);
+    const strategy = getNodeStrategyOnly(rootNode); // safe strategy getter
     const stockQty = isStockDeductEnabled ? (userStockMap[rootTypeId] || userStockMap[rootNode.typeId] || 0) : 0;
     const netQtyNeeded = Math.max(0, rootNode.qtyNeeded - stockQty);
 
@@ -1330,6 +1362,12 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
   if (totalEl) totalEl.textContent = Math.round(totalBOMCost).toLocaleString() + ' ISK';
 
   window.currentBOMText = bomItems.map(i => `${i.name} x${i.qty}`).join('\n');
+}
+
+function getNodeStrategyOnly(node) {
+  if (!node) return 'sell';
+  const globalStrategy = document.getElementById('input-price-mode')?.value || 'sell';
+  return customBuyModes[node.typeId] || globalStrategy;
 }
 
 function copyMultibuyText() {
@@ -1459,12 +1497,16 @@ function addCurrentJobToLedger(e) {
         lineCost: unitPrice * netQtyNeeded
       });
     } else {
-      node.children.forEach(child => extractBOM(child));
+      node.children.forEach(child => {
+        if (child) extractBOM(child);
+      });
     }
   }
 
   if (recipeTreeRoot.isBuildingSelf && recipeTreeRoot.children && recipeTreeRoot.children.length > 0) {
-    recipeTreeRoot.children.forEach(c => extractBOM(c));
+    recipeTreeRoot.children.forEach(c => {
+      if (c) extractBOM(c);
+    });
   } else {
     const rootTypeId = recipeTreeRoot.displayTypeId || recipeTreeRoot.typeId;
     const strategy = getNodePriceStrategy(recipeTreeRoot);
@@ -1488,7 +1530,7 @@ function addCurrentJobToLedger(e) {
   }
 
   const job = {
-    id: ++instanceCounter + Date.now(),
+    id: Date.now() + Math.floor(Math.random() * 1000), // Secure timestamp-based unique ID
     typeId: recipeTreeRoot.displayTypeId || recipeTreeRoot.typeId,
     name: recipeTreeRoot.name,
     runsNeeded: recipeTreeRoot.runsNeeded,

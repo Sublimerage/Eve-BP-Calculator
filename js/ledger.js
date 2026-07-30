@@ -33,7 +33,7 @@ function loadJournalState() {
 
   try {
     const savedHistory = localStorage.getItem('eve_ledger_history');
-    buildHistory = safeParseJSON(savedHistory, []);
+    buildHistory = savedHistory ? JSON.parse(savedHistory) : [];
     if (!Array.isArray(buildHistory)) buildHistory = [];
   } catch (e) {
     buildHistory = [];
@@ -598,6 +598,7 @@ function updateJournalStockCountBadge() {
 
 function applyJournalStockFilter() {
   const filterVal = document.getElementById('stock-location-filter')?.value || 'all';
+
   const useChar = document.getElementById('use-char-assets')?.checked ?? true;
   const useCorp = document.getElementById('use-corp-assets')?.checked ?? true;
 
