@@ -18,23 +18,28 @@
       </div>
     </div>
     
-    <div class="flex items-center space-x-3 text-xs mono">
+    <div class="flex items-center space-x-2.5 text-xs mono">
       <!-- ESI SSO Character Status / Login Button -->
       <div id="esi-login-container">
-        <button onclick="startEsiSSOLogin()" class="px-4 py-2 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-md transition flex items-center gap-2 shadow text-xs" title="Login with EVE Online to import your character assets">
+        <button onclick="startEsiSSOLogin()" class="px-3.5 py-2 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-md transition flex items-center gap-1.5 shadow text-xs" title="Login with EVE Online to import your character assets">
           🔐 EVE SSO Login
         </button>
       </div>
 
+      <!-- Live Asset Refresh Button -->
+      <button onclick="refreshLiveAssets()" class="px-3.5 py-2 bg-cyan-900/80 hover:bg-cyan-700 text-cyan-200 font-bold rounded-md transition text-xs shadow border border-cyan-500/40 flex items-center gap-1" title="Fetch latest live character and corp assets from EVE Online">
+        🔄 Refresh Assets
+      </button>
+
       <!-- Clipboard Hangar Stock Import Button -->
-      <button onclick="openPasteModal()" class="px-4 py-2 bg-[#1e3348] hover:bg-slate-600 text-slate-100 font-bold rounded-md transition text-xs shadow" title="Paste in-game inventory text to import stock">
+      <button onclick="openPasteModal()" class="px-3.5 py-2 bg-[#1e3348] hover:bg-slate-600 text-slate-100 font-bold rounded-md transition text-xs shadow" title="Paste in-game inventory text to import stock">
         📋 Paste Hangar
       </button>
 
-      <button onclick="centerOnSelectedNode()" class="px-3.5 py-2 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded-md transition text-xs shadow">
+      <button onclick="centerOnSelectedNode()" class="px-3 py-2 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded-md transition text-xs shadow">
         Center [F]
       </button>
-      <button onclick="resetPanZoom()" class="px-3.5 py-2 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded-md transition text-xs shadow">
+      <button onclick="resetPanZoom()" class="px-3 py-2 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded-md transition text-xs shadow">
         Reset View
       </button>
       <div id="status-badge" class="px-3 py-2 bg-[#0d1922] border border-[#1e3348] rounded-md flex items-center gap-2 text-xs shadow">
@@ -199,7 +204,7 @@
       </div>
     </div>
 
-    <!-- Hangar Stock Deduction, Corp Division & Location Filter Panel -->
+    <!-- Hangar Stock Deduction & Real-Time Location / Container Filter Panel -->
     <div class="flex flex-col bg-[#0d1922] p-2.5 rounded-lg border border-[#1e3348] flex-1 max-w-2xl shadow space-y-1.5">
       <div class="flex items-center justify-between">
         <span class="text-cyan-400 text-[11px] font-bold uppercase rajdhani">Hangar Stock, Corp Divisions &amp; Location Filter:</span>
