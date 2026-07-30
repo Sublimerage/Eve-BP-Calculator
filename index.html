@@ -3,9 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Force browser to revalidate this HTML file on every load -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>EVE Online Blueprint & Multi-Layer Industry Calculator</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/styles.css?v=2.0.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -56,7 +60,7 @@
     <div class="md:col-span-3 bg-[#0c1318] p-3 rounded-lg border border-[#1e3348] relative z-50 flex flex-col justify-between shadow-md">
       <label class="block text-cyan-400 font-bold uppercase tracking-wider text-[11px] mb-1.5 rajdhani">Item / Blueprint Search</label>
       <div class="relative">
-        <input type="text" id="item-search" autocomplete="off" placeholder="Type e.g. Drekavac, Leshak, Fuel Block..." 
+        <input type="text" id="item-search" autocomplete="off" placeholder="Type e.g. Drekavac, Fuel Block..." 
           class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md p-2 text-white font-bold focus:border-cyan-500 outline-none mono text-xs shadow-inner">
         <div id="search-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
       </div>
@@ -364,11 +368,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=1.0.2"></script>
-  <script src="js/config.js?v=1.0.2"></script>
-  <script src="js/esi.js?v=1.0.2"></script>
-  <script src="js/tree.js?v=1.0.2"></script>
-  <script src="js/optimizers.js?v=1.0.2"></script>
-  <script src="js/app.js?v=1.0.2"></script>
+  <script src="eve_db.js?v=2.0.0"></script>
+  <script src="js/config.js?v=2.0.0"></script>
+  <script src="js/esi.js?v=2.0.0"></script>
+  <script src="js/tree.js?v=2.0.0"></script>
+  <script src="js/optimizers.js?v=2.0.0"></script>
+  <script src="js/app.js?v=2.0.0"></script>
 </body>
 </html>
