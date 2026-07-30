@@ -32,57 +32,40 @@ function isShipLocationFlag(flag) {
          f.includes('autofit') || f.includes('corpsebay');
 }
 
-// Check if a type ID corresponds to a known container type name
-function isKnownContainerType(typeId, typeName) {
-  if (!typeName) typeName = getItemTypeName(typeId);
-  if (!typeName) return false;
-  const t = typeName.toLowerCase();
-
-  return t.includes('container') || 
-         t.includes('canister') || 
-         t.includes('vault') || 
-         t.includes('freight') || 
-         t.includes('plastic wrap') || 
-         t.includes('audit log') || 
-         t.includes('box') || 
-         t.includes('crate') || 
-         t.includes('chest') || 
-         t.includes('can') ||
-         t.includes('hangar array') ||
-         t.includes('silo') ||
-         t.includes('storage') ||
-         t.includes('depot');
-}
-
-// Check for Rookie Ships and all EVE ship hull types
-function isShipType(typeId) {
-  const rookieShipIds = new Set([
-    601, 606, 608, 596, 33079, 33081, 33083, 33085, // Rookie ships (Ibis, Reaper, Velator, Impairor, Taipan, etc.)
-    621, 622, 12005, 587, 24698, 644, 642, 643, 12015, 11987, 11989 // Popular ships
-  ]);
-  if (rookieShipIds.has(typeId)) return true;
-
+// Strict check: Returns true ONLY if the item type is an actual inventory container
+function isContainerAsset(typeId) {
   const typeName = getItemTypeName(typeId);
   if (!typeName) return false;
   const t = typeName.toLowerCase();
 
-  if (isKnownContainerType(typeId, typeName)) {
-    return false;
-  }
+  // 1. MUST match container keywords
+  const isContainer = t.includes('container') || 
+                      t.includes('canister') || 
+                      t.includes('vault') || 
+                      t.includes('freight') || 
+                      t.includes('plastic wrap') || 
+                      t.includes('audit log') || 
+                      t.includes('box') || 
+                      t.includes('crate') || 
+                      t.includes('chest') || 
+                      t.includes('can') ||
+                      t.includes('hangar array') ||
+                      t.includes('silo') ||
+                      t.includes('storage') ||
+                      t.includes('depot');
 
-  const shipTerms = [
-    'frigate', 'destroyer', 'cruiser', 'battlecruiser', 'battleship', 'dreadnought',
-    'carrier', 'supercarrier', 'titan', 'corvette', 'industrial', 'freighter',
-    'mining barge', 'exhumer', 'shuttle', 'interdictor', 'covert ops', 'stealth bomber',
-    'logistics', 'assault', 'recon', 'command ship', 'heavy assault', 'blockade runner',
-    'deep space', 'jump freighter', 'tactical destroyer', 'strategic cruiser',
-    'ibis', 'reaper', 'velator', 'impairor', 'taipan', 'hematite', 'violator', 'echo',
-    'venture', 'procurer', 'retriever', 'covetor', 'orca', 'rorqual', 'bowhead',
-    'heron', 'magnate', 'imicus', 'probe', 'condor', 'slicer', 'executioner', 'tormentor',
-    'punisher', 'kestrel', 'merlin', 'tristan', 'inquisitor', 'navitas', 'bantam', 'ship'
-  ];
+  // 2. MUST NOT match ship hull keywords
+  const isShip = t.includes('frigate') || t.includes('destroyer') || t.includes('cruiser') ||
+                 t.includes('battlecruiser') || t.includes('battleship') || t.includes('dreadnought') ||
+                 t.includes('carrier') || t.includes('titan') || t.includes('corvette') ||
+                 t.includes('industrial') || t.includes('freighter') || t.includes('barge') ||
+                 t.includes('exhumer') || t.includes('shuttle') || t.includes('interdictor') ||
+                 t.includes('covert ops') || t.includes('logistics') || t.includes('ship') ||
+                 t.includes('transport') || t.includes('ibis') || t.includes('reaper') ||
+                 t.includes('velator') || t.includes('impairor') || t.includes('taipan') ||
+                 t.includes('venture') || t.includes('orca') || t.includes('rorqual');
 
-  return shipTerms.some(term => t.includes(term));
+  return isContainer && !isShip;
 }
 
 // Strict ESI Adjusted Price Fetcher (STRICT CCP ADJUSTED_PRICE ONLY)
@@ -409,16 +392,9 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
 
       while (itemIdToAssetMap[currentLoc] && depth < 10) {
         const parentAsset = itemIdToAssetMap[currentLoc];
-        
-        // WATERPROOF CONTAINER CHECK:
-        // 1) Child asset location_flag must NOT be a ship slot/bay
-        // 2) Parent asset type must NOT be a ship
-        // 3) Parent asset type MUST be a recognized container or hold container flags
-        const isShipSlot = isShipLocationFlag(ast.location_flag) || isShipLocationFlag(parentAsset.location_flag);
-        const isShip = isShipType(parentAsset.type_id);
-        const isContainer = isKnownContainerType(parentAsset.type_id);
 
-        if (!isShipSlot && !isShip && isContainer) {
+        // An asset is a container IF AND ONLY IF parentAsset.type_id is a container!
+        if (isContainerAsset(parentAsset.type_id)) {
           if (!containerId) {
             containerId = currentLoc;
             if (ast.owner_type === 'char' && !charContainerIds.includes(containerId)) {
