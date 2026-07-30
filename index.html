@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Blueprint & Multi-Layer Industry Calculator</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="css/styles.css?v=2.0.1">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=2.0.2">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -208,6 +208,29 @@
       </div>
     </div>
 
+    <!-- Contract Settings Panel -->
+    <div class="flex items-center space-x-3 bg-[#0d1922] p-2.5 rounded-lg border border-purple-500/40 text-xs mono shadow">
+      <span class="text-purple-400 font-bold text-[11px] uppercase rajdhani">Contract Settings:</span>
+      
+      <div class="flex items-center space-x-1" title="Contract Sales Tax %">
+        <span class="text-slate-400 font-semibold">C. Tax:</span>
+        <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-14 bg-[#070b0f] border border-[#1e3348] rounded text-center text-purple-400 font-bold p-1 outline-none text-xs">
+        <span class="text-slate-500">%</span>
+      </div>
+
+      <div class="flex items-center space-x-1" title="Contract Broker Fee %">
+        <span class="text-slate-400 font-semibold">C. Broker:</span>
+        <input type="number" id="contract-broker" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-14 bg-[#070b0f] border border-[#1e3348] rounded text-center text-purple-400 font-bold p-1 outline-none text-xs">
+        <span class="text-slate-500">%</span>
+      </div>
+
+      <div class="flex items-center space-x-1" title="Contract Deposit % (Refundable, 100k minimum)">
+        <span class="text-slate-400 font-semibold">C. Deposit:</span>
+        <input type="number" id="contract-deposit" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-14 bg-[#070b0f] border border-[#1e3348] rounded text-center text-purple-400 font-bold p-1 outline-none text-xs">
+        <span class="text-slate-500">%</span>
+      </div>
+    </div>
+
     <!-- Hangar Stock Deduction & Real-Time Location / Container Filter Panel -->
     <div class="flex flex-col bg-[#0d1922] p-2.5 rounded-lg border border-[#1e3348] flex-1 max-w-2xl shadow space-y-1.5">
       <div class="flex items-center justify-between">
@@ -368,11 +391,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=2.0.1"></script>
-  <script src="js/config.js?v=2.0.1"></script>
-  <script src="js/esi.js?v=2.0.1"></script>
-  <script src="js/tree.js?v=2.0.1"></script>
-  <script src="js/optimizers.js?v=2.0.1"></script>
-  <script src="js/app.js?v=2.0.1"></script>
+  <script src="eve_db.js?v=2.0.2"></script>
+  <script src="js/config.js?v=2.0.2"></script>
+  <script src="js/esi.js?v=2.0.2"></script>
+  <script src="js/tree.js?v=2.0.2"></script>
+  <script src="js/optimizers.js?v=2.0.2"></script>
+  <script src="js/app.js?v=2.0.2"></script>
 </body>
 </html>
