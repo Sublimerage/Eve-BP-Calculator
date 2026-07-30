@@ -199,10 +199,10 @@
       </div>
     </div>
 
-    <!-- Hangar Stock Deduction & Real-Time Location / Container Filter Panel -->
+    <!-- Hangar Stock Deduction, Corp Division & Location Filter Panel -->
     <div class="flex flex-col bg-[#0d1922] p-2.5 rounded-lg border border-[#1e3348] flex-1 max-w-2xl shadow space-y-1.5">
       <div class="flex items-center justify-between">
-        <span class="text-cyan-400 text-[11px] font-bold uppercase rajdhani">Hangar Stock &amp; Location Deduction:</span>
+        <span class="text-cyan-400 text-[11px] font-bold uppercase rajdhani">Hangar Stock, Corp Divisions &amp; Location Filter:</span>
         <span id="location-search-feedback" class="text-[10px] text-amber-300 font-mono font-bold hidden"></span>
       </div>
 
@@ -222,11 +222,11 @@
           <span>Corp</span>
         </label>
 
-        <!-- Search Station / Container Box -->
-        <input type="text" id="location-filter-search" autocomplete="off" placeholder="Search station / container..." oninput="filterLocationDropdownOptions()" 
+        <!-- Search Station / Corp Division / Container Box -->
+        <input type="text" id="location-filter-search" autocomplete="off" placeholder="Search station / div / container..." oninput="filterLocationDropdownOptions()" 
           class="w-36 bg-[#070b0f] border border-[#1e3348] rounded-md p-1.5 text-slate-200 text-xs mono outline-none focus:border-cyan-500">
 
-        <!-- Station & Container Dropdown -->
+        <!-- Station, Corp Division & Container Dropdown -->
         <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded-md p-1.5 text-amber-300 font-bold text-xs outline-none truncate">
           <option value="all" selected>All Locations (Combined Assets)</option>
           <option value="industry_system">Current System Only (JITA)</option>
