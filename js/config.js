@@ -9,43 +9,74 @@ window.esc = esc;
 // Hardcoded EVE Developer Application Client ID for instant 1-click SSO
 window.HARDCODED_CLIENT_ID = '20e4087a1f564a3e897aaaa6daebbecd';
 
-// Global Caches & Indexes (Explicitly attached to window)
-window.IDX = {};                  // Full Item Index (Keyed by lowercase name)
-window.TYPE_ID_TO_NAME = {};      // Fast O(1) Direct Lookup Index (Keyed by integer Type ID)
-window.SYSTEM_IDX = {};           // Full Solar System Index
-window.recipeMap = {};            // Dual-Key Recipe Map
-window.currentProduct = null;      // Selected root item metadata
-window.recipeTreeRoot = null;      // Recursive blueprint tree
-window.blueprintCache = {};        // Cached blueprint responses
-window.priceCache = {};            // Cached Jita 4-4 prices
-window.eivCache = {};              // Cached EVE ESI Adjusted Prices
-window.rawAssetItems = [];         // Raw ESI / Pasted asset records
-window.userStockMap = {};          // Filtered stock quantities
-window.systemNameCache = {};       // Cached system names
-window.resolvedLocationNames = {}; // Cached location names
-window.corpDivisionNames = {};     // Custom Corporation Hangar Division Names
-window.instanceCounter = 0;        // Node instance ID counter
+// Shared Lexical Global Declarations (Strict-mode compliant across all files)
+var IDX = {};                  // Full Item Index (Keyed by lowercase name)
+var TYPE_ID_TO_NAME = {};      // Fast O(1) Direct Lookup Index (Keyed by integer Type ID)
+var SYSTEM_IDX = {};           // Full Solar System Index
+var recipeMap = {};            // Dual-Key Recipe Map
+var currentProduct = null;      // Selected root item metadata
+var recipeTreeRoot = null;      // Recursive blueprint tree
+var blueprintCache = {};        // Cached blueprint responses
+var priceCache = {};            // Cached Jita 4-4 prices
+var eivCache = {};              // Cached EVE ESI Adjusted Prices
+var rawAssetItems = [];         // Raw ESI / Pasted asset records
+var userStockMap = {};          // Filtered stock quantities
+var systemNameCache = {};       // Cached system names
+var resolvedLocationNames = {}; // Cached location names
+var corpDivisionNames = {};     // Custom Corporation Hangar Division Names
+var instanceCounter = 0;        // Node instance ID counter
 
 // User Overrides State
-window.buildSelfOverrides = {};    // { typeId: boolean }
-window.customBuyModes = {};        // { typeId: 'sell' | 'buy' }
-window.customMEOverrides = {};     // { typeId: number }
-window.customTEOverrides = {};     // { typeId: number }
+var buildSelfOverrides = {};    // { typeId: boolean }
+var customBuyModes = {};        // { typeId: 'sell' | 'buy' }
+var customMEOverrides = {};     // { typeId: number }
+var customTEOverrides = {};     // { typeId: number }
 
-window.selectedInstanceId = null;  
-window.isolatedInstanceId = null;  
+var selectedInstanceId = null;  
+var isolatedInstanceId = null;  
 
 // Live ESI System Cost Indices
-window.activeMfgSCI = 0.0425;
-window.activeReactSCI = 0.0110;
+var activeMfgSCI = 0.0425;
+var activeReactSCI = 0.0110;
 
 // Pan & Zoom State
-window.zoomScale = 1.0;
-window.panX = 0;
-window.panY = 0;
-window.isPanning = false;
-window.startX = 0;
-window.startY = 0;
+var zoomScale = 1.0;
+var panX = 0;
+var panY = 0;
+var isPanning = false;
+var startX = 0;
+var startY = 0;
+
+// Explicitly attach to window for cross-module compatibility
+window.IDX = IDX;
+window.TYPE_ID_TO_NAME = TYPE_ID_TO_NAME;
+window.SYSTEM_IDX = SYSTEM_IDX;
+window.recipeMap = recipeMap;
+window.currentProduct = currentProduct;
+window.recipeTreeRoot = recipeTreeRoot;
+window.blueprintCache = blueprintCache;
+window.priceCache = priceCache;
+window.eivCache = eivCache;
+window.rawAssetItems = rawAssetItems;
+window.userStockMap = userStockMap;
+window.systemNameCache = systemNameCache;
+window.resolvedLocationNames = resolvedLocationNames;
+window.corpDivisionNames = corpDivisionNames;
+window.instanceCounter = instanceCounter;
+window.buildSelfOverrides = buildSelfOverrides;
+window.customBuyModes = customBuyModes;
+window.customMEOverrides = customMEOverrides;
+window.customTEOverrides = customTEOverrides;
+window.selectedInstanceId = selectedInstanceId;
+window.isolatedInstanceId = isolatedInstanceId;
+window.activeMfgSCI = activeMfgSCI;
+window.activeReactSCI = activeReactSCI;
+window.zoomScale = zoomScale;
+window.panX = panX;
+window.panY = panY;
+window.isPanning = isPanning;
+window.startX = startX;
+window.startY = startY;
 
 // Known Base Raw Materials
 const RAW_BASE_MATERIALS = new Set([
@@ -320,28 +351,28 @@ window.buildPrepackedIndexes = function() {
     const recipesObj = (typeof EVE_RECIPES !== 'undefined') ? EVE_RECIPES : (window.EVE_RECIPES || null);
     const systemsObj = (typeof EVE_SYSTEMS !== 'undefined') ? EVE_SYSTEMS : (window.EVE_SYSTEMS || null);
 
-    if (itemsObj && Object.keys(itemsObj).length > 10) {
+    if (itemsObj && typeof itemsObj === 'object') {
       for (const [idStr, name] of Object.entries(itemsObj)) {
         const numericId = parseInt(idStr);
-        window.IDX[name.toLowerCase()] = { id: numericId, name: name };
-        window.TYPE_ID_TO_NAME[numericId] = name; // FAST O(1) DIRECT LOOKUP MAP
+        IDX[name.toLowerCase()] = { id: numericId, name: name };
+        TYPE_ID_TO_NAME[numericId] = name; // FAST O(1) DIRECT LOOKUP MAP
       }
     } else {
       POPULAR_ITEMS.forEach(r => {
-        window.IDX[r.name.toLowerCase()] = { id: r.id, name: r.name };
-        window.TYPE_ID_TO_NAME[r.id] = r.name;
+        IDX[r.name.toLowerCase()] = { id: r.id, name: r.name };
+        TYPE_ID_TO_NAME[r.id] = r.name;
       });
     }
 
-    if (systemsObj && Object.keys(systemsObj).length > 10) {
+    if (systemsObj && typeof systemsObj === 'object') {
       for (const [id, name] of Object.entries(systemsObj)) {
-        window.SYSTEM_IDX[name.toLowerCase()] = { id: parseInt(id), name: name.toUpperCase() };
-        window.systemNameCache[id] = name.toUpperCase();
+        SYSTEM_IDX[name.toLowerCase()] = { id: parseInt(id), name: name.toUpperCase() };
+        systemNameCache[id] = name.toUpperCase();
       }
     } else {
       POPULAR_SYSTEMS.forEach(sys => {
-        window.SYSTEM_IDX[sys.name.toLowerCase()] = { id: sys.id, name: sys.name.toUpperCase() };
-        window.systemNameCache[sys.id] = sys.name.toUpperCase();
+        SYSTEM_IDX[sys.name.toLowerCase()] = { id: sys.id, name: sys.name.toUpperCase() };
+        systemNameCache[sys.id] = sys.name.toUpperCase();
       });
     }
 
@@ -349,27 +380,27 @@ window.buildPrepackedIndexes = function() {
       for (const [idStr, recipe] of Object.entries(recipesObj)) {
         if (!recipe) continue;
         const keyId = parseInt(idStr);
-        window.recipeMap[keyId] = recipe;
+        recipeMap[keyId] = recipe;
         
         // Map all candidate key fields without mutating recipe object directly
         const bpId = recipe.blueprintTypeID || recipe.bp || recipe.bpId;
         const pId = recipe.productTypeID || recipe.product || recipe.p || recipe.pId;
 
-        if (bpId) window.recipeMap[parseInt(bpId)] = recipe;
-        if (pId) window.recipeMap[parseInt(pId)] = recipe;
+        if (bpId) recipeMap[parseInt(bpId)] = recipe;
+        if (pId) recipeMap[parseInt(pId)] = recipe;
       }
     }
 
     // Explicitly override built-in recipes
     for (const [idStr, recipe] of Object.entries(BUILTIN_RECIPES)) {
       const keyId = parseInt(idStr);
-      window.recipeMap[keyId] = recipe;
-      if (recipe.blueprintTypeID) window.recipeMap[recipe.blueprintTypeID] = recipe;
-      if (recipe.productTypeID) window.recipeMap[recipe.productTypeID] = recipe;
+      recipeMap[keyId] = recipe;
+      if (recipe.blueprintTypeID) recipeMap[recipe.blueprintTypeID] = recipe;
+      if (recipe.productTypeID) recipeMap[recipe.productTypeID] = recipe;
     }
 
     if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
-    if (statusText) statusText.textContent = `INDEX READY (${Object.keys(window.IDX).length.toLocaleString()} ITEMS | ${Object.keys(window.recipeMap).length.toLocaleString()} RECIPES)`;
+    if (statusText) statusText.textContent = `INDEX READY (${Object.keys(IDX).length.toLocaleString()} ITEMS | ${Object.keys(recipeMap).length.toLocaleString()} RECIPES)`;
   } catch (err) {
     console.error('buildPrepackedIndexes error:', err);
     if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-red-500';
