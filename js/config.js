@@ -407,4 +407,3 @@ window.buildPrepackedIndexes = function() {
     if (statusText) statusText.textContent = 'INDEX LOAD ERROR: ' + err.message;
   }
 };
-```.

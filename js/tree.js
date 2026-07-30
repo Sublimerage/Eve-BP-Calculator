@@ -352,4 +352,3 @@ function scaleTreeQuantities(node, facility) {
     scaleTreeQuantities(child, facility);
   });
 }
-```.

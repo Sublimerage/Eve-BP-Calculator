@@ -1029,4 +1029,3 @@ async function fetchMarketPrices(typeIds) {
     });
   }));
 }
-```.
