@@ -3,6 +3,7 @@
 // Initialize root pricing strategy states if not already defined
 if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sell';
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
+if (window.rootCustomTax === undefined) window.rootCustomTax = 0.5;
 
 function saveTaxSettings() {
   try {
@@ -45,6 +46,7 @@ function searchItems(query) {
   return [...exact, ...starts, ...contains].slice(0, 15);
 }
 
+// Full search solar systems locally
 function searchSolarSystemsLocally(query) {
   const q = query.toLowerCase().trim();
   if (!q) return [];
@@ -373,42 +375,60 @@ function recalculate() {
   let totalProductionCost = effectiveMaterialCost + totalJobFees;
 
   const outputPrices = priceCache[recipeTreeRoot.typeId] || { sell: 0, buy: 0 };
-  
-  // Custom price override
-  const customPrice = window.rootCustomPrice || 0;
-  const unitSellPrice = customPrice > 0 ? customPrice : outputPrices.sell;
-  const unitBuyPrice = customPrice > 0 ? customPrice : outputPrices.buy;
+  const selectedStrategy = window.rootSellStrategy || 'market-sell';
+
+  let unitSellPrice = 0;
+  let isBuyMode = false;
+  let isContractMode = false;
+
+  if (selectedStrategy === 'market-sell') {
+    unitSellPrice = outputPrices.sell;
+    isBuyMode = false;
+  } else if (selectedStrategy === 'market-buy') {
+    unitSellPrice = outputPrices.buy;
+    isBuyMode = true;
+  } else if (selectedStrategy === 'custom-market-sell') {
+    unitSellPrice = window.rootCustomPrice || 0;
+    isBuyMode = false;
+  } else if (selectedStrategy === 'custom-market-buy') {
+    unitSellPrice = window.rootCustomPrice || 0;
+    isBuyMode = true;
+  } else if (selectedStrategy === 'custom-contract') {
+    unitSellPrice = window.rootCustomPrice || 0;
+    isContractMode = true;
+  }
 
   const grossSellRevenue = unitSellPrice * totalRootOutputQty;
-  const grossBuyRevenue = unitBuyPrice * totalRootOutputQty;
+  const grossBuyRevenue = outputPrices.buy * totalRootOutputQty; // fallback reference
 
   recipeTreeRoot.calculatedCost = totalProductionCost;
   recipeTreeRoot.outputMarketValue = grossSellRevenue;
 
-  // Compute final net revenue based on selected selling strategy
-  const selectedStrategy = window.rootSellStrategy || 'market-sell';
+  // Compute final net revenue based on chosen channel strategy
   let netSellRevenue = grossSellRevenue;
   let netBuyRevenue = grossBuyRevenue;
 
-  if (selectedStrategy === 'market-sell') {
-    netSellRevenue = grossSellRevenue * (1 - salesTax - brokerFee);
-    netBuyRevenue = grossBuyRevenue * (1 - salesTax);
-  } else if (selectedStrategy === 'market-buy') {
-    netSellRevenue = grossSellRevenue * (1 - salesTax - brokerFee);
-    netBuyRevenue = grossBuyRevenue * (1 - salesTax);
-  } else if (selectedStrategy === 'contract') {
-    // 0.5% sales tax (Accounting V) and flat 10k ISK fee
-    const contractTaxRate = 0.005; 
+  if (isContractMode) {
+    // Contract Sale: uses custom contract tax % and flat 10k ISK fee
+    const contractTaxRate = (window.rootCustomTax || 0) / 100;
     const contractBrokerFee = 10000;
     const baseRevenue = unitSellPrice * totalRootOutputQty;
     const netContractRevenue = baseRevenue - (baseRevenue * contractTaxRate) - contractBrokerFee;
     netSellRevenue = netContractRevenue;
     netBuyRevenue = netContractRevenue;
+  } else if (isBuyMode) {
+    // Market Buy: uses settings' Sales Tax
+    netBuyRevenue = grossSellRevenue * (1 - salesTax);
+    netSellRevenue = grossSellRevenue * (1 - salesTax - brokerFee);
+  } else {
+    // Market Sell: uses settings' Sales Tax + Broker Fee
+    netSellRevenue = grossSellRevenue * (1 - salesTax - brokerFee);
+    netBuyRevenue = grossBuyRevenue * (1 - salesTax);
   }
 
   // Net Profit formula includes Surplus Re-sale Credit
   const profitSell = netSellRevenue + totalSurplusMaterialValue - totalProductionCost;
-  const profitBuy = netBuyRevenue + totalSurplusMaterialValue - totalProductionCost;
+  const profitBuy = isBuyMode ? profitSell : (netBuyRevenue + totalSurplusMaterialValue - totalProductionCost);
   
   // Attach final aligned profit and revenue calculations to root node structure
   recipeTreeRoot.netProfitSell = profitSell;
@@ -428,16 +448,12 @@ function recalculate() {
 
   const summaryOutSellEl = document.getElementById('summary-output-sell');
   if (summaryOutSellEl) {
-    if (selectedStrategy === 'contract') {
-      summaryOutSellEl.textContent = Math.round(netSellRevenue).toLocaleString() + ' ISK';
-    } else {
-      summaryOutSellEl.textContent = Math.round(netSellRevenue).toLocaleString() + ' ISK';
-    }
+    summaryOutSellEl.textContent = Math.round(netSellRevenue).toLocaleString() + ' ISK';
   }
 
   const summaryOutBuyEl = document.getElementById('summary-output-buy');
   if (summaryOutBuyEl) {
-    if (selectedStrategy === 'contract') {
+    if (isContractMode) {
       summaryOutBuyEl.textContent = 'Net Contract: ' + Math.round(netBuyRevenue).toLocaleString() + ' ISK';
     } else {
       summaryOutBuyEl.textContent = `Net Instant Buy: ${Math.round(netBuyRevenue).toLocaleString()} ISK`;
@@ -446,19 +462,19 @@ function recalculate() {
 
   const pSellEl = document.getElementById('summary-profit-sell');
   if (pSellEl) {
-    const finalProfit = selectedStrategy === 'market-buy' ? profitBuy : profitSell;
+    const finalProfit = isBuyMode ? profitBuy : profitSell;
     pSellEl.textContent = Math.round(finalProfit).toLocaleString() + ' ISK';
     pSellEl.className = `text-lg font-bold mt-0.5 mono ${finalProfit >= 0 ? 'text-green-400' : 'text-red-500'}`;
   }
 
   const roiSellEl = document.getElementById('summary-roi-sell');
   if (roiSellEl) {
-    const finalProfit = selectedStrategy === 'market-buy' ? profitBuy : profitSell;
+    const finalProfit = isBuyMode ? profitBuy : profitSell;
     const finalRoi = totalProductionCost > 0 ? ((finalProfit / totalProductionCost) * 100).toFixed(1) : 0;
     
     let label = 'Net ROI';
-    if (selectedStrategy === 'contract') label = 'Contract ROI';
-    else if (selectedStrategy === 'market-buy') label = 'Buy Order ROI';
+    if (selectedStrategy === 'custom-contract') label = 'Contract ROI';
+    else if (isBuyMode) label = 'Buy Order ROI';
     else label = 'Sell Order ROI';
 
     roiSellEl.textContent = `${label}: ${finalRoi}% (Inc. Surplus)`;
@@ -472,8 +488,6 @@ function recalculate() {
 
   const roiBuyEl = document.getElementById('summary-roi-buy');
   if (roiBuyEl) roiBuyEl.textContent = `Net ROI: ${roiBuy}% (Inc. Surplus)`;
-
-  const curStrategy = window.rootSellStrategy || 'market-sell';
 
   if (isolatedInstanceId) {
     const isoNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
@@ -578,31 +592,54 @@ function createNodeCard(node) {
   if (isRoot) {
     const curStrategy = window.rootSellStrategy || 'market-sell';
     const curCustomPrice = window.rootCustomPrice || '';
+    const curCustomTax = window.rootCustomTax !== undefined ? window.rootCustomTax : 0.5;
+
+    const isCustomStrategy = curStrategy.startsWith('custom-');
+    const isContractStrategy = curStrategy === 'custom-contract';
 
     sellStrategyUI = `
       <div class="mb-2 p-1.5 bg-[#070b0f] rounded border border-purple-500/40 space-y-1.5" onclick="event.stopPropagation()">
         <div class="flex justify-between items-center text-[10px] mono">
           <span class="text-purple-300 font-bold">Sell Channel:</span>
           <select id="card-sell-strategy" onchange="syncSellStrategy(event)" class="bg-[#0c1318] text-white rounded p-0.5 border border-[#1e3348] text-[10px] outline-none">
-            <option value="market-sell" ${curStrategy === 'market-sell' ? 'selected' : ''}>Market (Sell Orders)</option>
-            <option value="market-buy" ${curStrategy === 'market-buy' ? 'selected' : ''}>Market (Buy Orders)</option>
-            <option value="contract" ${curStrategy === 'contract' ? 'selected' : ''}>Contract (0.5% Tax + 10k)</option>
+            <option value="market-sell" ${curStrategy === 'market-sell' ? 'selected' : ''}>Auto (Jita Sell)</option>
+            <option value="market-buy" ${curStrategy === 'market-buy' ? 'selected' : ''}>Auto (Jita Buy)</option>
+            <option value="custom-market-sell" ${curStrategy === 'custom-market-sell' ? 'selected' : ''}>Custom Market Sell</option>
+            <option value="custom-market-buy" ${curStrategy === 'custom-market-buy' ? 'selected' : ''}>Custom Market Buy</option>
+            <option value="custom-contract" ${curStrategy === 'custom-contract' ? 'selected' : ''}>Custom Contract Sale</option>
           </select>
         </div>
-        <div class="flex justify-between items-center text-[10px] mono">
-          <span class="text-purple-300 font-bold">Custom Sell Price:</span>
-          <div class="flex items-center space-x-1">
-            <input type="number" id="card-custom-price" value="${curCustomPrice}" placeholder="Auto (Market)"
-              oninput="syncCustomPrice(event)"
-              class="w-24 bg-[#0c1318] border border-[#1e3348] text-center text-green-400 font-bold rounded p-0.5 outline-none text-[10px]">
-            <span class="text-slate-500 text-[9px]">ISK</span>
+        
+        ${isCustomStrategy ? `
+          <div class="flex justify-between items-center text-[10px] mono">
+            <span class="text-purple-300 font-bold">Custom Sell Price:</span>
+            <div class="flex items-center space-x-1">
+              <input type="number" id="card-custom-price" value="${curCustomPrice}" placeholder="Unit Price"
+                oninput="syncCustomPrice(event)"
+                class="w-24 bg-[#0c1318] border border-[#1e3348] text-center text-green-400 font-bold rounded p-0.5 outline-none text-[10px]">
+              <span class="text-slate-500 text-[9px]">ISK</span>
+            </div>
           </div>
-        </div>
+        ` : ''}
+
+        ${isContractStrategy ? `
+          <div class="flex justify-between items-center text-[10px] mono">
+            <span class="text-purple-300 font-bold">Custom Contract Tax:</span>
+            <div class="flex items-center space-x-1">
+              <input type="number" id="card-custom-tax" value="${curCustomTax}" placeholder="0.5" step="0.1" min="0" max="100"
+                oninput="syncCustomTax(event)"
+                class="w-24 bg-[#0c1318] border border-[#1e3348] text-center text-amber-300 font-bold rounded p-0.5 outline-none text-[10px]">
+              <span class="text-slate-500 text-[9px]">%</span>
+            </div>
+          </div>
+        ` : ''}
       </div>
     `;
   }
 
   card.className = `diagram-node rounded p-3 shadow-2xl transition-all ${cardStyle}`;
+
+  const isBuyModeSelected = window.rootSellStrategy === 'market-buy' || window.rootSellStrategy === 'custom-market-buy';
 
   card.innerHTML = `
     <div class="flex items-center space-x-3 border-b border-[#1e3348] pb-2 mb-2">
@@ -740,10 +777,10 @@ function createNodeCard(node) {
       ${isRoot ? `
         <div class="flex justify-between font-bold border-t border-green-500/40 pt-1 mt-1 bg-green-950/30 p-1 rounded">
           <span class="text-slate-300">
-            ${window.rootSellStrategy === 'contract' ? 'Net Profit (Contract Output):' : window.rootSellStrategy === 'market-buy' ? 'Net Profit (Buy Output):' : 'Net Profit (Sell Output):'}
+            ${window.rootSellStrategy === 'custom-contract' ? 'Net Profit (Contract Output):' : isBuyModeSelected ? 'Net Profit (Buy Output):' : 'Net Profit (Sell Output):'}
           </span>
-          <span class="${(window.rootSellStrategy === 'market-buy' ? node.netProfitBuy : node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">
-            ${Math.round(window.rootSellStrategy === 'market-buy' ? (node.netProfitBuy || 0) : (node.netProfitSell || 0)).toLocaleString()} ISK
+          <span class="${(isBuyModeSelected ? node.netProfitBuy : node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">
+            ${Math.round(isBuyModeSelected ? (node.netProfitBuy || 0) : (node.netProfitSell || 0)).toLocaleString()} ISK
           </span>
         </div>
       ` : ''}
@@ -773,9 +810,16 @@ function syncCustomPrice(e) {
   recalculate();
 }
 
+function syncCustomTax(e) {
+  const val = parseFloat(e.target.value) || 0;
+  window.rootCustomTax = val >= 0 ? val : 0;
+  recalculate();
+}
+
 // Bind to window for HTML event accessibility
 window.syncSellStrategy = syncSellStrategy;
 window.syncCustomPrice = syncCustomPrice;
+window.syncCustomTax = syncCustomTax;
 
 function onNodeClick(e, instanceId) {
   e.stopPropagation();
