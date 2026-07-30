@@ -10,7 +10,8 @@ window.esc = esc;
 window.HARDCODED_CLIENT_ID = '20e4087a1f564a3e897aaaa6daebbecd';
 
 // Global Caches & Indexes (Explicitly attached to window)
-window.IDX = {};                  // Full Item Index
+window.IDX = {};                  // Full Item Index (Keyed by lowercase name)
+window.TYPE_ID_TO_NAME = {};      // Fast O(1) Direct Lookup Index (Keyed by integer Type ID)
 window.SYSTEM_IDX = {};           // Full Solar System Index
 window.recipeMap = {};            // Dual-Key Recipe Map
 window.currentProduct = null;      // Selected root item metadata
@@ -22,6 +23,7 @@ window.rawAssetItems = [];         // Raw ESI / Pasted asset records
 window.userStockMap = {};          // Filtered stock quantities
 window.systemNameCache = {};       // Cached system names
 window.resolvedLocationNames = {}; // Cached location names
+window.corpDivisionNames = {};     // Custom Corporation Hangar Division Names
 window.instanceCounter = 0;        // Node instance ID counter
 
 // User Overrides State
@@ -227,12 +229,15 @@ window.buildPrepackedIndexes = function() {
   const systemsObj = (typeof EVE_SYSTEMS !== 'undefined') ? EVE_SYSTEMS : (window.EVE_SYSTEMS || null);
 
   if (itemsObj && Object.keys(itemsObj).length > 10) {
-    for (const [id, name] of Object.entries(itemsObj)) {
-      window.IDX[name.toLowerCase()] = { id: parseInt(id), name: name };
+    for (const [idStr, name] of Object.entries(itemsObj)) {
+      const numericId = parseInt(idStr);
+      window.IDX[name.toLowerCase()] = { id: numericId, name: name };
+      window.TYPE_ID_TO_NAME[numericId] = name; // INSTANT O(1) DIRECT LOOKUP MAP
     }
   } else {
     POPULAR_ITEMS.forEach(r => {
       window.IDX[r.name.toLowerCase()] = { id: r.id, name: r.name };
+      window.TYPE_ID_TO_NAME[r.id] = r.name;
     });
   }
 
@@ -265,6 +270,6 @@ window.buildPrepackedIndexes = function() {
     if (recipe.productTypeID) window.recipeMap[recipe.productTypeID] = recipe;
   }
 
-  if (statusDot) statusDot.className = 'w-2 h-2 rounded-full bg-green-400';
+  if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
   if (statusText) statusText.textContent = `INDEX READY (${Object.keys(window.IDX).length.toLocaleString()} ITEMS | ${Object.keys(window.recipeMap).length.toLocaleString()} RECIPES)`;
 };

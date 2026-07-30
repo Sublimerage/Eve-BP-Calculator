@@ -9,14 +9,14 @@ function esc(s) {
 }
 if (!window.esc) window.esc = esc;
 
-// Helper to look up exact item type name from loaded index or EVE_ITEMS database
+// Fast O(1) Helper to look up exact item type name from TYPE_ID_TO_NAME or EVE_ITEMS database
 function getItemTypeName(typeId) {
   if (!typeId) return '';
+  if (window.TYPE_ID_TO_NAME && window.TYPE_ID_TO_NAME[typeId]) {
+    return window.TYPE_ID_TO_NAME[typeId];
+  }
   if (window.EVE_ITEMS && window.EVE_ITEMS[typeId]) {
     return window.EVE_ITEMS[typeId];
-  }
-  for (const [k, v] of Object.entries(IDX)) {
-    if (v.id === typeId) return v.name;
   }
   return '';
 }
@@ -413,11 +413,12 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       while (itemIdToAssetMap[currentLoc] && depth < 10) {
         const parentAsset = itemIdToAssetMap[currentLoc];
         
-        // STRICT CONTAINER CHECK: Must be a verified container type AND not in a ship slot
+        // STRICT CONTAINER CHECK: Check location flag, ship category, AND container verification
         const isShipSlot = isShipLocationFlag(ast.location_flag) || isShipLocationFlag(parentAsset.location_flag);
+        const isShip = isShipType(parentAsset.type_id);
         const isContainer = isKnownContainerType(parentAsset.type_id);
 
-        if (!isShipSlot && isContainer) {
+        if (!isShipSlot && !isShip && isContainer) {
           if (!containerId) {
             containerId = currentLoc;
             if (ast.owner_type === 'char' && !charContainerIds.includes(containerId)) {
@@ -630,7 +631,7 @@ function populateLocationDropdown() {
     'CorpDeliveries': 'CORP DELIVERIES'
   };
 
-  // Aggregate assets by root station/structure, Corp Divisions, and Containers
+  // Aggregate assets by root station/structure AND track actual containers
   const locCounts = {};
   rawAssetItems.forEach(item => {
     const locId = item.root_location_id || item.location_id;
