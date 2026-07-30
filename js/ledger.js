@@ -23,21 +23,39 @@ let userStockMap = {};
 
 // Load states from shared LocalStorage
 function loadJournalState() {
-  const savedJobs = localStorage.getItem('eve_ledger_jobs');
-  activeJobs = safeParseJSON(savedJobs, []);
-  if (!Array.isArray(activeJobs)) activeJobs = [];
+  try {
+    const savedJobs = localStorage.getItem('eve_ledger_jobs');
+    activeJobs = safeParseJSON(savedJobs, []);
+    if (!Array.isArray(activeJobs)) activeJobs = [];
+  } catch (e) {
+    activeJobs = [];
+  }
 
-  const savedHistory = localStorage.getItem('eve_ledger_history');
-  buildHistory = safeParseJSON(savedHistory, []);
-  if (!Array.isArray(buildHistory)) buildHistory = [];
+  try {
+    const savedHistory = localStorage.getItem('eve_ledger_history');
+    buildHistory = safeParseJSON(savedHistory, []);
+    if (!Array.isArray(buildHistory)) buildHistory = [];
+  } catch (e) {
+    buildHistory = [];
+  }
 
   // Load custom location names and assets
-  window.rawAssetItems = safeParseJSON(localStorage.getItem('eve_raw_assets'), []);
-  window.resolvedLocationNames = safeParseJSON(localStorage.getItem('eve_resolved_location_names'), {});
-  window.corpDivisionNames = safeParseJSON(localStorage.getItem('eve_corp_division_names'), {});
+  try {
+    window.rawAssetItems = safeParseJSON(localStorage.getItem('eve_raw_assets'), []);
+    window.resolvedLocationNames = safeParseJSON(localStorage.getItem('eve_resolved_location_names'), {});
+    window.corpDivisionNames = safeParseJSON(localStorage.getItem('eve_corp_division_names'), {});
+  } catch (e) {
+    window.rawAssetItems = [];
+    window.resolvedLocationNames = {};
+    window.corpDivisionNames = {};
+  }
 
-  const savedStocks = localStorage.getItem('eve_user_stock_map');
-  userStockMap = safeParseJSON(savedStocks, {});
+  try {
+    const savedStocks = localStorage.getItem('eve_user_stock_map');
+    userStockMap = safeParseJSON(savedStocks, {});
+  } catch (e) {
+    userStockMap = {};
+  }
 }
 
 // Render overall dashboard KPIs and list details
@@ -52,7 +70,7 @@ function renderJournalPage() {
   // 1. Calculate Active Jobs Cost KPI
   let totalActiveCost = 0;
   activeJobs.forEach(job => {
-    totalActiveCost += job.calculatedCost || 0;
+    if (job) totalActiveCost += job.calculatedCost || 0;
   });
 
   if (activeJobsCountEl) activeJobsCountEl.textContent = activeJobs.length.toLocaleString();
@@ -61,8 +79,9 @@ function renderJournalPage() {
   // 2. Compile Consolidated BOM across ALL active jobs
   const consolidatedBOM = {};
   activeJobs.forEach(job => {
-    if (Array.isArray(job.materials)) {
+    if (job && Array.isArray(job.materials)) {
       job.materials.forEach(mat => {
+        if (!mat || !mat.typeId) return;
         const id = mat.typeId;
         if (!consolidatedBOM[id]) {
           consolidatedBOM[id] = {
@@ -123,11 +142,13 @@ function renderActiveJobsList() {
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
 
   container.innerHTML = activeJobs.map(job => {
+    if (!job) return '';
     const iconTypeId = job.typeId;
     const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
 
     // Generate individual BOM breakdown with stock deduction mapping
     const individualBOMHTML = job.materials.map(mat => {
+      if (!mat) return '';
       const stockQty = isStockDeductEnabled ? (userStockMap[mat.typeId] || 0) : 0;
       const netMissing = Math.max(0, mat.qtyNeeded - stockQty);
       const isAcquired = netMissing === 0;
@@ -139,18 +160,6 @@ function renderActiveJobsList() {
         </div>
       `;
     }).join('');
-
-    // Format individual job deficit text list for multibuy clipboard pasting
-    const cardBOMMultibuyText = job.materials
-      .filter(m => {
-        const stockQty = isStockDeductEnabled ? (userStockMap[m.typeId] || 0) : 0;
-        return (m.qtyNeeded - stockQty) > 0;
-      })
-      .map(m => {
-        const stockQty = isStockDeductEnabled ? (userStockMap[m.typeId] || 0) : 0;
-        return `${m.name} x${m.qtyNeeded - stockQty}`;
-      })
-      .join('\n');
 
     return `
       <div class="bg-[#0c1318] border border-[#1e3348] hover:border-purple-500/40 rounded p-4 flex flex-col justify-between shadow-md transition space-y-3">
@@ -169,7 +178,7 @@ function renderActiveJobsList() {
         <div class="p-2 bg-[#070b0f] rounded border border-[#1e3348]/40">
           <div class="flex justify-between items-center mb-1.5 pb-1 border-b border-[#1e3348]/40">
             <span class="text-[10px] text-cyan-400 font-bold uppercase tracking-wider rajdhani">Job Materials (BOM)</span>
-            <button onclick="copyIndividualJobMultibuy(event, \`${esc(cardBOMMultibuyText)}\`)" class="text-[9px] bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-1.5 py-0.5 rounded mono transition">
+            <button onclick="copyIndividualJobMultibuy(event, ${job.id})" class="text-[9px] bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-1.5 py-0.5 rounded mono transition">
               📋 Copy BOM
             </button>
           </div>
@@ -196,9 +205,28 @@ function renderActiveJobsList() {
 }
 
 // Copy single card deficit components to clipboard in EVE Online Multibuy format
-function copyIndividualJobMultibuy(e, textList) {
+function copyIndividualJobMultibuy(e, jobId) {
   if (e) e.stopPropagation();
-  if (!textList || textList.trim() === '') return;
+  
+  const job = activeJobs.find(j => j && j.id === jobId);
+  if (!job || !Array.isArray(job.materials)) return;
+
+  const deductModeInput = document.getElementById('deduct-stock-mode');
+  const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+
+  const textList = job.materials
+    .filter(m => {
+      if (!m) return false;
+      const stockQty = isStockDeductEnabled ? (userStockMap[m.typeId] || 0) : 0;
+      return (m.qtyNeeded - stockQty) > 0;
+    })
+    .map(m => {
+      const stockQty = isStockDeductEnabled ? (userStockMap[m.typeId] || 0) : 0;
+      return `${m.name} x${m.qtyNeeded - stockQty}`;
+    })
+    .join('\n');
+
+  if (!textList.trim()) return;
 
   navigator.clipboard.writeText(textList).then(() => {
     const btn = e.target;
@@ -292,7 +320,7 @@ function copyJournalMultibuy() {
 function markJobAsBuilt(jobId) {
   loadJournalState();
 
-  const jobIndex = activeJobs.findIndex(j => j.id === jobId);
+  const jobIndex = activeJobs.findIndex(j => j && j.id === jobId);
   if (jobIndex === -1) return;
 
   const job = activeJobs[jobIndex];
@@ -300,6 +328,7 @@ function markJobAsBuilt(jobId) {
   // 1. MRP Material Consumption: Subtract required quantities from stock ledger
   if (Array.isArray(job.materials)) {
     job.materials.forEach(mat => {
+      if (!mat) return;
       const id = mat.typeId;
       const consumedQty = mat.qtyNeeded || 0;
       if (userStockMap[id] !== undefined) {
@@ -337,13 +366,13 @@ function markJobAsBuilt(jobId) {
 function requeueCompletedJob(recordId) {
   loadJournalState();
 
-  const recordIndex = buildHistory.findIndex(r => r.id === recordId);
+  const recordIndex = buildHistory.findIndex(r => r && r.id === recordId);
   if (recordIndex === -1) return;
 
   const record = buildHistory[recordIndex];
 
   const job = {
-    id: Date.now() + Math.floor(Math.random() * 1000), // watertight unique ID
+    id: Date.now() + Math.floor(Math.random() * 1000), // Watertight unique ID
     typeId: record.typeId,
     name: record.name,
     runsNeeded: record.runsNeeded,
@@ -363,7 +392,7 @@ function requeueCompletedJob(recordId) {
 function deleteJobFromQueue(jobId) {
   loadJournalState();
 
-  const index = activeJobs.findIndex(j => j.id === jobId);
+  const index = activeJobs.findIndex(j => j && j.id === jobId);
   if (index !== -1) {
     activeJobs.splice(index, 1);
     localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
@@ -388,6 +417,7 @@ function renderBuildHistoryLedger() {
   }
 
   container.innerHTML = buildHistory.map(record => {
+    if (!record) return '';
     const formattedDate = record.completedAt ? new Date(record.completedAt).toLocaleDateString() + ' ' + new Date(record.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
     return `
       <tr class="hover:bg-[#0c1318]/50 text-slate-300 border-b border-[#1e3348]/20">
@@ -440,6 +470,7 @@ function populateJournalLocationDropdown() {
 
   const locCounts = {};
   window.rawAssetItems.forEach(item => {
+    if (!item) return;
     const locId = item.root_location_id || item.location_id;
     const locName = window.resolvedLocationNames[locId] || `Location #${locId}`;
 
@@ -573,6 +604,7 @@ function applyJournalStockFilter() {
   window.userStockMap = {};
 
   window.rawAssetItems.forEach(item => {
+    if (!item) return;
     if (item.owner_type === 'char' && !useChar) return;
     if (item.owner_type === 'corp' && !useCorp) return;
 
