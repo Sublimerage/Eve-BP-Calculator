@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Blueprint & Multi-Layer Industry Calculator</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=2.0.6">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=3.0.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -40,6 +40,11 @@
         📋 Paste Hangar
       </button>
 
+      <!-- NEW: Consolidated Manufacturing Queue (Journal) Header Button -->
+      <a href="journal.html" class="px-4 py-2 bg-purple-700 hover:bg-purple-600 text-purple-100 font-bold rounded-md transition text-xs shadow flex items-center gap-1.5" title="View your consolidated manufacturing jobs queue">
+        📖 View Journal <span id="header-journal-count" class="bg-purple-950 text-purple-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">0</span>
+      </a>
+
       <button onclick="centerOnSelectedNode()" class="px-3.5 py-2 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded-md transition text-xs shadow">
         Center [F]
       </button>
@@ -54,108 +59,89 @@
   </header>
 
   <!-- Toolbar Row 1: Primary Search, Build Actions, Smart Optimizers, Pricing Strategy -->
-  <section class="bg-[#0d1922] border-b border-[#1e3348] p-2 grid grid-cols-1 md:grid-cols-12 gap-2 text-xs relative z-50">
+  <section class="bg-[#0d1922] border-b border-[#1e3348] p-1.5 flex flex-wrap items-center gap-2 text-xs relative z-50">
     
-    <!-- Item Search & Global Pricing Combined (Highly Compact md:col-span-3 - Narrower!) -->
-    <div class="md:col-span-3 bg-[#0c1318] p-2 rounded-lg border border-[#1e3348] relative z-50 flex flex-col justify-between space-y-1.5 shadow-md">
-      <div class="flex justify-between items-center border-b border-[#1e3348]/60 pb-1">
-        <label class="block text-cyan-400 font-bold uppercase tracking-wider text-[10px] rajdhani">Search &amp; Price</label>
-      </div>
-      <div class="flex items-center space-x-2 relative">
+    <!-- Item Search & Global Pricing Combined (Highly Compact) -->
+    <div class="bg-[#0c1318] p-1.5 rounded border border-[#1e3348] relative z-50 flex items-center space-x-1.5 shadow">
+      <span class="text-cyan-400 font-bold uppercase text-[9px] rajdhani leading-none">Search &amp; Price:</span>
+      <div class="relative w-44">
         <!-- Compact Autocomplete Input -->
         <input type="text" id="item-search" autocomplete="off" placeholder="Search item..." 
-          class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded p-1 text-white font-bold focus:border-cyan-500 outline-none mono text-[11px] shadow-inner">
+          class="w-full bg-[#070b0f] border border-[#1e3348] rounded p-1 text-white font-bold focus:border-cyan-500 outline-none mono text-[11px] shadow-inner">
         <div id="search-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
       </div>
-      <div class="flex items-center space-x-1">
-        <!-- Pricing Mode -->
-        <select id="input-price-mode" onchange="recalculate()" class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded p-1 text-white font-bold text-[10px] outline-none">
-          <option value="sell" selected>Sell (Inst.)</option>
-          <option value="buy">Buy Order</option>
-        </select>
-        
-        <!-- Reactions -->
-        <select id="include-reactions" onchange="if(currentProduct) selectItem(currentProduct.id, currentProduct.name, true)" class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded p-1 text-purple-300 font-bold text-[10px] outline-none">
-          <option value="true" selected>React ON</option>
-          <option value="false">React OFF</option>
-        </select>
-      </div>
+      
+      <!-- Pricing Mode -->
+      <select id="input-price-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-white font-bold text-[10px] outline-none w-20">
+        <option value="sell" selected>Sell (Inst.)</option>
+        <option value="buy">Buy Order</option>
+      </select>
+      
+      <!-- Reactions -->
+      <select id="include-reactions" onchange="if(currentProduct) selectItem(currentProduct.id, currentProduct.name, true)" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-purple-300 font-bold text-[10px] outline-none w-20">
+        <option value="true" selected>React ON</option>
+        <option value="false">React OFF</option>
+      </select>
     </div>
 
-    <!-- Tree Build / Buy Actions (Compact md:col-span-4 - Larger buttons!) -->
-    <div class="md:col-span-4 bg-[#0c1318] p-2 rounded-lg border border-[#1e3348] flex flex-col justify-between space-y-1.5 shadow-md">
-      <div class="flex justify-between items-center border-b border-[#1e3348]/60 pb-1">
-        <label class="block text-green-400 font-bold uppercase tracking-wider text-[10px] rajdhani">Sub-Component Build Mode</label>
-        <button onclick="buyAllSubComponents()" class="text-slate-400 hover:text-slate-300 text-[9px] mono transition" title="Reset all sub-components back to Buy off Market">
-          Reset
-        </button>
-      </div>
-      <div class="flex items-center space-x-2">
-        <button onclick="buildAllComponents()" class="flex-1 bg-green-800/80 hover:bg-green-700 text-white font-bold py-2 px-3 rounded text-[11px] mono transition shadow border border-green-600/30">
+    <!-- Tree Build / Buy Actions (Compact) -->
+    <div class="bg-[#0c1318] p-1.5 rounded border border-[#1e3348] flex items-center space-x-2 shadow">
+      <span class="text-green-400 font-bold uppercase text-[9px] rajdhani leading-none">Build Mode:</span>
+      <div class="flex items-center space-x-1">
+        <button onclick="buildAllComponents()" class="bg-green-800/80 hover:bg-green-700 text-white font-bold py-1 px-2 rounded text-[10px] mono transition shadow border border-green-600/30">
           🔨 Build All
         </button>
-        <button onclick="buyAllSubComponents()" class="flex-1 bg-slate-700/80 hover:bg-slate-600 text-white font-bold py-2 px-3 rounded text-[11px] mono transition shadow border border-slate-500/30">
+        <button onclick="buyAllSubComponents()" class="bg-slate-700/80 hover:bg-slate-600 text-white font-bold py-1 px-2 rounded text-[10px] mono transition shadow border border-slate-500/30">
           🛒 Buy All
         </button>
       </div>
       <!-- Built profit optimizer inline -->
-      <div class="bg-[#070b0f] px-2 py-1 rounded border border-[#1e3348] flex items-center justify-between gap-1.5" title="Build Margin Threshold">
+      <div class="bg-[#070b0f] px-1 py-0.5 rounded border border-[#1e3348] flex items-center space-x-1" title="Build Margin Threshold">
         <span class="text-slate-400 text-[9px] font-bold">Min:</span>
-        <div class="flex items-center space-x-1">
-          <input type="number" id="build-profit-threshold" value="5.0" step="0.5" min="0" max="100" 
-            class="w-12 bg-[#0d1922] border border-green-500/40 text-center text-green-300 font-bold rounded p-0.5 outline-none text-[10px]">
-          <span class="text-slate-500 text-[9px] font-bold">%</span>
-        </div>
-        <button onclick="applyBuildProfitOptimizer()" class="bg-green-800 hover:bg-green-700 text-white font-semibold py-1 px-2.5 rounded text-[10px] transition shadow mono">
+        <input type="number" id="build-profit-threshold" value="5.0" step="0.5" min="0" max="100" 
+          class="w-12 bg-[#0d1922] border border-green-500/40 text-center text-green-300 font-bold rounded p-0.5 outline-none text-[10px]">
+        <span class="text-slate-500 text-[9px] font-bold">%</span>
+        <button onclick="applyBuildProfitOptimizer()" class="bg-green-800 hover:bg-green-700 text-white font-semibold py-0.5 px-1.5 rounded text-[9px] transition shadow mono">
           ⚡ Apply
         </button>
       </div>
     </div>
 
-    <!-- SMART ORDER OPTIMIZERS CARD (Compact md:col-span-5 - Perfect width!) -->
-    <div class="md:col-span-5 bg-[#0c1318] p-2 rounded-lg border border-amber-500/50 shadow-lg flex flex-col justify-between space-y-1.5">
-      <div class="flex justify-between items-center border-b border-[#1e3348]/60 pb-1">
-        <span class="text-amber-300 font-bold rajdhani text-[10px] tracking-wider">
-          ⚡ SMART ORDER OPTIMIZERS
-        </span>
-        <button onclick="resetSmartBuyModes()" class="text-slate-400 hover:text-slate-300 text-[9px] mono transition" title="Reset buy modes">
-          Reset
+    <!-- SMART ORDER OPTIMIZERS CARD (Compact Inline List) -->
+    <div class="bg-[#0c1318] p-1.5 rounded border border-amber-500/50 shadow flex items-center space-x-2">
+      <span class="text-amber-300 font-bold uppercase text-[9px] rajdhani leading-none">Smart Optimizers:</span>
+      
+      <!-- Optimizer 1: Component Spread -->
+      <div class="bg-[#070b0f] p-1 rounded border border-[#1e3348] flex items-center space-x-1" title="Spread Optimizer">
+        <span class="text-slate-400 text-[9px]">Spread:</span>
+        <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100" 
+          class="w-12 bg-[#0d1922] border border-amber-500/40 text-center text-amber-300 font-bold rounded p-0.5 outline-none text-[9px]">
+        <span class="text-slate-500 text-[9px] font-bold">%</span>
+        <button onclick="applyComponentSpreadOptimizer()" class="bg-amber-700 hover:bg-amber-600 text-white font-semibold py-0.5 px-1.5 rounded text-[9px] transition">
+          Opt
         </button>
       </div>
 
-      <div class="grid grid-cols-2 gap-2 text-[10px] mono">
-        <!-- Optimizer 1: Component Spread -->
-        <div class="bg-[#070b0f] p-1.5 rounded border border-[#1e3348] flex items-center justify-between" title="Spread Optimizer">
-          <span class="text-slate-400 text-[9px]">Spread:</span>
-          <div class="flex items-center space-x-1">
-            <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100" 
-              class="w-12 bg-[#0d1922] border border-amber-500/40 text-center text-amber-300 font-bold rounded p-0.5 outline-none text-[9px]">
-            <span class="text-slate-500 text-[9px] font-bold">%</span>
-          </div>
-          <button onclick="applyComponentSpreadOptimizer()" class="bg-amber-700 hover:bg-amber-600 text-white font-semibold py-1 px-2.5 rounded text-[10px] transition">
-            Opt
-          </button>
-        </div>
-
-        <!-- Optimizer 2: Budget Impact -->
-        <div class="bg-[#070b0f] p-1.5 rounded border border-[#1e3348] flex items-center justify-between" title="Budget Impact Optimizer">
-          <span class="text-slate-400 text-[9px]">Budget:</span>
-          <div class="flex items-center space-x-1">
-            <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100" 
-              class="w-12 bg-[#0d1922] border border-cyan-500/40 text-center text-cyan-300 font-bold rounded p-0.5 outline-none text-[9px]">
-            <span class="text-slate-500 text-[9px] font-bold">%</span>
-          </div>
-          <button onclick="applyBudgetImpactOptimizer()" class="bg-cyan-700 hover:bg-cyan-600 text-white font-semibold py-1 px-2.5 rounded text-[10px] transition">
-            Opt
-          </button>
-        </div>
+      <!-- Optimizer 2: Budget Impact -->
+      <div class="bg-[#070b0f] p-1 rounded border border-[#1e3348] flex items-center space-x-1" title="Budget Impact Optimizer">
+        <span class="text-slate-400 text-[9px]">Budget:</span>
+        <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100" 
+          class="w-12 bg-[#0d1922] border border-cyan-500/40 text-center text-cyan-300 font-bold rounded p-0.5 outline-none text-[9px]">
+        <span class="text-slate-500 text-[9px] font-bold">%</span>
+        <button onclick="applyBudgetImpactOptimizer()" class="bg-cyan-700 hover:bg-cyan-600 text-white font-semibold py-0.5 px-1.5 rounded text-[9px] transition">
+          Opt
+        </button>
       </div>
+
+      <button onclick="resetSmartBuyModes()" class="text-slate-400 hover:text-slate-300 text-[9px] mono transition" title="Reset buy modes">
+        Reset
+      </button>
     </div>
 
   </section>
 
   <!-- Toolbar Row 2: Compact Settings, Taxes, Hangar Stock & SCI Status -->
-  <section class="bg-[#0c1318] border-b border-[#1e3348] p-1.5 flex flex-wrap items-center gap-2.5 text-xs relative z-40">
+  <section class="bg-[#0c1318] border-b border-[#1e3348] p-1.5 flex flex-wrap items-stretch gap-2.5 text-xs relative z-40">
     
     <!-- System & Structure Panel (With inline SCI and EIV stats directly underneath!) -->
     <div class="flex flex-col bg-[#0d1922] p-1.5 rounded-lg border border-[#1e3348] shadow flex-grow max-w-[340px]">
@@ -382,11 +368,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=2.0.6"></script>
-  <script src="js/config.js?v=2.0.6"></script>
-  <script src="js/esi.js?v=2.0.6"></script>
-  <script src="js/tree.js?v=2.0.6"></script>
-  <script src="js/optimizers.js?v=2.0.6"></script>
-  <script src="js/app.js?v=2.0.6"></script>
+  <script src="eve_db.js?v=3.0.0"></script>
+  <script src="js/config.js?v=3.0.0"></script>
+  <script src="js/esi.js?v=3.0.0"></script>
+  <script src="js/tree.js?v=3.0.0"></script>
+  <script src="js/optimizers.js?v=3.0.0"></script>
+  <script src="js/app.js?v=3.0.0"></script>
 </body>
 </html>
