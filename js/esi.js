@@ -29,12 +29,13 @@ function isShipLocationFlag(flag) {
          f.includes('autofit');
 }
 
-// Helper to check if a type ID corresponds to a known container type
-function isKnownContainerType(typeId, typeName) {
-  if (!typeName) typeName = getItemTypeName(typeId);
+// Strict check: Returns true ONLY if the type is an actual inventory container
+function isActualContainerType(typeId) {
+  const typeName = getItemTypeName(typeId);
   if (!typeName) return false;
   const t = typeName.toLowerCase();
 
+  // Explicit keywords covering all EVE Online container classes
   return t.includes('container') || 
          t.includes('canister') || 
          t.includes('vault') || 
@@ -49,40 +50,6 @@ function isKnownContainerType(typeId, typeName) {
          t.includes('silo') ||
          t.includes('storage') ||
          t.includes('depot');
-}
-
-// Comprehensive check for Rookie Ships and all EVE ship hull types
-function isShipType(typeId) {
-  // Explicit Rookie Ship Type IDs
-  const rookieShipIds = new Set([
-    601, 606, 608, 596, 33079, 33081, 33083, 33085, // Rookie ships (Ibis, Reaper, Velator, Impairor, Taipan, etc.)
-    621, 622, 12005, 587, 24698, 644, 642, 643, 12015, 11987, 11989 // Popular ships
-  ]);
-  if (rookieShipIds.has(typeId)) return true;
-
-  const typeName = getItemTypeName(typeId);
-  if (!typeName) return false;
-  const t = typeName.toLowerCase();
-
-  // Known container keywords - if it matches these, it is a container and NOT a ship
-  if (isKnownContainerType(typeId, typeName)) {
-    return false;
-  }
-
-  // Common ship hull / class keywords including rookie ships
-  const shipTerms = [
-    'frigate', 'destroyer', 'cruiser', 'battlecruiser', 'battleship', 'dreadnought',
-    'carrier', 'supercarrier', 'titan', 'corvette', 'industrial', 'freighter',
-    'mining barge', 'exhumer', 'shuttle', 'interdictor', 'covert ops', 'stealth bomber',
-    'logistics', 'assault', 'recon', 'command ship', 'heavy assault', 'blockade runner',
-    'deep space', 'jump freighter', 'tactical destroyer', 'strategic cruiser',
-    'ibis', 'reaper', 'velator', 'impairor', 'taipan', 'hematite', 'violator', 'echo',
-    'venture', 'procurer', 'retriever', 'covetor', 'orca', 'rorqual', 'bowhead',
-    'heron', 'magnate', 'imicus', 'probe', 'condor', 'slicer', 'executioner', 'tormentor',
-    'punisher', 'kestrel', 'merlin', 'tristan', 'inquisitor', 'navitas', 'bantam', 'ship'
-  ];
-
-  return shipTerms.some(term => t.includes(term));
 }
 
 // Strict ESI Adjusted Price Fetcher (STRICT CCP ADJUSTED_PRICE ONLY)
@@ -378,7 +345,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     });
 
-    // Trace asset hierarchy up to root station/structure and identify ALL actual containers (strictly excluding ships)
+    // Trace asset hierarchy up to root station/structure and identify ACTUAL containers (strictly excluding ships)
     const charContainerIds = [];
     const corpContainerIds = [];
 
@@ -390,13 +357,11 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       while (itemIdToAssetMap[currentLoc] && depth < 10) {
         const parentAsset = itemIdToAssetMap[currentLoc];
         
-        // STRICT SHIP EXCLUSION: Check location flag, ship category, AND container verification
+        // STRICT CONTAINER CHECK: Must be an actual container type AND not in a ship slot
         const isShipSlot = isShipLocationFlag(ast.location_flag) || isShipLocationFlag(parentAsset.location_flag);
-        const isShip = isShipType(parentAsset.type_id);
-        const isContainer = isKnownContainerType(parentAsset.type_id);
+        const isContainer = isActualContainerType(parentAsset.type_id);
 
-        if (!isShipSlot && !isShip && isContainer) {
-          // Parent item is a verified non-ship container holding sub-assets -> IT IS A CONTAINER!
+        if (!isShipSlot && isContainer) {
           if (!containerId) {
             containerId = currentLoc;
             if (ast.owner_type === 'char' && !charContainerIds.includes(containerId)) {
