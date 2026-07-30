@@ -4,21 +4,47 @@
 function getBatchYield(recipe, isReaction) {
   if (!recipe) return 1;
 
-  // 1. Read explicit yield directly from the database record
-  const explicitQty = recipe.productQtyPerRun || recipe.mfgQtyPerRun || recipe.reactionQtyPerRun || recipe.outputQty || recipe.portionSize || recipe.quantity || recipe.products?.[0]?.quantity;
-  if (explicitQty && parseInt(explicitQty) > 0) {
-    return parseInt(explicitQty);
+  if (typeof window.extractRecipeYield === 'function') {
+    const explicit = window.extractRecipeYield(recipe);
+    if (explicit > 1) return explicit;
   }
 
-  // 2. Fallback check on item names for known SDE batch yield standards
+  // 1. Read explicit yield directly from all possible database record properties
+  const candidates = [
+    recipe.productQtyPerRun,
+    recipe.mfgQtyPerRun,
+    recipe.reactionQtyPerRun,
+    recipe.outputQty,
+    recipe.portionSize,
+    recipe.quantity,
+    recipe.qty,
+    recipe.productQty,
+    recipe.pQty,
+    recipe.yield,
+    recipe.batchYield,
+    recipe.amount,
+    recipe.qtyPerRun,
+    recipe.products?.[0]?.quantity,
+    recipe.products?.[0]?.qty,
+    recipe.activityProducts?.[1]?.[0]?.quantity,
+    recipe.activityProducts?.[11]?.[0]?.quantity,
+    recipe.activityProducts?.['1']?.[0]?.quantity,
+    recipe.activityProducts?.['11']?.[0]?.quantity
+  ];
+
+  for (const c of candidates) {
+    const parsed = parseInt(c);
+    if (!isNaN(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  // 2. Fallback check on item names / IDs for known SDE batch yield standards
   const name = ((recipe.productName || '') + ' ' + (recipe.blueprintTypeName || '')).toLowerCase();
   const typeId = recipe.productTypeID || recipe.typeID;
 
-  // All Carbide Reactions (Tungsten Carbide, Titanium Carbide, Fernite Carbide, Crystalline Carbonide) = 10,000
   if (typeId === 16681 || typeId === 16680 || typeId === 16679 || name.includes('carbide')) {
-    if (isReaction || name.includes('reaction') || name.includes('formula') || name.includes('carbide')) {
-      return 10000;
-    }
+    return 10000;
   }
 
   if (name.includes('fuel block')) return 40;
@@ -67,75 +93,7 @@ async function fetchBlueprintData(typeId) {
     return recipe;
   }
 
-  // SHORT-CIRCUIT: If prepacked local DB is loaded, any item not in recipeMap is a raw base material!
-  if ((window.EVE_RECIPES && Object.keys(window.EVE_RECIPES).length > 20) || (window.EVE_ITEMS && Object.keys(window.EVE_ITEMS).length > 50)) {
-    blueprintCache[typeId] = null;
-    return null;
-  }
-
-  const tryTypeIds = [typeId];
-  const popMatch = POPULAR_ITEMS ? POPULAR_ITEMS.find(p => p.id === typeId || p.bpId === typeId) : null;
-  if (popMatch && popMatch.bpId && !tryTypeIds.includes(popMatch.bpId)) {
-    tryTypeIds.unshift(popMatch.bpId);
-  }
-
-  for (const targetId of tryTypeIds) {
-    const fuzzworkUrl = `https://www.fuzzwork.co.uk/blueprint/api/blueprint.php?typeid=${targetId}`;
-    const tryUrls = [
-      fuzzworkUrl,
-      `https://corsproxy.io/?${encodeURIComponent(fuzzworkUrl)}`
-    ];
-
-    for (const url of tryUrls) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
-
-        const res = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.activityMaterials && typeof data.activityMaterials === 'object') {
-            const mfgMat = data.activityMaterials['1'] ? data.activityMaterials['1'].map(m => ({
-              typeId: parseInt(m.typeid),
-              name: m.name,
-              baseQty: parseInt(m.quantity)
-            })) : null;
-
-            const reactionMat = data.activityMaterials['11'] ? data.activityMaterials['11'].map(m => ({
-              typeId: parseInt(m.typeid),
-              name: m.name,
-              baseQty: parseInt(m.quantity)
-            })) : null;
-
-            if (mfgMat || reactionMat) {
-              const parsed = {
-                blueprintTypeID: data.blueprintTypeID,
-                blueprintTypeName: data.blueprintTypeName || '',
-                productTypeID: parseInt(data.productTypeID) || typeId,
-                productName: data.productTypeName || '',
-                activityProducts: data.activityProducts || null,
-                productQtyPerRun: parseInt(data.productQtyPerRun) || 1,
-                mfgQtyPerRun: parseInt(data.productQtyPerRun) || 1,
-                time: data.time || 0,
-                mfgMaterials: mfgMat,
-                reactionMaterials: reactionMat
-              };
-
-              blueprintCache[typeId] = parsed;
-              if (parsed.productTypeID) blueprintCache[parsed.productTypeID] = parsed;
-              if (parsed.blueprintTypeID) blueprintCache[parsed.blueprintTypeID] = parsed;
-              return parsed;
-            }
-          }
-        }
-      } catch (e) {
-        // Try next
-      }
-    }
-  }
-
+  // Pure Offline DB Lookup: If item is not in local EVE_RECIPES/recipeMap, it is a raw base material
   blueprintCache[typeId] = null;
   return null;
 }
@@ -174,12 +132,12 @@ async function buildRecursiveRecipeTree(typeId, name, qtyNeeded, currentDepth, m
   try {
     const recipe = await fetchBlueprintData(typeId);
     if (recipe) {
-      node.displayTypeId = recipe.productTypeID || typeId;
+      node.displayTypeId = recipe.productTypeID || recipe.product || recipe.p || typeId;
       node.isManufacturable = true;
       
       const allowReactions = document.getElementById('include-reactions')?.value === 'true';
 
-      let rawMaterials = recipe.mfgMaterials || recipe.materials;
+      let rawMaterials = recipe.mfgMaterials || recipe.materials || recipe.mats || recipe.m;
       let isReaction = false;
 
       if ((!rawMaterials || rawMaterials.length === 0) && allowReactions && recipe.reactionMaterials && recipe.reactionMaterials.length > 0) {
@@ -189,17 +147,17 @@ async function buildRecursiveRecipeTree(typeId, name, qtyNeeded, currentDepth, m
 
       if (rawMaterials && rawMaterials.length > 0) {
         // CONSOLIDATE & DE-DUPLICATE SDE RECIPE MATERIALS:
-        // Keeps unique typeIDs with their true single quantity (e.g. 11), preventing double-counting to 22
+        // Keeps unique typeIDs with their true single quantity
         const activeMaterials = [];
         const matMap = {};
 
         rawMaterials.forEach(m => {
-          const tId = parseInt(m.typeId || m.typeid);
-          const qty = parseInt(m.baseQty || m.quantity || 1);
+          const tId = parseInt(m.typeId || m.typeid || m.id);
+          const qty = parseInt(m.baseQty || m.quantity || m.qty || 1);
           const matName = m.name || (window.TYPE_ID_TO_NAME ? window.TYPE_ID_TO_NAME[tId] : '') || 'Material';
 
           if (matMap[tId]) {
-            matMap[tId].baseQty = Math.max(matMap[tId].baseQty, qty); // Keeps single true quantity (11)
+            matMap[tId].baseQty = Math.max(matMap[tId].baseQty, qty);
           } else {
             matMap[tId] = {
               typeId: tId,
@@ -212,7 +170,7 @@ async function buildRecursiveRecipeTree(typeId, name, qtyNeeded, currentDepth, m
 
         const batchYield = getBatchYield(recipe, isReaction);
 
-        node.recipe = { ...recipe, materials: activeMaterials };
+        node.recipe = { ...recipe, materials: activeMaterials, productQtyPerRun: batchYield, portionSize: batchYield, batchYield: batchYield };
         node.isReaction = isReaction;
         node.batchYield = batchYield;
 
@@ -282,3 +240,4 @@ function scaleTreeQuantities(node, facility) {
     scaleTreeQuantities(child, facility);
   });
 }
+```.

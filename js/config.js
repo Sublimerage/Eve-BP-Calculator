@@ -93,11 +93,43 @@ const POPULAR_SYSTEMS = [
 ];
 window.POPULAR_SYSTEMS = POPULAR_SYSTEMS;
 
+// Structural Helper Function to extract yield from any recipe object format
+function extractRecipeYield(recipe) {
+  if (!recipe) return 1;
+  const candidates = [
+    recipe.productQtyPerRun,
+    recipe.mfgQtyPerRun,
+    recipe.reactionQtyPerRun,
+    recipe.outputQty,
+    recipe.portionSize,
+    recipe.quantity,
+    recipe.qty,
+    recipe.productQty,
+    recipe.pQty,
+    recipe.yield,
+    recipe.batchYield,
+    recipe.amount,
+    recipe.qtyPerRun,
+    recipe.products?.[0]?.quantity,
+    recipe.products?.[0]?.qty,
+    recipe.activityProducts?.[1]?.[0]?.quantity,
+    recipe.activityProducts?.[11]?.[0]?.quantity,
+    recipe.activityProducts?.['1']?.[0]?.quantity,
+    recipe.activityProducts?.['11']?.[0]?.quantity
+  ];
+  for (const c of candidates) {
+    const val = parseInt(c);
+    if (!isNaN(val) && val > 0) return val;
+  }
+  return 1;
+}
+window.extractRecipeYield = extractRecipeYield;
+
 // Corrected Live EVE Client SDE Material Quantities & Verified Type IDs
 const BUILTIN_RECIPES = {
   // Tungsten Carbide Reaction (10,000 Output Yield per 1 Run Batch)
   16681: {
-    blueprintTypeID: 17730, productTypeID: 16681, productName: "Tungsten Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000,
+    blueprintTypeID: 17730, productTypeID: 16681, productName: "Tungsten Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000,
     reactionMaterials: [
       { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
       { typeId: 16672, name: "Rolled Tungsten Alloy", baseQty: 100 },
@@ -105,7 +137,7 @@ const BUILTIN_RECIPES = {
     ]
   },
   17730: {
-    blueprintTypeID: 17730, productTypeID: 16681, productName: "Tungsten Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000,
+    blueprintTypeID: 17730, productTypeID: 16681, productName: "Tungsten Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000,
     reactionMaterials: [
       { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
       { typeId: 16672, name: "Rolled Tungsten Alloy", baseQty: 100 },
@@ -114,7 +146,7 @@ const BUILTIN_RECIPES = {
   },
   // Titanium Carbide Reaction (10,000 Output Yield)
   16680: {
-    blueprintTypeID: 17729, productTypeID: 16680, productName: "Titanium Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000,
+    blueprintTypeID: 17729, productTypeID: 16680, productName: "Titanium Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000,
     reactionMaterials: [
       { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
       { typeId: 16671, name: "Titanium Alloy", baseQty: 100 },
@@ -122,7 +154,7 @@ const BUILTIN_RECIPES = {
     ]
   },
   17729: {
-    blueprintTypeID: 17729, productTypeID: 16680, productName: "Titanium Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000,
+    blueprintTypeID: 17729, productTypeID: 16680, productName: "Titanium Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000,
     reactionMaterials: [
       { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
       { typeId: 16671, name: "Titanium Alloy", baseQty: 100 },
@@ -131,7 +163,7 @@ const BUILTIN_RECIPES = {
   },
   // Crystalline Carbonide Reaction (10,000 Output Yield)
   16679: {
-    blueprintTypeID: 17728, productTypeID: 16679, productName: "Crystalline Carbonide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000,
+    blueprintTypeID: 17728, productTypeID: 16679, productName: "Crystalline Carbonide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000,
     reactionMaterials: [
       { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
       { typeId: 16669, name: "Crystalline 3-M4", baseQty: 100 },
@@ -139,16 +171,23 @@ const BUILTIN_RECIPES = {
     ]
   },
   17728: {
-    blueprintTypeID: 17728, productTypeID: 16679, productName: "Crystalline Carbonide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000,
+    blueprintTypeID: 17728, productTypeID: 16679, productName: "Crystalline Carbonide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000,
     reactionMaterials: [
       { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
       { typeId: 16669, name: "Crystalline 3-M4", baseQty: 100 },
       { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
     ]
   },
+  // Hydrogen Fuel Block (40 Output Yield)
+  4247: {
+    blueprintTypeID: 4248, productTypeID: 4247, productName: "Hydrogen Fuel Block", mfgQtyPerRun: 40, productQtyPerRun: 40, portionSize: 40, qty: 40
+  },
+  4248: {
+    blueprintTypeID: 4248, productTypeID: 4247, productName: "Hydrogen Fuel Block", mfgQtyPerRun: 40, productQtyPerRun: 40, portionSize: 40, qty: 40
+  },
   // Drekavac
   48519: {
-    blueprintTypeID: 49715, productTypeID: 48519, productName: "Drekavac", mfgQtyPerRun: 1, productQtyPerRun: 1,
+    blueprintTypeID: 49715, productTypeID: 48519, productName: "Drekavac", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1,
     mfgMaterials: [
       { typeId: 34, name: "Tritanium", baseQty: 1828712 },
       { typeId: 35, name: "Pyerite", baseQty: 368466 },
@@ -162,7 +201,7 @@ const BUILTIN_RECIPES = {
     ]
   },
   49715: {
-    blueprintTypeID: 49715, productTypeID: 48519, productName: "Drekavac", mfgQtyPerRun: 1, productQtyPerRun: 1,
+    blueprintTypeID: 49715, productTypeID: 48519, productName: "Drekavac", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1,
     mfgMaterials: [
       { typeId: 34, name: "Tritanium", baseQty: 1828712 },
       { typeId: 35, name: "Pyerite", baseQty: 368466 },
@@ -177,7 +216,7 @@ const BUILTIN_RECIPES = {
   },
   // Leshak
   47271: {
-    blueprintTypeID: 47968, productTypeID: 47271, productName: "Leshak", mfgQtyPerRun: 1, productQtyPerRun: 1,
+    blueprintTypeID: 47968, productTypeID: 47271, productName: "Leshak", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1,
     mfgMaterials: [
       { typeId: 34, name: "Tritanium", baseQty: 8800000 },
       { typeId: 35, name: "Pyerite", baseQty: 2930004 },
@@ -191,7 +230,7 @@ const BUILTIN_RECIPES = {
     ]
   },
   47968: {
-    blueprintTypeID: 47968, productTypeID: 47271, productName: "Leshak", mfgQtyPerRun: 1, productQtyPerRun: 1,
+    blueprintTypeID: 47968, productTypeID: 47271, productName: "Leshak", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1,
     mfgMaterials: [
       { typeId: 34, name: "Tritanium", baseQty: 8800000 },
       { typeId: 35, name: "Pyerite", baseQty: 2930004 },
@@ -206,7 +245,7 @@ const BUILTIN_RECIPES = {
   },
   // Auto-Integrity Preservation Seal
   57478: {
-    blueprintTypeID: 57515, productTypeID: 57478, productName: "Auto-Integrity Preservation Seal", mfgQtyPerRun: 3, productQtyPerRun: 3,
+    blueprintTypeID: 57515, productTypeID: 57478, productName: "Auto-Integrity Preservation Seal", mfgQtyPerRun: 3, productQtyPerRun: 3, portionSize: 3, qty: 3,
     mfgMaterials: [
       { typeId: 2312, name: "Supertensile Plastics", baseQty: 4 },
       { typeId: 2463, name: "Nanites", baseQty: 4 },
@@ -214,7 +253,7 @@ const BUILTIN_RECIPES = {
     ]
   },
   57515: {
-    blueprintTypeID: 57515, productTypeID: 57478, productName: "Auto-Integrity Preservation Seal", mfgQtyPerRun: 3, productQtyPerRun: 3,
+    blueprintTypeID: 57515, productTypeID: 57478, productName: "Auto-Integrity Preservation Seal", mfgQtyPerRun: 3, productQtyPerRun: 3, portionSize: 3, qty: 3,
     mfgMaterials: [
       { typeId: 2312, name: "Supertensile Plastics", baseQty: 4 },
       { typeId: 2463, name: "Nanites", baseQty: 4 },
@@ -223,7 +262,7 @@ const BUILTIN_RECIPES = {
   },
   // Life Support Backup Unit
   57486: {
-    blueprintTypeID: 57523, productTypeID: 57486, productName: "Life Support Backup Unit", mfgQtyPerRun: 3, productQtyPerRun: 3,
+    blueprintTypeID: 57523, productTypeID: 57486, productName: "Life Support Backup Unit", mfgQtyPerRun: 3, productQtyPerRun: 3, portionSize: 3, qty: 3,
     mfgMaterials: [
       { typeId: 2319, name: "Test Cultures", baseQty: 8 },
       { typeId: 3775, name: "Viral Agent", baseQty: 8 },
@@ -231,7 +270,7 @@ const BUILTIN_RECIPES = {
     ]
   },
   57523: {
-    blueprintTypeID: 57523, productTypeID: 57486, productName: "Life Support Backup Unit", mfgQtyPerRun: 3, productQtyPerRun: 3,
+    blueprintTypeID: 57523, productTypeID: 57486, productName: "Life Support Backup Unit", mfgQtyPerRun: 3, productQtyPerRun: 3, portionSize: 3, qty: 3,
     mfgMaterials: [
       { typeId: 2319, name: "Test Cultures", baseQty: 8 },
       { typeId: 3775, name: "Viral Agent", baseQty: 8 },
@@ -240,7 +279,7 @@ const BUILTIN_RECIPES = {
   },
   // Core Temperature Regulator
   57479: {
-    blueprintTypeID: 57516, productTypeID: 57479, productName: "Core Temperature Regulator", mfgQtyPerRun: 1, productQtyPerRun: 1,
+    blueprintTypeID: 57516, productTypeID: 57479, productName: "Core Temperature Regulator", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1,
     mfgMaterials: [
       { typeId: 57453, name: "Pressurized Oxidizers", baseQty: 100 },
       { typeId: 2401, name: "Chiral Structures", baseQty: 100 },
@@ -248,7 +287,7 @@ const BUILTIN_RECIPES = {
     ]
   },
   57516: {
-    blueprintTypeID: 57516, productTypeID: 57479, productName: "Core Temperature Regulator", mfgQtyPerRun: 1, productQtyPerRun: 1,
+    blueprintTypeID: 57516, productTypeID: 57479, productName: "Core Temperature Regulator", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1,
     mfgMaterials: [
       { typeId: 57453, name: "Pressurized Oxidizers", baseQty: 100 },
       { typeId: 2401, name: "Chiral Structures", baseQty: 100 },
@@ -257,7 +296,7 @@ const BUILTIN_RECIPES = {
   },
   // Caracal
   621: {
-    blueprintTypeID: 622, productTypeID: 621, productName: "Caracal", mfgQtyPerRun: 1, productQtyPerRun: 1,
+    blueprintTypeID: 622, productTypeID: 621, productName: "Caracal", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1,
     mfgMaterials: [
       { typeId: 34, name: "Tritanium", baseQty: 540000 },
       { typeId: 35, name: "Pyerite", baseQty: 180000 },
@@ -308,15 +347,33 @@ window.buildPrepackedIndexes = function() {
   if (recipesObj && typeof recipesObj === 'object') {
     for (const [idStr, recipe] of Object.entries(recipesObj)) {
       const keyId = parseInt(idStr);
+      
+      // STRUCTURAL YIELD NORMALIZATION:
+      // Extract yield across all property formats in EVE_RECIPES DB
+      const extractedYield = extractRecipeYield(recipe);
+      recipe.productQtyPerRun = extractedYield;
+      recipe.mfgQtyPerRun = extractedYield;
+      recipe.portionSize = extractedYield;
+      recipe.batchYield = extractedYield;
+
       window.recipeMap[keyId] = recipe;
       if (recipe.blueprintTypeID) window.recipeMap[recipe.blueprintTypeID] = recipe;
       if (recipe.productTypeID) window.recipeMap[recipe.productTypeID] = recipe;
+      if (recipe.bp) window.recipeMap[recipe.bp] = recipe;
+      if (recipe.product) window.recipeMap[recipe.product] = recipe;
+      if (recipe.p) window.recipeMap[recipe.p] = recipe;
     }
   }
 
   // Explicitly override stale recipes with live verified SDE quantities
   for (const [idStr, recipe] of Object.entries(BUILTIN_RECIPES)) {
     const keyId = parseInt(idStr);
+    const extractedYield = extractRecipeYield(recipe);
+    recipe.productQtyPerRun = extractedYield;
+    recipe.mfgQtyPerRun = extractedYield;
+    recipe.portionSize = extractedYield;
+    recipe.batchYield = extractedYield;
+
     window.recipeMap[keyId] = recipe;
     if (recipe.blueprintTypeID) window.recipeMap[recipe.blueprintTypeID] = recipe;
     if (recipe.productTypeID) window.recipeMap[recipe.productTypeID] = recipe;
@@ -325,3 +382,4 @@ window.buildPrepackedIndexes = function() {
   if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
   if (statusText) statusText.textContent = `INDEX READY (${Object.keys(window.IDX).length.toLocaleString()} ITEMS | ${Object.keys(window.recipeMap).length.toLocaleString()} RECIPES)`;
 };
+```.
