@@ -68,6 +68,30 @@ function isContainerAsset(typeId) {
   return isContainer && !isShip;
 }
 
+// Live Asset Refresh Action Triggered from Top Bar Button
+async function refreshLiveAssets() {
+  const charId = localStorage.getItem('esi_char_id');
+  const token = localStorage.getItem('esi_access_token');
+  if (!charId || !token) {
+    startEsiSSOLogin();
+    return;
+  }
+
+  const statusText = document.getElementById('status-text');
+  const statusDot = document.getElementById('status-dot');
+  if (statusText) statusText.textContent = 'REFRESHING LIVE ESI ASSETS...';
+  if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
+
+  // Wipe old location & stock maps for clean re-parse
+  resolvedLocationNames = {};
+  userStockMap = {};
+
+  await fetchUserAndCorpAssets(charId, token);
+
+  if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
+  if (statusText) statusText.textContent = 'ASSETS REFRESHED';
+}
+
 // Strict ESI Adjusted Price Fetcher (STRICT CCP ADJUSTED_PRICE ONLY)
 async function fetchAdjustedPrices() {
   const statusEl = document.getElementById('eiv-status-text');
@@ -393,7 +417,8 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       while (itemIdToAssetMap[currentLoc] && depth < 10) {
         const parentAsset = itemIdToAssetMap[currentLoc];
 
-        // An asset is a container IF AND ONLY IF parentAsset.type_id is a container!
+        // WATERPROOF CONTAINER CHECK:
+        // An asset is a container IF AND ONLY IF parentAsset.type_id is an actual container type!
         if (isContainerAsset(parentAsset.type_id)) {
           if (!containerId) {
             containerId = currentLoc;
