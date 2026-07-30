@@ -1,5 +1,9 @@
 'use strict';
 
+// Initialize root pricing strategy states if not already defined
+if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sell';
+if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
+
 function saveTaxSettings() {
   try {
     const settings = {
@@ -369,14 +373,38 @@ function recalculate() {
   let totalProductionCost = effectiveMaterialCost + totalJobFees;
 
   const outputPrices = priceCache[recipeTreeRoot.typeId] || { sell: 0, buy: 0 };
-  const grossSellRevenue = outputPrices.sell * totalRootOutputQty;
-  const grossBuyRevenue = outputPrices.buy * totalRootOutputQty;
+  
+  // Custom price override
+  const customPrice = window.rootCustomPrice || 0;
+  const unitSellPrice = customPrice > 0 ? customPrice : outputPrices.sell;
+  const unitBuyPrice = customPrice > 0 ? customPrice : outputPrices.buy;
+
+  const grossSellRevenue = unitSellPrice * totalRootOutputQty;
+  const grossBuyRevenue = unitBuyPrice * totalRootOutputQty;
 
   recipeTreeRoot.calculatedCost = totalProductionCost;
   recipeTreeRoot.outputMarketValue = grossSellRevenue;
 
-  const netSellRevenue = grossSellRevenue * (1 - salesTax - brokerFee);
-  const netBuyRevenue = grossBuyRevenue * (1 - salesTax);
+  // Compute final net revenue based on selected selling strategy
+  const selectedStrategy = window.rootSellStrategy || 'market-sell';
+  let netSellRevenue = grossSellRevenue;
+  let netBuyRevenue = grossBuyRevenue;
+
+  if (selectedStrategy === 'market-sell') {
+    netSellRevenue = grossSellRevenue * (1 - salesTax - brokerFee);
+    netBuyRevenue = grossBuyRevenue * (1 - salesTax);
+  } else if (selectedStrategy === 'market-buy') {
+    netSellRevenue = grossSellRevenue * (1 - salesTax - brokerFee);
+    netBuyRevenue = grossBuyRevenue * (1 - salesTax);
+  } else if (selectedStrategy === 'contract') {
+    // 0.5% sales tax (Accounting V) and flat 10k ISK fee
+    const contractTaxRate = 0.005; 
+    const contractBrokerFee = 10000;
+    const baseRevenue = unitSellPrice * totalRootOutputQty;
+    const netContractRevenue = baseRevenue - (baseRevenue * contractTaxRate) - contractBrokerFee;
+    netSellRevenue = netContractRevenue;
+    netBuyRevenue = netContractRevenue;
+  }
 
   // Net Profit formula includes Surplus Re-sale Credit
   const profitSell = netSellRevenue + totalSurplusMaterialValue - totalProductionCost;
@@ -399,19 +427,42 @@ function recalculate() {
   if (summarySurplusEl) summarySurplusEl.textContent = `+${Math.round(totalSurplusMaterialValue).toLocaleString()} ISK`;
 
   const summaryOutSellEl = document.getElementById('summary-output-sell');
-  if (summaryOutSellEl) summaryOutSellEl.textContent = Math.round(netSellRevenue).toLocaleString() + ' ISK';
+  if (summaryOutSellEl) {
+    if (selectedStrategy === 'contract') {
+      summaryOutSellEl.textContent = Math.round(netSellRevenue).toLocaleString() + ' ISK';
+    } else {
+      summaryOutSellEl.textContent = Math.round(netSellRevenue).toLocaleString() + ' ISK';
+    }
+  }
 
   const summaryOutBuyEl = document.getElementById('summary-output-buy');
-  if (summaryOutBuyEl) summaryOutBuyEl.textContent = `Net Instant Buy: ${Math.round(netBuyRevenue).toLocaleString()} ISK`;
+  if (summaryOutBuyEl) {
+    if (selectedStrategy === 'contract') {
+      summaryOutBuyEl.textContent = 'Net Contract: ' + Math.round(netBuyRevenue).toLocaleString() + ' ISK';
+    } else {
+      summaryOutBuyEl.textContent = `Net Instant Buy: ${Math.round(netBuyRevenue).toLocaleString()} ISK`;
+    }
+  }
 
   const pSellEl = document.getElementById('summary-profit-sell');
   if (pSellEl) {
-    pSellEl.textContent = Math.round(profitSell).toLocaleString() + ' ISK';
-    pSellEl.className = `text-lg font-bold mt-0.5 mono ${profitSell >= 0 ? 'text-green-400' : 'text-red-500'}`;
+    const finalProfit = selectedStrategy === 'market-buy' ? profitBuy : profitSell;
+    pSellEl.textContent = Math.round(finalProfit).toLocaleString() + ' ISK';
+    pSellEl.className = `text-lg font-bold mt-0.5 mono ${finalProfit >= 0 ? 'text-green-400' : 'text-red-500'}`;
   }
 
   const roiSellEl = document.getElementById('summary-roi-sell');
-  if (roiSellEl) roiSellEl.textContent = `Net ROI: ${roiSell}% (Inc. Surplus)`;
+  if (roiSellEl) {
+    const finalProfit = selectedStrategy === 'market-buy' ? profitBuy : profitSell;
+    const finalRoi = totalProductionCost > 0 ? ((finalProfit / totalProductionCost) * 100).toFixed(1) : 0;
+    
+    let label = 'Net ROI';
+    if (selectedStrategy === 'contract') label = 'Contract ROI';
+    else if (selectedStrategy === 'market-buy') label = 'Buy Order ROI';
+    else label = 'Sell Order ROI';
+
+    roiSellEl.textContent = `${label}: ${finalRoi}% (Inc. Surplus)`;
+  }
 
   const pBuyEl = document.getElementById('summary-profit-buy');
   if (pBuyEl) {
@@ -421,6 +472,8 @@ function recalculate() {
 
   const roiBuyEl = document.getElementById('summary-roi-buy');
   if (roiBuyEl) roiBuyEl.textContent = `Net ROI: ${roiBuy}% (Inc. Surplus)`;
+
+  const curStrategy = window.rootSellStrategy || 'market-sell';
 
   if (isolatedInstanceId) {
     const isoNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
@@ -521,6 +574,34 @@ function createNodeCard(node) {
 
   const currentBuyStrategy = getNodePriceStrategy(node);
 
+  let sellStrategyUI = '';
+  if (isRoot) {
+    const curStrategy = window.rootSellStrategy || 'market-sell';
+    const curCustomPrice = window.rootCustomPrice || '';
+
+    sellStrategyUI = `
+      <div class="mb-2 p-1.5 bg-[#070b0f] rounded border border-purple-500/40 space-y-1.5" onclick="event.stopPropagation()">
+        <div class="flex justify-between items-center text-[10px] mono">
+          <span class="text-purple-300 font-bold">Sell Channel:</span>
+          <select id="card-sell-strategy" onchange="syncSellStrategy(event)" class="bg-[#0c1318] text-white rounded p-0.5 border border-[#1e3348] text-[10px] outline-none">
+            <option value="market-sell" ${curStrategy === 'market-sell' ? 'selected' : ''}>Market (Sell Orders)</option>
+            <option value="market-buy" ${curStrategy === 'market-buy' ? 'selected' : ''}>Market (Buy Orders)</option>
+            <option value="contract" ${curStrategy === 'contract' ? 'selected' : ''}>Contract (0.5% Tax + 10k)</option>
+          </select>
+        </div>
+        <div class="flex justify-between items-center text-[10px] mono">
+          <span class="text-purple-300 font-bold">Custom Sell Price:</span>
+          <div class="flex items-center space-x-1">
+            <input type="number" id="card-custom-price" value="${curCustomPrice}" placeholder="Auto (Market)"
+              oninput="syncCustomPrice(event)"
+              class="w-24 bg-[#0c1318] border border-[#1e3348] text-center text-green-400 font-bold rounded p-0.5 outline-none text-[10px]">
+            <span class="text-slate-500 text-[9px]">ISK</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   card.className = `diagram-node rounded p-3 shadow-2xl transition-all ${cardStyle}`;
 
   card.innerHTML = `
@@ -556,7 +637,7 @@ function createNodeCard(node) {
           </div>
         </div>
         <div class="text-[11px] text-cyan-400 mono flex items-center justify-between">
-          <span>Req Qty: ${node.qtyNeeded.toLocaleString()}</span>
+          <span>${isRoot ? 'Output Qty:' : 'Req Qty:'} ${node.qtyNeeded.toLocaleString()}</span>
           ${stockQty > 0 ? `<span class="bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-[9px] px-1 rounded font-bold" title="In Stock in Hangar">Stock: ${stockQty.toLocaleString()}</span>` : ''}
         </div>
         ${node.isBuildingSelf && node.batchYield > 1 
@@ -578,6 +659,8 @@ function createNodeCard(node) {
         </div>
       </div>
     ` : ''}
+
+    ${sellStrategyUI}
 
     ${!isRoot && node.isManufacturable ? `
       <div class="mb-2 flex items-center justify-between bg-[#070b0f] p-1 rounded border border-[#1e3348]/60 text-[10px] mono">
@@ -656,9 +739,11 @@ function createNodeCard(node) {
 
       ${isRoot ? `
         <div class="flex justify-between font-bold border-t border-green-500/40 pt-1 mt-1 bg-green-950/30 p-1 rounded">
-          <span class="text-slate-300">Net Profit (Sell Output):</span>
-          <span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">
-            ${Math.round(node.netProfitSell || 0).toLocaleString()} ISK
+          <span class="text-slate-300">
+            ${window.rootSellStrategy === 'contract' ? 'Net Profit (Contract Output):' : window.rootSellStrategy === 'market-buy' ? 'Net Profit (Buy Output):' : 'Net Profit (Sell Output):'}
+          </span>
+          <span class="${(window.rootSellStrategy === 'market-buy' ? node.netProfitBuy : node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">
+            ${Math.round(window.rootSellStrategy === 'market-buy' ? (node.netProfitBuy || 0) : (node.netProfitSell || 0)).toLocaleString()} ISK
           </span>
         </div>
       ` : ''}
@@ -676,6 +761,21 @@ function syncCardRunsToGlobal(e) {
   }
   recalculate();
 }
+
+function syncSellStrategy(e) {
+  window.rootSellStrategy = e.target.value;
+  recalculate();
+}
+
+function syncCustomPrice(e) {
+  const val = parseFloat(e.target.value) || 0;
+  window.rootCustomPrice = val >= 0 ? val : 0;
+  recalculate();
+}
+
+// Bind to window for HTML event accessibility
+window.syncSellStrategy = syncSellStrategy;
+window.syncCustomPrice = syncCustomPrice;
 
 function onNodeClick(e, instanceId) {
   e.stopPropagation();
@@ -833,7 +933,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// Accurate Camera Centering using screen pixel deltas relative to viewport
+// Accurate Camera Centering using absolute content-space coordinates
 function centerOnSelectedNode() {
   let targetId = isolatedInstanceId || selectedInstanceId;
   
@@ -845,26 +945,33 @@ function centerOnSelectedNode() {
 
   const card = document.getElementById(`node-card-${targetId}`);
   const viewport = document.getElementById('viewport');
+  const content = document.getElementById('pan-zoom-content');
 
-  if (!card || !viewport) return;
+  if (!card || !viewport || !content) return;
 
-  // Neutralize any browser scroll inside overflow:hidden viewport
+  // Neutralize any browser-native auto-scroll offsets inside the viewport container
   viewport.scrollTop = 0;
   viewport.scrollLeft = 0;
 
-  const cardRect = card.getBoundingClientRect();
   const viewportRect = viewport.getBoundingClientRect();
+  const contentRect = content.getBoundingClientRect();
+  const cardRect = card.getBoundingClientRect();
 
-  // Screen-space center coordinates
-  const viewportCenterX = viewportRect.left + viewportRect.width / 2;
-  const viewportCenterY = viewportRect.top + viewportRect.height / 2;
+  // 1. Calculate the card's static, unscaled position relative to the content container
+  const cardContentX = (cardRect.left - contentRect.left) / zoomScale;
+  const cardContentY = (cardRect.top - contentRect.top) / zoomScale;
 
-  const cardCenterX = cardRect.left + cardRect.width / 2;
-  const cardCenterY = cardRect.top + cardRect.height / 2;
+  // 2. Calculate the card's unscaled dimensions
+  const cardContentWidth = cardRect.width / zoomScale;
+  const cardContentHeight = cardRect.height / zoomScale;
 
-  // Shift panX and panY by exact screen-space deltas, accounting for zoom scale
-  panX += (viewportCenterX - cardCenterX) / zoomScale;
-  panY += (viewportCenterY - cardCenterY) / zoomScale;
+  // 3. Find the exact center of the card in unscaled content space
+  const cardContentCenterX = cardContentX + cardContentWidth / 2;
+  const cardContentCenterY = cardContentY + cardContentHeight / 2;
+
+  // 4. Calculate the absolute panX and panY required to align the card's center with the viewport's center
+  panX = (viewportRect.width / 2) - cardContentCenterX * zoomScale;
+  panY = (viewportRect.height / 2) - cardContentCenterY * zoomScale;
 
   updateTransform();
   drawConnectingLines();
