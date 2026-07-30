@@ -382,6 +382,10 @@ function recalculate() {
   const profitSell = netSellRevenue + totalSurplusMaterialValue - totalProductionCost;
   const profitBuy = netBuyRevenue + totalSurplusMaterialValue - totalProductionCost;
   
+  // Attach final aligned profit and revenue calculations to root node structure
+  recipeTreeRoot.netProfitSell = profitSell;
+  recipeTreeRoot.netProfitBuy = profitBuy;
+
   const roiSell = totalProductionCost > 0 ? ((profitSell / totalProductionCost) * 100).toFixed(1) : 0;
   const roiBuy = totalProductionCost > 0 ? ((profitBuy / totalProductionCost) * 100).toFixed(1) : 0;
 
@@ -653,8 +657,8 @@ function createNodeCard(node) {
       ${isRoot ? `
         <div class="flex justify-between font-bold border-t border-green-500/40 pt-1 mt-1 bg-green-950/30 p-1 rounded">
           <span class="text-slate-300">Net Profit (Sell Output):</span>
-          <span class="${(recipeTreeRoot.outputMarketValue - node.calculatedCost) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">
-            ${Math.round(recipeTreeRoot.outputMarketValue - node.calculatedCost).toLocaleString()} ISK
+          <span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">
+            ${Math.round(node.netProfitSell || 0).toLocaleString()} ISK
           </span>
         </div>
       ` : ''}
