@@ -18,10 +18,10 @@
       </div>
     </div>
     
-    <div class="flex items-center space-x-2.5 text-xs mono">
+    <div class="flex items-center space-x-3 text-xs mono">
       <!-- ESI SSO Character Status / Login Button -->
       <div id="esi-login-container">
-        <button onclick="startEsiSSOLogin()" class="px-3.5 py-2 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-md transition flex items-center gap-1.5 shadow text-xs" title="Login with EVE Online to import your character assets">
+        <button onclick="startEsiSSOLogin()" class="px-4 py-2 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-md transition flex items-center gap-2 shadow text-xs" title="Login with EVE Online to import your character assets">
           🔐 EVE SSO Login
         </button>
       </div>
@@ -32,14 +32,14 @@
       </button>
 
       <!-- Clipboard Hangar Stock Import Button -->
-      <button onclick="openPasteModal()" class="px-3.5 py-2 bg-[#1e3348] hover:bg-slate-600 text-slate-100 font-bold rounded-md transition text-xs shadow" title="Paste in-game inventory text to import stock">
+      <button onclick="openPasteModal()" class="px-4 py-2 bg-[#1e3348] hover:bg-slate-600 text-slate-100 font-bold rounded-md transition text-xs shadow" title="Paste in-game inventory text to import stock">
         📋 Paste Hangar
       </button>
 
-      <button onclick="centerOnSelectedNode()" class="px-3 py-2 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded-md transition text-xs shadow">
+      <button onclick="centerOnSelectedNode()" class="px-3.5 py-2 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded-md transition text-xs shadow">
         Center [F]
       </button>
-      <button onclick="resetPanZoom()" class="px-3 py-2 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded-md transition text-xs shadow">
+      <button onclick="resetPanZoom()" class="px-3.5 py-2 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded-md transition text-xs shadow">
         Reset View
       </button>
       <div id="status-badge" class="px-3 py-2 bg-[#0d1922] border border-[#1e3348] rounded-md flex items-center gap-2 text-xs shadow">
@@ -363,12 +363,12 @@
     </div>
   </div>
 
-  <!-- Load Split JavaScript Modules in strict order -->
-  <script src="eve_db.js"></script>
-  <script src="js/config.js"></script>
-  <script src="js/esi.js"></script>
-  <script src="js/tree.js"></script>
-  <script src="js/optimizers.js"></script>
-  <script src="js/app.js"></script>
+  <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
+  <script src="eve_db.js?v=1.0.2"></script>
+  <script src="js/config.js?v=1.0.2"></script>
+  <script src="js/esi.js?v=1.0.2"></script>
+  <script src="js/tree.js?v=1.0.2"></script>
+  <script src="js/optimizers.js?v=1.0.2"></script>
+  <script src="js/app.js?v=1.0.2"></script>
 </body>
 </html>
