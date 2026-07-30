@@ -80,7 +80,6 @@ function isShipType(typeId) {
   if (!typeName) return false;
   const t = typeName.toLowerCase();
 
-  // FIXED: Corrected call to isContainerAsset() to prevent ReferenceError
   if (isContainerAsset(typeId)) {
     return false;
   }
@@ -448,7 +447,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
 
       while (itemIdToAssetMap[currentLoc] && depth < 10) {
         const parentAsset = itemIdToAssetMap[currentLoc];
-
+        
         // WATERPROOF CONTAINER CHECK:
         // An asset is a container IF AND ONLY IF parentAsset.type_id is an actual container type!
         if (isContainerAsset(parentAsset.type_id)) {

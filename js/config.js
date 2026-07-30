@@ -315,4 +315,13 @@ window.buildPrepackedIndexes = function() {
   }
 
   // Explicitly override stale recipes with live verified SDE quantities
-  for (con
+  for (const [idStr, recipe] of Object.entries(BUILTIN_RECIPES)) {
+    const keyId = parseInt(idStr);
+    window.recipeMap[keyId] = recipe;
+    if (recipe.blueprintTypeID) window.recipeMap[recipe.blueprintTypeID] = recipe;
+    if (recipe.productTypeID) window.recipeMap[recipe.productTypeID] = recipe;
+  }
+
+  if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
+  if (statusText) statusText.textContent = `INDEX READY (${Object.keys(window.IDX).length.toLocaleString()} ITEMS | ${Object.keys(window.recipeMap).length.toLocaleString()} RECIPES)`;
+};
