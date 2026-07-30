@@ -848,6 +848,10 @@ function centerOnSelectedNode() {
 
   if (!card || !viewport) return;
 
+  // Neutralize any browser scroll inside overflow:hidden viewport
+  viewport.scrollTop = 0;
+  viewport.scrollLeft = 0;
+
   const cardRect = card.getBoundingClientRect();
   const viewportRect = viewport.getBoundingClientRect();
 
@@ -858,9 +862,9 @@ function centerOnSelectedNode() {
   const cardCenterX = cardRect.left + cardRect.width / 2;
   const cardCenterY = cardRect.top + cardRect.height / 2;
 
-  // Shift panX and panY by exact screen-space deltas
-  panX += (viewportCenterX - cardCenterX);
-  panY += (viewportCenterY - cardCenterY);
+  // Shift panX and panY by exact screen-space deltas, accounting for zoom scale
+  panX += (viewportCenterX - cardCenterX) / zoomScale;
+  panY += (viewportCenterY - cardCenterY) / zoomScale;
 
   updateTransform();
   drawConnectingLines();
