@@ -1,21 +1,15 @@
 'use strict';
 
-// Centralized helpers (esc, safeParseJSON, formatDuration) are loaded globally from js/config.js.
-// They MUST NOT be re-declared here with "const" or "let" to prevent duplicate declaration SyntaxErrors.
-
-// Global Ledger Queue State (relying on global userStockMap from config.js)
 let activeJobs = [];
 let buildHistory = [];
 
-// Active BOM Filter States
-let activeOrderFilter = 'all'; // 'all', 'buy', 'sell'
-let activeCategoryFilter = 'all'; // 'all', 'minerals', 'pigas', 'fuel', 'ships', 'others'
+let activeOrderFilter = 'all'; 
+let activeCategoryFilter = 'all'; 
 
-// Load states defensively from shared LocalStorage (avoiding global reference mutations)
 function loadJournalState() {
   try {
     const savedJobs = localStorage.getItem('eve_ledger_jobs');
-    activeJobs = safeParseJSON(savedJobs, []);
+    activeJobs = window.safeParseJSON(savedJobs, []);
     if (!Array.isArray(activeJobs)) activeJobs = [];
   } catch (e) {
     activeJobs = [];
@@ -23,16 +17,15 @@ function loadJournalState() {
 
   try {
     const savedHistory = localStorage.getItem('eve_ledger_history');
-    buildHistory = safeParseJSON(savedHistory, []);
+    buildHistory = window.safeParseJSON(savedHistory, []);
     if (!Array.isArray(buildHistory)) buildHistory = [];
   } catch (e) {
     buildHistory = [];
   }
 
-  // Safely empty and refill rawAssetItems (Array)
   try {
     const rawSaved = localStorage.getItem('eve_raw_assets');
-    const parsedRaw = safeParseJSON(rawSaved, []);
+    const parsedRaw = window.safeParseJSON(rawSaved, []);
     rawAssetItems.length = 0; 
     parsedRaw.forEach(item => {
       if (item) rawAssetItems.push(item);
@@ -41,10 +34,9 @@ function loadJournalState() {
     rawAssetItems.length = 0;
   }
 
-  // Safely empty and refill resolvedLocationNames (Object)
   try {
     const resolvedSaved = localStorage.getItem('eve_resolved_location_names');
-    const parsedResolved = safeParseJSON(resolvedSaved, {});
+    const parsedResolved = window.safeParseJSON(resolvedSaved, {});
     for (const key in resolvedLocationNames) {
       delete resolvedLocationNames[key];
     }
@@ -55,10 +47,9 @@ function loadJournalState() {
     }
   }
 
-  // Safely empty and refill corpDivisionNames (Object)
   try {
     const corpSaved = localStorage.getItem('eve_corp_division_names');
-    const parsedCorp = safeParseJSON(corpSaved, {});
+    const parsedCorp = window.safeParseJSON(corpSaved, {});
     for (const key in corpDivisionNames) {
       delete corpDivisionNames[key];
     }
@@ -69,10 +60,9 @@ function loadJournalState() {
     }
   }
 
-  // Safely empty and refill userStockMap (Object)
   try {
     const savedStocks = localStorage.getItem('eve_user_stock_map');
-    const parsedStocks = safeParseJSON(savedStocks, {});
+    const parsedStocks = window.safeParseJSON(savedStocks, {});
     for (const key in userStockMap) {
       delete userStockMap[key];
     }
@@ -84,37 +74,26 @@ function loadJournalState() {
   }
 }
 
-// Structural helper to classify material categories
 function getItemCategory(typeId, name) {
   if (!name) return 'others';
   const n = name.toLowerCase();
-
-  // Minerals Group
   const mineralIds = new Set([34, 35, 36, 37, 38, 39, 40, 11399]);
   if (mineralIds.has(typeId) || n.includes('tritanium') || n.includes('pyerite') || n.includes('mexallon') || n.includes('isogen') || n.includes('nocxium') || n.includes('zydrine') || n.includes('megacyte') || n.includes('morphite')) {
     return 'minerals';
   }
-
-  // Fuel Blocks Group
   if (n.includes('fuel block')) {
     return 'fuel';
   }
-
-  // PI & Industrial Gases Group
   if (n.includes('gas') || n.includes('isotope') || n.includes('water') || n.includes('ozone') || 
       n.includes('plastics') || n.includes('chiral') || n.includes('cultures') || n.includes('viral') || n.includes('fiber') || n.includes('nanites')) {
     return 'pigas';
   }
-
-  // Ships Group
-  if (typeof isShipType === 'function' && isShipType(typeId)) {
+  if (typeof window.isShipType === 'function' && window.isShipType(typeId)) {
     return 'ships';
   }
-
   return 'others';
 }
 
-// Render overall ledger KPIs, consolidated BOM lists, and history ledger rows
 function renderJournalPage() {
   loadJournalState();
 
@@ -123,7 +102,6 @@ function renderJournalPage() {
   const uniqueMaterialsEl = document.getElementById('journal-unique-materials');
   const materialsCostEl = document.getElementById('journal-materials-cost');
 
-  // 1. Calculate Active Jobs Cost KPI
   let totalActiveCost = 0;
   activeJobs.forEach(job => {
     if (job) totalActiveCost += job.calculatedCost || 0;
@@ -132,17 +110,13 @@ function renderJournalPage() {
   if (activeJobsCountEl) activeJobsCountEl.textContent = activeJobs.length.toLocaleString();
   if (totalCostEl) totalCostEl.textContent = Math.round(totalActiveCost).toLocaleString() + ' ISK';
 
-  // 2. Compile Consolidated BOM across ALL active jobs (respecting strategy & category filters)
   const consolidatedBOM = {};
   activeJobs.forEach(job => {
     if (job && Array.isArray(job.materials)) {
       job.materials.forEach(mat => {
         if (!mat || !mat.typeId) return;
-
-        // Apply Order strategy filters dynamically on consolidation
         if (activeOrderFilter !== 'all' && mat.strategy !== activeOrderFilter) return;
 
-        // Apply Category filters dynamically on consolidation
         const category = getItemCategory(mat.typeId, mat.name);
         if (activeCategoryFilter !== 'all' && category !== activeCategoryFilter) return;
 
@@ -161,7 +135,6 @@ function renderJournalPage() {
     }
   });
 
-  // 3. Contrast consolidated material totals against active hangar stock map
   const bomItems = Object.values(consolidatedBOM);
   let aggregatedMissingCost = 0;
 
@@ -177,13 +150,11 @@ function renderJournalPage() {
     aggregatedMissingCost += item.lineCost;
   });
 
-  // Sort missing items by descending line cost (most expensive deficits first)
   bomItems.sort((a, b) => b.lineCost - a.lineCost);
 
   if (uniqueMaterialsEl) uniqueMaterialsEl.textContent = bomItems.length.toLocaleString() + ' types';
   if (materialsCostEl) materialsCostEl.textContent = Math.round(aggregatedMissingCost).toLocaleString() + ' ISK';
 
-  // Clone stock map for prioritized FIFO allocation across job card loops
   const allocatedStock = { ...userStockMap };
 
   renderActiveJobsList(allocatedStock);
@@ -191,7 +162,6 @@ function renderJournalPage() {
   renderBuildHistoryLedger();
 }
 
-// Render active queued jobs with skills-aware times, priority sorters, and inline Copy BOM
 function renderActiveJobsList(allocatedStock) {
   const container = document.getElementById('active-jobs-list');
   if (!container) return;
@@ -210,10 +180,9 @@ function renderActiveJobsList(allocatedStock) {
 
   container.innerHTML = activeJobs.map(job => {
     if (!job) return '';
-    const iconTypeId = job.productTypeId || job.typeId; // Renders physical manufactured item icon cleanly!
+    const iconTypeId = job.productTypeId || job.typeId;
     const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
 
-    // Priority move buttons layout
     const priorityButtonsHTML = `
       <div class="flex items-center space-x-1 flex-shrink-0" onclick="event.stopPropagation()">
         <button onclick="moveJobUp(${job.id})" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold px-1.5 py-0.5 rounded text-[9px] mono border border-[#1e3348]" title="Move up in priority (increases stock allocation preference)">
@@ -225,14 +194,11 @@ function renderActiveJobsList(allocatedStock) {
       </div>
     `;
 
-    // Generate individual BOM breakdown with prioritized FIFO allocation
     const individualBOMHTML = Array.isArray(job.materials) ? job.materials.map(mat => {
       if (!mat) return '';
-      
       const availableInStock = isStockDeductEnabled ? (allocatedStock[mat.typeId] || 0) : 0;
       const consumedQty = Math.min(mat.qtyNeeded, availableInStock);
 
-      // Subtract consumed parts iteratively from our prioritized in-memory stock clone
       if (isStockDeductEnabled && allocatedStock[mat.typeId] !== undefined) {
         allocatedStock[mat.typeId] = Math.max(0, allocatedStock[mat.typeId] - consumedQty);
       }
@@ -242,26 +208,21 @@ function renderActiveJobsList(allocatedStock) {
 
       return `
         <div class="flex justify-between items-center text-[10px] mono py-0.5 border-b border-[#1e3348]/20 ${isAcquired ? 'text-green-400' : 'text-slate-400'}">
-          <span class="truncate pr-4">${esc(mat.name)}</span>
+          <span class="truncate pr-4">${window.esc(mat.name)}</span>
           <span class="flex-shrink-0">${isAcquired ? `✔ ${mat.qtyNeeded}` : `x${mat.qtyNeeded} (Deficit: ${netMissing})`}</span>
         </div>
       `;
     }).join('') : '<div class="text-[10px] text-slate-500 italic py-1">No materials logged for this build.</div>';
 
-    // Skill and facility-adjusted Build Duration calculation per card
     let buildTimeUI = '';
     const baseTime = job.baseTime || 0;
     if (baseTime > 0) {
-      // Standard default TE factor fallback (T1 BPCs are typically TE 0, researched TE 10 is 20% reduction)
       const teFactor = 1.0; 
-      
-      // EVE Skill multipliers: Industry (4% per level) and Adv Industry (3% per level)
-      const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
+      const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
       const indFactor = 1 - (0.04 * (skills.industry || 0));
       const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
       const skillTimeFactor = indFactor * advIndFactor;
 
-      // Official Upwell Engineering Complex Time Reduction:
       const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
       let facilityFactor = 1.0;
       let structureName = 'NPC Station';
@@ -271,14 +232,12 @@ function renderActiveJobsList(allocatedStock) {
       else if (activeFacilityKey === 'raitaru') { facilityFactor = 0.85; structureName = 'Raitaru'; structureTEBonus = '15%'; }
 
       const totalSeconds = baseTime * teFactor * skillTimeFactor * facilityFactor * job.runsNeeded;
-      
-      // Provide dynamic browser tooltips on hovering to clearly show skill allocations on the Ledger
-      const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)\n• Base SDE Time: ${formatDuration(baseTime)}`;
+      const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)\n• Base SDE Time: ${window.formatDuration(baseTime)}`;
 
       buildTimeUI = `
-        <div class="flex justify-between text-[10px] text-slate-400 mono cursor-help" title="${esc(hoverTitle)}">
+        <div class="flex justify-between text-[10px] text-slate-400 mono cursor-help" title="${window.esc(hoverTitle)}">
           <span>Est. Build Time:</span>
-          <span class="text-slate-300 font-semibold">${formatDuration(totalSeconds)}</span>
+          <span class="text-slate-300 font-semibold">${window.formatDuration(totalSeconds)}</span>
         </div>
       `;
     }
@@ -289,11 +248,10 @@ function renderActiveJobsList(allocatedStock) {
           <div class="flex items-start space-x-3 min-w-0 flex-1">
             <img src="https://images.evetech.net/types/${iconTypeId}/icon?size=64" class="w-12 h-12 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
-              <h3 class="font-bold text-sm text-white truncate">${esc(job.name)}</h3>
+              <h3 class="font-bold text-sm text-white truncate">${window.esc(job.name)}</h3>
               <div class="text-[10px] mono text-slate-400 mt-0.5">Added on: ${formattedDate}</div>
             </div>
           </div>
-          <!-- Priority Sorters -->
           ${priorityButtonsHTML}
         </div>
 
@@ -301,7 +259,6 @@ function renderActiveJobsList(allocatedStock) {
           ${job.runsNeeded.toLocaleString()} Run${job.runsNeeded > 1 ? 's' : ''} @ ${job.qtyNeeded.toLocaleString()} total units
         </div>
 
-        <!-- Individual Material BOM breakdown area with Priority allocation -->
         <div class="p-2 bg-[#070b0f] rounded border border-[#1e3348]/40">
           <div class="flex justify-between items-center mb-1.5 pb-1 border-b border-[#1e3348]/40">
             <span class="text-[10px] text-cyan-400 font-bold uppercase tracking-wider rajdhani">Job Materials (BOM)</span>
@@ -334,21 +291,17 @@ function renderActiveJobsList(allocatedStock) {
   }).join('');
 }
 
-// Copy single card deficit components to clipboard in EVE Online Multibuy format
 function copyIndividualJobMultibuy(e, jobId) {
   if (e) e.stopPropagation();
-  
   const job = activeJobs.find(j => j && j.id === jobId);
   if (!job || !Array.isArray(job.materials)) return;
 
   const deductModeInput = document.getElementById('deduct-stock-mode');
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
 
-  // We re-evaluate priority allocations dynamically on copy click
   const allocatedStock = { ...userStockMap };
   const targetIndex = activeJobs.findIndex(j => j && j.id === jobId);
   
-  // Deduct previous jobs first to match FIFO priority bounds
   for (let i = 0; i < targetIndex; i++) {
     const prevJob = activeJobs[i];
     if (prevJob && Array.isArray(prevJob.materials)) {
@@ -391,7 +344,6 @@ function copyIndividualJobMultibuy(e, jobId) {
   });
 }
 
-// Render Consolidated BOM Sidebar
 function renderConsolidatedBOMList(bomItems, totalMissingISK) {
   const container = document.getElementById('journal-bom-items');
   const bomTypesEl = document.getElementById('journal-bom-types');
@@ -418,7 +370,6 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
       ? `<span class="bg-green-950 text-green-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">Acquired</span>` 
       : `<span class="bg-amber-950 text-amber-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">Missing</span>`;
 
-    // Dynamic Buy/Sell strategy badge
     const strategyBadge = item.strategy === 'sell' 
       ? `<span class="bg-amber-900/60 text-amber-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">SELL</span>` 
       : `<span class="bg-cyan-900/60 text-cyan-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">BUY</span>`;
@@ -429,7 +380,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
           <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-7 h-7 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           <div class="min-w-0 flex-1">
             <div class="font-semibold text-slate-200 truncate flex items-center">
-              <span class="truncate">${esc(item.name)}</span>
+              <span class="truncate">${window.esc(item.name)}</span>
               ${statusBadge}
               ${strategyBadge}
             </div>
@@ -446,14 +397,12 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
     `;
   }).join('');
 
-  // Cache missing list as text for EVE Multibuy copy/paste
   window.journalMultibuyText = bomItems
     .filter(i => i.netMissingQty > 0)
     .map(i => `${i.name} x${i.netMissingQty}`)
     .join('\n');
 }
 
-// Copy Consolidated Missing items to clipboard
 function copyJournalMultibuy() {
   if (!window.journalMultibuyText) return;
   
@@ -471,16 +420,12 @@ function copyJournalMultibuy() {
   });
 }
 
-// Mark queued job as "built": Logs to History without deducting from active API stock map
 function markJobAsBuilt(jobId) {
   loadJournalState();
-
   const jobIndex = activeJobs.findIndex(j => j && j.id === jobId);
   if (jobIndex === -1) return;
-
   const job = activeJobs[jobIndex];
 
-  // 1. Ledger Logging: Archive job records into completed build history array
   const record = {
     id: job.id,
     typeId: job.typeId,
@@ -488,31 +433,27 @@ function markJobAsBuilt(jobId) {
     runsNeeded: job.runsNeeded,
     qtyNeeded: job.qtyNeeded,
     calculatedCost: job.calculatedCost,
-    materials: job.materials, // Saved BOM
+    materials: job.materials, 
     completedAt: new Date().toISOString()
   };
 
-  buildHistory.unshift(record); // Insert completed job as first record
+  buildHistory.unshift(record);
   localStorage.setItem('eve_ledger_history', JSON.stringify(buildHistory));
 
-  // 2. Remove job from the active manufacturing queue
   activeJobs.splice(jobIndex, 1);
   localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
 
   renderJournalPage();
 }
 
-// Re-queue completed job back into active queue
 function requeueCompletedJob(recordId) {
   loadJournalState();
-
   const recordIndex = buildHistory.findIndex(r => r && r.id === recordId);
   if (recordIndex === -1) return;
-
   const record = buildHistory[recordIndex];
 
   const job = {
-    id: Date.now() + Math.floor(Math.random() * 1000), // Watertight unique ID
+    id: Date.now() + Math.floor(Math.random() * 1000), 
     typeId: record.typeId,
     name: record.name,
     runsNeeded: record.runsNeeded,
@@ -528,10 +469,8 @@ function requeueCompletedJob(recordId) {
   renderJournalPage();
 }
 
-// Delete queued job from active queue (no history or stock deduction)
 function deleteJobFromQueue(jobId) {
   loadJournalState();
-
   const index = activeJobs.findIndex(j => j && j.id === jobId);
   if (index !== -1) {
     activeJobs.splice(index, 1);
@@ -540,7 +479,6 @@ function deleteJobFromQueue(jobId) {
   }
 }
 
-// Render Completed build history table
 function renderBuildHistoryLedger() {
   const container = document.getElementById('journal-history-rows');
   if (!container) return;
@@ -562,7 +500,7 @@ function renderBuildHistoryLedger() {
     return `
       <tr class="hover:bg-[#0c1318]/50 text-slate-300 border-b border-[#1e3348]/20">
         <td class="p-1.5 py-2">${formattedDate}</td>
-        <td class="p-1.5 py-2 font-bold text-white">${esc(record.name)}</td>
+        <td class="p-1.5 py-2 font-bold text-white">${window.esc(record.name)}</td>
         <td class="p-1.5 py-2 text-right">${record.runsNeeded.toLocaleString()}</td>
         <td class="p-1.5 py-2 text-right text-purple-300 font-bold">${record.qtyNeeded.toLocaleString()}</td>
         <td class="p-1.5 py-2 text-right text-cyan-400 font-bold">${Math.round(record.calculatedCost || 0).toLocaleString()} ISK</td>
@@ -579,13 +517,11 @@ function renderBuildHistoryLedger() {
   }).join('');
 }
 
-// Clear finished build logs
 function clearJournalHistory() {
   localStorage.removeItem('eve_ledger_history');
   renderJournalPage();
 }
 
-// --- Priority Move Actions ---
 function moveJobUp(jobId) {
   loadJournalState();
   const index = activeJobs.findIndex(j => j && j.id === jobId);
@@ -593,13 +529,11 @@ function moveJobUp(jobId) {
     const temp = activeJobs[index];
     activeJobs[index] = activeJobs[index - 1];
     activeJobs[index - 1] = temp;
-
     localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
     renderJournalPage();
   }
 }
 
-// --- Priority Move Actions ---
 function moveJobDown(jobId) {
   loadJournalState();
   const index = activeJobs.findIndex(j => j && j.id === jobId);
@@ -607,17 +541,14 @@ function moveJobDown(jobId) {
     const temp = activeJobs[index];
     activeJobs[index] = activeJobs[index + 1];
     activeJobs[index + 1] = temp;
-
     localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
     renderJournalPage();
   }
 }
 
-// --- Live stock location / Container filter panel ---
 function populateJournalLocationDropdown() {
   const filterSelect = document.getElementById('stock-location-filter');
   if (!filterSelect) return;
-
   const currentValue = filterSelect.value || 'all';
 
   filterSelect.innerHTML = `
@@ -643,22 +574,14 @@ function populateJournalLocationDropdown() {
     const locName = window.resolvedLocationNames[locId] || `Location #${locId}`;
 
     if (!locCounts[locId]) {
-      locCounts[locId] = {
-        name: locName,
-        count: 0,
-        corpDivisions: {},
-        containers: {}
-      };
+      locCounts[locId] = { name: locName, count: 0, corpDivisions: {}, containers: {} };
     }
     locCounts[locId].count += item.quantity;
 
     if (item.owner_type === 'corp' && item.location_flag && item.location_flag.startsWith('Corp')) {
       const sagFlag = item.location_flag;
       if (!locCounts[locId].corpDivisions[sagFlag]) {
-        locCounts[locId].corpDivisions[sagFlag] = {
-          name: sagNameMap[sagFlag] || sagFlag,
-          count: 0
-        };
+        locCounts[locId].corpDivisions[sagFlag] = { name: sagNameMap[sagFlag] || sagFlag, count: 0 };
       }
       locCounts[locId].corpDivisions[sagFlag].count += item.quantity;
     }
@@ -667,10 +590,7 @@ function populateJournalLocationDropdown() {
       const cId = item.container_id;
       const cName = window.resolvedLocationNames[cId] || `Container #${cId}`;
       if (!locCounts[locId].containers[cId]) {
-        locCounts[locId].containers[cId] = {
-          name: cName,
-          count: 0
-        };
+        locCounts[locId].containers[cId] = { name: cName, count: 0 };
       }
       locCounts[locId].containers[cId].count += item.quantity;
     }
@@ -679,10 +599,8 @@ function populateJournalLocationDropdown() {
   for (const [locId, data] of Object.entries(locCounts)) {
     const mainOpt = document.createElement('option');
     mainOpt.value = `loc_${locId}`;
-    
     const numericLocId = parseInt(locId);
     const isUpwellStructure = numericLocId > 1000000000000;
-
     if (isUpwellStructure) {
       mainOpt.style.color = '#f97316';
       mainOpt.style.backgroundColor = '#0c1318';
@@ -694,7 +612,6 @@ function populateJournalLocationDropdown() {
       mainOpt.style.fontWeight = 'bold';
       mainOpt.textContent = `🟩 ${data.name} (${data.count.toLocaleString()} items)`;
     }
-
     filterSelect.appendChild(mainOpt);
 
     for (const [sagFlag, sagData] of Object.entries(data.corpDivisions)) {
@@ -703,7 +620,7 @@ function populateJournalLocationDropdown() {
       sagOpt.style.color = '#c084fc';
       sagOpt.style.backgroundColor = '#070b0f';
       sagOpt.style.fontWeight = 'bold';
-      sagOpt.textContent = `  └─ 🟪 Corp Hangar: ${sagData.name} (${sagData.count.toLocaleString()} items)`;
+      sagOpt.textContent = `  └─ 🟪 Corp: ${sagData.name} (${sagData.count.toLocaleString()} items)`;
       filterSelect.appendChild(sagOpt);
     }
 
@@ -724,7 +641,7 @@ function populateJournalLocationDropdown() {
   }
 }
 
-function filterLocationDropdownOptions() {
+function filterJournalLocationOptions() {
   const query = (document.getElementById('location-filter-search')?.value || '').trim().toUpperCase();
   const filterSelect = document.getElementById('stock-location-filter');
   const feedbackBadge = document.getElementById('location-search-feedback');
@@ -732,7 +649,6 @@ function filterLocationDropdownOptions() {
 
   const options = filterSelect.querySelectorAll('option');
   let visibleCount = 0;
-
   options.forEach(opt => {
     if (opt.value === 'all' || opt.value === 'industry_system') {
       opt.style.display = '';
@@ -748,7 +664,7 @@ function filterLocationDropdownOptions() {
 
   if (feedbackBadge) {
     if (query) {
-      feedbackBadge.textContent = `Found: ${visibleCount} location(s) / container(s)`;
+      feedbackBadge.textContent = `Found: ${visibleCount}`;
       feedbackBadge.classList.remove('hidden');
     } else {
       feedbackBadge.textContent = '';
@@ -766,12 +682,10 @@ function updateJournalStockCountBadge() {
 
 function applyJournalStockFilter() {
   const filterVal = document.getElementById('stock-location-filter')?.value || 'all';
-
   const useChar = document.getElementById('use-char-assets')?.checked ?? true;
   const useCorp = document.getElementById('use-corp-assets')?.checked ?? true;
 
   window.userStockMap = {};
-
   window.rawAssetItems.forEach(item => {
     if (!item) return;
     if (item.owner_type === 'char' && !useChar) return;
@@ -803,9 +717,7 @@ function applyJournalStockFilter() {
     }
   });
 
-  // Sync to shared memory
   localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap));
-
   updateJournalStockCountBadge();
   renderJournalPage();
 }
@@ -814,7 +726,6 @@ function recalculateJournalStock() {
   applyJournalStockFilter();
 }
 
-// Active BOM Filter actions
 function setBOMOrderFilter(type) {
   activeOrderFilter = type;
   const btnAll = document.getElementById('btn-order-all');
@@ -833,7 +744,7 @@ function setBOMCategoryFilter(cat) {
   renderJournalPage();
 }
 
-// Expose actions globally to windows environment
+// Explicit window bindings
 window.copyJournalMultibuy = copyJournalMultibuy;
 window.copyIndividualJobMultibuy = copyIndividualJobMultibuy;
 window.markJobAsBuilt = markJobAsBuilt;
@@ -848,13 +759,11 @@ window.setBOMCategoryFilter = setBOMCategoryFilter;
 window.moveJobUp = moveJobUp;
 window.moveJobDown = moveJobDown;
 
-// Initialize Ledger page on window load
 window.onload = async () => {
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
 
-  // Load local cached states instantly so the ledger is fully interactive immediately!
   try {
     loadJournalState();
     populateJournalLocationDropdown();
@@ -864,13 +773,11 @@ window.onload = async () => {
     console.error("Ledger state load error:", err);
   }
 
-  // Process SSO authentication and restore asset profiles asynchronously in background
-  if (typeof handleEsiSSOCallback === 'function') {
-    handleEsiSSOCallback().catch(err => console.error("SSO Callback error:", err));
+  if (typeof window.handleEsiSSOCallback === 'function') {
+    window.handleEsiSSOCallback().catch(err => console.error("SSO Callback error:", err));
   }
 
-  // Fetch adjusted prices asynchronously in the background
-  if (typeof fetchAdjustedPrices === 'function') {
-    fetchAdjustedPrices().catch(err => console.error("Adjusted prices fetch error:", err));
+  if (typeof window.fetchAdjustedPrices === 'function') {
+    window.fetchAdjustedPrices().catch(err => console.error("Adjusted prices fetch error:", err));
   }
 };

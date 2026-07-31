@@ -4,7 +4,7 @@ if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sel
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
 if (window.globalRuns === undefined) window.globalRuns = 1;
 
-// Strictly queries exact unreduced SDE manufacturing durations directly from SDE database
+// Queries unreduced SDE manufacturing durations directly from SDE database
 function extractBuildTime(recipe) {
   if (!recipe) return 0;
   return parseInt(recipe.time || recipe.t || recipe.timeSeconds || recipe.duration || recipe.mfgTime || recipe.productionTime || 0);
@@ -142,6 +142,20 @@ async function fetchEsiSearchResults(query) {
   } catch (err) { return []; }
 }
 
+async function resolveProductIdFromBlueprintNameAsync(blueprintName) {
+  const local = window.resolveProductIdFromBlueprintName(blueprintName);
+  if (local) return local;
+  try {
+    let pName = blueprintName.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
+    const hits = await fetchEsiSearchResults(pName);
+    if (hits && hits.length > 0) {
+      const match = hits.find(h => h.name.toLowerCase() === pName.toLowerCase());
+      if (match) return match.id;
+    }
+  } catch (e) {}
+  return null;
+}
+
 const searchInput = document.getElementById('item-search');
 const searchResults = document.getElementById('search-results');
 
@@ -255,6 +269,15 @@ async function selectItem(typeId, name, preserveView = false) {
     window.customMEOverrides = {};
     window.customTEOverrides = {};
   }
+
+  window.recipeTreeRootProductTypeId = null;
+  if (name.includes('Blueprint') || name.includes('Formula') || name.includes('Reaction')) {
+    const resolvedProductTypeId = await window.resolveProductIdFromBlueprintNameAsync(name);
+    if (resolvedProductTypeId) {
+      window.recipeTreeRootProductTypeId = resolvedProductTypeId;
+    }
+  }
+
   const maxDepth = 10;
   window.recipeTreeRoot = await window.buildRecursiveRecipeTree(typeId, name, 1, 0, maxDepth, new Set(), null);
   recalculate();
@@ -356,7 +379,7 @@ function recalculate() {
   let totalSurplusMaterialValue = 0;
 
   Object.values(globalDemand).forEach(item => {
-    // CORRECTION: Exclude the root node's typeId (both blueprint and product IDs) from surplus credit! [1]
+    // Exclude the root node's typeId (both blueprint and product IDs) from surplus credit! [1]
     const rootProductTypeId = window.recipeTreeRoot.productTypeId || window.recipeTreeRoot.typeId;
     if (item.typeId === window.recipeTreeRoot.typeId || item.typeId === rootProductTypeId || item.productTypeId === rootProductTypeId) {
       return;
@@ -542,7 +565,7 @@ function createNodeCard(node) {
   const surplus = totalProduced - node.qtyNeeded;
   
   const iconUrl = node.isManufacturable
-    ? `https://images.evetech.net/blueprints/${node.typeId}/blueprint?size=128`
+    ? `https://images.evetech.net/types/${node.typeId}/bp?size=128`
     : `https://images.evetech.net/types/${node.typeId}/icon?size=128`;
 
   const unitEIV = node.unitEIV || 0;
@@ -719,7 +742,6 @@ function syncCardRunsToGlobal(e) {
   recalculate();
 }
 
-// Sync Custom prices, tax, and strategy to root calculations
 function syncCustomPrice(e) {
   const val = parseFloat(e.target.value) || 0;
   window.rootCustomPrice = val >= 0 ? val : 0;
@@ -823,6 +845,7 @@ function addCurrentJobToLedger(e) {
     id: Date.now() + Math.floor(Math.random() * 1000),
     typeId: window.recipeTreeRoot.typeId,
     name: window.recipeTreeRoot.name,
+    productTypeId: window.recipeTreeRoot.productTypeId,
     runsNeeded: window.recipeTreeRoot.runsNeeded,
     qtyNeeded: window.recipeTreeRoot.qtyNeeded,
     calculatedCost: window.recipeTreeRoot.calculatedCost || 0,
@@ -1103,7 +1126,7 @@ function drawConnectingLines() {
     }
 
     if (isolatedNode.parentInstanceId) {
-      const parentNode = findNodeByInstanceId(window.recipeTreeRoot, isolatedNode.parentInstanceId);
+      const parentNode = findNodeByInstanceId(window.recipeTreeRoot, window.isolatedInstanceId.parentInstanceId);
       if (parentNode) {
         const parentEl = document.getElementById(`node-card-${parentNode.instanceId}`);
         if (parentEl) {
@@ -1402,6 +1425,7 @@ window.highlightNodeByTypeId = highlightNodeByTypeId;
 window.centerOnSelectedNode = centerOnSelectedNode;
 window.resetPanZoom = resetPanZoom;
 window.copyMultibuyText = copyMultibuyText;
+window.resolveProductIdFromBlueprintNameAsync = resolveProductIdFromBlueprintNameAsync;
 
 // Initialize Application
 window.onload = async () => {
