@@ -252,7 +252,7 @@ async function startEsiSSOLogin() {
   const clientId = HARDCODED_CLIENT_ID;
 
   const verifier = generateRandomString(32);
-  sessionStorage.setItem('esi_code_verifier', verifier);
+  localStorage.setItem('esi_code_verifier', verifier); // Replaced sessionStorage with persistent localStorage
 
   const hashed = await sha256(verifier);
   const challenge = base64urlEncode(hashed);
@@ -261,7 +261,7 @@ async function startEsiSSOLogin() {
 
   const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1';
   const state = generateRandomString(16);
-  sessionStorage.setItem('esi_auth_state', state);
+  localStorage.setItem('esi_auth_state', state); // Replaced sessionStorage with persistent localStorage
 
   const authUrl = `https://login.eveonline.com/v2/oauth/authorize/?response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&client_id=${encodeURIComponent(clientId)}&scope=${encodeURIComponent(scope)}&code_challenge=${challenge}&code_challenge_method=S256&state=${state}`;
 
@@ -282,7 +282,7 @@ async function handleEsiSSOCallback() {
     return;
   }
 
-  const verifier = sessionStorage.getItem('esi_code_verifier');
+  const verifier = localStorage.getItem('esi_code_verifier'); // Replaced sessionStorage with persistent localStorage
   const clientId = HARDCODED_CLIENT_ID;
 
   if (!verifier) return;
@@ -312,7 +312,7 @@ async function handleEsiSSOCallback() {
       
       const jwtPayload = decodeJwt(accessToken);
       if (jwtPayload) {
-        const charId = jwtPayload.sub.split(':')[2];
+        const charId = String(jwtPayload.sub.split(':')[2]).trim();
         const charName = jwtPayload.name;
 
         localStorage.setItem('esi_access_token', accessToken);
@@ -337,7 +337,7 @@ function updateEsiUserUI(charName, charId) {
   if (container) {
     container.innerHTML = `
       <div class="flex items-center space-x-2 text-xs mono bg-[#0d1922] px-3 py-1.5 rounded-md border border-cyan-500/50 shadow">
-        <img src="https://images.evetech.net/characters/${charId}/portrait?size=64" class="w-5 h-5 rounded-full border border-cyan-400" onerror="this.onerror=null; this.src='https://images.evetech.net/characters/1/portrait?size=64';">
+        <img src="https://images.evetech.net/characters/${charId}/portrait?size=128" class="w-6 h-6 rounded-full border border-cyan-400" onerror="this.onerror=null; this.src='https://images.evetech.net/characters/1/portrait?size=128';">
         <span class="text-cyan-300 font-bold">${safeName}</span>
         <button onclick="logoutEsiSSO()" class="text-slate-400 hover:text-red-400 font-bold ml-1.5" title="Log out ESI Character">✖</button>
       </div>
@@ -349,6 +349,8 @@ function logoutEsiSSO() {
   localStorage.removeItem('esi_access_token');
   localStorage.removeItem('esi_char_id');
   localStorage.removeItem('esi_char_name');
+  localStorage.removeItem('esi_code_verifier');
+  localStorage.removeItem('esi_auth_state');
   window.rawAssetItems = [];
   window.userStockMap = {};
   window.corpDivisionNames = {};
@@ -842,7 +844,6 @@ function filterLocationDropdownOptions() {
   }
 }
 
-// Global stock badge counter
 function updateStockDisplayCount() {
   const el = document.getElementById('stock-count-display');
   if (!el) return;

@@ -1,5 +1,7 @@
 'use strict';
 
+// Centralized helpers are loaded globally from js/config.js (window.esc, window.safeParseJSON, window.formatDuration)
+
 // Global Ledger Queue State (relying on global userStockMap from config.js)
 let activeJobs = [];
 let buildHistory = [];
@@ -12,7 +14,7 @@ let activeCategoryFilter = 'all'; // 'all', 'minerals', 'pigas', 'fuel', 'ships'
 function loadJournalState() {
   try {
     const savedJobs = localStorage.getItem('eve_ledger_jobs');
-    activeJobs = safeParseJSON(savedJobs, []);
+    activeJobs = window.safeParseJSON(savedJobs, []);
     if (!Array.isArray(activeJobs)) activeJobs = [];
   } catch (e) {
     activeJobs = [];
@@ -20,7 +22,7 @@ function loadJournalState() {
 
   try {
     const savedHistory = localStorage.getItem('eve_ledger_history');
-    buildHistory = safeParseJSON(savedHistory, []);
+    buildHistory = window.safeParseJSON(savedHistory, []);
     if (!Array.isArray(buildHistory)) buildHistory = [];
   } catch (e) {
     buildHistory = [];
@@ -29,7 +31,7 @@ function loadJournalState() {
   // Safely empty and refill rawAssetItems (Array)
   try {
     const rawSaved = localStorage.getItem('eve_raw_assets');
-    const parsedRaw = safeParseJSON(rawSaved, []);
+    const parsedRaw = window.safeParseJSON(rawSaved, []);
     rawAssetItems.length = 0; 
     parsedRaw.forEach(item => {
       if (item) rawAssetItems.push(item);
@@ -41,7 +43,7 @@ function loadJournalState() {
   // Safely empty and refill resolvedLocationNames (Object)
   try {
     const resolvedSaved = localStorage.getItem('eve_resolved_location_names');
-    const parsedResolved = safeParseJSON(resolvedSaved, {});
+    const parsedResolved = window.safeParseJSON(resolvedSaved, {});
     for (const key in resolvedLocationNames) {
       delete resolvedLocationNames[key];
     }
@@ -55,7 +57,7 @@ function loadJournalState() {
   // Safely empty and refill corpDivisionNames (Object)
   try {
     const corpSaved = localStorage.getItem('eve_corp_division_names');
-    const parsedCorp = safeParseJSON(corpSaved, {});
+    const parsedCorp = window.safeParseJSON(corpSaved, {});
     for (const key in corpDivisionNames) {
       delete corpDivisionNames[key];
     }
@@ -69,7 +71,7 @@ function loadJournalState() {
   // Safely empty and refill userStockMap (Object)
   try {
     const savedStocks = localStorage.getItem('eve_user_stock_map');
-    const parsedStocks = safeParseJSON(savedStocks, {});
+    const parsedStocks = window.safeParseJSON(savedStocks, {});
     for (const key in userStockMap) {
       delete userStockMap[key];
     }
@@ -239,13 +241,13 @@ function renderActiveJobsList(allocatedStock) {
 
       return `
         <div class="flex justify-between items-center text-[10px] mono py-0.5 border-b border-[#1e3348]/20 ${isAcquired ? 'text-green-400' : 'text-slate-400'}">
-          <span class="truncate pr-4">${esc(mat.name)}</span>
+          <span class="truncate pr-4">${window.esc(mat.name)}</span>
           <span class="flex-shrink-0">${isAcquired ? `✔ ${mat.qtyNeeded}` : `x${mat.qtyNeeded} (Deficit: ${netMissing})`}</span>
         </div>
       `;
     }).join('') : '<div class="text-[10px] text-slate-500 italic py-1">No materials logged for this build.</div>';
 
-    // Skill and Sotiyo-adjusted Build Duration calculation per card
+    // Skill and facility-adjusted Build Duration calculation per card
     let buildTimeUI = '';
     const baseTime = job.baseTime || 0;
     if (baseTime > 0) {
@@ -253,7 +255,7 @@ function renderActiveJobsList(allocatedStock) {
       const teFactor = 1.0; 
       
       // EVE Skill multipliers: Industry (4% per level) and Adv Industry (3% per level)
-      const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
+      const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
       const indFactor = 1 - (0.04 * (skills.industry || 0));
       const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
       const skillTimeFactor = indFactor * advIndFactor;
@@ -261,15 +263,21 @@ function renderActiveJobsList(allocatedStock) {
       // Official Upwell Engineering Complex Time Reduction:
       const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
       let facilityFactor = 1.0;
-      if (activeFacilityKey === 'sotiyo') facilityFactor = 0.70;      // 30% reduction
-      else if (activeFacilityKey === 'azbel') facilityFactor = 0.80;    // 20% reduction
-      else if (activeFacilityKey === 'raitaru') facilityFactor = 0.85;  // 15% reduction
+      let structureName = 'NPC Station';
+      let structureTEBonus = '0%';
+      if (activeFacilityKey === 'sotiyo') { facilityFactor = 0.70; structureName = 'Sotiyo'; structureTEBonus = '30%'; }
+      else if (activeFacilityKey === 'azbel') { facilityFactor = 0.80; structureName = 'Azbel'; structureTEBonus = '20%'; }
+      else if (activeFacilityKey === 'raitaru') { facilityFactor = 0.85; structureName = 'Raitaru'; structureTEBonus = '15%'; }
 
       const totalSeconds = baseTime * teFactor * skillTimeFactor * facilityFactor * job.runsNeeded;
+      
+      // Provide dynamic browser tooltips on hovering to clearly show skill allocations on the Ledger
+      const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)\n• Base SDE Time: ${window.formatDuration(baseTime)}`;
+
       buildTimeUI = `
-        <div class="flex justify-between text-[10px] text-slate-400 mono">
+        <div class="flex justify-between text-[10px] text-slate-400 mono cursor-help" title="${window.esc(hoverTitle)}">
           <span>Est. Build Time:</span>
-          <span class="text-slate-300 font-semibold">${formatDuration(totalSeconds)}</span>
+          <span class="text-slate-300 font-semibold">${window.formatDuration(totalSeconds)}</span>
         </div>
       `;
     }
@@ -280,7 +288,7 @@ function renderActiveJobsList(allocatedStock) {
           <div class="flex items-start space-x-3 min-w-0 flex-1">
             <img src="https://images.evetech.net/types/${iconTypeId}/icon?size=64" class="w-12 h-12 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
-              <h3 class="font-bold text-sm text-white truncate">${esc(job.name)}</h3>
+              <h3 class="font-bold text-sm text-white truncate">${window.esc(job.name)}</h3>
               <div class="text-[10px] mono text-slate-400 mt-0.5">Added on: ${formattedDate}</div>
             </div>
           </div>
@@ -420,7 +428,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
           <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-7 h-7 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           <div class="min-w-0 flex-1">
             <div class="font-semibold text-slate-200 truncate flex items-center">
-              <span class="truncate">${esc(item.name)}</span>
+              <span class="truncate">${window.esc(item.name)}</span>
               ${statusBadge}
               ${strategyBadge}
             </div>
@@ -553,7 +561,7 @@ function renderBuildHistoryLedger() {
     return `
       <tr class="hover:bg-[#0c1318]/50 text-slate-300 border-b border-[#1e3348]/20">
         <td class="p-1.5 py-2">${formattedDate}</td>
-        <td class="p-1.5 py-2 font-bold text-white">${esc(record.name)}</td>
+        <td class="p-1.5 py-2 font-bold text-white">${window.esc(record.name)}</td>
         <td class="p-1.5 py-2 text-right">${record.runsNeeded.toLocaleString()}</td>
         <td class="p-1.5 py-2 text-right text-purple-300 font-bold">${record.qtyNeeded.toLocaleString()}</td>
         <td class="p-1.5 py-2 text-right text-cyan-400 font-bold">${Math.round(record.calculatedCost || 0).toLocaleString()} ISK</td>
