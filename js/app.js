@@ -32,10 +32,10 @@ function extractBuildTime(recipe, typeId, name) {
 
   // 1. Known stubs by Type ID
   if (tId === 16681 || tId === 16680 || tId === 16679 || tId === 17730 || tId === 17729 || tId === 17728) {
-    return 600; // Reactions
+    return 600; // Reactions (10 minutes)
   }
   if (tId === 4247 || tId === 4248 || tId === 4246) {
-    return 15; // Fuel blocks
+    return 15; // Fuel blocks (15 seconds)
   }
   if (tId === 57478 || tId === 57515 || tId === 57486 || tId === 57523) {
     return 240; // Auto-integrity / Life support
@@ -44,17 +44,18 @@ function extractBuildTime(recipe, typeId, name) {
     return 1200; // Core temp regulator
   }
 
-  // 2. Item categories by name
-  if (n.includes('fuel block')) return 15;
-  if (n.includes('carbide') || n.includes('carbonide') || n.includes('reaction')) return 600;
-  if (n.includes('battleship') || n.includes('leshak') || n.includes('dominix') || n.includes('megacyte')) return 24000;
-  if (n.includes('battlecruiser') || n.includes('drekavac') || n.includes('drake')) return 12000;
-  if (n.includes('cruiser') || n.includes('caracal') || n.includes('ishtar') || n.includes('cerberus') || n.includes('eagle')) return 6000;
-  if (n.includes('destroyer')) return 4000;
-  if (n.includes('frigate') || n.includes('rifter')) return 3000;
+  // 2. Ships by Category
+  if (n.includes('battleship') || n.includes('leshak') || n.includes('dominix') || n.includes('megathron')) return 80000;
+  if (n.includes('battlecruiser') || n.includes('drekavac') || n.includes('drake')) return 40000;
+  if (n.includes('cruiser') || n.includes('caracal') || n.includes('ishtar') || n.includes('cerberus') || n.includes('eagle')) return 24000;
+  if (n.includes('destroyer')) return 12000;
+  if (n.includes('frigate') || n.includes('rifter')) return 6000;
 
-  // Components default fallback
-  return 300; 
+  // 3. Modules by Tech Level
+  if (n.includes(' ii') || n.endsWith(' ii') || n.includes('2')) return 2340; // Tech II Modules / Items (39 minutes)
+
+  // Default T1 Modules/Items
+  return 900; // Tech I Modules (15 minutes)
 }
 
 // Recursively binds memory ME/TE overrides to tree objects before calculating
@@ -63,8 +64,8 @@ function syncTreeOverrides(node) {
   const tId = node.typeId;
 
   // Guard against uninitialized variables on initial loads
-  const meMap = (typeof customMEOverrides !== 'undefined' && customMEOverrides) ? customMEOverrides : {};
-  const teMap = (typeof customTEOverrides !== 'undefined' && customTEOverrides) ? customTEOverrides : {};
+  const meMap = (typeof window.customMEOverrides !== 'undefined' && window.customMEOverrides) ? window.customMEOverrides : {};
+  const teMap = (typeof window.customTEOverrides !== 'undefined' && window.customTEOverrides) ? window.customTEOverrides : {};
 
   node.customME = meMap[tId] !== undefined ? meMap[tId] : 0;
   node.customTE = teMap[tId] !== undefined ? teMap[tId] : 0;
@@ -405,19 +406,13 @@ function saveActiveState() {
 // Load settings defensively on window load
 function loadSavedState() {
   try {
-    buildSelfOverrides = window.safeParseJSON(localStorage.getItem('eve_build_self_overrides'), {});
-    customBuyModes = window.safeParseJSON(localStorage.getItem('eve_custom_buy_modes'), {});
-    customMEOverrides = window.safeParseJSON(localStorage.getItem('eve_custom_me_overrides'), {});
-    customTEOverrides = window.safeParseJSON(localStorage.getItem('eve_custom_te_overrides'), {});
+    window.buildSelfOverrides = window.safeParseJSON(localStorage.getItem('eve_build_self_overrides'), {});
+    window.customBuyModes = window.safeParseJSON(localStorage.getItem('eve_custom_buy_modes'), {});
+    window.customMEOverrides = window.safeParseJSON(localStorage.getItem('eve_custom_me_overrides'), {});
+    window.customTEOverrides = window.safeParseJSON(localStorage.getItem('eve_custom_te_overrides'), {});
     window.globalRuns = parseInt(localStorage.getItem('eve_global_runs')) || 1;
     window.rootSellStrategy = localStorage.getItem('eve_root_sell_strategy') || 'market-sell';
     window.rootCustomPrice = parseFloat(localStorage.getItem('eve_root_custom_price')) || 0;
-    
-    // Sync window objects
-    window.buildSelfOverrides = buildSelfOverrides;
-    window.customBuyModes = customBuyModes;
-    window.customMEOverrides = customMEOverrides;
-    window.customTEOverrides = customTEOverrides;
 
     const savedProduct = window.safeParseJSON(localStorage.getItem('eve_active_product'), null);
     if (savedProduct && savedProduct.id && savedProduct.name) {

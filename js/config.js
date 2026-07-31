@@ -18,9 +18,9 @@ function safeParseJSON(str, fallback) {
 }
 window.safeParseJSON = safeParseJSON;
 
-// Centralized Duration Formatter Helper (Globally shared)
+// Centralized Exact Duration Formatter (Displays precise Days, Hours, Minutes, and Seconds)
 function formatDuration(seconds) {
-  if (!seconds || isNaN(seconds) || seconds <= 0) return 'N/A';
+  if (!seconds || isNaN(seconds) || seconds <= 0) return '0s';
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
@@ -30,7 +30,8 @@ function formatDuration(seconds) {
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0) parts.push(`${hours}h`);
   if (mins > 0) parts.push(`${mins}m`);
-  if (parts.length === 0) parts.push(`${secs}s`);
+  if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
+  
   return parts.join(' ');
 }
 window.formatDuration = formatDuration;
