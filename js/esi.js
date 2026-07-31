@@ -1,5 +1,10 @@
 'use strict';
 
+// Bind globally centralized helpers explicitly to satisfy strict-mode compilation
+const esc = window.esc;
+const safeParseJSON = window.safeParseJSON;
+const formatDuration = window.formatDuration;
+
 // Decodes unpadded Base64URL JWT payloads securely
 function decodeJwt(token) {
   try {
@@ -252,7 +257,7 @@ async function startEsiSSOLogin() {
   const clientId = HARDCODED_CLIENT_ID;
 
   const verifier = generateRandomString(32);
-  localStorage.setItem('esi_code_verifier', verifier); // Replaced sessionStorage with persistent localStorage
+  localStorage.setItem('esi_code_verifier', verifier);
 
   const hashed = await sha256(verifier);
   const challenge = base64urlEncode(hashed);
@@ -261,7 +266,7 @@ async function startEsiSSOLogin() {
 
   const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1';
   const state = generateRandomString(16);
-  localStorage.setItem('esi_auth_state', state); // Replaced sessionStorage with persistent localStorage
+  localStorage.setItem('esi_auth_state', state);
 
   const authUrl = `https://login.eveonline.com/v2/oauth/authorize/?response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&client_id=${encodeURIComponent(clientId)}&scope=${encodeURIComponent(scope)}&code_challenge=${challenge}&code_challenge_method=S256&state=${state}`;
 
@@ -282,8 +287,7 @@ async function handleEsiSSOCallback() {
     return;
   }
 
-  const verifier = localStorage.getItem('esi_code_verifier'); // Replaced sessionStorage with persistent localStorage
-  const clientId = HARDCODED_CLIENT_ID;
+  const verifier = localStorage.getItem('esi_code_verifier');
 
   if (!verifier) return;
 
