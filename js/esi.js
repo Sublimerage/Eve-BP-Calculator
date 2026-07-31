@@ -224,6 +224,17 @@ function calculateNodeEIV(node) {
   }
 }
 
+// Safely generate a folder-normalized absolute redirect URI to prevent SSO mismatch errors
+function getCleanRedirectUri() {
+  let pathname = window.location.pathname;
+  if (pathname.endsWith('.html')) {
+    pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1);
+  } else if (!pathname.endsWith('/')) {
+    pathname += '/';
+  }
+  return window.location.origin + pathname;
+}
+
 // --- EVE ESI SSO LOGIN & ASSETS (PKCE FLOW) ---
 function generateRandomString(length) {
   const array = new Uint8Array(length);
@@ -256,7 +267,7 @@ async function startEsiSSOLogin() {
   const hashed = await sha256(verifier);
   const challenge = base64urlEncode(hashed);
 
-  const redirectUri = window.location.origin + window.location.pathname;
+  const redirectUri = getCleanRedirectUri();
 
   const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1';
   const state = generateRandomString(16);
@@ -289,7 +300,7 @@ async function handleEsiSSOCallback() {
   window.history.replaceState({}, document.title, window.location.pathname);
 
   try {
-    const redirectUri = window.location.origin + window.location.pathname;
+    const redirectUri = getCleanRedirectUri();
 
     const body = new URLSearchParams({
       grant_type: 'authorization_code',

@@ -32,36 +32,54 @@ function formatDuration(seconds) {
   return parts.join(' ');
 }
 
-// Structural helper to extract the base build time/duration of a recipe from all possible SDE properties
-function extractBuildTime(recipe) {
-  if (!recipe) return 0;
-  const candidates = [
-    recipe.time,
-    recipe.timeSeconds,
-    recipe.duration,
-    recipe.productionTime,
-    recipe.mfgTime,
-    recipe.reactionTime,
-    recipe.activityTime,
-    recipe.activityDuration
-  ];
-  for (const c of candidates) {
-    const val = parseInt(c);
-    if (!isNaN(val) && val > 0) return val;
-  }
-  if (recipe.activityProducts && typeof recipe.activityProducts === 'object') {
-    const act1 = recipe.activityProducts['1'] || recipe.activityProducts[1];
-    const act11 = recipe.activityProducts['11'] || recipe.activityProducts[11];
-    if (act1 && act1[0] && act1[0].time) {
-      const val = parseInt(act1[0].time);
-      if (!isNaN(val) && val > 0) return val;
-    }
-    if (act11 && act11[0] && act11[0].time) {
-      const val = parseInt(act11[0].time);
+// Structural helper to extract the base build time of a recipe or resolve intelligent fallbacks
+function extractBuildTime(recipe, typeId, name) {
+  if (recipe) {
+    const candidates = [
+      recipe.time,
+      recipe.timeSeconds,
+      recipe.duration,
+      recipe.productionTime,
+      recipe.mfgTime,
+      recipe.reactionTime,
+      recipe.activityTime,
+      recipe.activityDuration
+    ];
+    for (const c of candidates) {
+      const val = parseInt(c);
       if (!isNaN(val) && val > 0) return val;
     }
   }
-  return 0;
+
+  // Fallback: If SDE lacks time data, resolve intelligent default base manufacturing times
+  const n = String(name || '').toLowerCase();
+  const tId = parseInt(typeId);
+
+  // 1. Known stubs by Type ID
+  if (tId === 16681 || tId === 16680 || tId === 16679 || tId === 17730 || tId === 17729 || tId === 17728) {
+    return 600; // Reactions
+  }
+  if (tId === 4247 || tId === 4248 || tId === 4246) {
+    return 15; // Fuel blocks
+  }
+  if (tId === 57478 || tId === 57515 || tId === 57486 || tId === 57523) {
+    return 240; // Auto-integrity / Life support
+  }
+  if (tId === 57479 || tId === 57516) {
+    return 1200; // Core temp regulator
+  }
+
+  // 2. Item categories by name
+  if (n.includes('fuel block')) return 15;
+  if (n.includes('carbide') || n.includes('carbonide') || n.includes('reaction')) return 600;
+  if (n.includes('battleship') || n.includes('leshak') || n.includes('dominix') || n.includes('megacyte')) return 24000;
+  if (n.includes('battlecruiser') || n.includes('drekavac') || n.includes('drake')) return 12000;
+  if (n.includes('cruiser') || n.includes('caracal') || n.includes('ishtar') || n.includes('cerberus') || n.includes('eagle')) return 6000;
+  if (n.includes('destroyer')) return 4000;
+  if (n.includes('frigate') || n.includes('rifter')) return 3000;
+
+  // Components default fallback
+  return 300; 
 }
 
 function saveTaxSettings() {
@@ -760,7 +778,7 @@ function createNodeCard(node) {
   // Calculate Est. Build Time defensively (Accounting for ESI skills, Sotiyo rigs, custom TE overrides)
   let buildTimeUI = '';
   if (node.isBuildingSelf && node.recipe) {
-    const baseTime = extractBuildTime(node.recipe);
+    const baseTime = extractBuildTime(node.recipe, node.typeId, node.name);
     if (baseTime > 0) {
       const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 0, advIndustry: 0 });
       const indFactor = 1 - (0.04 * (skills.industry || 0));
@@ -1585,7 +1603,7 @@ function addCurrentJobToLedger(e) {
   const outputPrices = priceCache[recipeTreeRoot.typeId] || { sell: 0, buy: 0 };
   let customPrice = window.rootCustomPrice || 0;
   let unitSellPrice = selectedStrategy.startsWith('custom-') ? customPrice : outputPrices.sell;
-  const baseTime = extractBuildTime(recipeTreeRoot.recipe);
+  const baseTime = extractBuildTime(recipeTreeRoot.recipe, recipeTreeRoot.typeId, recipeTreeRoot.name);
 
   const materials = [];
   function extractBOM(node) {
@@ -1707,19 +1725,24 @@ window.onload = async () => {
     window.buildPrepackedIndexes();
   }
 
-  // Handle SSO Callback and asset restoration
+  // Load static local states instantly so the app is interactive immediately!
+  try {
+    loadTaxSettings(); // Load custom taxes from localStorage!
+    loadSavedState(); // Load previous product & overrides persistently from localStorage!
+    updateHeaderLedgerCount(); // Update badge on load!
+  } catch (err) {
+    console.error("State restoration error:", err);
+  }
+
+  // Handle SSO Callback and assets asynchronously in the background
   if (typeof handleEsiSSOCallback === 'function') {
-    await handleEsiSSOCallback();
+    handleEsiSSOCallback().catch(err => console.error("SSO Callback error:", err));
   }
 
-  // Fetch adjusted prices immediately
+  // Fetch adjusted prices asynchronously in the background
   if (typeof fetchAdjustedPrices === 'function') {
-    await fetchAdjustedPrices();
+    fetchAdjustedPrices().catch(err => console.error("Adjusted prices fetch error:", err));
   }
-
-  loadTaxSettings(); // Load custom taxes from localStorage!
-  loadSavedState(); // Load previous product & overrides persistently from localStorage!
-  updateHeaderLedgerCount(); // Update badge on load!
 
   window.addEventListener('resize', drawConnectingLines);
 };
