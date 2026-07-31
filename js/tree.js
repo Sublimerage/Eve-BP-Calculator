@@ -401,6 +401,7 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
 
         const me = isReaction ? 0 : node.customME;
         const facility = document.getElementById('facility-select')?.value || '0.01';
+        const rigMEBonus = document.getElementById('rig-me-bonus')?.value || 0;
 
         const runsNeeded = Math.ceil(qtyNeeded / batchYield);
         node.runsNeeded = runsNeeded;
@@ -416,7 +417,7 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
         if (currentDepth < maxDepth && !isCircular && isBuildingSelf) {
           const childPromises = activeMaterials.map(async mat => {
             try {
-              const childQty = calculateInputQuantity(mat.baseQty, runsNeeded, me, facility, isReaction);
+              const childQty = calculateInputQuantity(mat.baseQty, runsNeeded, me, facility, isReaction, rigMEBonus);
               // findBlueprintTypeIdForProduct relies on the recipe map already being reverse-indexed by
               // product id - which fails for materials whose SDE/Fuzzwork entry never populated a usable
               // productTypeID/product/p field (the same data gap that broke Vargur/Leshak). Fall back to
@@ -470,11 +471,12 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
   return node;
 }
 
-function calculateInputQuantity(baseQty, runs, me, facilityBonus, isReaction = false) {
+function calculateInputQuantity(baseQty, runs, me, facilityBonus, isReaction = false, rigMEBonus = 0) {
   const meFactor = isReaction ? 1.0 : (1 - me / 100);
-  const facFactor = (1 - parseFloat(facilityBonus));
+  const facFactor = (1 - parseFloat(facilityBonus || 0));
+  const rigFactor = 1 - (parseFloat(rigMEBonus) || 0) / 100;
   const minQty = isReaction ? 1 : runs;
-  return Math.max(minQty, Math.ceil(runs * baseQty * meFactor * facFactor));
+  return Math.max(minQty, Math.ceil(runs * baseQty * meFactor * facFactor * rigFactor));
 }
 
 function scaleTreeQuantities(node, facility) {
@@ -486,12 +488,13 @@ function scaleTreeQuantities(node, facility) {
   node.runsNeeded = runsNeeded;
 
   const effectiveME = node.isReaction ? 0 : (node.customME || 0);
+  const rigMEBonus = document.getElementById('rig-me-bonus')?.value || 0;
 
   node.children.forEach(child => {
     const childProductTypeId = child.productTypeId || child.typeId;
     const mat = Array.isArray(node.recipe.materials) ? node.recipe.materials.find(m => m.typeId === childProductTypeId) : null;
     if (mat) {
-      child.qtyNeeded = calculateInputQuantity(mat.baseQty, runsNeeded, effectiveME, facility, node.isReaction);
+      child.qtyNeeded = calculateInputQuantity(mat.baseQty, runsNeeded, effectiveME, facility, node.isReaction, rigMEBonus);
     }
     scaleTreeQuantities(child, facility);
   });

@@ -218,7 +218,7 @@ function renderActiveJobsList(allocatedStock) {
     let totalBuildSeconds = job.totalBuildSeconds;
     if (totalBuildSeconds === undefined) {
       // Legacy jobs added before totalBuildSeconds existed: fall back to the root job's own time only,
-      // adjusted for skills/facility but not TE (TE per sub-component isn't recoverable without the
+      // adjusted for skills/facility/rig but not TE (TE per sub-component isn't recoverable without the
       // full tree, which isn't available on this page).
       const baseTime = job.baseTime || 0;
       if (baseTime > 0) {
@@ -231,7 +231,9 @@ function renderActiveJobsList(allocatedStock) {
         if (activeFacilityKey === 'sotiyo') facilityFactor = 0.70;
         else if (activeFacilityKey === 'azbel') facilityFactor = 0.80;
         else if (activeFacilityKey === 'raitaru') facilityFactor = 0.85;
-        totalBuildSeconds = baseTime * skillTimeFactor * facilityFactor * (job.runsNeeded || 1);
+        const rigTEBonus = parseFloat(localStorage.getItem('eve_rig_te_bonus')) || 0;
+        const rigFactor = 1 - (rigTEBonus / 100);
+        totalBuildSeconds = baseTime * skillTimeFactor * facilityFactor * rigFactor * (job.runsNeeded || 1);
       } else {
         totalBuildSeconds = 0;
       }
@@ -242,9 +244,10 @@ function renderActiveJobsList(allocatedStock) {
     if (activeFacilityKey === 'sotiyo') structureName = 'Sotiyo';
     else if (activeFacilityKey === 'azbel') structureName = 'Azbel';
     else if (activeFacilityKey === 'raitaru') structureName = 'Raitaru';
+    const rigTEBonusDisplay = parseFloat(localStorage.getItem('eve_rig_te_bonus')) || 0;
 
     if (totalBuildSeconds > 0) {
-      const hoverTitle = `Total time to build this item and every sub-component you're manufacturing yourself.\nIndustry: ${skills.industry}/5 | Advanced Industry: ${skills.advIndustry}/5 | Facility: ${structureName}`;
+      const hoverTitle = `Total time to build this item and every sub-component you're manufacturing yourself.\nIndustry: ${skills.industry}/5 | Advanced Industry: ${skills.advIndustry}/5 | Facility: ${structureName}${rigTEBonusDisplay > 0 ? ` | Rig: -${rigTEBonusDisplay}% TE` : ''}`;
 
       const iskPerHour = job.netProfit !== undefined ? (job.netProfit / (totalBuildSeconds / 3600)) : null;
       const iskPerHourUI = iskPerHour !== null

@@ -26,7 +26,9 @@ function calculateAdjustedJobSeconds(baseTimeSeconds, customTE, runsNeeded, isRe
   if (activeFacilityKey === 'sotiyo') facilityFactor = 0.70;
   else if (activeFacilityKey === 'azbel') facilityFactor = 0.80;
   else if (activeFacilityKey === 'raitaru') facilityFactor = 0.85;
-  return baseTimeSeconds * teFactor * skillTimeFactor * facilityFactor * (runsNeeded || 1);
+  const rigTEBonus = parseFloat(localStorage.getItem('eve_rig_te_bonus')) || 0;
+  const rigFactor = 1 - (rigTEBonus / 100);
+  return baseTimeSeconds * teFactor * skillTimeFactor * facilityFactor * rigFactor * (runsNeeded || 1);
 }
 
 // Recursively sums the adjusted build time across every job actually being manufactured in the tree.
@@ -70,6 +72,13 @@ function saveTaxSettings() {
 
     localStorage.setItem('eve_active_facility_key', facilityKey);
 
+    const rigMEBonus = document.getElementById('rig-me-bonus')?.value || '0';
+    const rigTEBonus = document.getElementById('rig-te-bonus')?.value || '0';
+    // Dedicated keys (not just the JSON blob below) so ledger.js - which has no facility/rig inputs of
+    // its own - can read the player's rig bonuses directly, the same way it already reads facility key.
+    localStorage.setItem('eve_rig_me_bonus', rigMEBonus);
+    localStorage.setItem('eve_rig_te_bonus', rigTEBonus);
+
     const settings = {
       facilityTax: document.getElementById('facility-tax')?.value,
       sccSurcharge: document.getElementById('scc-surcharge')?.value,
@@ -78,7 +87,9 @@ function saveTaxSettings() {
       facilitySelect: document.getElementById('facility-select')?.value,
       structureRoleBonus: document.getElementById('structure-role-bonus')?.value,
       contractTax: document.getElementById('contract-tax')?.value,
-      contractBroker: document.getElementById('contract-broker')?.value
+      contractBroker: document.getElementById('contract-broker')?.value,
+      rigMEBonus: rigMEBonus,
+      rigTEBonus: rigTEBonus
     };
     localStorage.setItem('eve_tax_settings', JSON.stringify(settings));
   } catch (e) {}
@@ -97,6 +108,8 @@ function loadTaxSettings() {
       if (settings.structureRoleBonus !== undefined && document.getElementById('structure-role-bonus')) document.getElementById('structure-role-bonus').value = settings.structureRoleBonus;
       if (settings.contractTax !== undefined && document.getElementById('contract-tax')) document.getElementById('contract-tax').value = settings.contractTax;
       if (settings.contractBroker !== undefined && document.getElementById('contract-broker')) document.getElementById('contract-broker').value = settings.contractBroker;
+      if (settings.rigMEBonus !== undefined && document.getElementById('rig-me-bonus')) document.getElementById('rig-me-bonus').value = settings.rigMEBonus;
+      if (settings.rigTEBonus !== undefined && document.getElementById('rig-te-bonus')) document.getElementById('rig-te-bonus').value = settings.rigTEBonus;
     }
   } catch (e) {}
 }
@@ -666,23 +679,17 @@ function createNodeCard(node) {
   if (node.isBuildingSelf && node.isManufacturable) {
     const baseTime = extractBuildTime(node.recipe);
     const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
-    const indFactor = 1 - (0.04 * (skills.industry || 0));
-    const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
-    const skillTimeFactor = indFactor * advIndFactor;
-    const te = node.customTE || 0;
-    const teFactor = 1 - (te / 100);
-
     const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
-    let facilityFactor = 1.0;
     let structureName = 'NPC Station';
     let structureTEBonus = '0%';
-    if (activeFacilityKey === 'sotiyo') { facilityFactor = 0.70; structureName = 'Sotiyo'; structureTEBonus = '30%'; }
-    else if (activeFacilityKey === 'azbel') { facilityFactor = 0.80; structureName = 'Azbel'; structureTEBonus = '20%'; }
-    else if (activeFacilityKey === 'raitaru') { facilityFactor = 0.85; structureName = 'Raitaru'; structureTEBonus = '15%'; }
+    if (activeFacilityKey === 'sotiyo') { structureName = 'Sotiyo'; structureTEBonus = '30%'; }
+    else if (activeFacilityKey === 'azbel') { structureName = 'Azbel'; structureTEBonus = '20%'; }
+    else if (activeFacilityKey === 'raitaru') { structureName = 'Raitaru'; structureTEBonus = '15%'; }
+    const rigTEBonus = parseFloat(localStorage.getItem('eve_rig_te_bonus')) || 0;
 
     if (baseTime > 0) {
-      const totalSeconds = baseTime * teFactor * skillTimeFactor * facilityFactor * node.runsNeeded;
-      const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)\n• Base SDE Time: ${window.formatDuration(baseTime)}`;
+      const totalSeconds = calculateAdjustedJobSeconds(baseTime, node.customTE, node.runsNeeded, node.isReaction);
+      const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)${rigTEBonus > 0 ? `\n• Rig Bonus: -${rigTEBonus}% TE` : ''}\n• Base SDE Time: ${window.formatDuration(baseTime)}`;
 
       buildTimeUI = `
         <div class="flex justify-between text-[10px] text-slate-400 mono border-t border-[#1e3348]/40 pt-1 mt-1 cursor-help" title="${window.esc(hoverTitle)}">
