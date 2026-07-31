@@ -10,7 +10,9 @@ if (window.globalRuns === undefined) window.globalRuns = 1;
 // Structural helper to extract the base build time of a recipe or resolve intelligent fallbacks
 function extractBuildTime(recipe, typeId, name) {
   if (recipe) {
+    // Standard compressed SDE files use "t" for the base blueprint time to conserve space
     const candidates = [
+      recipe.t,
       recipe.time,
       recipe.timeSeconds,
       recipe.duration,
@@ -24,9 +26,23 @@ function extractBuildTime(recipe, typeId, name) {
       const val = parseInt(c);
       if (!isNaN(val) && val > 0) return val;
     }
+
+    // Check inside nested activityProducts/activityMaterials or standard compressed SDE arrays
+    if (recipe.activityProducts && typeof recipe.activityProducts === 'object') {
+      const act1 = recipe.activityProducts['1'] || recipe.activityProducts[1];
+      const act11 = recipe.activityProducts['11'] || recipe.activityProducts[11];
+      if (act1 && act1[0] && (act1[0].time || act1[0].t)) {
+        const val = parseInt(act1[0].time || act1[0].t);
+        if (!isNaN(val) && val > 0) return val;
+      }
+      if (act11 && act11[0] && (act11[0].time || act11[0].t)) {
+        const val = parseInt(act11[0].time || act11[0].t);
+        if (!isNaN(val) && val > 0) return val;
+      }
+    }
   }
 
-  // Fallback: If SDE lacks time data, resolve intelligent default base manufacturing times
+  // Fallback: If SDE lacks time data entirely, resolve intelligent default base manufacturing times
   const n = String(name || '').toLowerCase();
   const tId = parseInt(typeId);
 
@@ -413,6 +429,12 @@ function loadSavedState() {
     window.globalRuns = parseInt(localStorage.getItem('eve_global_runs')) || 1;
     window.rootSellStrategy = localStorage.getItem('eve_root_sell_strategy') || 'market-sell';
     window.rootCustomPrice = parseFloat(localStorage.getItem('eve_root_custom_price')) || 0;
+    
+    // Sync window objects
+    window.buildSelfOverrides = buildSelfOverrides;
+    window.customBuyModes = customBuyModes;
+    window.customMEOverrides = customMEOverrides;
+    window.customTEOverrides = customTEOverrides;
 
     const savedProduct = window.safeParseJSON(localStorage.getItem('eve_active_product'), null);
     if (savedProduct && savedProduct.id && savedProduct.name) {
