@@ -246,62 +246,23 @@ const BUILTIN_RECIPES = {
   4248: {
     blueprintTypeID: 4248, productTypeID: 4247, productName: "Hydrogen Fuel Block", mfgQtyPerRun: 40, productQtyPerRun: 40, portionSize: 40, qty: 40, time: 15
   },
-  // Drekavac
-  48519: {
-    blueprintTypeID: 49715, productTypeID: 48519, productName: "Drekavac", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 24000,
+  // Gila
+  17715: {
+    blueprintTypeID: 17714, productTypeID: 17715, productName: "Gila", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 24000,
     mfgMaterials: [
-      { typeId: 34, name: "Tritanium", baseQty: 1828712 },
-      { typeId: 35, name: "Pyerite", baseQty: 368466 },
-      { typeId: 36, name: "Mexallon", baseQty: 87814 },
-      { typeId: 37, name: "Isogen", baseQty: 19374 },
-      { typeId: 38, name: "Nocxium", baseQty: 5774 },
-      { typeId: 39, name: "Zydrine", baseQty: 2804 },
-      { typeId: 40, name: "Megacyte", baseQty: 1402 },
-      { typeId: 52310, name: "Crystalline Isogen-10", baseQty: 460 },
-      { typeId: 52311, name: "Zero-Point Condensate", baseQty: 360 }
+      { typeId: 621, name: "Caracal", baseQty: 1 },
+      { typeId: 57478, name: "Auto-Integrity Preservation Seal", baseQty: 60 },
+      { typeId: 57486, name: "Life Support Backup Unit", baseQty: 30 },
+      { typeId: 57479, name: "Core Temperature Regulator", baseQty: 1 }
     ]
   },
-  49715: {
-    blueprintTypeID: 49715, productTypeID: 48519, productName: "Drekavac", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 24000,
+  17714: {
+    blueprintTypeID: 17714, productTypeID: 17715, productName: "Gila", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 24000,
     mfgMaterials: [
-      { typeId: 34, name: "Tritanium", baseQty: 1828712 },
-      { typeId: 35, name: "Pyerite", baseQty: 368466 },
-      { typeId: 36, name: "Mexallon", baseQty: 87814 },
-      { typeId: 37, name: "Isogen", baseQty: 19374 },
-      { typeId: 38, name: "Nocxium", baseQty: 5774 },
-      { typeId: 39, name: "Zydrine", baseQty: 2804 },
-      { typeId: 40, name: "Megacyte", baseQty: 1402 },
-      { typeId: 52310, name: "Crystalline Isogen-10", baseQty: 460 },
-      { typeId: 52311, name: "Zero-Point Condensate", baseQty: 360 }
-    ]
-  },
-  // Leshak
-  47271: {
-    blueprintTypeID: 47968, productTypeID: 47271, productName: "Leshak", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 24000,
-    mfgMaterials: [
-      { typeId: 34, name: "Tritanium", baseQty: 8800000 },
-      { typeId: 35, name: "Pyerite", baseQty: 2930004 },
-      { typeId: 36, name: "Mexallon", baseQty: 660000 },
-      { typeId: 37, name: "Isogen", baseQty: 186361 },
-      { typeId: 38, name: "Nocxium", baseQty: 46200 },
-      { typeId: 39, name: "Zydrine", baseQty: 15400 },
-      { typeId: 40, name: "Megacyte", baseQty: 6575 },
-      { typeId: 52310, name: "Crystalline Isogen-10", baseQty: 845 },
-      { typeId: 52311, name: "Zero-Point Condensate", baseQty: 850 }
-    ]
-  },
-  47968: {
-    blueprintTypeID: 47968, productTypeID: 47271, productName: "Leshak", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 24000,
-    mfgMaterials: [
-      { typeId: 34, name: "Tritanium", baseQty: 8800000 },
-      { typeId: 35, name: "Pyerite", baseQty: 2930004 },
-      { typeId: 36, name: "Mexallon", baseQty: 660000 },
-      { typeId: 37, name: "Isogen", baseQty: 186361 },
-      { typeId: 38, name: "Nocxium", baseQty: 46200 },
-      { typeId: 39, name: "Zydrine", baseQty: 15400 },
-      { typeId: 40, name: "Megacyte", baseQty: 6575 },
-      { typeId: 52310, name: "Crystalline Isogen-10", baseQty: 845 },
-      { typeId: 52311, name: "Zero-Point Condensate", baseQty: 850 }
+      { typeId: 621, name: "Caracal", baseQty: 1 },
+      { typeId: 57478, name: "Auto-Integrity Preservation Seal", baseQty: 60 },
+      { typeId: 57486, name: "Life Support Backup Unit", baseQty: 30 },
+      { typeId: 57479, name: "Core Temperature Regulator", baseQty: 1 }
     ]
   },
   // Auto-Integrity Preservation Seal

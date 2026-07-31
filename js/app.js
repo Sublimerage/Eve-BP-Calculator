@@ -1,7 +1,9 @@
 'use strict';
 
-// Centralized helpers (esc, safeParseJSON, formatDuration) are loaded globally from js/config.js.
-// They MUST NOT be re-declared here with "const" or "let" to prevent duplicate declaration SyntaxErrors.
+// Retrieve globally centralized helpers from window context (strict-mode compliant)
+const esc = window.esc;
+const safeParseJSON = window.safeParseJSON;
+const formatDuration = window.formatDuration;
 
 if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sell';
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
@@ -314,20 +316,14 @@ function loadSavedState() {
     window.globalRuns = parseInt(localStorage.getItem('eve_global_runs')) || 1;
     window.rootSellStrategy = localStorage.getItem('eve_root_sell_strategy') || 'market-sell';
     window.rootCustomPrice = parseFloat(localStorage.getItem('eve_root_custom_price')) || 0;
-    
-    // Sync window objects
-    window.buildSelfOverrides = buildSelfOverrides;
-    window.customBuyModes = customBuyModes;
-    window.customMEOverrides = customMEOverrides;
-    window.customTEOverrides = customTEOverrides;
 
     const savedProduct = safeParseJSON(localStorage.getItem('eve_active_product'), null);
     if (savedProduct && savedProduct.id && savedProduct.name) {
       selectItem(savedProduct.id, savedProduct.name, true);
     } else {
-      selectItem(48519, 'Drekavac');
+      selectItem(48519, 'Drekavac Blueprint');
     }
-  } catch (e) { selectItem(48519, 'Drekavac'); }
+  } catch (e) { selectItem(48519, 'Drekavac Blueprint'); }
 }
 
 function recalculate() {
@@ -474,6 +470,8 @@ function recalculate() {
   const roiBuyEl = document.getElementById('summary-roi-buy');
   if (roiBuyEl) roiBuyEl.textContent = `ROI: ${roiBuy}%`;
 
+  const curStrategy = window.rootSellStrategy || 'market-sell';
+
   if (isolatedInstanceId) {
     const isoNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
     if (isoNode) { renderIsolatedDiagram(); } else { isolatedInstanceId = null; renderTreeDiagram(recipeTreeRoot, priceStrategy, profitSell, roiSell); }
@@ -545,7 +543,13 @@ function createNodeCard(node) {
 
   const totalProduced = node.runsNeeded * node.batchYield;
   const surplus = totalProduced - node.qtyNeeded;
-  const iconTypeId = node.typeId; // Blueprint Icon
+  
+  // Immersive Graphic Selection:
+  // Manufacturable nodes (Blueprint jobs) fetch the official blueprint scroll overlay with product thumbnail.
+  // Raw materials (minerals, reactants) fetch their normal high-fidelity item icons natively from SDE [1, 2].
+  const iconUrl = node.isManufacturable
+    ? `https://images.evetech.net/blueprints/${node.typeId}/blueprint?size=128`
+    : `https://images.evetech.net/types/${node.typeId}/icon?size=128`;
 
   const unitEIV = node.unitEIV || 0;
   const totalEIV = node.jobEIV || (unitEIV * node.qtyNeeded);
@@ -592,16 +596,13 @@ function createNodeCard(node) {
   if (node.isBuildingSelf && node.recipe) {
     const baseTime = extractBuildTime(node.recipe, node.typeId, node.name);
     if (baseTime > 0) {
-      // Default to Max Level 5 fallback if guest/not logged in, otherwise load character sheets
       const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
       const indFactor = 1 - (0.04 * (skills.industry || 0));
       const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
       const skillTimeFactor = indFactor * advIndFactor;
-
       const te = node.customTE || 0;
       const teFactor = 1 - (te / 100);
 
-      // Resolve specific Upwell Engineering Complex Time bonuses (Sotiyo: 30%, Azbel: 20%, Raitaru: 15%, NPC: 0%)
       const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
       let facilityFactor = 1.0;
       let structureName = 'NPC Station';
@@ -625,7 +626,7 @@ function createNodeCard(node) {
   card.className = `diagram-node rounded p-3 shadow-2xl transition-all ${cardStyle}`;
   card.innerHTML = `
     <div class="flex items-center space-x-3 border-b border-[#1e3348] pb-2 mb-2">
-      <img src="https://images.evetech.net/types/${iconTypeId}/icon?size=64" class="w-10 h-10 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
+      <img src="${iconUrl}" class="w-10 h-10 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/icon?size=64';">
       <div class="min-w-0 flex-1">
         <div class="font-bold text-sm text-white truncate flex items-center justify-between">
           <span class="truncate">${node.name}</span>
@@ -1404,7 +1405,6 @@ function resetPanZoom() {
   drawConnectingLines();
 }
 
-// Bind to window namespaces cleanly for direct strict-mode support
 window.addCurrentJobToLedger = addCurrentJobToLedger;
 window.updateHeaderLedgerCount = updateHeaderLedgerCount;
 window.syncSellStrategy = syncSellStrategy;

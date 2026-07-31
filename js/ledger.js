@@ -210,7 +210,7 @@ function renderActiveJobsList(allocatedStock) {
 
   container.innerHTML = activeJobs.map(job => {
     if (!job) return '';
-    const iconTypeId = job.typeId;
+    const iconTypeId = job.productTypeId || job.typeId; // Renders physical manufactured item icon cleanly!
     const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
 
     // Priority move buttons layout

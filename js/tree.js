@@ -188,6 +188,14 @@ function collectAllTypeIds(node, typeIds = new Set()) {
   return typeIds;
 }
 
+// Watertight list mapping blueprint IDs directly to their manufactured product IDs
+const BLUEPRINT_TO_PRODUCT_MAP = {
+  57523: 57486, // Life Support Backup Unit Blueprint -> Life Support Backup Unit
+  57515: 57478, // Auto-Integrity Preservation Seal Blueprint -> Auto-Integrity Preservation Seal
+  57516: 57479, // Core Temperature Regulator Blueprint -> Core Temperature Regulator
+  17714: 17715  // Gila Blueprint -> Gila
+};
+
 // O(1) Fast SDE Reverse Lookup to find a Blueprint Type ID for a given manufactured item Product ID
 function findBlueprintTypeIdForProduct(productTypeId) {
   const pId = parseInt(productTypeId);
@@ -367,7 +375,7 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
     parentInstanceId: parentNode ? parentNode.instanceId : null,
     typeId: blueprintTypeId, // This is the Blueprint ID (e.g., 622)
     displayTypeId: blueprintTypeId,
-    productTypeId: null,     // Physical item manufactured (e.g., 621)
+    productTypeId: BLUEPRINT_TO_PRODUCT_MAP[blueprintTypeId] || null,     // Physical item manufactured (e.g., 621)
     name: name,              // Blueprint Name (e.g., "Caracal Blueprint")
     productName: '',         // Manufactured Item Name (e.g., "Caracal")
     qtyNeeded: qtyNeeded,    // Quantity of physical product needed by parent
@@ -389,7 +397,7 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
   try {
     const recipe = await fetchBlueprintData(blueprintTypeId);
     if (recipe) {
-      node.productTypeId = recipe.productTypeID || recipe.product || recipe.p || blueprintTypeId;
+      node.productTypeId = recipe.productTypeID || recipe.product || recipe.p || BLUEPRINT_TO_PRODUCT_MAP[blueprintTypeId] || blueprintTypeId;
       node.productName = recipe.productName || window.TYPE_ID_TO_NAME[node.productTypeId] || '';
       node.isManufacturable = true;
       
