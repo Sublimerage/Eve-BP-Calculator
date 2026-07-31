@@ -793,7 +793,7 @@ function filterLocationDropdownOptions() {
   });
   if (feedbackBadge) {
     if (query) {
-      feedbackBadge.textContent = `Found: ${visibleCount}`;
+      feedbackBadge.textContent = `Found: ${visibleCount.toLocaleString()}`;
       feedbackBadge.classList.remove('hidden');
     } else {
       feedbackBadge.textContent = '';

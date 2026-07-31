@@ -10,6 +10,41 @@ function extractBuildTime(recipe) {
   return parseInt(recipe.time || recipe.t || recipe.timeSeconds || recipe.duration || recipe.mfgTime || recipe.productionTime || 0);
 }
 
+// Applies TE research, character skills (Industry/Advanced Industry), and the selected facility's
+// time bonus to a single job's raw SDE duration. Reactions can't be TE-researched, so TE is ignored
+// for them. Shared by the per-card time display, the total-tree time summary, and the ledger.
+function calculateAdjustedJobSeconds(baseTimeSeconds, customTE, runsNeeded, isReaction) {
+  if (!baseTimeSeconds || baseTimeSeconds <= 0) return 0;
+  const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
+  const indFactor = 1 - (0.04 * (skills.industry || 0));
+  const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
+  const skillTimeFactor = indFactor * advIndFactor;
+  const te = isReaction ? 0 : (customTE || 0);
+  const teFactor = 1 - (te / 100);
+  const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
+  let facilityFactor = 1.0;
+  if (activeFacilityKey === 'sotiyo') facilityFactor = 0.70;
+  else if (activeFacilityKey === 'azbel') facilityFactor = 0.80;
+  else if (activeFacilityKey === 'raitaru') facilityFactor = 0.85;
+  return baseTimeSeconds * teFactor * skillTimeFactor * facilityFactor * (runsNeeded || 1);
+}
+
+// Recursively sums the adjusted build time across every job actually being manufactured in the tree.
+// Sub-components toggled to "Buy" contribute no build time of their own - only what you're building.
+function calculateTotalBuildSeconds(node) {
+  if (!node || !node.isBuildingSelf) return 0;
+  let total = 0;
+  if (node.recipe) {
+    total += calculateAdjustedJobSeconds(extractBuildTime(node.recipe), node.customTE, node.runsNeeded, node.isReaction);
+  }
+  if (node.children) {
+    node.children.forEach(child => { if (child) total += calculateTotalBuildSeconds(child); });
+  }
+  return total;
+}
+window.calculateAdjustedJobSeconds = calculateAdjustedJobSeconds;
+window.calculateTotalBuildSeconds = calculateTotalBuildSeconds;
+
 // Binds custom card overrides directly to tree node structures before calculations
 function syncTreeOverrides(node) {
   if (!node) return;
@@ -501,6 +536,24 @@ function recalculate() {
   const roiBuyEl = document.getElementById('summary-roi-buy');
   if (roiBuyEl) roiBuyEl.textContent = `ROI: ${roiBuy}%`;
 
+  // Total estimated build time across every job actually being manufactured in the tree, and the
+  // resulting ISK/hour based on net sell profit.
+  const totalBuildSeconds = calculateTotalBuildSeconds(window.recipeTreeRoot);
+  window.recipeTreeRoot.totalBuildSeconds = totalBuildSeconds;
+  const buildTimeEl = document.getElementById('summary-build-time');
+  if (buildTimeEl) buildTimeEl.textContent = totalBuildSeconds > 0 ? window.formatDuration(totalBuildSeconds) : '—';
+  const iskPerHourEl = document.getElementById('summary-isk-per-hour');
+  if (iskPerHourEl) {
+    if (totalBuildSeconds > 0) {
+      const iskPerHour = profitSell / (totalBuildSeconds / 3600);
+      iskPerHourEl.textContent = `ISK/Hr: ${Math.round(iskPerHour).toLocaleString()} ISK`;
+      iskPerHourEl.className = `text-[8px] truncate ${iskPerHour >= 0 ? 'text-green-400' : 'text-red-400'}`;
+    } else {
+      iskPerHourEl.textContent = 'ISK/Hr: —';
+      iskPerHourEl.className = 'text-[8px] text-slate-500 truncate';
+    }
+  }
+
   if (window.isolatedInstanceId) {
     const isoNode = findNodeByInstanceId(window.recipeTreeRoot, window.isolatedInstanceId);
     if (isoNode) { renderIsolatedDiagram(); } else { window.isolatedInstanceId = null; renderTreeDiagram(window.recipeTreeRoot, priceStrategy, profitSell, roiSell); }
@@ -863,6 +916,8 @@ function addCurrentJobToLedger(e) {
     qtyNeeded: window.recipeTreeRoot.qtyNeeded,
     calculatedCost: window.recipeTreeRoot.calculatedCost || 0,
     baseTime: baseTime,
+    totalBuildSeconds: calculateTotalBuildSeconds(window.recipeTreeRoot),
+    netProfit: window.recipeTreeRoot.netProfitSell || 0,
     sellStrategy: selectedStrategy,
     unitSellPrice: unitSellPrice,
     materials: materials,
@@ -1329,7 +1384,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
   });
 
   const countEl = document.getElementById('bom-type-count');
-  if (countEl) countEl.textContent = bomItems.length.toString();
+  if (countEl) countEl.textContent = bomItems.length.toLocaleString();
 
   const totalEl = document.getElementById('bom-total-isk');
   if (totalEl) totalEl.textContent = Math.round(totalBOMCost).toLocaleString() + ' ISK';

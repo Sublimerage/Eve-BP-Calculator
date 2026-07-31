@@ -209,36 +209,53 @@ function renderActiveJobsList(allocatedStock) {
       return `
         <div class="flex justify-between items-center text-[10px] mono py-0.5 border-b border-[#1e3348]/20 ${isAcquired ? 'text-green-400' : 'text-slate-400'}">
           <span class="truncate pr-4">${window.esc(mat.name)}</span>
-          <span class="flex-shrink-0">${isAcquired ? `✔ ${mat.qtyNeeded}` : `x${mat.qtyNeeded} (Deficit: ${netMissing})`}</span>
+          <span class="flex-shrink-0">${isAcquired ? `✔ ${mat.qtyNeeded.toLocaleString()}` : `x${mat.qtyNeeded.toLocaleString()} (Deficit: ${netMissing.toLocaleString()})`}</span>
         </div>
       `;
     }).join('') : '<div class="text-[10px] text-slate-500 italic py-1">No materials logged for this build.</div>';
 
     let buildTimeUI = '';
-    const baseTime = job.baseTime || 0;
-    if (baseTime > 0) {
-      const teFactor = 1.0; 
+    let totalBuildSeconds = job.totalBuildSeconds;
+    if (totalBuildSeconds === undefined) {
+      // Legacy jobs added before totalBuildSeconds existed: fall back to the root job's own time only,
+      // adjusted for skills/facility but not TE (TE per sub-component isn't recoverable without the
+      // full tree, which isn't available on this page).
+      const baseTime = job.baseTime || 0;
+      if (baseTime > 0) {
+        const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
+        const indFactor = 1 - (0.04 * (skills.industry || 0));
+        const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
+        const skillTimeFactor = indFactor * advIndFactor;
+        const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
+        let facilityFactor = 1.0;
+        if (activeFacilityKey === 'sotiyo') facilityFactor = 0.70;
+        else if (activeFacilityKey === 'azbel') facilityFactor = 0.80;
+        else if (activeFacilityKey === 'raitaru') facilityFactor = 0.85;
+        totalBuildSeconds = baseTime * skillTimeFactor * facilityFactor * (job.runsNeeded || 1);
+      } else {
+        totalBuildSeconds = 0;
+      }
+    }
+    if (totalBuildSeconds > 0) {
       const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
-      const indFactor = 1 - (0.04 * (skills.industry || 0));
-      const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
-      const skillTimeFactor = indFactor * advIndFactor;
-
       const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
-      let facilityFactor = 1.0;
       let structureName = 'NPC Station';
-      let structureTEBonus = '0%';
-      if (activeFacilityKey === 'sotiyo') { facilityFactor = 0.70; structureName = 'Sotiyo'; structureTEBonus = '30%'; }
-      else if (activeFacilityKey === 'azbel') { facilityFactor = 0.80; structureName = 'Azbel'; structureTEBonus = '20%'; }
-      else if (activeFacilityKey === 'raitaru') { facilityFactor = 0.85; structureName = 'Raitaru'; structureTEBonus = '15%'; }
+      if (activeFacilityKey === 'sotiyo') structureName = 'Sotiyo';
+      else if (activeFacilityKey === 'azbel') structureName = 'Azbel';
+      else if (activeFacilityKey === 'raitaru') structureName = 'Raitaru';
+      const hoverTitle = `Total time to build this item and every sub-component you're manufacturing yourself.\nIndustry: ${skills.industry}/5 | Advanced Industry: ${skills.advIndustry}/5 | Facility: ${structureName}`;
 
-      const totalSeconds = baseTime * teFactor * skillTimeFactor * facilityFactor * job.runsNeeded;
-      const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)\n• Base SDE Time: ${window.formatDuration(baseTime)}`;
+      const iskPerHour = job.netProfit !== undefined ? (job.netProfit / (totalBuildSeconds / 3600)) : null;
+      const iskPerHourUI = iskPerHour !== null
+        ? `<div class="flex justify-between text-[10px] mono"><span class="text-slate-400">Est. ISK/Hour:</span><span class="font-bold ${iskPerHour >= 0 ? 'text-green-400' : 'text-red-400'}">${Math.round(iskPerHour).toLocaleString()} ISK</span></div>`
+        : '';
 
       buildTimeUI = `
         <div class="flex justify-between text-[10px] text-slate-400 mono cursor-help" title="${window.esc(hoverTitle)}">
           <span>Est. Build Time:</span>
-          <span class="text-slate-300 font-semibold">${window.formatDuration(totalSeconds)}</span>
+          <span class="text-slate-300 font-semibold">${window.formatDuration(totalBuildSeconds)}</span>
         </div>
+        ${iskPerHourUI}
       `;
     }
 
@@ -685,7 +702,7 @@ function filterJournalLocationOptions() {
 
   if (feedbackBadge) {
     if (query) {
-      feedbackBadge.textContent = `Found: ${visibleCount}`;
+      feedbackBadge.textContent = `Found: ${visibleCount.toLocaleString()}`;
       feedbackBadge.classList.remove('hidden');
     } else {
       feedbackBadge.textContent = '';
