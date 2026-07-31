@@ -4,7 +4,7 @@ if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sel
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
 if (window.globalRuns === undefined) window.globalRuns = 1;
 
-// Queries unreduced SDE manufacturing durations directly from SDE database
+// Queries unreduced SDE manufacturing durations directly from the SDE database
 function extractBuildTime(recipe) {
   if (!recipe) return 0;
   return parseInt(recipe.time || recipe.t || recipe.timeSeconds || recipe.duration || recipe.mfgTime || recipe.productionTime || 0);
@@ -215,7 +215,7 @@ if (systemSearchInput) {
     if (systemSearchResults) {
       systemSearchResults.innerHTML = hits.map(sys => `
         <div class="px-3 py-1.5 hover:bg-[#1e3348] cursor-pointer text-xs font-bold text-cyan-300 border-b border-[#1e3348]/40 mono"
-             onclick="selectSolarSystem(${sys.id}, '${window.esc(sys.name)}')">
+             onclick="window.selectSolarSystem(${sys.id}, '${window.esc(sys.name)}')">
           ${window.esc(sys.name)}
         </div>
       `).join('');
@@ -226,7 +226,7 @@ if (systemSearchInput) {
   systemSearchInput.addEventListener('keydown', async (e) => {
     if (e.key === 'Enter') {
       const q = systemSearchInput.value.trim();
-      if (q) { await resolveSystemSCI(q); }
+      if (q) { await window.resolveSystemSCI(q); }
     }
   });
 }
@@ -256,7 +256,7 @@ async function selectItem(typeId, name, preserveView = false) {
     window.customTEOverrides = {};
   }
   const maxDepth = 10;
-  window.recipeTreeRoot = await buildRecursiveRecipeTree(typeId, name, 1, 0, maxDepth, new Set(), null);
+  window.recipeTreeRoot = await window.buildRecursiveRecipeTree(typeId, name, 1, 0, maxDepth, new Set(), null);
   recalculate();
   if (!preserveView) { resetPanZoom(); } else { setTimeout(drawConnectingLines, 50); }
 
@@ -266,8 +266,8 @@ async function selectItem(typeId, name, preserveView = false) {
   if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
 
   const allTypeIds = new Set();
-  collectAllTypeIds(window.recipeTreeRoot, allTypeIds);
-  fetchMarketPrices(Array.from(allTypeIds)).finally(() => {
+  window.collectAllTypeIds(window.recipeTreeRoot, allTypeIds);
+  window.fetchMarketPrices(Array.from(allTypeIds)).finally(() => {
     if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
     if (statusText) statusText.textContent = 'RECIPES & PRICES LOADED';
     recalculate();
@@ -349,8 +349,8 @@ function recalculate() {
   window.recipeTreeRoot.qtyNeeded = totalRootOutputQty;
   window.recipeTreeRoot.runsNeeded = rootRunsNeeded;
 
-  scaleTreeQuantities(window.recipeTreeRoot, facility);
-  calculateNodeEIV(window.recipeTreeRoot);
+  window.scaleTreeQuantities(window.recipeTreeRoot, facility);
+  window.calculateNodeEIV(window.recipeTreeRoot);
 
   const globalDemand = collectGlobalDemand(window.recipeTreeRoot);
   let totalSurplusMaterialValue = 0;
@@ -363,7 +363,7 @@ function recalculate() {
       if (netSurplusQty > 0) {
         const productTypeId = item.productTypeId || item.typeId;
         const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
-        const unitPrice = prices.sell || prices.buy || getEIV(item.typeId) || 0;
+        const unitPrice = prices.sell || prices.buy || window.getEIV(item.typeId) || 0;
         totalSurplusMaterialValue += netSurplusQty * unitPrice;
       }
     }
@@ -371,9 +371,9 @@ function recalculate() {
 
   let rawMaterialCost = 0;
   if (window.recipeTreeRoot.isBuildingSelf && window.recipeTreeRoot.children && window.recipeTreeRoot.children.length > 0) {
-    window.recipeTreeRoot.children.forEach(child => { rawMaterialCost += calculateTreeNodeCost(child); });
+    window.recipeTreeRoot.children.forEach(child => { rawMaterialCost += window.calculateTreeNodeCost(child); });
   } else {
-    const rootStrategy = getNodePriceStrategy(window.recipeTreeRoot);
+    const rootStrategy = window.getNodePriceStrategy(window.recipeTreeRoot);
     const productTypeId = window.recipeTreeRoot.productTypeId || window.recipeTreeRoot.typeId;
     const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
     let unitPrice = rootStrategy === 'sell' ? prices.sell : prices.buy;
@@ -386,7 +386,7 @@ function recalculate() {
   }
 
   let effectiveMaterialCost = rawMaterialCost;
-  let totalJobFees = calculateNodeJobFee(window.recipeTreeRoot, facilityTax, sccSurcharge, structureRoleBonus);
+  let totalJobFees = window.calculateNodeJobFee(window.recipeTreeRoot, facilityTax, sccSurcharge, structureRoleBonus);
   let totalProductionCost = effectiveMaterialCost + totalJobFees;
 
   const rootProductTypeId = window.recipeTreeRoot.productTypeId || window.recipeTreeRoot.typeId;
@@ -545,7 +545,7 @@ function createNodeCard(node) {
   const formattedTotalEIV = Math.round(totalEIV).toLocaleString() + ' ISK';
 
   const savingsPct = prices.sell > 0 && prices.buy > 0 && prices.sell > prices.buy ? (((prices.sell - prices.buy) / prices.sell) * 100).toFixed(1) : null;
-  const currentBuyStrategy = getNodePriceStrategy(node);
+  const currentBuyStrategy = window.getNodePriceStrategy(node);
 
   let sellStrategyUI = '';
   if (isRoot) {
@@ -758,7 +758,7 @@ function addCurrentJobToLedger(e) {
     if (!node) return;
     if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
       const typeId = node.displayTypeId || node.typeId;
-      const strategy = getNodePriceStrategy(node);
+      const strategy = window.getNodePriceStrategy(node);
       
       const deductModeInput = document.getElementById('deduct-stock-mode');
       const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
@@ -792,7 +792,7 @@ function addCurrentJobToLedger(e) {
     });
   } else {
     const rootTypeId = window.recipeTreeRoot.productTypeId || window.recipeTreeRoot.typeId;
-    const strategy = getNodePriceStrategy(window.recipeTreeRoot);
+    const strategy = window.getNodePriceStrategy(window.recipeTreeRoot);
     const deductModeInput = document.getElementById('deduct-stock-mode');
     const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
     const stockQty = isStockDeductEnabled ? (window.userStockMap[rootTypeId] || window.userStockMap[window.recipeTreeRoot.typeId] || 0) : 0;
@@ -1207,7 +1207,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
     if (!node) return;
     if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
       const typeId = node.displayTypeId || node.typeId;
-      const strategy = getNodePriceStrategy(node);
+      const strategy = window.getNodePriceStrategy(node);
       
       const productTypeId = node.productTypeId || node.typeId;
       const stockQty = isStockDeductEnabled ? (window.userStockMap[productTypeId] || window.userStockMap[node.typeId] || 0) : 0;
@@ -1235,7 +1235,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
     });
   } else {
     const rootTypeId = rootNode.productTypeId || rootNode.typeId;
-    const strategy = getNodeStrategyOnly(rootNode);
+    const strategy = getNodeStrategyOnly(rootNode); // safe strategy getter
     const stockQty = isStockDeductEnabled ? (window.userStockMap[rootTypeId] || window.userStockMap[rootNode.typeId] || 0) : 0;
     const netQtyNeeded = Math.max(0, rootNode.qtyNeeded - stockQty);
 
@@ -1316,6 +1316,7 @@ function copyMultibuyText() {
   });
 }
 
+// Smooth Pan and Zoom Engine
 const viewport = document.getElementById('viewport');
 const content = document.getElementById('pan-zoom-content');
 
@@ -1386,7 +1387,6 @@ window.syncCustomPrice = syncCustomPrice;
 window.syncCustomTax = syncCustomTax;
 window.syncCardRunsToGlobal = syncCardRunsToGlobal;
 window.selectItem = selectItem;
-window.selectSolarSystem = selectSolarSystem;
 window.clearHighlight = clearHighlight;
 window.isolateComponent = isolateComponent;
 window.exitIsolation = exitIsolation;
@@ -1396,25 +1396,29 @@ window.centerOnSelectedNode = centerOnSelectedNode;
 window.resetPanZoom = resetPanZoom;
 window.copyMultibuyText = copyMultibuyText;
 
+// Initialize Application
 window.onload = async () => {
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
 
+  // Load static local states instantly so the app is interactive immediately!
   try {
-    loadTaxSettings();
-    loadSavedState();
-    updateHeaderLedgerCount();
+    loadTaxSettings(); // Load custom taxes from localStorage!
+    loadSavedState(); // Load previous product & overrides persistently from localStorage!
+    updateHeaderLedgerCount(); // Update badge on load!
   } catch (err) {
     console.error("State restoration error:", err);
   }
 
-  if (typeof handleEsiSSOCallback === 'function') {
-    handleEsiSSOCallback().catch(err => console.error("SSO Callback error:", err));
+  // Handle SSO Callback and assets asynchronously in the background
+  if (typeof window.handleEsiSSOCallback === 'function') {
+    window.handleEsiSSOCallback().catch(err => console.error("SSO Callback error:", err));
   }
 
-  if (typeof fetchAdjustedPrices === 'function') {
-    fetchAdjustedPrices().catch(err => console.error("Adjusted prices fetch error:", err));
+  // Fetch adjusted prices asynchronously in the background
+  if (typeof window.fetchAdjustedPrices === 'function') {
+    window.fetchAdjustedPrices().catch(err => console.error("Adjusted prices fetch error:", err));
   }
 
   window.addEventListener('resize', drawConnectingLines);
