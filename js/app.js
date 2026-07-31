@@ -4,7 +4,7 @@ if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sel
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
 if (window.globalRuns === undefined) window.globalRuns = 1;
 
-// Queries unreduced SDE manufacturing durations directly from the SDE database
+// Strictly queries exact unreduced SDE manufacturing durations directly from SDE database
 function extractBuildTime(recipe) {
   if (!recipe) return 0;
   return parseInt(recipe.time || recipe.t || recipe.timeSeconds || recipe.duration || recipe.mfgTime || recipe.productionTime || 0);
@@ -278,7 +278,7 @@ function collectGlobalDemand(node, demandMap = {}) {
   if (!node) return demandMap;
   const typeId = node.displayTypeId || node.typeId;
   if (!demandMap[typeId]) {
-    demandMap[typeId] = { typeId, name: node.name, totalQtyNeeded: 0, isBuildingSelf: node.isBuildingSelf, batchYield: node.batchYield || 1, nodes: [] };
+    demandMap[typeId] = { typeId, name: node.name, totalQtyNeeded: 0, isBuildingSelf: node.isBuildingSelf, batchYield: node.batchYield || 1, productTypeId: node.productTypeId, nodes: [] };
   }
   demandMap[typeId].totalQtyNeeded += node.qtyNeeded;
   demandMap[typeId].nodes.push(node);
@@ -356,6 +356,12 @@ function recalculate() {
   let totalSurplusMaterialValue = 0;
 
   Object.values(globalDemand).forEach(item => {
+    // CORRECTION: Exclude the root node's typeId (both blueprint and product IDs) from surplus credit! [1]
+    const rootProductTypeId = window.recipeTreeRoot.productTypeId || window.recipeTreeRoot.typeId;
+    if (item.typeId === window.recipeTreeRoot.typeId || item.typeId === rootProductTypeId || item.productTypeId === rootProductTypeId) {
+      return;
+    }
+
     if (item.isBuildingSelf && item.batchYield > 1) {
       const runs = Math.ceil(item.totalQtyNeeded / item.batchYield);
       const totalProduced = runs * item.batchYield;
@@ -713,6 +719,7 @@ function syncCardRunsToGlobal(e) {
   recalculate();
 }
 
+// Sync Custom prices, tax, and strategy to root calculations
 function syncCustomPrice(e) {
   const val = parseFloat(e.target.value) || 0;
   window.rootCustomPrice = val >= 0 ? val : 0;
@@ -998,7 +1005,7 @@ function renderIsolatedDiagram() {
   if (parentNode) {
     outputCol.appendChild(createNodeCard(parentNode));
   } else {
-    outputCol.innerHTML = `<div class="bg-[#0c1318] border border-amber-500/50 p-3 text-xs text-amber-300 font-bold mono rounded">Final Target Job Output</div>`;
+    outputCol.innerHTML = `<div class="bg-[#0c1318] border border-amber-500/50 p-3 text-xs text-amber-300 font-bold mono rounded">Final Target Output</div>`;
   }
 
   container.appendChild(inputCol);
