@@ -1,13 +1,18 @@
 'use strict';
 
+// Retrieve globally centralized helpers from window context (strict-mode compliant)
+const esc = window.esc;
+const safeParseJSON = window.safeParseJSON;
+const formatDuration = window.formatDuration;
+
 if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sell';
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
 if (window.globalRuns === undefined) window.globalRuns = 1;
 
-// Strictly queries exact unreduced SDE manufacturing durations directly from your database
+// Strictly queries exact unreduced SDE manufacturing durations directly from your SDE database
 function extractBuildTime(recipe) {
   if (!recipe) return 0;
-  return parseInt(recipe.time || recipe.t || recipe.timeSeconds || recipe.duration || recipe.mfgTime || recipe.productionTime || 0);
+  return parseInt(recipe.t || recipe.time || recipe.timeSeconds || recipe.duration || recipe.mfgTime || recipe.productionTime || 0);
 }
 
 // Binds custom card overrides directly to tree node structures before calculations
@@ -52,7 +57,7 @@ function loadTaxSettings() {
   try {
     const saved = localStorage.getItem('eve_tax_settings');
     if (saved) {
-      const settings = window.safeParseJSON(saved, {});
+      const settings = safeParseJSON(saved, {});
       if (settings.facilityTax !== undefined && document.getElementById('facility-tax')) document.getElementById('facility-tax').value = settings.facilityTax;
       if (settings.sccSurcharge !== undefined && document.getElementById('scc-surcharge')) document.getElementById('scc-surcharge').value = settings.sccSurcharge;
       if (settings.salesTax !== undefined && document.getElementById('sales-tax')) document.getElementById('sales-tax').value = settings.salesTax;
@@ -70,6 +75,10 @@ function searchItems(query) {
   if (!q) return [];
   const exact = [], starts = [], contains = [];
   for (const [k, v] of Object.entries(IDX)) {
+    // Filter autocomplete to strictly index blueprints and reaction formulas
+    const isBlueprint = k.includes('blueprint') || k.includes('formula') || k.includes('reaction');
+    if (!isBlueprint) continue;
+
     if (k === q) exact.push(v);
     else if (k.startsWith(q)) starts.push(v);
     else if (k.includes(q)) contains.push(v);
@@ -157,7 +166,7 @@ if (searchInput) {
       onlineHits.forEach(h => map.set(h.id, h));
       hits = Array.from(map.values()).slice(0, 15);
     }
-    const safeQ = window.esc(q);
+    const safeQ = esc(q);
     if (!hits.length) {
       if (searchResults) {
         searchResults.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">No matching items found for "${safeQ}"</div>`;
@@ -168,9 +177,9 @@ if (searchInput) {
     if (searchResults) {
       searchResults.innerHTML = hits.map(item => `
         <div class="px-3 py-2 hover:bg-[#1e3348] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#1e3348]/40"
-             onclick="selectItem(${item.id}, '${window.esc(item.name)}')">
+             onclick="selectItem(${item.id}, '${esc(item.name)}')">
           <img src="https://images.evetech.net/types/${item.id}/icon?size=32" class="w-6 h-6 rounded" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.id}/render?size=32';">
-          <span class="font-semibold text-slate-200">${window.esc(item.name)}</span>
+          <span class="font-semibold text-slate-200">${esc(item.name)}</span>
         </div>
       `).join('');
       searchResults.classList.remove('hidden');
@@ -212,8 +221,8 @@ if (systemSearchInput) {
     if (systemSearchResults) {
       systemSearchResults.innerHTML = hits.map(sys => `
         <div class="px-3 py-1.5 hover:bg-[#1e3348] cursor-pointer text-xs font-bold text-cyan-300 border-b border-[#1e3348]/40 mono"
-             onclick="selectSolarSystem(${sys.id}, '${window.esc(sys.name)}')">
-          ${window.esc(sys.name)}
+             onclick="selectSolarSystem(${sys.id}, '${esc(sys.name)}')">
+          ${esc(sys.name)}
         </div>
       `).join('');
       systemSearchResults.classList.remove('hidden');
@@ -300,15 +309,15 @@ function saveActiveState() {
 
 function loadSavedState() {
   try {
-    window.buildSelfOverrides = window.safeParseJSON(localStorage.getItem('eve_build_self_overrides'), {});
-    window.customBuyModes = window.safeParseJSON(localStorage.getItem('eve_custom_buy_modes'), {});
-    window.customMEOverrides = window.safeParseJSON(localStorage.getItem('eve_custom_me_overrides'), {});
-    window.customTEOverrides = window.safeParseJSON(localStorage.getItem('eve_custom_te_overrides'), {});
+    window.buildSelfOverrides = safeParseJSON(localStorage.getItem('eve_build_self_overrides'), {});
+    window.customBuyModes = safeParseJSON(localStorage.getItem('eve_custom_buy_modes'), {});
+    window.customMEOverrides = safeParseJSON(localStorage.getItem('eve_custom_me_overrides'), {});
+    window.customTEOverrides = safeParseJSON(localStorage.getItem('eve_custom_te_overrides'), {});
     window.globalRuns = parseInt(localStorage.getItem('eve_global_runs')) || 1;
     window.rootSellStrategy = localStorage.getItem('eve_root_sell_strategy') || 'market-sell';
     window.rootCustomPrice = parseFloat(localStorage.getItem('eve_root_custom_price')) || 0;
 
-    const savedProduct = window.safeParseJSON(localStorage.getItem('eve_active_product'), null);
+    const savedProduct = safeParseJSON(localStorage.getItem('eve_active_product'), null);
     if (savedProduct && savedProduct.id && savedProduct.name) {
       selectItem(savedProduct.id, savedProduct.name, true);
     } else {
@@ -358,7 +367,9 @@ function recalculate() {
       const totalProduced = runs * item.batchYield;
       const netSurplusQty = totalProduced - item.totalQtyNeeded;
       if (netSurplusQty > 0) {
-        const prices = priceCache[item.typeId] || { sell: 0, buy: 0 };
+        // Query prices using the correct produced item product ID, not the blueprint scroll ID
+        const productTypeId = item.productTypeId || item.typeId;
+        const prices = priceCache[productTypeId] || { sell: 0, buy: 0 };
         const unitPrice = prices.sell || prices.buy || getEIV(item.typeId) || 0;
         totalSurplusMaterialValue += netSurplusQty * unitPrice;
       }
@@ -370,12 +381,13 @@ function recalculate() {
     recipeTreeRoot.children.forEach(child => { rawMaterialCost += calculateTreeNodeCost(child); });
   } else {
     const rootStrategy = getNodePriceStrategy(recipeTreeRoot);
-    const prices = priceCache[recipeTreeRoot.typeId] || { sell: 0, buy: 0 };
+    const productTypeId = recipeTreeRoot.productTypeId || recipeTreeRoot.typeId;
+    const prices = priceCache[productTypeId] || { sell: 0, buy: 0 };
     let unitPrice = rootStrategy === 'sell' ? prices.sell : prices.buy;
     if (rootStrategy === 'buy') { unitPrice = unitPrice * (1 + brokerFee); }
     const deductModeInput = document.getElementById('deduct-stock-mode');
     const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-    const stockQty = isStockDeductEnabled ? (userStockMap[recipeTreeRoot.typeId] || userStockMap[recipeTreeRoot.displayTypeId] || 0) : 0;
+    const stockQty = isStockDeductEnabled ? (userStockMap[productTypeId] || userStockMap[recipeTreeRoot.typeId] || 0) : 0;
     const netRootQty = Math.max(0, totalRootOutputQty - stockQty);
     rawMaterialCost = unitPrice * netRootQty;
   }
@@ -384,7 +396,8 @@ function recalculate() {
   let totalJobFees = calculateNodeJobFee(recipeTreeRoot, facilityTax, sccSurcharge, structureRoleBonus);
   let totalProductionCost = effectiveMaterialCost + totalJobFees;
 
-  const outputPrices = priceCache[recipeTreeRoot.typeId] || { sell: 0, buy: 0 };
+  const rootProductTypeId = recipeTreeRoot.productTypeId || recipeTreeRoot.typeId;
+  const outputPrices = priceCache[rootProductTypeId] || { sell: 0, buy: 0 };
   const selectedStrategy = window.rootSellStrategy || 'market-sell';
   let unitSellPrice = 0;
   let isContractMode = selectedStrategy === 'custom-contract';
@@ -507,12 +520,13 @@ function renderTreeDiagram(rootNode, priceStrategy, profitSell, roiSell) {
 }
 
 function createNodeCard(node) {
-  const prices = priceCache[node.typeId] || { sell: 0, buy: 0 };
+  const productTypeId = node.productTypeId || node.typeId;
+  const prices = priceCache[productTypeId] || { sell: 0, buy: 0 };
   const isRoot = node.depth === 0;
   const isIsolated = node.instanceId === isolatedInstanceId;
   const deductModeInput = document.getElementById('deduct-stock-mode');
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-  const stockQty = isStockDeductEnabled ? (userStockMap[node.typeId] || userStockMap[node.displayTypeId] || 0) : 0;
+  const stockQty = isStockDeductEnabled ? (userStockMap[productTypeId] || userStockMap[node.typeId] || 0) : 0;
 
   const card = document.createElement('div');
   card.id = `node-card-${node.instanceId}`;
@@ -527,7 +541,7 @@ function createNodeCard(node) {
 
   const totalProduced = node.runsNeeded * node.batchYield;
   const surplus = totalProduced - node.qtyNeeded;
-  const iconTypeId = node.displayTypeId || node.typeId;
+  const iconTypeId = node.typeId; // Blueprint Icon
 
   const unitEIV = node.unitEIV || 0;
   const totalEIV = node.jobEIV || (unitEIV * node.qtyNeeded);
@@ -574,7 +588,7 @@ function createNodeCard(node) {
   if (node.isBuildingSelf && node.recipe) {
     const baseTime = extractBuildTime(node.recipe, node.typeId, node.name);
     if (baseTime > 0) {
-      const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
+      const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
       const indFactor = 1 - (0.04 * (skills.industry || 0));
       const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
       const skillTimeFactor = indFactor * advIndFactor;
@@ -590,12 +604,12 @@ function createNodeCard(node) {
       else if (activeFacilityKey === 'raitaru') { facilityFactor = 0.85; structureName = 'Raitaru'; structureTEBonus = '15%'; }
 
       const totalSeconds = baseTime * teFactor * skillTimeFactor * facilityFactor * node.runsNeeded;
-      const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)\n• Base SDE Time: ${window.formatDuration(baseTime)}`;
+      const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)\n• Base SDE Time: ${formatDuration(baseTime)}`;
 
       buildTimeUI = `
-        <div class="flex justify-between text-[10px] text-slate-400 mono border-t border-[#1e3348]/40 pt-1 mt-1 cursor-help" title="${window.esc(hoverTitle)}">
+        <div class="flex justify-between text-[10px] text-slate-400 mono border-t border-[#1e3348]/40 pt-1 mt-1 cursor-help" title="${esc(hoverTitle)}">
           <span>Est. Build Time:</span>
-          <span class="text-slate-300 font-semibold">${window.formatDuration(totalSeconds)}</span>
+          <span class="text-slate-300 font-semibold">${formatDuration(totalSeconds)}</span>
         </div>
       `;
     }
@@ -627,7 +641,7 @@ function createNodeCard(node) {
           </div>
         </div>
         <div class="text-[11px] text-cyan-400 mono flex items-center justify-between">
-          <span>${isRoot ? 'Output Qty:' : 'Req Qty:'} ${node.qtyNeeded.toLocaleString()}</span>
+          <span>${isRoot ? 'Output Qty:' : 'Req Qty:'} ${node.qtyNeeded.toLocaleString()} ${node.productName}</span>
           ${stockQty > 0 ? `<span class="bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-[9px] px-1 rounded font-bold" title="In Stock in Hangar">Stock: ${stockQty.toLocaleString()}</span>` : ''}
         </div>
         ${node.isBuildingSelf && node.batchYield > 1 ? `<div class="${node.isReaction ? 'text-purple-300 font-bold' : 'text-amber-300'} text-[10px] mono font-semibold mt-0.5">(${node.runsNeeded} Run${node.runsNeeded > 1 ? 's' : ''} @ ${node.batchYield}/run ${surplus > 0 ? `→ ${surplus} Surplus` : ''})</div>` : ''}
@@ -723,16 +737,22 @@ function syncSellStrategy(e) {
 function addCurrentJobToLedger(e) {
   if (e) e.stopPropagation();
   if (!recipeTreeRoot) return;
+
   recalculate();
 
   let queue = [];
   try {
     const saved = localStorage.getItem('eve_ledger_jobs');
-    if (saved) { queue = JSON.parse(saved); }
-  } catch (err) { queue = []; }
+    if (saved) {
+      queue = JSON.parse(saved);
+    }
+  } catch (err) {
+    queue = [];
+  }
 
   const selectedStrategy = window.rootSellStrategy || 'market-sell';
-  const outputPrices = priceCache[recipeTreeRoot.typeId] || { sell: 0, buy: 0 };
+  const rootProductTypeId = recipeTreeRoot.productTypeId || recipeTreeRoot.typeId;
+  const outputPrices = priceCache[rootProductTypeId] || { sell: 0, buy: 0 };
   let customPrice = window.rootCustomPrice || 0;
   let unitSellPrice = selectedStrategy.startsWith('custom-') ? customPrice : outputPrices.sell;
   const baseTime = extractBuildTime(recipeTreeRoot.recipe, recipeTreeRoot.typeId, recipeTreeRoot.name);
@@ -743,23 +763,39 @@ function addCurrentJobToLedger(e) {
     if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
       const typeId = node.displayTypeId || node.typeId;
       const strategy = getNodePriceStrategy(node);
+      
       const deductModeInput = document.getElementById('deduct-stock-mode');
       const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-      const stockQty = isStockDeductEnabled ? (userStockMap[typeId] || userStockMap[node.typeId] || 0) : 0;
+      const productTypeId = node.productTypeId || node.typeId;
+      const stockQty = isStockDeductEnabled ? (userStockMap[productTypeId] || userStockMap[node.typeId] || 0) : 0;
       const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
-      const prices = priceCache[typeId] || { sell: 0, buy: 0 };
+
+      const prices = priceCache[productTypeId] || { sell: 0, buy: 0 };
       let unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
       
-      materials.push({ typeId, name: node.name, qtyNeeded: node.qtyNeeded, stockQty, netQtyNeeded, strategy, unitPrice, lineCost: unitPrice * netQtyNeeded });
+      materials.push({
+        typeId: productTypeId,
+        name: node.name.replace(' Blueprint', ''),
+        qtyNeeded: node.qtyNeeded,
+        stockQty: stockQty,
+        netQtyNeeded: netQtyNeeded,
+        strategy: strategy,
+        unitPrice: unitPrice,
+        lineCost: unitPrice * netQtyNeeded
+      });
     } else {
-      node.children.forEach(child => { if (child) extractBOM(child); });
+      node.children.forEach(child => {
+        if (child) extractBOM(child);
+      });
     }
   }
 
   if (recipeTreeRoot.isBuildingSelf && recipeTreeRoot.children && recipeTreeRoot.children.length > 0) {
-    recipeTreeRoot.children.forEach(c => { if (c) extractBOM(c); });
+    recipeTreeRoot.children.forEach(c => {
+      if (c) extractBOM(c);
+    });
   } else {
-    const rootTypeId = recipeTreeRoot.displayTypeId || recipeTreeRoot.typeId;
+    const rootTypeId = recipeTreeRoot.productTypeId || recipeTreeRoot.typeId;
     const strategy = getNodePriceStrategy(recipeTreeRoot);
     const deductModeInput = document.getElementById('deduct-stock-mode');
     const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
@@ -768,25 +804,38 @@ function addCurrentJobToLedger(e) {
     const prices = priceCache[rootTypeId] || { sell: 0, buy: 0 };
     let unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
 
-    materials.push({ typeId: rootTypeId, name: recipeTreeRoot.name, qtyNeeded: recipeTreeRoot.qtyNeeded, stockQty, netQtyNeeded, strategy, unitPrice, lineCost: unitPrice * netQtyNeeded });
+    materials.push({
+      typeId: rootTypeId,
+      name: recipeTreeRoot.productName || recipeTreeRoot.name.replace(' Blueprint', ''),
+      qtyNeeded: recipeTreeRoot.qtyNeeded,
+      stockQty: stockQty,
+      netQtyNeeded: netQtyNeeded,
+      strategy: strategy,
+      unitPrice: unitPrice,
+      lineCost: unitPrice * netQtyNeeded
+    });
   }
 
   const job = {
-    id: Date.now() + Math.floor(Math.random() * 1000),
-    typeId: recipeTreeRoot.displayTypeId || recipeTreeRoot.typeId,
+    id: Date.now() + Math.floor(Math.random() * 1000), // Secure timestamp-based unique ID
+    typeId: recipeTreeRoot.typeId,
     name: recipeTreeRoot.name,
     runsNeeded: recipeTreeRoot.runsNeeded,
     qtyNeeded: recipeTreeRoot.qtyNeeded,
     calculatedCost: recipeTreeRoot.calculatedCost || 0,
-    baseTime: baseTime,
+    baseTime: baseTime, // Serialized here for SDE duration on the Ledger page
     sellStrategy: selectedStrategy,
     unitSellPrice: unitSellPrice,
     materials: materials,
     addedAt: new Date().toISOString()
   };
+
   queue.push(job);
   localStorage.setItem('eve_ledger_jobs', JSON.stringify(queue));
+
+  // Sync active stock map to localStorage so the ledger page can read it too
   localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap || {}));
+
   updateHeaderLedgerCount();
 
   const btn = e.target.closest('button');
@@ -811,14 +860,21 @@ function updateHeaderLedgerCount() {
     if (saved) {
       const queue = JSON.parse(saved);
       badge.textContent = Array.isArray(queue) ? queue.length.toString() : '0';
-    } else { badge.textContent = '0'; }
-  } catch (e) { badge.textContent = '0'; }
+    } else {
+      badge.textContent = '0';
+    }
+  } catch (e) {
+    badge.textContent = '0';
+  }
 }
 
 function onNodeClick(e, instanceId) {
   e.stopPropagation();
-  if (selectedInstanceId === instanceId) { selectedInstanceId = null; } 
-  else { selectedInstanceId = instanceId; }
+  if (selectedInstanceId === instanceId) {
+    selectedInstanceId = null;
+  } else {
+    selectedInstanceId = instanceId;
+  }
   applyNodeHighlightClasses();
   drawConnectingLines();
 }
@@ -847,10 +903,14 @@ function findNodeByInstanceId(root, id) {
 
 function applyNodeHighlightClasses() {
   const allCards = document.querySelectorAll('.diagram-node');
+  
   if (!selectedInstanceId) {
-    allCards.forEach(card => { card.classList.remove('node-selected', 'node-child-highlight', 'node-parent-highlight', 'node-dimmed'); });
+    allCards.forEach(card => {
+      card.classList.remove('node-selected', 'node-child-highlight', 'node-parent-highlight', 'node-dimmed');
+    });
     return;
   }
+
   const selectedNode = findNodeByInstanceId(recipeTreeRoot, selectedInstanceId);
   const childInstanceIds = new Set(selectedNode ? selectedNode.children.map(c => c.instanceId) : []);
   const parentInstanceId = selectedNode ? selectedNode.parentInstanceId : null;
@@ -858,22 +918,35 @@ function applyNodeHighlightClasses() {
   allCards.forEach(card => {
     const instanceId = parseInt(card.getAttribute('data-instance-id'));
     card.classList.remove('node-selected', 'node-child-highlight', 'node-parent-highlight', 'node-dimmed');
-    if (instanceId === selectedInstanceId) { card.classList.add('node-selected'); } 
-    else if (childInstanceIds.has(instanceId)) { card.classList.add('node-child-highlight'); } 
-    else if (instanceId === parentInstanceId) { card.classList.add('node-parent-highlight'); } 
-    else { card.classList.add('node-dimmed'); }
+
+    if (instanceId === selectedInstanceId) {
+      card.classList.add('node-selected');
+    } else if (childInstanceIds.has(instanceId)) {
+      card.classList.add('node-child-highlight');
+    } else if (instanceId === parentInstanceId) {
+      card.classList.add('node-parent-highlight');
+    } else {
+      card.classList.add('node-dimmed');
+    }
   });
 }
 
+// Selects and centers camera dead-center on a diagram node when clicking a row in the Bill of Materials sidebar
 function highlightNodeByTypeId(typeId) {
   function findMatchingNode(node) {
     if (!node) return null;
     if (node.typeId === typeId || node.displayTypeId === typeId) return node;
     if (node.children) {
-      for (const child of node.children) { if (child) { const found = findMatchingNode(child); if (found) return found; } }
+      for (const child of node.children) {
+        if (child) {
+          const found = findMatchingNode(child);
+          if (found) return found;
+        }
+      }
     }
     return null;
   }
+
   const targetNode = findMatchingNode(recipeTreeRoot);
   if (targetNode) {
     selectedInstanceId = targetNode.instanceId;
@@ -909,16 +982,21 @@ function renderIsolatedDiagram() {
   const container = document.getElementById('tree-container');
   if (!container) return;
   container.innerHTML = '';
+
   const isolatedNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
   if (!isolatedNode) return;
+
   const parentNode = isolatedNode.parentInstanceId ? findNodeByInstanceId(recipeTreeRoot, isolatedNode.parentInstanceId) : null;
 
   const inputCol = document.createElement('div');
   inputCol.className = 'flex flex-col space-y-4 justify-center';
+  
   if (!isolatedNode.isBuildingSelf || isolatedNode.children.length === 0) {
     inputCol.innerHTML = `<div class="bg-[#0c1318] border border-[#1e3348] p-3 text-xs text-slate-400 mono rounded">${!isolatedNode.isBuildingSelf ? 'Purchased off Market (No decomposed inputs)' : 'No inputs (Base Material)'}</div>`;
   } else {
-    isolatedNode.children.forEach(child => { if (child) inputCol.appendChild(createNodeCard(child)); });
+    isolatedNode.children.forEach(child => {
+      if (child) inputCol.appendChild(createNodeCard(child));
+    });
   }
 
   const centerCol = document.createElement('div');
@@ -927,25 +1005,37 @@ function renderIsolatedDiagram() {
 
   const outputCol = document.createElement('div');
   outputCol.className = 'flex flex-col justify-center';
-  if (parentNode) { outputCol.appendChild(createNodeCard(parentNode)); } 
-  else { outputCol.innerHTML = `<div class="bg-[#0c1318] border border-amber-500/50 p-3 text-xs text-amber-300 font-bold mono rounded">Final Target Job Output</div>`; }
+  
+  if (parentNode) {
+    outputCol.appendChild(createNodeCard(parentNode));
+  } else {
+    outputCol.innerHTML = `<div class="bg-[#0c1318] border border-amber-500/50 p-3 text-xs text-amber-300 font-bold mono rounded">Final Target Job Output</div>`;
+  }
 
   container.appendChild(inputCol);
   container.appendChild(centerCol);
   container.appendChild(outputCol);
+
   applyNodeHighlightClasses();
 }
 
+// Accurate Camera Centering using absolute content-space coordinates
 function centerOnSelectedNode() {
   let targetId = isolatedInstanceId || selectedInstanceId;
-  if (!targetId && recipeTreeRoot) { targetId = recipeTreeRoot.instanceId; }
+  
+  if (!targetId && recipeTreeRoot) {
+    targetId = recipeTreeRoot.instanceId;
+  }
+
   if (!targetId) return;
 
   const card = document.getElementById(`node-card-${targetId}`);
   const viewport = document.getElementById('viewport');
   const content = document.getElementById('pan-zoom-content');
+
   if (!card || !viewport || !content) return;
 
+  // Neutralize any browser-native auto-scroll offsets inside the viewport container
   viewport.scrollTop = 0;
   viewport.scrollLeft = 0;
 
@@ -953,14 +1043,19 @@ function centerOnSelectedNode() {
   const contentRect = content.getBoundingClientRect();
   const cardRect = card.getBoundingClientRect();
 
+  // 1. Calculate the card's static, unscaled position relative to the content container
   const cardContentX = (cardRect.left - contentRect.left) / zoomScale;
   const cardContentY = (cardRect.top - contentRect.top) / zoomScale;
+
+  // 2. Calculate the card's unscaled dimensions
   const cardContentWidth = cardRect.width / zoomScale;
   const cardContentHeight = cardRect.height / zoomScale;
 
+  // 3. Find the exact center of the card in unscaled content space
   const cardContentCenterX = cardContentX + cardContentWidth / 2;
   const cardContentCenterY = cardContentY + cardContentHeight / 2;
 
+  // 4. Calculate the absolute panX and panY required to align the card's center with the viewport's center
   panX = (viewportRect.width / 2) - cardContentCenterX * zoomScale;
   panY = (viewportRect.height / 2) - cardContentCenterY * zoomScale;
 
@@ -979,12 +1074,15 @@ function drawConnectingLines() {
   svg.setAttribute('width', container.scrollWidth);
   svg.setAttribute('height', container.scrollHeight);
   svg.innerHTML = '';
+
   if (!recipeTreeRoot) return;
 
   const containerRect = container.getBoundingClientRect();
+
   if (isolatedInstanceId !== null) {
     const isolatedNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
     if (!isolatedNode) return;
+
     const MathEl = document.getElementById(`node-card-${isolatedNode.instanceId}`);
     if (!MathEl) return;
 
@@ -1001,6 +1099,7 @@ function drawConnectingLines() {
             const childRect = childEl.getBoundingClientRect();
             const startX = (childRect.right - containerRect.left) / zoomScale;
             const startY = (childRect.top + childRect.height / 2 - containerRect.top) / zoomScale;
+
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.setAttribute('d', `M ${startX} ${startY} C ${startX + 40} ${startY}, ${isoLeftX - 40} ${isoCenterY}, ${isoLeftX} ${isoCenterY}`);
             path.setAttribute('stroke', '#4caf6f');
@@ -1021,6 +1120,7 @@ function drawConnectingLines() {
           const parentRect = parentEl.getBoundingClientRect();
           const endX = (parentRect.left - containerRect.left) / zoomScale;
           const endY = (parentRect.top + parentRect.height / 2 - containerRect.top) / zoomScale;
+
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           path.setAttribute('d', `M ${isoRightX} ${isoCenterY} C ${isoRightX + 40} ${isoCenterY}, ${endX - 40} ${endY}, ${endX} ${endY}`);
           path.setAttribute('stroke', '#e8c96a');
@@ -1033,11 +1133,13 @@ function drawConnectingLines() {
     }
     return;
   }
+
   drawConnectingLinesForTree(recipeTreeRoot);
 }
 
 function drawConnectingLinesForTree(root) {
   if (!root) return;
+  
   const container = document.getElementById('tree-container');
   const svg = document.getElementById('tree-svg');
   if (!svg || !container) return;
@@ -1049,9 +1151,12 @@ function drawConnectingLinesForTree(root) {
 
   function drawLinesForNode(node) {
     if (!node.isBuildingSelf || !node.children || node.children.length === 0) return;
+
     const parentEl = document.getElementById(`node-card-${node.instanceId}`);
     if (!parentEl) return;
+
     const parentRect = parentEl.getBoundingClientRect();
+    
     const endX = (parentRect.left - containerRect.left) / zoomScale;
     const endY = (parentRect.top + parentRect.height / 2 - containerRect.top) / zoomScale;
 
@@ -1060,18 +1165,25 @@ function drawConnectingLinesForTree(root) {
         const childEl = document.getElementById(`node-card-${child.instanceId}`);
         if (childEl) {
           const childRect = childEl.getBoundingClientRect();
+          
           const startX = (childRect.right - containerRect.left) / zoomScale;
           const startY = (childRect.top + childRect.height / 2 - containerRect.top) / zoomScale;
+
           const controlX1 = startX + 40;
           const controlX2 = endX - 40;
 
-          const isInputConnection = (selectedInstanceId !== null) && (node.instanceId === selectedInstanceId && activeChildIds.has(child.instanceId));
-          const isOutputConnection = (selectedInstanceId !== null) && (child.instanceId === selectedInstanceId && node.instanceId === parentInstanceId);
+          const isInputConnection = (selectedInstanceId !== null) && 
+            (node.instanceId === selectedInstanceId && activeChildIds.has(child.instanceId));
+
+          const isOutputConnection = (selectedInstanceId !== null) && 
+            (child.instanceId === selectedInstanceId && node.instanceId === parentInstanceId);
+
           const isHighlightedConnection = isInputConnection || isOutputConnection;
           const isDimmedConnection = (selectedInstanceId !== null) && !isHighlightedConnection;
 
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           path.setAttribute('d', `M ${startX} ${startY} C ${controlX1} ${startY}, ${controlX2} ${endY}, ${endX} ${endY}`);
+          
           if (isHighlightedConnection) {
             path.setAttribute('stroke', isOutputConnection ? '#e8c96a' : '#4caf6f');
             path.setAttribute('stroke-width', '3.5');
@@ -1085,6 +1197,7 @@ function drawConnectingLinesForTree(root) {
             path.setAttribute('stroke-width', '2');
             path.setAttribute('stroke-opacity', '0.75');
           }
+
           path.setAttribute('fill', 'none');
           svg.appendChild(path);
         }
@@ -1092,6 +1205,7 @@ function drawConnectingLinesForTree(root) {
       drawLinesForNode(child);
     });
   }
+
   drawLinesForNode(root);
 }
 
@@ -1099,6 +1213,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
   const listContainer = document.getElementById('bom-items-list');
   if (!listContainer) return;
   listContainer.innerHTML = '';
+
   if (!rootNode) return;
 
   const deductModeInput = document.getElementById('deduct-stock-mode');
@@ -1110,23 +1225,38 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
     if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
       const typeId = node.displayTypeId || node.typeId;
       const strategy = getNodePriceStrategy(node);
-      const stockQty = isStockDeductEnabled ? (userStockMap[typeId] || userStockMap[node.typeId] || 0) : 0;
+      
+      const productTypeId = node.productTypeId || node.typeId;
+      const stockQty = isStockDeductEnabled ? (userStockMap[productTypeId] || userStockMap[node.typeId] || 0) : 0;
       const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
-      if (!bomMap[typeId]) { bomMap[typeId] = { typeId, name: node.name, qty: 0, strategy }; }
-      bomMap[typeId].qty += netQtyNeeded;
+
+      if (!bomMap[productTypeId]) {
+        bomMap[productTypeId] = {
+          typeId: productTypeId,
+          name: node.name.replace(' Blueprint', ''),
+          qty: 0,
+          strategy: strategy
+        };
+      }
+      bomMap[productTypeId].qty += netQtyNeeded;
     } else {
-      node.children.forEach(child => { if (child) generateBOM(child); });
+      node.children.forEach(child => {
+        if (child) generateBOM(child);
+      });
     }
   }
 
   if (rootNode.isBuildingSelf && rootNode.children && rootNode.children.length > 0) {
-    rootNode.children.forEach(c => { if (c) generateBOM(c); });
+    rootNode.children.forEach(c => {
+      if (c) generateBOM(c);
+    });
   } else {
-    const rootTypeId = rootNode.displayTypeId || rootNode.typeId;
-    const strategy = getNodeStrategyOnly(rootNode);
+    const rootTypeId = rootNode.productTypeId || rootNode.typeId;
+    const strategy = getNodeStrategyOnly(rootNode); // safe strategy getter
     const stockQty = isStockDeductEnabled ? (userStockMap[rootTypeId] || userStockMap[rootNode.typeId] || 0) : 0;
     const netQtyNeeded = Math.max(0, rootNode.qtyNeeded - stockQty);
-    bomMap[rootTypeId] = { typeId: rootTypeId, name: rootNode.name, qty: netQtyNeeded, strategy };
+
+    bomMap[rootTypeId] = { typeId: rootTypeId, name: rootNode.productName || rootNode.name.replace(' Blueprint', ''), qty: netQtyNeeded, strategy: strategy };
   }
 
   const bomItems = Object.values(bomMap);
@@ -1135,7 +1265,9 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
   bomItems.forEach(item => {
     const prices = priceCache[item.typeId] || { sell: 0, buy: 0 };
     let unitPrice = item.strategy === 'sell' ? prices.sell : prices.buy;
-    if (item.strategy === 'buy') { unitPrice = unitPrice * (1 + brokerFee); }
+    if (item.strategy === 'buy') {
+      unitPrice = unitPrice * (1 + brokerFee);
+    }
     item.unitPrice = unitPrice;
     item.lineCost = unitPrice * item.qty;
     totalBOMCost += item.lineCost;
@@ -1155,20 +1287,27 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
         <div class="min-w-0 flex-1">
           <div class="font-semibold text-slate-200 truncate flex items-center gap-1.5">
             <span class="truncate">${item.name}</span>
-            <span class="text-[9px] px-1 rounded font-bold mono ${item.strategy === 'sell' ? 'bg-amber-900/60 text-amber-300' : 'bg-cyan-900/60 text-cyan-300'}">${item.strategy === 'sell' ? 'SELL' : 'BUY'}</span>
+            <span class="text-[9px] px-1 rounded font-bold mono ${item.strategy === 'sell' ? 'bg-amber-900/60 text-amber-300' : 'bg-cyan-900/60 text-cyan-300'}">
+              ${item.strategy === 'sell' ? 'SELL' : 'BUY'}
+            </span>
           </div>
           <div class="text-[10px] text-slate-400 mono font-semibold">Qty: ${item.qty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK</div>
         </div>
       </div>
-      <div class="text-right mono font-bold text-cyan-400 flex-shrink-0 ml-2">${Math.round(item.lineCost).toLocaleString()} ISK</div>
+      <div class="text-right mono font-bold text-cyan-400 flex-shrink-0 ml-2">
+        ${Math.round(item.lineCost).toLocaleString()} ISK
+      </div>
     `;
+
     listContainer.appendChild(row);
   });
 
   const countEl = document.getElementById('bom-type-count');
   if (countEl) countEl.textContent = bomItems.length.toString();
+
   const totalEl = document.getElementById('bom-total-isk');
   if (totalEl) totalEl.textContent = Math.round(totalBOMCost).toLocaleString() + ' ISK';
+
   window.currentBOMText = bomItems.map(i => `${i.name} x${i.qty}`).join('\n');
 }
 
@@ -1194,6 +1333,7 @@ function copyMultibuyText() {
   });
 }
 
+// Smooth Pan and Zoom Engine
 const viewport = document.getElementById('viewport');
 const content = document.getElementById('pan-zoom-content');
 
@@ -1227,6 +1367,7 @@ if (viewport) {
     e.preventDefault();
     const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
     const newScale = Math.min(Math.max(0.2, zoomScale * zoomFactor), 3.0);
+
     const rect = viewport.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
@@ -1256,6 +1397,7 @@ function resetPanZoom() {
   drawConnectingLines();
 }
 
+// Bind window handlers explicitly
 window.addCurrentJobToLedger = addCurrentJobToLedger;
 window.updateHeaderLedgerCount = updateHeaderLedgerCount;
 window.syncSellStrategy = syncSellStrategy;
@@ -1273,21 +1415,30 @@ window.centerOnSelectedNode = centerOnSelectedNode;
 window.resetPanZoom = resetPanZoom;
 window.copyMultibuyText = copyMultibuyText;
 
+// Initialize Application
 window.onload = async () => {
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
-  try {
-    loadTaxSettings();
-    loadSavedState();
-    updateHeaderLedgerCount();
-  } catch (err) { console.error("State restoration error:", err); }
 
+  // Load static local states instantly so the app is interactive immediately!
+  try {
+    loadTaxSettings(); // Load custom taxes from localStorage!
+    loadSavedState(); // Load previous product & overrides persistently from localStorage!
+    updateHeaderLedgerCount(); // Update badge on load!
+  } catch (err) {
+    console.error("State restoration error:", err);
+  }
+
+  // Handle SSO Callback and assets asynchronously in the background
   if (typeof handleEsiSSOCallback === 'function') {
     handleEsiSSOCallback().catch(err => console.error("SSO Callback error:", err));
   }
+
+  // Fetch adjusted prices asynchronously in the background
   if (typeof fetchAdjustedPrices === 'function') {
     fetchAdjustedPrices().catch(err => console.error("Adjusted prices fetch error:", err));
   }
+
   window.addEventListener('resize', drawConnectingLines);
 };

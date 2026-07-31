@@ -181,11 +181,53 @@ function collectAllTypeIds(node, typeIds = new Set()) {
   if (!node) return typeIds;
   if (node.typeId) typeIds.add(node.typeId);
   if (node.displayTypeId) typeIds.add(node.displayTypeId);
+  if (node.productTypeId) typeIds.add(node.productTypeId);
   if (node.children) {
     node.children.forEach(child => collectAllTypeIds(child, typeIds));
   }
   return typeIds;
 }
+
+// O(1) Fast SDE Reverse Lookup to find a Blueprint Type ID for a given manufactured item Product ID
+function findBlueprintTypeIdForProduct(productTypeId) {
+  const pId = parseInt(productTypeId);
+  if (isNaN(pId)) return null;
+
+  // 1. Direct index match
+  if (window.recipeMap && window.recipeMap[pId]) {
+    const recipe = window.recipeMap[pId];
+    const bpId = recipe.blueprintTypeID || recipe.bp || recipe.bpId;
+    if (bpId && parseInt(bpId) !== pId) {
+      return parseInt(bpId);
+    }
+  }
+
+  if (window.EVE_RECIPES && window.EVE_RECIPES[pId]) {
+    const recipe = window.EVE_RECIPES[pId];
+    const bpId = recipe.blueprintTypeID || recipe.bp || recipe.bpId;
+    if (bpId && parseInt(bpId) !== pId) {
+      return parseInt(bpId);
+    }
+  }
+
+  // 2. Loop match fallback
+  if (window.recipeMap) {
+    for (const [key, r] of Object.entries(window.recipeMap)) {
+      if (r) {
+        const currentPId = r.productTypeID || r.product || r.p || r.pId;
+        if (parseInt(currentPId) === pId) {
+          const bpId = r.blueprintTypeID || r.bp || r.bpId || key;
+          if (bpId && parseInt(bpId) !== pId) {
+            return parseInt(bpId);
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+window.findBlueprintTypeIdForProduct = findBlueprintTypeIdForProduct;
 
 async function fetchBlueprintData(typeId) {
   if (blueprintCache[typeId] !== undefined) {
@@ -219,9 +261,7 @@ async function fetchBlueprintData(typeId) {
   // 4. Search recipeMap for matching product or blueprint type ID
   if (window.recipeMap) {
     for (const r of Object.values(window.recipeMap)) {
-      if (r && (r.productTypeID === typeId || r.blueprintTypeID === typeId || 
-                r.product === typeId || r.bp === typeId || r.p === typeId ||
-                r.result === typeId || r.output === typeId)) {
+      if (r && (r.blueprintTypeID === typeId || r.productTypeID === typeId || r.bp === typeId || r.product === typeId || r.p === typeId || r.result === typeId || r.output === typeId)) {
         blueprintCache[typeId] = r;
         return r;
       }
@@ -231,31 +271,15 @@ async function fetchBlueprintData(typeId) {
   // 5. Search window.EVE_RECIPES for matching product or blueprint type ID
   if (window.EVE_RECIPES) {
     for (const r of Object.values(window.EVE_RECIPES)) {
-      if (r && (r.productTypeID === typeId || r.blueprintTypeID === typeId || 
-                r.product === typeId || r.bp === typeId || r.p === typeId ||
-                r.result === typeId || r.output === typeId)) {
+      if (r && (r.blueprintTypeID === typeId || r.productTypeID === typeId || r.bp === typeId || r.product === typeId || r.p === typeId || r.result === typeId || r.output === typeId)) {
         blueprintCache[typeId] = r;
         return r;
       }
     }
   }
 
-  // 6. Check POPULAR_ITEMS cross-reference
-  const popMatch = POPULAR_ITEMS ? POPULAR_ITEMS.find(p => p.id === typeId || p.bpId === typeId) : null;
-  if (popMatch) {
-    const otherId = (popMatch.id === typeId) ? popMatch.bpId : popMatch.id;
-    if (otherId && recipeMap[otherId]) {
-      blueprintCache[typeId] = recipeMap[otherId];
-      return recipeMap[otherId];
-    }
-  }
-
-  // 7. Fallback to external API (with exact activityProducts batch yield extraction)
+  // 6. Fallback to external API (with exact activityProducts batch yield extraction)
   const tryTypeIds = [typeId];
-  if (popMatch && popMatch.bpId && !tryTypeIds.includes(popMatch.bpId)) {
-    tryTypeIds.unshift(popMatch.bpId);
-  }
-
   for (const targetId of tryTypeIds) {
     const fuzzworkUrl = `https://www.fuzzwork.co.uk/blueprint/api/blueprint.php?typeid=${targetId}`;
     const tryUrls = [
@@ -330,22 +354,23 @@ async function fetchBlueprintData(typeId) {
   return null;
 }
 
-// Parallel Multi-Layer Tree Generator with Default ME = 0% and TE = 0%
-async function buildRecursiveRecipeTree(typeId, name, qtyNeeded, currentDepth, maxDepth, visitedPath = new Set(), parentNode = null) {
+// Parallel Multi-Layer SDE Blueprint-Centric Tree Generator
+async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, currentDepth, maxDepth, visitedPath = new Set(), parentNode = null) {
   const defaultBuildState = (currentDepth === 0) ? true : false;
-  const isBuildingSelf = (buildSelfOverrides[typeId] !== undefined) ? buildSelfOverrides[typeId] : defaultBuildState;
+  const isBuildingSelf = (buildSelfOverrides[blueprintTypeId] !== undefined) ? buildSelfOverrides[blueprintTypeId] : defaultBuildState;
 
-  // Strict default ME = 0%, TE = 0%
   const defaultME = 0;
   const defaultTE = 0;
 
   const node = {
     instanceId: ++instanceCounter,
     parentInstanceId: parentNode ? parentNode.instanceId : null,
-    typeId,
-    displayTypeId: typeId,
-    name,
-    qtyNeeded,
+    typeId: blueprintTypeId, // This is the Blueprint ID (e.g., 622)
+    displayTypeId: blueprintTypeId,
+    productTypeId: null,     // Physical item manufactured (e.g., 621)
+    name: name,              // Blueprint Name (e.g., "Caracal Blueprint")
+    productName: '',         // Manufactured Item Name (e.g., "Caracal")
+    qtyNeeded: qtyNeeded,    // Quantity of physical product needed by parent
     depth: currentDepth,
     recipe: null,
     children: [],
@@ -354,17 +379,18 @@ async function buildRecursiveRecipeTree(typeId, name, qtyNeeded, currentDepth, m
     batchYield: 1,
     runsNeeded: 1,
     isBuildingSelf: isBuildingSelf,
-    customME: customMEOverrides[typeId] !== undefined ? customMEOverrides[typeId] : defaultME,
-    customTE: customTEOverrides[typeId] !== undefined ? customTEOverrides[typeId] : defaultTE,
+    customME: customMEOverrides[blueprintTypeId] !== undefined ? customMEOverrides[blueprintTypeId] : defaultME,
+    customTE: customTEOverrides[blueprintTypeId] !== undefined ? customTEOverrides[blueprintTypeId] : defaultTE,
     unitEIV: 0,
     jobEIV: 0,
     jobFee: 0
   };
 
   try {
-    const recipe = await fetchBlueprintData(typeId);
+    const recipe = await fetchBlueprintData(blueprintTypeId);
     if (recipe) {
-      node.displayTypeId = recipe.productTypeID || recipe.product || recipe.p || typeId;
+      node.productTypeId = recipe.productTypeID || recipe.product || recipe.p || blueprintTypeId;
+      node.productName = recipe.productName || window.TYPE_ID_TO_NAME[node.productTypeId] || '';
       node.isManufacturable = true;
       
       const allowReactions = document.getElementById('include-reactions')?.value === 'true';
@@ -378,8 +404,6 @@ async function buildRecursiveRecipeTree(typeId, name, qtyNeeded, currentDepth, m
       }
 
       if (rawMaterials && rawMaterials.length > 0) {
-        // CONSOLIDATE & DE-DUPLICATE SDE RECIPE MATERIALS:
-        // Keeps unique typeIDs with their true single quantity
         const activeMaterials = [];
         const matMap = {};
 
@@ -413,23 +437,43 @@ async function buildRecursiveRecipeTree(typeId, name, qtyNeeded, currentDepth, m
         node.runsNeeded = runsNeeded;
 
         const nextVisited = new Set(visitedPath);
-        nextVisited.add(typeId);
-        if (node.displayTypeId) {
-          nextVisited.add(node.displayTypeId);
+        nextVisited.add(blueprintTypeId);
+        if (node.productTypeId) {
+          nextVisited.add(node.productTypeId);
         }
 
-        const isCircular = visitedPath.has(typeId) || (node.displayTypeId && visitedPath.has(node.displayTypeId));
+        const isCircular = visitedPath.has(blueprintTypeId) || (node.productTypeId && visitedPath.has(node.productTypeId));
 
         if (currentDepth < maxDepth && !isCircular && isBuildingSelf) {
           const childPromises = activeMaterials.map(async mat => {
             try {
               const childQty = calculateInputQuantity(mat.baseQty, runsNeeded, me, facility, isReaction);
-              return await buildRecursiveRecipeTree(mat.typeId, mat.name, childQty, currentDepth + 1, maxDepth, nextVisited, node);
+              const childBlueprintTypeId = findBlueprintTypeIdForProduct(mat.typeId);
+
+              if (childBlueprintTypeId) {
+                // Child is manufacturable: Recurse on its Blueprint!
+                return await buildRecursiveRecipeTree(childBlueprintTypeId, mat.name + ' Blueprint', childQty, currentDepth + 1, maxDepth, nextVisited, node);
+              } else {
+                // Child is raw/unmanufacturable: Create terminal leaf node
+                return {
+                  instanceId: ++instanceCounter,
+                  parentInstanceId: node.instanceId,
+                  typeId: mat.typeId,
+                  displayTypeId: mat.typeId,
+                  name: mat.name,
+                  qtyNeeded: childQty,
+                  depth: currentDepth + 1,
+                  children: [],
+                  isManufacturable: false,
+                  isBuildingSelf: false
+                };
+              }
             } catch (err) {
               return {
                 instanceId: ++instanceCounter,
                 parentInstanceId: node.instanceId,
                 typeId: mat.typeId,
+                displayTypeId: mat.typeId,
                 name: mat.name,
                 qtyNeeded: mat.baseQty,
                 depth: currentDepth + 1,
@@ -460,7 +504,7 @@ function calculateInputQuantity(baseQty, runs, me, facilityBonus, isReaction = f
 }
 
 function scaleTreeQuantities(node, facility) {
-  if (!node.recipe || !node.recipe.materials || !node.children) return;
+  if (!node.recipe || !node.children) return;
 
   const batchYield = node.batchYield || getBatchYield(node.recipe, node.isReaction) || 1;
   node.batchYield = batchYield;
@@ -470,7 +514,10 @@ function scaleTreeQuantities(node, facility) {
   const effectiveME = node.isReaction ? 0 : (node.customME || 0);
 
   node.children.forEach(child => {
-    const mat = Array.isArray(node.recipe.materials) ? node.recipe.materials.find(m => m.typeId === child.typeId) : null;
+    // Determine the product ID to match the recipe materials array correctly
+    const childProductTypeId = child.productTypeId || child.typeId;
+    
+    const mat = Array.isArray(node.recipe.materials) ? node.recipe.materials.find(m => m.typeId === childProductTypeId) : null;
     if (mat) {
       child.qtyNeeded = calculateInputQuantity(mat.baseQty, runsNeeded, effectiveME, facility, node.isReaction);
     }

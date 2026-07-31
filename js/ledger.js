@@ -1,9 +1,7 @@
 'use strict';
 
-// Bind globally centralized helpers explicitly to satisfy strict-mode compilation
-const esc = window.esc;
-const safeParseJSON = window.safeParseJSON;
-const formatDuration = window.formatDuration;
+// Centralized helpers (esc, safeParseJSON, formatDuration) are loaded globally from js/config.js.
+// They MUST NOT be re-declared here with "const" or "let" to prevent duplicate declaration SyntaxErrors.
 
 // Global Ledger Queue State (relying on global userStockMap from config.js)
 let activeJobs = [];
