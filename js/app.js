@@ -270,8 +270,10 @@ async function selectItem(typeId, name, preserveView = false) {
     window.customTEOverrides = {};
   }
 
+  // Pre-resolve the product ID asynchronously with a fully case-insensitive suffix check [1]
+  const lowerName = name.toLowerCase();
   window.recipeTreeRootProductTypeId = null;
-  if (name.includes('Blueprint') || name.includes('Formula') || name.includes('Reaction')) {
+  if (lowerName.includes('blueprint') || lowerName.includes('formula') || lowerName.includes('reaction')) {
     const resolvedProductTypeId = await window.resolveProductIdFromBlueprintNameAsync(name);
     if (resolvedProductTypeId) {
       window.recipeTreeRootProductTypeId = resolvedProductTypeId;
@@ -379,7 +381,7 @@ function recalculate() {
   let totalSurplusMaterialValue = 0;
 
   Object.values(globalDemand).forEach(item => {
-    // CORRECTION: Exclude the root node's typeId (both blueprint and product IDs) from surplus credit! [1]
+    // Exclude the root node's typeId (both blueprint and product IDs) from surplus credit! [1]
     const rootProductTypeId = window.recipeTreeRoot.productTypeId || window.recipeTreeRoot.typeId;
     if (item.typeId === window.recipeTreeRoot.typeId || item.typeId === rootProductTypeId || item.productTypeId === rootProductTypeId) {
       return;
@@ -1092,16 +1094,16 @@ function drawConnectingLines() {
   const containerRect = container.getBoundingClientRect();
 
   if (window.isolatedInstanceId !== null) {
-    const isolatedNode = findNodeByInstanceId(window.recipeTreeRoot, window.isolatedInstanceId);
-    if (!isolatedNode) return;
-
-    const MathEl = document.getElementById(`node-card-${isolatedNode.instanceId}`);
+    const MathEl = document.getElementById(`node-card-${window.isolatedInstanceId}`);
     if (!MathEl) return;
 
     const isoRect = MathEl.getBoundingClientRect();
     const isoLeftX = (isoRect.left - containerRect.left) / window.zoomScale;
     const isoRightX = (isoRect.right - containerRect.left) / window.zoomScale;
     const isoCenterY = (isoRect.top + isoRect.height / 2 - containerRect.top) / window.zoomScale;
+
+    const isolatedNode = findNodeByInstanceId(window.recipeTreeRoot, window.isolatedInstanceId);
+    if (!isolatedNode) return;
 
     if (isolatedNode.isBuildingSelf && isolatedNode.children) {
       isolatedNode.children.forEach(child => {
@@ -1125,7 +1127,7 @@ function drawConnectingLines() {
     }
 
     if (isolatedNode.parentInstanceId) {
-      const parentNode = findNodeByInstanceId(window.recipeTreeRoot, window.isolatedInstanceId.parentInstanceId);
+      const parentNode = findNodeByInstanceId(window.recipeTreeRoot, isolatedNode.parentInstanceId);
       if (parentNode) {
         const parentEl = document.getElementById(`node-card-${parentNode.instanceId}`);
         if (parentEl) {

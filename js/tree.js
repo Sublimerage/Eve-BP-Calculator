@@ -83,7 +83,7 @@ function collectAllTypeIds(node, typeIds = new Set()) {
   return typeIds;
 }
 
-// O(1) Fast SDE Reverse Lookup to find a Blueprint Type ID for a given Product ID
+// O(1) Fast SDE Reverse Lookup to find a Blueprint Type ID for a given manufactured item Product ID
 function findBlueprintTypeIdForProduct(productTypeId) {
   const pId = parseInt(productTypeId);
   if (isNaN(pId)) return null;
@@ -170,7 +170,7 @@ async function fetchBlueprintData(typeId) {
     for (const url of tryUrls) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // Expanded timeout for proxy limits
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // Stable proxy fallback bounds
 
         const res = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
