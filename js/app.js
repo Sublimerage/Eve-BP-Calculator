@@ -965,6 +965,11 @@ function syncCardRunsToGlobal(e) {
   recalculate();
 }
 
+function syncSellStrategy(e) {
+  window.rootSellStrategy = e.target.value;
+  recalculate();
+}
+
 function syncCustomPrice(e) {
   const val = parseFloat(e.target.value) || 0;
   window.rootCustomPrice = val >= 0 ? val : 0;
@@ -1715,9 +1720,30 @@ function updateHeaderLedgerCount() {
   }
 }
 
+function syncSellStrategy(e) {
+  window.rootSellStrategy = e.target.value;
+  recalculate();
+}
+
+function syncCustomPrice(e) {
+  const val = parseFloat(e.target.value) || 0;
+  window.rootCustomPrice = val >= 0 ? val : 0;
+  recalculate();
+}
+
+function syncCustomTax(e) {
+  const val = parseFloat(e.target.value) || 0;
+  window.rootCustomTax = val >= 0 ? val : 0;
+  recalculate();
+}
+
 // Bind to window for HTML accessibility
 window.addCurrentJobToLedger = addCurrentJobToLedger;
 window.updateHeaderLedgerCount = updateHeaderLedgerCount;
+window.syncSellStrategy = syncSellStrategy;
+window.syncCustomPrice = syncCustomPrice;
+window.syncCustomTax = syncCustomTax;
+window.syncCardRunsToGlobal = syncCardRunsToGlobal;
 
 // Initialize Application
 window.onload = async () => {

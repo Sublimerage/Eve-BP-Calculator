@@ -226,6 +226,13 @@ function calculateNodeEIV(node) {
 
 // Safely generate a folder-normalized absolute redirect URI to prevent SSO mismatch errors
 function getCleanRedirectUri() {
+  const hostname = window.location.hostname.toLowerCase();
+  
+  // Force exactly what you registered in the developer portal to bypass any browser casing changes!
+  if (hostname === 'sublimerage.github.io') {
+    return 'https://sublimerage.github.io/Eve-BP-Calculator/';
+  }
+
   let pathname = window.location.pathname;
   if (pathname.endsWith('.html')) {
     pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1);
