@@ -242,11 +242,18 @@ function renderActiveJobsList(allocatedStock) {
       `;
     }
 
+    // CORRECTION: Direct blueprint path safety check inside active jobs loop prevents any imageservers 400 errors [1.1.1, 1.1.4]
+    const jobNameLower = (window.TYPE_ID_TO_NAME[iconTypeId] || job.name || '').toLowerCase();
+    const isJobBp = jobNameLower.includes('blueprint') || jobNameLower.includes('formula') || jobNameLower.includes('reaction');
+    const jobIconUrl = isJobBp
+      ? `https://images.evetech.net/types/${iconTypeId}/bp?size=64`
+      : `https://images.evetech.net/types/${iconTypeId}/icon?size=64`;
+
     return `
       <div class="bg-[#0c1318] border border-[#1e3348] hover:border-purple-500/40 rounded p-4 flex flex-col justify-between shadow-md transition space-y-3">
         <div class="flex items-start justify-between">
           <div class="flex items-start space-x-3 min-w-0 flex-1">
-            <img src="https://images.evetech.net/types/${iconTypeId}/icon?size=64" class="w-12 h-12 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
+            <img src="${jobIconUrl}" class="w-12 h-12 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
               <h3 class="font-bold text-sm text-white truncate">${window.esc(job.name)}</h3>
               <div class="text-[10px] mono text-slate-400 mt-0.5">Added on: ${formattedDate}</div>
@@ -374,10 +381,17 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
       ? `<span class="bg-amber-900/60 text-amber-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">SELL</span>` 
       : `<span class="bg-cyan-900/60 text-cyan-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">BUY</span>`;
 
+    // CORRECTION: Direct blueprint path safety check inside consolidated BOM prevents any imageservers 400 errors [1.1.1, 1.1.4]
+    const itemNameLower = (window.TYPE_ID_TO_NAME[item.typeId] || item.name || '').toLowerCase();
+    const isItemBp = itemNameLower.includes('blueprint') || itemNameLower.includes('formula') || itemNameLower.includes('reaction');
+    const itemIconUrl = isItemBp
+      ? `https://images.evetech.net/types/${item.typeId}/bp?size=32`
+      : `https://images.evetech.net/types/${item.typeId}/icon?size=32`;
+
     return `
       <div class="rounded border p-2 flex items-center justify-between transition shadow-sm ${rowBg}">
         <div class="flex items-center space-x-2.5 min-w-0">
-          <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-7 h-7 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
+          <img src="${itemIconUrl}" class="w-7 h-7 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           <div class="min-w-0 flex-1">
             <div class="font-semibold text-slate-200 truncate flex items-center">
               <span class="truncate">${window.esc(item.name)}</span>
@@ -471,313 +485,4 @@ function requeueCompletedJob(recordId) {
 
 function deleteJobFromQueue(jobId) {
   loadJournalState();
-  const index = activeJobs.findIndex(j => j && j.id === jobId);
-  if (index !== -1) {
-    activeJobs.splice(index, 1);
-    localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
-    renderJournalPage();
-  }
-}
-
-function renderBuildHistoryLedger() {
-  const container = document.getElementById('journal-history-rows');
-  if (!container) return;
-
-  if (buildHistory.length === 0) {
-    container.innerHTML = `
-      <tr>
-        <td colspan="6" class="p-4 text-center text-slate-400 mono italic">
-          No completed build records logged in ledger history database.
-        </td>
-      </tr>
-    `;
-    return;
-  }
-
-  container.innerHTML = buildHistory.map(record => {
-    if (!record) return '';
-    const formattedDate = record.completedAt ? new Date(record.completedAt).toLocaleDateString() + ' ' + new Date(record.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
-    return `
-      <tr class="hover:bg-[#0c1318]/50 text-slate-300 border-b border-[#1e3348]/20">
-        <td class="p-1.5 py-2">${formattedDate}</td>
-        <td class="p-1.5 py-2 font-bold text-white">${window.esc(record.name)}</td>
-        <td class="p-1.5 py-2 text-right">${record.runsNeeded.toLocaleString()}</td>
-        <td class="p-1.5 py-2 text-right text-purple-300 font-bold">${record.qtyNeeded.toLocaleString()}</td>
-        <td class="p-1.5 py-2 text-right text-cyan-400 font-bold">${Math.round(record.calculatedCost || 0).toLocaleString()} ISK</td>
-        <td class="p-1.5 py-2">
-          <div class="flex items-center space-x-2">
-            <span class="text-green-400 font-bold uppercase text-[9px] bg-green-950 px-1 py-0.5 rounded">✔ Built</span>
-            <button onclick="requeueCompletedJob(${record.id})" class="px-2 py-0.5 bg-purple-950/60 hover:bg-purple-800 text-purple-300 font-semibold rounded text-[9px] mono border border-purple-800/40 transition">
-              🔄 Re-queue
-            </button>
-          </div>
-        </td>
-      </tr>
-    `;
-  }).join('');
-}
-
-function clearJournalHistory() {
-  localStorage.removeItem('eve_ledger_history');
-  renderJournalPage();
-}
-
-function moveJobUp(jobId) {
-  loadJournalState();
-  const index = activeJobs.findIndex(j => j && j.id === jobId);
-  if (index > 0) {
-    const temp = activeJobs[index];
-    activeJobs[index] = activeJobs[index - 1];
-    activeJobs[index - 1] = temp;
-    localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
-    renderJournalPage();
-  }
-}
-
-function moveJobDown(jobId) {
-  loadJournalState();
-  const index = activeJobs.findIndex(j => j && j.id === jobId);
-  if (index !== -1 && index < activeJobs.length - 1) {
-    const temp = activeJobs[index];
-    activeJobs[index] = activeJobs[index + 1];
-    activeJobs[index + 1] = temp;
-    localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
-    renderJournalPage();
-  }
-}
-
-function populateJournalLocationDropdown() {
-  const filterSelect = document.getElementById('stock-location-filter');
-  if (!filterSelect) return;
-  const currentValue = filterSelect.value || 'all';
-
-  filterSelect.innerHTML = `
-    <option value="all" style="color: #38bdf8; background-color: #0c1318; font-weight: bold;">All Locations (Combined Assets)</option>
-    <option value="industry_system" style="color: #38bdf8; background-color: #0c1318; font-weight: bold;">Current System Only (JITA)</option>
-  `;
-
-  const sagNameMap = {
-    'CorpSAG1': window.corpDivisionNames[1] || 'DIVISION 1',
-    'CorpSAG2': window.corpDivisionNames[2] || 'DIVISION 2',
-    'CorpSAG3': window.corpDivisionNames[3] || 'DIVISION 3',
-    'CorpSAG4': window.corpDivisionNames[4] || 'DIVISION 4',
-    'CorpSAG5': window.corpDivisionNames[5] || 'DIVISION 5',
-    'CorpSAG6': window.corpDivisionNames[6] || 'DIVISION 6',
-    'CorpSAG7': window.corpDivisionNames[7] || 'DIVISION 7',
-    'CorpDeliveries': 'CORP DELIVERIES'
-  };
-
-  const locCounts = {};
-  window.rawAssetItems.forEach(item => {
-    if (!item) return;
-    const locId = item.root_location_id || item.location_id;
-    const locName = window.resolvedLocationNames[locId] || `Location #${locId}`;
-
-    if (!locCounts[locId]) {
-      locCounts[locId] = { name: locName, count: 0, corpDivisions: {}, containers: {} };
-    }
-    locCounts[locId].count += item.quantity;
-
-    if (item.owner_type === 'corp' && item.location_flag && item.location_flag.startsWith('Corp')) {
-      const sagFlag = item.location_flag;
-      if (!locCounts[locId].corpDivisions[sagFlag]) {
-        locCounts[locId].corpDivisions[sagFlag] = { name: sagNameMap[sagFlag] || sagFlag, count: 0 };
-      }
-      locCounts[locId].corpDivisions[sagFlag].count += item.quantity;
-    }
-
-    if (item.container_id) {
-      const cId = item.container_id;
-      const cName = window.resolvedLocationNames[cId] || `Container #${cId}`;
-      if (!locCounts[locId].containers[cId]) {
-        locCounts[locId].containers[cId] = { name: cName, count: 0 };
-      }
-      locCounts[locId].containers[cId].count += item.quantity;
-    }
-  });
-
-  for (const [locId, data] of Object.entries(locCounts)) {
-    const mainOpt = document.createElement('option');
-    mainOpt.value = `loc_${locId}`;
-    const numericLocId = parseInt(locId);
-    const isUpwellStructure = numericLocId > 1000000000000;
-    if (isUpwellStructure) {
-      mainOpt.style.color = '#f97316';
-      mainOpt.style.backgroundColor = '#0c1318';
-      mainOpt.style.fontWeight = 'bold';
-      mainOpt.textContent = `🟧 ${data.name} (${data.count.toLocaleString()} items)`;
-    } else {
-      mainOpt.style.color = '#4caf6f';
-      mainOpt.style.backgroundColor = '#0c1318';
-      mainOpt.style.fontWeight = 'bold';
-      mainOpt.textContent = `🟩 ${data.name} (${data.count.toLocaleString()} items)`;
-    }
-    filterSelect.appendChild(mainOpt);
-
-    for (const [sagFlag, sagData] of Object.entries(data.corpDivisions)) {
-      const sagOpt = document.createElement('option');
-      sagOpt.value = `corpsag_${locId}_${sagFlag}`;
-      sagOpt.style.color = '#c084fc';
-      sagOpt.style.backgroundColor = '#070b0f';
-      sagOpt.style.fontWeight = 'bold';
-      sagOpt.textContent = `  └─ 🟪 Corp: ${sagData.name} (${sagData.count.toLocaleString()} items)`;
-      filterSelect.appendChild(sagOpt);
-    }
-
-    for (const [cId, cData] of Object.entries(data.containers)) {
-      const containerOpt = document.createElement('option');
-      containerOpt.value = `container_${cId}`;
-      containerOpt.style.color = '#f8fafc';
-      containerOpt.style.backgroundColor = '#070b0f';
-      containerOpt.textContent = `  └─ 📦 Container: ${cData.name} (${cData.count.toLocaleString()} items)`;
-      filterSelect.appendChild(containerOpt);
-    }
-  }
-
-  if (filterSelect.querySelector(`option[value="${currentValue}"]`)) {
-    filterSelect.value = currentValue;
-  } else {
-    filterSelect.value = 'all';
-  }
-}
-
-function filterJournalLocationOptions() {
-  const query = (document.getElementById('location-filter-search')?.value || '').trim().toUpperCase();
-  const filterSelect = document.getElementById('stock-location-filter');
-  const feedbackBadge = document.getElementById('location-search-feedback');
-  if (!filterSelect) return;
-
-  const options = filterSelect.querySelectorAll('option');
-  let visibleCount = 0;
-  options.forEach(opt => {
-    if (opt.value === 'all' || opt.value === 'industry_system') {
-      opt.style.display = '';
-    } else {
-      if (!query || opt.textContent.toUpperCase().includes(query)) {
-        opt.style.display = '';
-        visibleCount++;
-      } else {
-        opt.style.display = 'none';
-      }
-    }
-  });
-
-  if (feedbackBadge) {
-    if (query) {
-      feedbackBadge.textContent = `Found: ${visibleCount}`;
-      feedbackBadge.classList.remove('hidden');
-    } else {
-      feedbackBadge.textContent = '';
-      feedbackBadge.classList.add('hidden');
-    }
-  }
-}
-
-function updateJournalStockCountBadge() {
-  const el = document.getElementById('stock-count-display');
-  if (!el) return;
-  const totalItems = Object.values(window.userStockMap || {}).reduce((acc, q) => acc + q, 0);
-  el.textContent = `${totalItems.toLocaleString()} items`;
-}
-
-function applyJournalStockFilter() {
-  const filterVal = document.getElementById('stock-location-filter')?.value || 'all';
-  const useChar = document.getElementById('use-char-assets')?.checked ?? true;
-  const useCorp = document.getElementById('use-corp-assets')?.checked ?? true;
-
-  window.userStockMap = {};
-  window.rawAssetItems.forEach(item => {
-    if (!item) return;
-    if (item.owner_type === 'char' && !useChar) return;
-    if (item.owner_type === 'corp' && !useCorp) return;
-
-    let include = false;
-    const rootLocId = item.root_location_id || item.location_id;
-    const itemLocName = window.resolvedLocationNames[rootLocId] || '';
-
-    if (filterVal === 'all') {
-      include = true;
-    } else if (filterVal === 'industry_system') {
-      include = itemLocName.includes('JITA');
-    } else if (filterVal.startsWith('loc_')) {
-      const targetLocId = parseInt(filterVal.replace('loc_', ''));
-      include = rootLocId === targetLocId;
-    } else if (filterVal.startsWith('corpsag_')) {
-      const parts = filterVal.split('_');
-      const targetLocId = parseInt(parts[1]);
-      const targetSag = parts[2];
-      include = (rootLocId === targetLocId) && (item.location_flag === targetSag);
-    } else if (filterVal.startsWith('container_')) {
-      const targetContainerId = parseInt(filterVal.replace('container_', ''));
-      include = item.container_id === targetContainerId;
-    }
-
-    if (include) {
-      window.userStockMap[item.type_id] = (window.userStockMap[item.type_id] || 0) + item.quantity;
-    }
-  });
-
-  localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap));
-  updateJournalStockCountBadge();
-  renderJournalPage();
-}
-
-function recalculateJournalStock() {
-  applyJournalStockFilter();
-}
-
-function setBOMOrderFilter(type) {
-  activeOrderFilter = type;
-  const btnAll = document.getElementById('btn-order-all');
-  const btnBuy = document.getElementById('btn-order-buy');
-  const btnSell = document.getElementById('btn-order-sell');
-
-  if (btnAll) btnAll.className = 'px-1.5 py-0.5 rounded font-bold transition ' + (type === 'all' ? 'bg-purple-800 text-white border border-purple-600/30' : 'bg-[#1e3348] text-slate-400 hover:text-white');
-  if (btnBuy) btnBuy.className = 'px-1.5 py-0.5 rounded font-bold transition ' + (type === 'buy' ? 'bg-purple-800 text-white border border-purple-600/30' : 'bg-[#1e3348] text-slate-400 hover:text-white');
-  if (btnSell) btnSell.className = 'px-1.5 py-0.5 rounded font-bold transition ' + (type === 'sell' ? 'bg-purple-800 text-white border border-purple-600/30' : 'bg-[#1e3348] text-slate-400 hover:text-white');
-
-  renderJournalPage();
-}
-
-function setBOMCategoryFilter(cat) {
-  activeCategoryFilter = cat;
-  renderJournalPage();
-}
-
-// Explicit window bindings
-window.copyJournalMultibuy = copyJournalMultibuy;
-window.copyIndividualJobMultibuy = copyIndividualJobMultibuy;
-window.markJobAsBuilt = markJobAsBuilt;
-window.requeueCompletedJob = requeueCompletedJob;
-window.deleteJobFromQueue = deleteJobFromQueue;
-window.clearJournalHistory = clearJournalHistory;
-window.applyJournalStockFilter = applyJournalStockFilter;
-window.filterJournalLocationOptions = filterJournalLocationOptions;
-window.recalculateJournalStock = recalculateJournalStock;
-window.setBOMOrderFilter = setBOMOrderFilter;
-window.setBOMCategoryFilter = setBOMCategoryFilter;
-window.moveJobUp = moveJobUp;
-window.moveJobDown = moveJobDown;
-
-window.onload = async () => {
-  if (typeof window.buildPrepackedIndexes === 'function') {
-    window.buildPrepackedIndexes();
-  }
-
-  try {
-    loadJournalState();
-    populateJournalLocationDropdown();
-    updateJournalStockCountBadge();
-    renderJournalPage();
-  } catch (err) {
-    console.error("Ledger state load error:", err);
-  }
-
-  if (typeof window.handleEsiSSOCallback === 'function') {
-    window.handleEsiSSOCallback().catch(err => console.error("SSO Callback error:", err));
-  }
-
-  if (typeof window.fetchAdjustedPrices === 'function') {
-    window.fetchAdjustedPrices().catch(err => console.error("Adjusted prices fetch error:", err));
-  }
-};
+  con

@@ -8,8 +8,21 @@ function resolveProductIdFromBlueprintName(blueprintName) {
                            .replace(/ Formula$/i, '')
                            .trim()
                            .toLowerCase();
-  const matched = window.IDX[pName];
-  return matched ? matched.id : null;
+
+  // Try thorough multi-scoping scans to guarantee match regardless of caching state
+  if (window.IDX[pName]) return window.IDX[pName].id;
+  for (const [k, v] of Object.entries(window.IDX)) {
+    if (k === pName || k.replace(/ /g, '') === pName.replace(/ /g, '')) {
+      return v.id;
+    }
+  }
+  for (const [id, name] of Object.entries(window.TYPE_ID_TO_NAME)) {
+    const n = name.toLowerCase();
+    if (n === pName || n.replace(/ /g, '') === pName.replace(/ /g, '')) {
+      return parseInt(id);
+    }
+  }
+  return null;
 }
 
 // Reverse SDE Match Helper to resolve Blueprint ID from any Product Name
@@ -163,7 +176,7 @@ async function fetchBlueprintData(typeId) {
     for (const url of tryUrls) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second window to resolve proxy blocks safely
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // stable timeout
 
         const res = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);

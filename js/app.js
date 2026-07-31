@@ -4,13 +4,11 @@ if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sel
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
 if (window.globalRuns === undefined) window.globalRuns = 1;
 
-// Strictly queries exact unreduced SDE manufacturing durations directly from SDE database
 function extractBuildTime(recipe) {
   if (!recipe) return 0;
   return parseInt(recipe.time || recipe.t || recipe.timeSeconds || recipe.duration || recipe.mfgTime || recipe.productionTime || 0);
 }
 
-// Binds custom card overrides directly to tree node structures before calculations
 function syncTreeOverrides(node) {
   if (!node) return;
   const tId = node.typeId;
@@ -564,8 +562,11 @@ function createNodeCard(node) {
   const totalProduced = node.runsNeeded * node.batchYield;
   const surplus = totalProduced - node.qtyNeeded;
   
-  // CORRECTION: Strictly display the final physical product's high-fidelity icon instead of blueprint scrolls! [1]
-  const iconUrl = `https://images.evetech.net/types/${productTypeId}/icon?size=128`;
+  const cardNameLower = (window.TYPE_ID_TO_NAME[productTypeId] || node.name || '').toLowerCase();
+  const isBpOriginal = cardNameLower.includes('blueprint') || cardNameLower.includes('formula') || cardNameLower.includes('reaction');
+  const iconUrl = isBpOriginal
+    ? `https://images.evetech.net/types/${productTypeId}/bp?size=128`
+    : `https://images.evetech.net/types/${productTypeId}/icon?size=128`;
 
   const unitEIV = node.unitEIV || 0;
   const totalEIV = node.jobEIV || (unitEIV * node.qtyNeeded);
@@ -645,7 +646,6 @@ function createNodeCard(node) {
       <img src="${iconUrl}" class="w-10 h-10 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
       <div class="min-w-0 flex-1">
         <div class="font-bold text-sm text-white truncate flex items-center justify-between">
-          <!-- CORRECTION: Strictly show the final manufactured product name on card headers instead of blueprints! [1] -->
           <span class="truncate">${node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()}</span>
           <div class="flex items-center space-x-1 flex-shrink-0 ml-1">
             ${isRoot ? `

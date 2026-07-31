@@ -94,10 +94,10 @@ window.startX = startX;
 window.startY = startY;
 
 window.BLUEPRINT_TO_PRODUCT_MAP = {
-  57523: 57486, // Life Support Backup Unit Blueprint -> Life Support Backup Unit
-  57515: 57478, // Auto-Integrity Preservation Seal Blueprint -> Auto-Integrity Preservation Seal
-  57516: 57479, // Core Temperature Regulator Blueprint -> Core Temperature Regulator
-  17714: 17715  // Gila Blueprint -> Gila
+  57523: 57486, 
+  57515: 57478, 
+  57516: 57479, 
+  17714: 17715  
 };
 
 const RAW_BASE_MATERIALS = new Set([
@@ -351,6 +351,7 @@ window.buildPrepackedIndexes = function() {
     }
 
     // Dynamic SDE local index builder to match any Blueprint to its Product ID
+    window.BLUEPRINT_TO_PRODUCT_MAP = window.BLUEPRINT_TO_PRODUCT_MAP || {};
     const blueprintSuffix = " blueprint";
     const formulaSuffix = " reaction formula";
     const formulaSuffix2 = " formula";
