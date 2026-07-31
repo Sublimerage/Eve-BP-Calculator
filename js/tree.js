@@ -195,11 +195,12 @@ async function fetchBlueprintData(typeId) {
               baseQty: parseInt(m.quantity)
             })) : null;
 
-            // Safe parsing of nested Fuzzwork Data Contracts
+            // Safe parsing of nested Fuzzwork Data Contracts. Confirmed real schema (via live debugging):
+            // blueprintDetails = { productTypeID, productTypeName, productQuantity, times: {"1": mfgSeconds, "11": reactionSeconds, ...}, ... }
             let resolvedProductTypeId = parseInt(data.productTypeID) || (data.blueprintDetails ? parseInt(data.blueprintDetails.productTypeID) : null) || window.BLUEPRINT_TO_PRODUCT_MAP[typeId] || typeId;
             let resolvedProductName = data.productTypeName || (data.blueprintDetails ? data.blueprintDetails.productTypeName : '') || '';
 
-            let outputBatchYield = parseInt(data.productQtyPerRun) || (data.blueprintDetails ? parseInt(data.blueprintDetails.productQtyPerRun) : null) || parseInt(data.portionSize) || 1;
+            let outputBatchYield = parseInt(data.productQtyPerRun) || (data.blueprintDetails ? parseInt(data.blueprintDetails.productQuantity ?? data.blueprintDetails.productQtyPerRun) : null) || parseInt(data.portionSize) || 1;
             if (data.activityProducts && typeof data.activityProducts === 'object') {
               const act1 = data.activityProducts['1'] || data.activityProducts[1];
               const act11 = data.activityProducts['11'] || data.activityProducts[11];
@@ -209,6 +210,9 @@ async function fetchBlueprintData(typeId) {
                 outputBatchYield = parseInt(act11[0].quantity);
               }
             }
+
+            const bpTimes = (data.blueprintDetails && data.blueprintDetails.times) || {};
+            const resolvedTime = parseInt(data.time) || parseInt(bpTimes['1'] ?? bpTimes[1]) || parseInt(bpTimes['11'] ?? bpTimes[11]) || 0;
 
             if (mfgMat || reactionMat) {
               const parsed = {
@@ -221,7 +225,7 @@ async function fetchBlueprintData(typeId) {
                 mfgQtyPerRun: outputBatchYield,
                 portionSize: outputBatchYield,
                 batchYield: outputBatchYield,
-                time: data.time || 0,
+                time: resolvedTime,
                 mfgMaterials: mfgMat,
                 reactionMaterials: reactionMat
               };
@@ -261,18 +265,15 @@ async function fetchBlueprintTimeOnly(blueprintTypeId) {
       clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
-        const t = parseInt(data.time) || (data.blueprintDetails ? parseInt(data.blueprintDetails.time) : 0) || 0;
+        const times = (data.blueprintDetails && data.blueprintDetails.times) || {};
+        // Fuzzwork nests durations under blueprintDetails.times, keyed by activity id:
+        // 1 = manufacturing, 11 = reaction. Prefer manufacturing, fall back to reaction.
+        const t = parseInt(times['1'] ?? times[1]) || parseInt(times['11'] ?? times[11]) || 0;
         if (t > 0) {
           blueprintTimeCache[blueprintTypeId] = t;
           return t;
         }
-        console.warn(`[BuildTime] Fuzzwork responded for blueprint ${blueprintTypeId} but had no usable time field. Response keys: ${Object.keys(data || {}).join(', ')}`);
-        if (data.blueprintDetails) {
-          console.warn(`[BuildTime] blueprintDetails contents for ${blueprintTypeId}:`, JSON.stringify(data.blueprintDetails));
-        }
-        if (data.activityMaterials) {
-          console.warn(`[BuildTime] activityMaterials keys for ${blueprintTypeId}: ${Object.keys(data.activityMaterials).join(', ')}`);
-        }
+        console.warn(`[BuildTime] Fuzzwork responded for blueprint ${blueprintTypeId} but blueprintDetails.times had no manufacturing/reaction entry. times: ${JSON.stringify(times)}`);
       } else {
         console.warn(`[BuildTime] Fuzzwork request for blueprint ${blueprintTypeId} via ${url.startsWith('https://corsproxy') ? 'corsproxy.io' : 'direct'} returned HTTP ${res.status}`);
       }
