@@ -225,7 +225,8 @@ async function startEsiSSOLogin() {
   }
   const redirectUri = window.location.origin + pathname;
 
-  const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1';
+  // Added 'esi-skills.read_skills.v1' to SSO scope parameters
+  const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1';
   const state = generateRandomString(16);
   sessionStorage.setItem('esi_auth_state', state);
 
@@ -379,6 +380,27 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
           }
         }
       } catch (e) {}
+    }
+
+    // Fetch character skills for Industry TE calculations
+    try {
+      const skillsRes = await fetch(`https://esi.evetech.net/latest/characters/${charId}/skills/?datasource=tranquility`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      if (skillsRes.ok) {
+        const skillsData = await skillsRes.json();
+        if (skillsData && Array.isArray(skillsData.skills)) {
+          let indLevel = 0;
+          let advIndLevel = 0;
+          skillsData.skills.forEach(sk => {
+            if (sk.skill_id === 3380) indLevel = sk.active_skill_level || sk.trained_skill_level || 0;
+            if (sk.skill_id === 3388) advIndLevel = sk.active_skill_level || sk.trained_skill_level || 0;
+          });
+          localStorage.setItem('eve_char_skills', JSON.stringify({ industry: indLevel, advIndustry: advIndLevel }));
+        }
+      }
+    } catch (e) {
+      console.warn('ESI Skills fetch failed:', e);
     }
 
     let page = 1;

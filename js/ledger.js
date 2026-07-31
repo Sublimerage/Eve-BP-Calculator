@@ -16,15 +16,36 @@ function safeParseJSON(str, fallback) {
   }
 }
 
-// Global Ledger Queue State (relying on global userStockMap from config.js)
+// Convert seconds into human-readable EVE duration format (e.g. 1d 4h 12m)
+function formatDuration(seconds) {
+  if (!seconds || isNaN(seconds) || seconds <= 0) return 'N/A';
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0) parts.push(`${mins}m`);
+  if (parts.length === 0) parts.push(`${secs}s`);
+  return parts.join(' ');
+}
+
+// Global Ledger Queue State
 let activeJobs = [];
 let buildHistory = [];
+let userStockMap = {};
+
+// Active BOM Filter States
+let activeOrderFilter = 'all'; // 'all', 'buy', 'sell'
+let activeCategoryFilter = 'all'; // 'all', 'minerals', 'pigas', 'fuel', 'ships', 'others'
 
 // Load states from shared LocalStorage
 function loadJournalState() {
   try {
     const savedJobs = localStorage.getItem('eve_ledger_jobs');
-    activeJobs = safeParseJSON(savedJobs, []);
+    activeJobs = savedJobs ? JSON.parse(savedJobs) : [];
     if (!Array.isArray(activeJobs)) activeJobs = [];
   } catch (e) {
     activeJobs = [];
@@ -32,7 +53,7 @@ function loadJournalState() {
 
   try {
     const savedHistory = localStorage.getItem('eve_ledger_history');
-    buildHistory = safeParseJSON(savedHistory, []);
+    buildHistory = savedHistory ? JSON.parse(savedHistory) : [];
     if (!Array.isArray(buildHistory)) buildHistory = [];
   } catch (e) {
     buildHistory = [];
@@ -57,6 +78,36 @@ function loadJournalState() {
   }
 }
 
+// Structural helper to classify material categories
+function getItemCategory(typeId, name) {
+  if (!name) return 'others';
+  const n = name.toLowerCase();
+
+  // Minerals Group
+  const mineralIds = new Set([34, 35, 36, 37, 38, 39, 40, 11399]);
+  if (mineralIds.has(typeId) || n.includes('tritanium') || n.includes('pyerite') || n.includes('mexallon') || n.includes('isogen') || n.includes('nocxium') || n.includes('zydrine') || n.includes('megacyte') || n.includes('morphite')) {
+    return 'minerals';
+  }
+
+  // Fuel Blocks Group
+  if (n.includes('fuel block')) {
+    return 'fuel';
+  }
+
+  // PI & Industrial Gases Group
+  if (n.includes('gas') || n.includes('isotope') || n.includes('water') || n.includes('ozone') || 
+      n.includes('plastics') || n.includes('chiral') || n.includes('cultures') || n.includes('viral') || n.includes('fiber') || n.includes('nanites')) {
+    return 'pigas';
+  }
+
+  // Ships Group
+  if (typeof isShipType === 'function' && isShipType(typeId)) {
+    return 'ships';
+  }
+
+  return 'others';
+}
+
 // Render overall dashboard KPIs and list details
 function renderJournalPage() {
   loadJournalState();
@@ -75,12 +126,20 @@ function renderJournalPage() {
   if (activeJobsCountEl) activeJobsCountEl.textContent = activeJobs.length.toLocaleString();
   if (totalCostEl) totalCostEl.textContent = Math.round(totalActiveCost).toLocaleString() + ' ISK';
 
-  // 2. Compile Consolidated BOM across ALL active jobs
+  // 2. Compile Consolidated BOM across ALL active jobs (respecting strategy filters)
   const consolidatedBOM = {};
   activeJobs.forEach(job => {
     if (job && Array.isArray(job.materials)) {
       job.materials.forEach(mat => {
         if (!mat || !mat.typeId) return;
+
+        // Apply Order strategy filters dynamically on consolidation
+        if (activeOrderFilter !== 'all' && mat.strategy !== activeOrderFilter) return;
+
+        // Apply Category filters dynamically on consolidation
+        const category = getItemCategory(mat.typeId, mat.name);
+        if (activeCategoryFilter !== 'all' && category !== activeCategoryFilter) return;
+
         const id = mat.typeId;
         if (!consolidatedBOM[id]) {
           consolidatedBOM[id] = {
@@ -118,13 +177,16 @@ function renderJournalPage() {
   if (uniqueMaterialsEl) uniqueMaterialsEl.textContent = bomItems.length.toLocaleString() + ' types';
   if (materialsCostEl) materialsCostEl.textContent = Math.round(aggregatedMissingCost).toLocaleString() + ' ISK';
 
-  renderActiveJobsList();
+  // Clone stock map for prioritized FIFO allocation across job card loops
+  const allocatedStock = { ...userStockMap };
+
+  renderActiveJobsList(allocatedStock);
   renderConsolidatedBOMList(bomItems, aggregatedMissingCost);
   renderBuildHistoryLedger();
 }
 
 // Render active queued jobs
-function renderActiveJobsList() {
+function renderActiveJobsList(allocatedStock) {
   const container = document.getElementById('active-jobs-list');
   if (!container) return;
 
@@ -140,16 +202,30 @@ function renderActiveJobsList() {
   const deductModeInput = document.getElementById('deduct-stock-mode');
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
 
+  // Retrieve Character skills for accurate TE Calculations
+  const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 0, advIndustry: 0 });
+  const indFactor = 1 - (0.04 * (skills.industry || 0));
+  const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
+  const skillTimeFactor = indFactor * advIndFactor;
+
   container.innerHTML = activeJobs.map(job => {
     if (!job) return '';
     const iconTypeId = job.typeId;
     const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
 
-    // Generate individual BOM breakdown defensively
+    // 1. Stockpile Allocation Priority (FIFO): Subtract required quantities from stock clone in order
     const individualBOMHTML = Array.isArray(job.materials) ? job.materials.map(mat => {
       if (!mat) return '';
-      const stockQty = isStockDeductEnabled ? (userStockMap[mat.typeId] || 0) : 0;
-      const netMissing = Math.max(0, mat.qtyNeeded - stockQty);
+      
+      const availableInStock = isStockDeductEnabled ? (allocatedStock[mat.typeId] || 0) : 0;
+      const consumedQty = Math.min(mat.qtyNeeded, availableInStock);
+
+      // Subtract consumed parts from our prioritized, in-memory stock clone
+      if (isStockDeductEnabled && allocatedStock[mat.typeId] !== undefined) {
+        allocatedStock[mat.typeId] = Math.max(0, allocatedStock[mat.typeId] - consumedQty);
+      }
+
+      const netMissing = Math.max(0, mat.qtyNeeded - consumedQty);
       const isAcquired = netMissing === 0;
 
       return `
@@ -159,6 +235,25 @@ function renderActiveJobsList() {
         </div>
       `;
     }).join('') : '<div class="text-[10px] text-slate-500 italic py-1">No materials logged for this build.</div>';
+
+    // 2. Skill-adjusted Build Duration calculation per card
+    let buildTimeUI = '';
+    const recipe = window.recipeMap ? (window.recipeMap[job.typeId] || null) : null;
+    if (recipe && recipe.time) {
+      const baseTime = recipe.time || 0;
+      const teFactor = 1.0; // standard default TE factor fallback
+      const facility = document.getElementById('facility-select')?.value || '0.01';
+      const facilityTimeBonus = (facility === '0.01') ? 0.05 : 0; // Sotiyo offers 5% manufacturing time rigs
+      const facilityFactor = 1 - facilityTimeBonus;
+
+      const totalSeconds = baseTime * teFactor * skillTimeFactor * facilityFactor * job.runsNeeded;
+      buildTimeUI = `
+        <div class="flex justify-between text-[10px] text-slate-400 mono">
+          <span>Est. Build Time:</span>
+          <span class="text-slate-300 font-semibold">${formatDuration(totalSeconds)}</span>
+        </div>
+      `;
+    }
 
     return `
       <div class="bg-[#0c1318] border border-[#1e3348] hover:border-purple-500/40 rounded p-4 flex flex-col justify-between shadow-md transition space-y-3">
@@ -173,7 +268,7 @@ function renderActiveJobsList() {
           </div>
         </div>
 
-        <!-- Individual Material BOM breakdown area -->
+        <!-- Individual Material BOM breakdown area with Priority allocation -->
         <div class="p-2 bg-[#070b0f] rounded border border-[#1e3348]/40">
           <div class="flex justify-between items-center mb-1.5 pb-1 border-b border-[#1e3348]/40">
             <span class="text-[10px] text-cyan-400 font-bold uppercase tracking-wider rajdhani">Job Materials (BOM)</span>
@@ -184,9 +279,12 @@ function renderActiveJobsList() {
           <div class="max-h-28 overflow-y-auto scrollbar-thin">
             ${individualBOMHTML}
           </div>
-          <div class="flex justify-between items-center text-[10px] mono font-bold pt-1.5 border-t border-[#1e3348]/40 mt-1">
-            <span class="text-slate-300">Total Build Cost:</span>
-            <span class="text-cyan-400">${Math.round(job.calculatedCost).toLocaleString()} ISK</span>
+          <div class="flex flex-col text-[10px] mono font-bold pt-1.5 border-t border-[#1e3348]/40 mt-1 space-y-1">
+            ${buildTimeUI}
+            <div class="flex justify-between items-center mt-0.5">
+              <span class="text-slate-300">Total Build Cost:</span>
+              <span class="text-cyan-400">${Math.round(job.calculatedCost).toLocaleString()} ISK</span>
+            </div>
           </div>
         </div>
 
@@ -213,15 +311,34 @@ function copyIndividualJobMultibuy(e, jobId) {
   const deductModeInput = document.getElementById('deduct-stock-mode');
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
 
+  // We re-evaluate priority allocations dynamically on copy click
+  const allocatedStock = { ...userStockMap };
+  const targetIndex = activeJobs.findIndex(j => j && j.id === jobId);
+  
+  // Deduct previous jobs first to match FIFO priority bounds!
+  for (let i = 0; i < targetIndex; i++) {
+    const prevJob = activeJobs[i];
+    if (prevJob && Array.isArray(prevJob.materials)) {
+      prevJob.materials.forEach(mat => {
+        const availableInStock = isStockDeductEnabled ? (allocatedStock[mat.typeId] || 0) : 0;
+        const consumed = Math.min(mat.qtyNeeded, availableInStock);
+        if (allocatedStock[mat.typeId] !== undefined) {
+          allocatedStock[mat.typeId] = Math.max(0, allocatedStock[mat.typeId] - consumed);
+        }
+      });
+    }
+  }
+
   const textList = job.materials
     .filter(m => {
       if (!m) return false;
-      const stockQty = isStockDeductEnabled ? (userStockMap[m.typeId] || 0) : 0;
-      return (m.qtyNeeded - stockQty) > 0;
+      const availableInStock = isStockDeductEnabled ? (allocatedStock[m.typeId] || 0) : 0;
+      return (m.qtyNeeded - availableInStock) > 0;
     })
     .map(m => {
-      const stockQty = isStockDeductEnabled ? (userStockMap[m.typeId] || 0) : 0;
-      return `${m.name} x${m.qtyNeeded - stockQty}`;
+      const availableInStock = isStockDeductEnabled ? (allocatedStock[m.typeId] || 0) : 0;
+      const netMissing = m.qtyNeeded - availableInStock;
+      return `${m.name} x${netMissing}`;
     })
     .join('\n');
 
@@ -255,7 +372,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
   if (bomItems.length === 0) {
     container.innerHTML = `
       <div class="bg-[#0c1318] p-4 text-center text-slate-400 mono italic">
-        No active material demands in queue.
+        No active material demands in queue matching selected filters.
       </div>
     `;
     return;
@@ -324,7 +441,7 @@ function markJobAsBuilt(jobId) {
 
   const job = activeJobs[jobIndex];
 
-  // Hangar stockpile quantities are left completely untouched, relying strictly on ESI API and clipboard hangar pastes.
+  // Hangar stockpile quantities are left untouched as requested to ensure stock data relies strictly on ESI API and clipboard hangar pastes.
 
   // 1. Ledger Logging: Archive job records into completed build history array
   const record = {
@@ -632,6 +749,25 @@ function recalculateJournalStock() {
   applyJournalStockFilter();
 }
 
+// Active BOM Filter actions
+function setBOMOrderFilter(type) {
+  activeOrderFilter = type;
+  const btnAll = document.getElementById('btn-order-all');
+  const btnBuy = document.getElementById('btn-order-buy');
+  const btnSell = document.getElementById('btn-order-sell');
+
+  if (btnAll) btnAll.className = 'px-1.5 py-0.5 rounded font-bold transition ' + (type === 'all' ? 'bg-purple-800 text-white border border-purple-600/30' : 'bg-[#1e3348] text-slate-400 hover:text-white');
+  if (btnBuy) btnBuy.className = 'px-1.5 py-0.5 rounded font-bold transition ' + (type === 'buy' ? 'bg-purple-800 text-white border border-purple-600/30' : 'bg-[#1e3348] text-slate-400 hover:text-white');
+  if (btnSell) btnSell.className = 'px-1.5 py-0.5 rounded font-bold transition ' + (type === 'sell' ? 'bg-purple-800 text-white border border-purple-600/30' : 'bg-[#1e3348] text-slate-400 hover:text-white');
+
+  renderJournalPage();
+}
+
+function setBOMCategoryFilter(cat) {
+  activeCategoryFilter = cat;
+  renderJournalPage();
+}
+
 // Expose actions globally to windows environment
 window.copyJournalMultibuy = copyJournalMultibuy;
 window.copyIndividualJobMultibuy = copyIndividualJobMultibuy;
@@ -642,6 +778,8 @@ window.clearJournalHistory = clearJournalHistory;
 window.applyJournalStockFilter = applyJournalStockFilter;
 window.filterJournalLocationOptions = filterJournalLocationOptions;
 window.recalculateJournalStock = recalculateJournalStock;
+window.setBOMOrderFilter = setBOMOrderFilter;
+window.setBOMCategoryFilter = setBOMCategoryFilter;
 
 // Initialize Ledger page on window load
 window.onload = () => {
