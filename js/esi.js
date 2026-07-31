@@ -86,8 +86,11 @@ function isShipType(typeId) {
   return shipTerms.some(term => t.includes(term));
 }
 
-// Unified fetch wrapper that validates active login sessions and handles auth decay
-async function fetchWithAuth(url, options = {}, token) {
+// Unified fetch wrapper that validates active login sessions and handles auth decay.
+// suppressLogout: for auxiliary/non-essential calls (corp division names, corp assets, skills) whose
+// failure (missing scope, missing corp role, etc.) is a normal, expected outcome for many characters
+// and must never be treated as "the whole session is invalid."
+async function fetchWithAuth(url, options = {}, token, suppressLogout = false) {
   if (!options.headers) options.headers = {};
   options.headers['Authorization'] = `Bearer ${token}`;
   try {
@@ -101,6 +104,10 @@ async function fetchWithAuth(url, options = {}, token) {
         res = await fetch(url, options);
       }
       if (res.status === 401) {
+        if (suppressLogout) {
+          console.warn("Auxiliary ESI call unauthorized (401/missing scope) - skipping without logging out:", url);
+          return null;
+        }
         console.warn("SSO Token expired or unauthorized (401), and refresh failed. Executing clean logout.");
         logoutEsiSSO();
         return null;
@@ -259,7 +266,7 @@ async function startEsiSSOLogin() {
   // (https://developers.eveonline.com) for this Client ID. Log it so it can be copied verbatim -
   // including the trailing slash, which EVE matches exactly.
   console.info(`[EVE SSO] Sending redirect_uri: "${redirectUri}" - this exact string must be registered as a Callback URL for Client ID ${clientId} at https://developers.eveonline.com`);
-  const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1';
+  const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1 esi-corporations.read_divisions.v1';
   const state = generateRandomString(16);
   localStorage.setItem('esi_auth_state', state);
   const authUrl = `https://login.eveonline.com/v2/oauth/authorize/?response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&client_id=${encodeURIComponent(clientId)}&scope=${encodeURIComponent(scope)}&code_challenge=${challenge}&code_challenge_method=S256&state=${state}`;
@@ -420,7 +427,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
     }
     if (corpId && accessToken) {
       try {
-        const divRes = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/divisions/?datasource=tranquility`, {}, accessToken);
+        const divRes = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/divisions/?datasource=tranquility`, {}, accessToken, true);
         if (divRes && divRes.ok) {
           const divData = await divRes.json();
           if (divData && Array.isArray(divData.hangar)) {
@@ -434,7 +441,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       } catch (e) {}
     }
     try {
-      const skillsRes = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/skills/?datasource=tranquility`, {}, accessToken);
+      const skillsRes = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/skills/?datasource=tranquility`, {}, accessToken, true);
       if (skillsRes && skillsRes.ok) {
         const skillsData = await skillsRes.json();
         if (skillsData && Array.isArray(skillsData.skills)) {
@@ -481,7 +488,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       page = 1;
       hasMore = true;
       while (hasMore) {
-        const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/assets/?datasource=tranquility&page=${page}`, {}, accessToken);
+        const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/assets/?datasource=tranquility&page=${page}`, {}, accessToken, true);
         if (res && res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
@@ -542,7 +549,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(chunk)
-          }, accessToken);
+          }, accessToken, true);
           if (nameRes && nameRes.ok) {
             const customNames = await nameRes.json();
             if (Array.isArray(customNames)) {
@@ -564,7 +571,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(chunk)
-          }, accessToken);
+          }, accessToken, true);
           if (nameRes && nameRes.ok) {
             const customNames = await nameRes.json();
             if (Array.isArray(customNames)) {
@@ -618,7 +625,7 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
     if (unresolvedStructureIds.length > 0 && token) {
       await Promise.all(unresolvedStructureIds.map(async (structId) => {
         try {
-          const res = await fetchWithAuth(`https://esi.evetech.net/latest/universe/structures/${structId}/?datasource=tranquility`, {}, token);
+          const res = await fetchWithAuth(`https://esi.evetech.net/latest/universe/structures/${structId}/?datasource=tranquility`, {}, token, true);
           if (res && res.ok) {
             const structData = await res.json();
             if (structData && structData.name) {
