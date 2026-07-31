@@ -128,14 +128,16 @@ async function applyBuildProfitOptimizer() {
         matCost += calculateTreeNodeCost(child);
       });
     } else {
-      const rootPrices = priceCache[recipeTreeRoot.typeId] || { sell: 0, buy: 0 };
+      const productTypeId = recipeTreeRoot.productTypeId || recipeTreeRoot.typeId;
+      const rootPrices = priceCache[productTypeId] || { sell: 0, buy: 0 };
       matCost = (rootPrices.sell || rootPrices.buy || 0) * recipeTreeRoot.qtyNeeded;
     }
 
     const jobFees = calculateNodeJobFee(recipeTreeRoot, facilityTax, sccSurcharge, structureRoleBonus);
     const totalCost = matCost + jobFees;
 
-    const outputPrices = priceCache[recipeTreeRoot.typeId] || { sell: 0, buy: 0 };
+    const productTypeId = recipeTreeRoot.productTypeId || recipeTreeRoot.typeId;
+    const outputPrices = priceCache[productTypeId] || { sell: 0, buy: 0 };
     const grossSell = outputPrices.sell * recipeTreeRoot.qtyNeeded;
     const salesTax = (parseFloat(document.getElementById('sales-tax')?.value) || 3.6) / 100;
     const netSell = grossSell * (1 - salesTax - brokerFee);
@@ -153,8 +155,10 @@ async function applyBuildProfitOptimizer() {
     buildSelfOverrides[typeId] = true;
     const profitBuild = simulateProfit();
 
-    const prices = priceCache[typeId] || { sell: 0, buy: 0 };
-    const unitPrice = prices.sell || prices.buy || getEIV(typeId) || 1;
+    const recipe = recipeMap[typeId];
+    const productTypeId = recipe ? (recipe.productTypeID || recipe.product || recipe.p || typeId) : typeId;
+    const prices = priceCache[productTypeId] || { sell: 0, buy: 0 };
+    const unitPrice = prices.sell || prices.buy || getEIV(productTypeId) || 1;
     const baseCost = unitPrice * (recipeTreeRoot.qtyNeeded || 1);
 
     const profitGain = profitBuild - profitBuy;
@@ -184,7 +188,9 @@ function applyComponentSpreadOptimizer() {
     
     if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
       const typeId = node.displayTypeId || node.typeId;
-      const prices = priceCache[typeId] || { sell: 0, buy: 0 };
+      const recipe = recipeMap[typeId];
+      const productTypeId = recipe ? (recipe.productTypeID || recipe.product || recipe.p || typeId) : typeId;
+      const prices = priceCache[productTypeId] || { sell: 0, buy: 0 };
       
       if (prices.sell > 0 && prices.buy > 0 && prices.sell > prices.buy) {
         const spreadPct = ((prices.sell - prices.buy) / prices.sell) * 100;
@@ -219,11 +225,13 @@ function applyBudgetImpactOptimizer() {
     
     if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
       const typeId = node.displayTypeId || node.typeId;
-      const prices = priceCache[typeId] || { sell: 0, buy: 0 };
+      const recipe = recipeMap[typeId];
+      const productTypeId = recipe ? (recipe.productTypeID || recipe.product || recipe.p || typeId) : typeId;
+      const prices = priceCache[productTypeId] || { sell: 0, buy: 0 };
       
       const deductModeInput = document.getElementById('deduct-stock-mode');
       const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-      const stockQty = isStockDeductEnabled ? (userStockMap[typeId] || userStockMap[node.typeId] || 0) : 0;
+      const stockQty = isStockDeductEnabled ? (userStockMap[productTypeId] || userStockMap[node.typeId] || 0) : 0;
       const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
 
       const sellTotal = prices.sell * netQtyNeeded;
@@ -268,12 +276,13 @@ function getNodePriceStrategy(node) {
 function calculateTreeNodeCost(node) {
   const deductModeInput = document.getElementById('deduct-stock-mode');
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-  const stockQty = isStockDeductEnabled ? (userStockMap[node.typeId] || userStockMap[node.displayTypeId] || 0) : 0;
+  const productTypeId = node.productTypeId || node.typeId;
+  const stockQty = isStockDeductEnabled ? (userStockMap[productTypeId] || userStockMap[node.typeId] || 0) : 0;
   const netNeededQty = Math.max(0, node.qtyNeeded - stockQty);
 
   if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
     const strategy = getNodePriceStrategy(node);
-    const prices = priceCache[node.typeId] || { sell: 0, buy: 0 };
+    const prices = priceCache[productTypeId] || { sell: 0, buy: 0 };
     let unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
     if (strategy === 'buy') {
       const brokerFeeInput = document.getElementById('broker-fee');
