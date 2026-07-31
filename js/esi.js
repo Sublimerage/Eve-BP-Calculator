@@ -91,16 +91,55 @@ async function fetchWithAuth(url, options = {}, token) {
   if (!options.headers) options.headers = {};
   options.headers['Authorization'] = `Bearer ${token}`;
   try {
-    const res = await fetch(url, options);
+    let res = await fetch(url, options);
     if (res.status === 401) {
-      console.warn("SSO Token expired or unauthorized (401). Executing clean logout.");
-      logoutEsiSSO();
-      return null;
+      // The access token may have simply expired since it was handed to this function - try one
+      // silent refresh-and-retry before giving up, instead of immediately logging the character out.
+      const refreshed = await refreshEsiAccessToken();
+      if (refreshed) {
+        options.headers['Authorization'] = `Bearer ${refreshed}`;
+        res = await fetch(url, options);
+      }
+      if (res.status === 401) {
+        console.warn("SSO Token expired or unauthorized (401), and refresh failed. Executing clean logout.");
+        logoutEsiSSO();
+        return null;
+      }
     }
     return res;
   } catch (err) {
     console.error("fetchWithAuth network error for URL:", url, err);
     throw err;
+  }
+}
+
+// Exchanges the stored refresh_token for a new access token. EVE SSO access tokens expire in
+// ~20 minutes; without this, any reload or long session inevitably hits a 401 and gets logged out.
+async function refreshEsiAccessToken() {
+  const refreshToken = localStorage.getItem('esi_refresh_token');
+  if (!refreshToken) return null;
+  try {
+    const body = new URLSearchParams({
+      grant_type: 'refresh_token',
+      client_id: window.HARDCODED_CLIENT_ID,
+      refresh_token: refreshToken
+    });
+    const res = await fetch('https://login.eveonline.com/v2/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body
+    });
+    if (!res.ok) return null;
+    const tokenData = await res.json();
+    if (!tokenData.access_token) return null;
+    const expiresAt = Date.now() + ((parseInt(tokenData.expires_in) || 1200) * 1000);
+    localStorage.setItem('esi_access_token', tokenData.access_token);
+    localStorage.setItem('esi_token_expiry', String(expiresAt));
+    if (tokenData.refresh_token) localStorage.setItem('esi_refresh_token', tokenData.refresh_token);
+    return tokenData.access_token;
+  } catch (err) {
+    console.warn('ESI token refresh failed:', err);
+    return null;
   }
 }
 
@@ -246,8 +285,21 @@ async function handleEsiSSOCallback() {
   if (!code) {
     const charName = localStorage.getItem('esi_char_name');
     const charId = localStorage.getItem('esi_char_id');
-    const token = localStorage.getItem('esi_access_token');
+    let token = localStorage.getItem('esi_access_token');
     if (charName && charId && token) {
+      const expiry = parseInt(localStorage.getItem('esi_token_expiry')) || 0;
+      const hasRefreshToken = !!localStorage.getItem('esi_refresh_token');
+      if (hasRefreshToken && Date.now() >= expiry - 30000) {
+        const refreshed = await refreshEsiAccessToken();
+        if (refreshed) {
+          token = refreshed;
+        } else {
+          // Refresh token is invalid/revoked, so the cached access token is stale too - log out
+          // cleanly instead of showing a "logged in" button that will immediately fail on any call.
+          logoutEsiSSO();
+          return;
+        }
+      }
       updateEsiUserUI(charName, charId);
       await fetchUserAndCorpAssets(charId, token);
     }
@@ -278,7 +330,10 @@ async function handleEsiSSOCallback() {
       if (jwtPayload) {
         const charId = String(jwtPayload.sub.split(':')[2]).trim();
         const charName = jwtPayload.name;
+        const expiresAt = Date.now() + ((parseInt(tokenData.expires_in) || 1200) * 1000);
         localStorage.setItem('esi_access_token', accessToken);
+        localStorage.setItem('esi_token_expiry', String(expiresAt));
+        if (tokenData.refresh_token) localStorage.setItem('esi_refresh_token', tokenData.refresh_token);
         localStorage.setItem('esi_char_id', charId);
         localStorage.setItem('esi_char_name', charName);
         updateEsiUserUI(charName, charId);
@@ -308,6 +363,8 @@ function updateEsiUserUI(charName, charId) {
 
 function logoutEsiSSO() {
   localStorage.removeItem('esi_access_token');
+  localStorage.removeItem('esi_refresh_token');
+  localStorage.removeItem('esi_token_expiry');
   localStorage.removeItem('esi_char_id');
   localStorage.removeItem('esi_char_name');
   localStorage.removeItem('esi_code_verifier');

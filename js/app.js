@@ -857,7 +857,7 @@ function addCurrentJobToLedger(e) {
   const job = {
     id: Date.now() + Math.floor(Math.random() * 1000),
     typeId: window.recipeTreeRoot.typeId,
-    name: window.recipeTreeRoot.name,
+    name: window.recipeTreeRoot.productName || window.recipeTreeRoot.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim(),
     productTypeId: window.recipeTreeRoot.productTypeId,
     runsNeeded: window.recipeTreeRoot.runsNeeded,
     qtyNeeded: window.recipeTreeRoot.qtyNeeded,
@@ -1455,6 +1455,12 @@ window.onload = async () => {
     console.error("State restoration error:", err);
   }
 
+  // Restore the previously-selected solar system (SCI) - was defined but never called, so the
+  // system silently reset to the default (Jita) on every reload.
+  if (typeof window.loadSavedSystem === 'function') {
+    window.loadSavedSystem().catch(err => console.error("Saved system restore error:", err));
+  }
+
   // Handle SSO Callback and assets asynchronously in the background
   if (typeof window.handleEsiSSOCallback === 'function') {
     window.handleEsiSSOCallback().catch(err => console.error("SSO Callback error:", err));
@@ -1467,3 +1473,16 @@ window.onload = async () => {
 
   window.addEventListener('resize', drawConnectingLines);
 };
+
+// "F" key: center/focus on the selected card, or the final output card when nothing is selected.
+// centerOnSelectedNode() already falls back to window.recipeTreeRoot when nothing is selected.
+window.addEventListener('keydown', (e) => {
+  if (e.key.toLowerCase() !== 'f' || e.ctrlKey || e.metaKey || e.altKey) return;
+  const activeEl = document.activeElement;
+  const tag = activeEl ? activeEl.tagName : '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (activeEl && activeEl.isContentEditable)) return;
+  if (typeof window.centerOnSelectedNode === 'function') {
+    e.preventDefault();
+    window.centerOnSelectedNode();
+  }
+});

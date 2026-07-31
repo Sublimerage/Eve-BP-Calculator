@@ -248,6 +248,10 @@ function renderActiveJobsList(allocatedStock) {
     const jobIconUrl = isJobBp
       ? `https://images.evetech.net/types/${iconTypeId}/bp?size=64`
       : `https://images.evetech.net/types/${iconTypeId}/icon?size=64`;
+    // The job may have been saved with the raw searched name (e.g. "Vargur Blueprint") - always show
+    // the manufactured product's name on the card instead.
+    const jobDisplayName = window.TYPE_ID_TO_NAME[iconTypeId] || (job.name || '')
+      .replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
 
     return `
       <div class="bg-[#0c1318] border border-[#1e3348] hover:border-purple-500/40 rounded p-4 flex flex-col justify-between shadow-md transition space-y-3">
@@ -255,7 +259,7 @@ function renderActiveJobsList(allocatedStock) {
           <div class="flex items-start space-x-3 min-w-0 flex-1">
             <img src="${jobIconUrl}" class="w-12 h-12 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
-              <h3 class="font-bold text-sm text-white truncate">${window.esc(job.name)}</h3>
+              <h3 class="font-bold text-sm text-white truncate">${window.esc(jobDisplayName)}</h3>
               <div class="text-[10px] mono text-slate-400 mt-0.5">Added on: ${formattedDate}</div>
             </div>
           </div>
@@ -443,6 +447,7 @@ function markJobAsBuilt(jobId) {
   const record = {
     id: job.id,
     typeId: job.typeId,
+    productTypeId: job.productTypeId,
     name: job.name,
     runsNeeded: job.runsNeeded,
     qtyNeeded: job.qtyNeeded,
@@ -511,10 +516,12 @@ function renderBuildHistoryLedger() {
   container.innerHTML = buildHistory.map(record => {
     if (!record) return '';
     const formattedDate = record.completedAt ? new Date(record.completedAt).toLocaleDateString() + ' ' + new Date(record.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
+    const recordDisplayName = window.TYPE_ID_TO_NAME[record.productTypeId] || (record.name || '')
+      .replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
     return `
       <tr class="hover:bg-[#0c1318]/50 text-slate-300 border-b border-[#1e3348]/20">
         <td class="p-1.5 py-2">${formattedDate}</td>
-        <td class="p-1.5 py-2 font-bold text-white">${window.esc(record.name)}</td>
+        <td class="p-1.5 py-2 font-bold text-white">${window.esc(recordDisplayName)}</td>
         <td class="p-1.5 py-2 text-right">${record.runsNeeded.toLocaleString()}</td>
         <td class="p-1.5 py-2 text-right text-purple-300 font-bold">${record.qtyNeeded.toLocaleString()}</td>
         <td class="p-1.5 py-2 text-right text-cyan-400 font-bold">${Math.round(record.calculatedCost || 0).toLocaleString()} ISK</td>
