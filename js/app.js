@@ -415,8 +415,7 @@ function recalculate() {
   if (!recipeTreeRoot) return;
 
   const activeEl = document.activeElement;
-  const isCardRunsFocused = activeEl && activeEl.id === 'card-bp-runs';
-  const isCardCustomPriceFocused = activeEl && activeEl.id === 'card-custom-price';
+  const activeId = activeEl ? activeEl.id : null;
 
   // Read directly from in-memory global runs count
   const inputVal = Math.max(1, window.globalRuns || 1);
@@ -624,18 +623,14 @@ function recalculate() {
     localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap || {}));
   } catch (err) {}
 
-  // Restore active input focus dynamically (avoiding value clearing loops that trigger recursion)
-  if (isCardRunsFocused) {
-    const newRunsInput = document.getElementById('card-bp-runs');
-    if (newRunsInput) {
-      newRunsInput.focus();
-    }
-  }
-
-  if (isCardCustomPriceFocused) {
-    const newPriceInput = document.getElementById('card-custom-price');
-    if (newPriceInput) {
-      newPriceInput.focus();
+  // Restore active input focus and cursor position dynamically (prevent cursor jump)
+  if (activeId) {
+    const newActiveEl = document.getElementById(activeId);
+    if (newActiveEl) {
+      newActiveEl.focus();
+      const val = newActiveEl.value;
+      newActiveEl.value = '';
+      newActiveEl.value = val;
     }
   }
 }
@@ -881,12 +876,12 @@ function createNodeCard(node) {
       <div class="flex items-center justify-between mb-2 px-1 text-[10px] mono border-b border-[#1e3348]/40 pb-1">
         <span class="text-slate-400 font-semibold">Job ME/TE:</span>
         <div class="flex items-center space-x-1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">
-          <input type="number" min="0" max="10" value="${node.customME}" 
+          <input type="number" id="card-me-${node.instanceId}" min="0" max="10" value="${node.customME}" 
             oninput="onCardMEChange(event, ${node.typeId}, ${node.instanceId})" 
             onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onkeydown="event.stopPropagation()"
             class="w-10 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-400 font-bold rounded p-0.5 outline-none focus:border-cyan-500" title="Component ME">
           <span class="text-slate-500">%</span>
-          <input type="number" min="0" max="20" value="${node.customTE}" 
+          <input type="number" id="card-te-${node.instanceId}" min="0" max="20" value="${node.customTE}" 
             oninput="onCardTEChange(event, ${node.typeId}, ${node.instanceId})" 
             onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onkeydown="event.stopPropagation()"
             class="w-10 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-400 font-bold rounded p-0.5 outline-none focus:border-cyan-500" title="Component TE">
@@ -949,11 +944,6 @@ function syncCardRunsToGlobal(e) {
   if (globalInput) {
     globalInput.value = val;
   }
-  recalculate();
-}
-
-function syncSellStrategy(e) {
-  window.rootSellStrategy = e.target.value;
   recalculate();
 }
 
@@ -1715,6 +1705,16 @@ window.updateHeaderLedgerCount = updateHeaderLedgerCount;
 window.onload = async () => {
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
+  }
+
+  // Handle SSO Callback and asset restoration
+  if (typeof handleEsiSSOCallback === 'function') {
+    await handleEsiSSOCallback();
+  }
+
+  // Fetch adjusted prices immediately
+  if (typeof fetchAdjustedPrices === 'function') {
+    await fetchAdjustedPrices();
   }
 
   loadTaxSettings(); // Load custom taxes from localStorage!

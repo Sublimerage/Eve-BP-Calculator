@@ -31,6 +31,7 @@ function extractSdeYield(recipe, targetProductTypeId) {
   if (recipe.products) {
     if (Array.isArray(recipe.products)) {
       for (const p of recipe.products) {
+        if (!p) continue; // Defensive guard
         const itemType = parseInt(p.typeID || p.typeId || p.id || p.productTypeID);
         if (itemType === pId) {
           const val = parseInt(p.quantity || p.qty || p.amount || p.yield);
@@ -65,6 +66,7 @@ function extractSdeYield(recipe, targetProductTypeId) {
       const products = recipe.activityProducts[actKey];
       if (Array.isArray(products)) {
         for (const p of products) {
+          if (!p) continue; // Defensive guard
           const itemType = parseInt(p.typeID || p.typeId || p.id || p.productTypeID);
           if (itemType === pId) {
             const val = parseInt(p.quantity || p.qty || p.amount);
@@ -77,7 +79,10 @@ function extractSdeYield(recipe, targetProductTypeId) {
           if (typeof directVal === 'number') return directVal;
           if (typeof directVal === 'object' && directVal !== null) {
             const val = parseInt(directVal.quantity || directVal.qty || directVal.amount);
-            if (!isNaN(val) && val > 0) return val;
+            if (!isNaN(val) && val > 0) {
+              foundYield = val;
+              return;
+            }
           }
         }
       }
@@ -407,8 +412,13 @@ async function buildRecursiveRecipeTree(typeId, name, qtyNeeded, currentDepth, m
 
         const nextVisited = new Set(visitedPath);
         nextVisited.add(typeId);
+        if (node.displayTypeId) {
+          nextVisited.add(node.displayTypeId);
+        }
 
-        if (currentDepth < maxDepth && !visitedPath.has(typeId) && isBuildingSelf) {
+        const isCircular = visitedPath.has(typeId) || (node.displayTypeId && visitedPath.has(node.displayTypeId));
+
+        if (currentDepth < maxDepth && !isCircular && isBuildingSelf) {
           const childPromises = activeMaterials.map(async mat => {
             try {
               const childQty = calculateInputQuantity(mat.baseQty, runsNeeded, me, facility, isReaction);

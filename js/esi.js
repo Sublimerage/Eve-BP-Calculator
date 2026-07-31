@@ -124,6 +124,25 @@ function isShipType(typeId) {
   return shipTerms.some(term => t.includes(term));
 }
 
+// Unified fetch wrapper that validates active login sessions and handles auth decay
+async function fetchWithAuth(url, options = {}, token) {
+  if (!options.headers) options.headers = {};
+  options.headers['Authorization'] = `Bearer ${token}`;
+  
+  try {
+    const res = await fetch(url, options);
+    if (res.status === 401) {
+      console.warn("SSO Token expired or unauthorized (401). Executing clean logout.");
+      logoutEsiSSO();
+      return null;
+    }
+    return res;
+  } catch (err) {
+    console.error("fetchWithAuth network error for URL:", url, err);
+    throw err;
+  }
+}
+
 // Strict ESI Adjusted Price Fetcher
 async function fetchAdjustedPrices() {
   const statusEl = document.getElementById('eiv-status-text');
@@ -161,7 +180,7 @@ async function fetchAdjustedPrices() {
           
           if (statusEl) statusEl.innerHTML = `EIV Prices: <span class="text-green-400 font-bold">Loaded (${loadedCount.toLocaleString()})</span>`;
           
-          if (window.recipeTreeRoot) {
+          if (window.recipeTreeRoot && typeof recalculate === 'function') {
             recalculate();
           }
           return;
@@ -237,7 +256,6 @@ async function startEsiSSOLogin() {
   const hashed = await sha256(verifier);
   const challenge = base64urlEncode(hashed);
 
-  // Restored exact Redirect URI calculation to match the CCP developer portal's configured addresses
   const redirectUri = window.location.origin + window.location.pathname;
 
   const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1';
@@ -258,7 +276,7 @@ async function handleEsiSSOCallback() {
     const token = localStorage.getItem('esi_access_token');
     if (charName && charId && token) {
       updateEsiUserUI(charName, charId);
-      fetchUserAndCorpAssets(charId, token);
+      await fetchUserAndCorpAssets(charId, token);
     }
     return;
   }
@@ -338,9 +356,18 @@ function logoutEsiSSO() {
       </button>
     `;
   }
-  updateStockDisplayCount();
-  populateLocationDropdown();
-  recalculate();
+  
+  if (typeof updateStockDisplayCount === 'function') updateStockDisplayCount();
+  if (typeof populateLocationDropdown === 'function') populateLocationDropdown();
+  
+  if (typeof updateJournalStockCountBadge === 'function') updateJournalStockCountBadge();
+  if (typeof populateJournalLocationDropdown === 'function') populateJournalLocationDropdown();
+
+  if (typeof recalculate === 'function') {
+    recalculate();
+  } else if (typeof renderJournalPage === 'function') {
+    renderJournalPage();
+  }
 }
 
 async function refreshLiveAssets() {
@@ -378,10 +405,8 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
 
     if (corpId && accessToken) {
       try {
-        const divRes = await fetch(`https://esi.evetech.net/latest/corporations/${corpId}/divisions/?datasource=tranquility`, {
-          headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
-        if (divRes.ok) {
+        const divRes = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/divisions/?datasource=tranquility`, {}, accessToken);
+        if (divRes && divRes.ok) {
           const divData = await divRes.json();
           if (divData && Array.isArray(divData.hangar)) {
             divData.hangar.forEach(d => {
@@ -396,10 +421,8 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
 
     // Fetch character skills for Industry TE calculations
     try {
-      const skillsRes = await fetch(`https://esi.evetech.net/latest/characters/${charId}/skills/?datasource=tranquility`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
-      if (skillsRes.ok) {
+      const skillsRes = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/skills/?datasource=tranquility`, {}, accessToken);
+      if (skillsRes && skillsRes.ok) {
         const skillsData = await skillsRes.json();
         if (skillsData && Array.isArray(skillsData.skills)) {
           let indLevel = 0;
@@ -418,11 +441,9 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
     let page = 1;
     let hasMore = true;
     while (hasMore) {
-      const res = await fetch(`https://esi.evetech.net/latest/characters/${charId}/assets/?datasource=tranquility&page=${page}`, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      });
+      const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/assets/?datasource=tranquility&page=${page}`, {}, accessToken);
 
-      if (res.ok) {
+      if (res && res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           data.forEach(ast => {
@@ -446,15 +467,13 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     }
 
-    if (corpId) {
+    if (corpId && accessToken) {
       page = 1;
       hasMore = true;
       while (hasMore) {
-        const res = await fetch(`https://esi.evetech.net/latest/corporations/${corpId}/assets/?datasource=tranquility&page=${page}`, {
-          headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
+        const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/assets/?datasource=tranquility&page=${page}`, {}, accessToken);
 
-        if (res.ok) {
+        if (res && res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
             data.forEach(ast => {
@@ -519,15 +538,12 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       for (let i = 0; i < charContainerIds.length; i += 500) {
         const chunk = charContainerIds.slice(i, i + 500);
         try {
-          const nameRes = await fetch(`https://esi.evetech.net/latest/characters/${charId}/assets/names/?datasource=tranquility`, {
+          const nameRes = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/assets/names/?datasource=tranquility`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${accessToken}`
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(chunk)
-          });
-          if (nameRes.ok) {
+          }, accessToken);
+          if (nameRes && nameRes.ok) {
             const customNames = await nameRes.json();
             if (Array.isArray(customNames)) {
               customNames.forEach(cn => {
@@ -541,19 +557,16 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     }
 
-    if (corpId && corpContainerIds.length > 0) {
+    if (corpId && corpContainerIds.length > 0 && accessToken) {
       for (let i = 0; i < corpContainerIds.length; i += 500) {
         const chunk = corpContainerIds.slice(i, i + 500);
         try {
-          const nameRes = await fetch(`https://esi.evetech.net/latest/corporations/${corpId}/assets/names/?datasource=tranquility`, {
+          const nameRes = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/assets/names/?datasource=tranquility`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${accessToken}`
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(chunk)
-          });
-          if (nameRes.ok) {
+          }, accessToken);
+          if (nameRes && nameRes.ok) {
             const customNames = await nameRes.json();
             if (Array.isArray(customNames)) {
               customNames.forEach(cn => {
@@ -614,11 +627,9 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
     if (unresolvedStructureIds.length > 0 && token) {
       await Promise.all(unresolvedStructureIds.map(async (structId) => {
         try {
-          const res = await fetch(`https://esi.evetech.net/latest/universe/structures/${structId}/?datasource=tranquility`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
+          const res = await fetchWithAuth(`https://esi.evetech.net/latest/universe/structures/${structId}/?datasource=tranquility`, {}, token);
 
-          if (res.ok) {
+          if (res && res.ok) {
             const structData = await res.json();
             if (structData && structData.name) {
               let sysName = window.systemNameCache[structData.solar_system_id] || '';
@@ -636,7 +647,7 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
               const fullName = structData.name.toUpperCase();
               window.resolvedLocationNames[structId] = sysName ? `${fullName} (${sysName})` : fullName;
             }
-          } else if (res.status === 403) {
+          } else if (res && res.status === 403) {
             window.resolvedLocationNames[structId] = `UPWELL STRUCTURE (${structId.toString().slice(-6)}) [PRIVATE/RESTRICTED]`;
           }
         } catch (e) {}
@@ -676,7 +687,12 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
   });
 
   populateLocationDropdown();
-  applyStockLocationFilter();
+  
+  if (typeof applyStockLocationFilter === 'function') {
+    applyStockLocationFilter();
+  } else if (typeof applyJournalStockFilter === 'function') {
+    applyJournalStockFilter();
+  }
 }
 
 function populateLocationDropdown() {
@@ -825,7 +841,7 @@ function filterLocationDropdownOptions() {
 function updateStockDisplayCount() {
   const el = document.getElementById('stock-count-display');
   if (!el) return;
-  const totalItems = Object.values(window.userStockMap).reduce((acc, q) => acc + q, 0);
+  const totalItems = Object.values(window.userStockMap || {}).reduce((acc, q) => acc + q, 0);
   el.textContent = `${totalItems.toLocaleString()} items`;
 }
 
@@ -869,7 +885,9 @@ function applyStockLocationFilter() {
   });
 
   updateStockDisplayCount();
-  recalculate();
+  if (typeof recalculate === 'function') {
+    recalculate();
+  }
 }
 
 function openPasteModal() {
@@ -887,7 +905,9 @@ function clearUserStock() {
   window.userStockMap = {};
   updateStockDisplayCount();
   populateLocationDropdown();
-  recalculate();
+  if (typeof recalculate === 'function') {
+    recalculate();
+  }
   closePasteModal();
 }
 
@@ -1025,7 +1045,9 @@ async function fetchSystemSCIById(systemId, systemName) {
         `System: ${systemName.toUpperCase()} | SCI: ${(mfgSCI * 100).toFixed(2)}% (Mfg) / ${(reactSCI * 100).toFixed(2)}% (React)`;
     }
 
-    recalculate();
+    if (typeof recalculate === 'function') {
+      recalculate();
+    }
   } catch (err) {
     console.warn('System SCI fetch error:', err);
   }

@@ -619,6 +619,7 @@ function moveJobUp(jobId) {
   }
 }
 
+// --- Priority Move Actions ---
 function moveJobDown(jobId) {
   loadJournalState();
   const index = activeJobs.findIndex(j => j && j.id === jobId);
@@ -868,10 +869,21 @@ window.moveJobUp = moveJobUp;
 window.moveJobDown = moveJobDown;
 
 // Initialize Ledger page on window load
-window.onload = () => {
+window.onload = async () => {
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
+  
+  // Process SSO authentication and restore asset profiles
+  if (typeof handleEsiSSOCallback === 'function') {
+    await handleEsiSSOCallback();
+  }
+
+  // Fetch adjusted prices immediately
+  if (typeof fetchAdjustedPrices === 'function') {
+    await fetchAdjustedPrices();
+  }
+
   loadJournalState();
   populateJournalLocationDropdown();
   updateJournalStockCountBadge();

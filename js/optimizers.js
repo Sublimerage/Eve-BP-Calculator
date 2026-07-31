@@ -1,5 +1,20 @@
 'use strict';
 
+// --- Action: Recursive Helper to Sync UI Overrides to Tree Structure ---
+function syncTreeBuildStates(node) {
+  if (!node) return;
+  const defaultBuildState = (node.depth === 0) ? true : false;
+  node.isBuildingSelf = (buildSelfOverrides[node.typeId] !== undefined) ? buildSelfOverrides[node.typeId] : defaultBuildState;
+  
+  if (node.displayTypeId && buildSelfOverrides[node.displayTypeId] !== undefined) {
+    node.isBuildingSelf = buildSelfOverrides[node.displayTypeId];
+  }
+
+  if (node.children) {
+    node.children.forEach(child => syncTreeBuildStates(child));
+  }
+}
+
 // --- Action: Toggle Component Build / Buy Mode ---
 async function toggleBuildSelf(e, typeId) {
   if (e) e.stopPropagation();
@@ -20,6 +35,7 @@ function onCardMEChange(e, typeId, instanceId) {
   }
 }
 
+// --- Action: Per-Card TE Change ---
 function onCardTEChange(e, typeId, instanceId) {
   if (e) e.stopPropagation();
   const val = Math.max(0, Math.min(20, parseFloat(e.target.value) || 0));
@@ -65,7 +81,8 @@ function resetSmartBuyModes() {
 
 // Optimizer 1: True Greedy Build vs Buy Profit Margin Optimizer
 async function applyBuildProfitOptimizer() {
-  const threshold = parseFloat(document.getElementById('build-profit-threshold')?.value) || 0;
+  const inputThreshold = parseFloat(document.getElementById('build-profit-threshold')?.value);
+  const threshold = isNaN(inputThreshold) ? 5.0 : Math.max(0, inputThreshold);
 
   if (!recipeTreeRoot) return;
 
@@ -96,10 +113,11 @@ async function applyBuildProfitOptimizer() {
   const brokerFee = (parseFloat(document.getElementById('broker-fee')?.value) || 1.0) / 100;
 
   // Helper to run a silent simulation test for profit under given build overrides
-  function simulateProfit(overrideState) {
-    const tempOverrides = { ...overrideState };
+  function simulateProfit() {
+    // Sync current override state modifications down to tree objects
+    syncTreeBuildStates(recipeTreeRoot);
     
-    // Scale tree quantities
+    // Scale tree quantities recursively
     scaleTreeQuantities(recipeTreeRoot, facility);
     calculateNodeEIV(recipeTreeRoot);
 
@@ -129,11 +147,11 @@ async function applyBuildProfitOptimizer() {
   for (const typeId of Array.from(manufacturableTypeIds)) {
     // Scenario A: Test with component set to BUY
     buildSelfOverrides[typeId] = false;
-    const profitBuy = simulateProfit(buildSelfOverrides);
+    const profitBuy = simulateProfit();
 
     // Scenario B: Test with component set to BUILD
     buildSelfOverrides[typeId] = true;
-    const profitBuild = simulateProfit(buildSelfOverrides);
+    const profitBuild = simulateProfit();
 
     const prices = priceCache[typeId] || { sell: 0, buy: 0 };
     const unitPrice = prices.sell || prices.buy || getEIV(typeId) || 1;
@@ -158,7 +176,8 @@ async function applyBuildProfitOptimizer() {
 
 // Optimizer 2: Component Market Spread Threshold
 function applyComponentSpreadOptimizer() {
-  const threshold = parseFloat(document.getElementById('buy-savings-threshold')?.value) || 0;
+  const inputThreshold = parseFloat(document.getElementById('buy-savings-threshold')?.value);
+  const threshold = isNaN(inputThreshold) ? 5.0 : Math.max(0, inputThreshold);
 
   function optimizeNode(node) {
     if (!node) return;
@@ -192,7 +211,8 @@ function applyComponentSpreadOptimizer() {
 
 // Optimizer 3: Build Cost Savings Impact Threshold
 function applyBudgetImpactOptimizer() {
-  const threshold = parseFloat(document.getElementById('total-cost-savings-threshold')?.value) || 0;
+  const inputThreshold = parseFloat(document.getElementById('total-cost-savings-threshold')?.value);
+  const threshold = isNaN(inputThreshold) ? 1.0 : Math.max(0, inputThreshold);
 
   function optimizeNode(node) {
     if (!node) return;
