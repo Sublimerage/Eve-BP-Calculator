@@ -266,9 +266,12 @@ async function fetchBlueprintTimeOnly(blueprintTypeId) {
           blueprintTimeCache[blueprintTypeId] = t;
           return t;
         }
+        console.warn(`[BuildTime] Fuzzwork responded for blueprint ${blueprintTypeId} but had no usable time field. Response keys: ${Object.keys(data || {}).join(', ')}`);
+      } else {
+        console.warn(`[BuildTime] Fuzzwork request for blueprint ${blueprintTypeId} via ${url.startsWith('https://corsproxy') ? 'corsproxy.io' : 'direct'} returned HTTP ${res.status}`);
       }
     } catch (e) {
-      // Try next URL
+      console.warn(`[BuildTime] Fuzzwork request for blueprint ${blueprintTypeId} via ${url.startsWith('https://corsproxy') ? 'corsproxy.io' : 'direct'} failed (likely CORS/network block):`, e.message || e);
     }
   }
   blueprintTimeCache[blueprintTypeId] = 0;
@@ -379,8 +382,14 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
         if (!(existingTime > 0)) {
           try {
             const fetchedTime = await fetchBlueprintTimeOnly(blueprintTypeId);
-            if (fetchedTime > 0) node.recipe.time = fetchedTime;
-          } catch (e) {}
+            if (fetchedTime > 0) {
+              node.recipe.time = fetchedTime;
+            } else {
+              console.warn(`[BuildTime] No time data for "${node.productName || name}" (blueprint ${blueprintTypeId}). Local recipe had no usable time field, and the live Fuzzwork lookup also returned nothing (network/CORS block, or Fuzzwork has no data for this blueprint). Local recipe keys: ${Object.keys(node.recipe).join(', ')}`);
+            }
+          } catch (e) {
+            console.warn(`[BuildTime] Fuzzwork time lookup threw an error for blueprint ${blueprintTypeId}:`, e);
+          }
         }
 
         const me = isReaction ? 0 : node.customME;

@@ -537,23 +537,10 @@ function recalculate() {
   const roiBuyEl = document.getElementById('summary-roi-buy');
   if (roiBuyEl) roiBuyEl.textContent = `ROI: ${roiBuy}%`;
 
-  // Total estimated build time across every job actually being manufactured in the tree, and the
-  // resulting ISK/hour based on net sell profit.
+  // Total estimated build time across every job actually being manufactured in the tree - read
+  // directly by the root card to show its own "Est. Build Time" and "Est. ISK/Hour" lines.
   const totalBuildSeconds = calculateTotalBuildSeconds(window.recipeTreeRoot);
   window.recipeTreeRoot.totalBuildSeconds = totalBuildSeconds;
-  const buildTimeEl = document.getElementById('summary-build-time');
-  if (buildTimeEl) buildTimeEl.textContent = totalBuildSeconds > 0 ? window.formatDuration(totalBuildSeconds) : '—';
-  const iskPerHourEl = document.getElementById('summary-isk-per-hour');
-  if (iskPerHourEl) {
-    if (totalBuildSeconds > 0) {
-      const iskPerHour = profitSell / (totalBuildSeconds / 3600);
-      iskPerHourEl.textContent = `ISK/Hr: ${Math.round(iskPerHour).toLocaleString()} ISK`;
-      iskPerHourEl.className = `text-[8px] truncate ${iskPerHour >= 0 ? 'text-green-400' : 'text-red-400'}`;
-    } else {
-      iskPerHourEl.textContent = 'ISK/Hr: —';
-      iskPerHourEl.className = 'text-[8px] text-slate-500 truncate';
-    }
-  }
 
   if (window.isolatedInstanceId) {
     const isoNode = findNodeByInstanceId(window.recipeTreeRoot, window.isolatedInstanceId);
@@ -803,6 +790,12 @@ function createNodeCard(node) {
         <div class="flex justify-between font-bold border-t border-green-500/40 pt-1 mt-1 bg-green-950/30 p-1 rounded">
           <span class="text-slate-300">${window.rootSellStrategy === 'custom-contract' ? 'Net Profit (Contract Output):' : 'Net Profit (Sell Output):'}</span>
           <span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${Math.round(node.netProfitSell || 0).toLocaleString()} ISK</span>
+        </div>
+        <div class="flex justify-between font-bold" title="Total net sell profit divided by the total time to build this item and every sub-component you're manufacturing yourself.">
+          <span class="text-slate-300">Est. ISK/Hour:</span>
+          ${node.totalBuildSeconds > 0
+            ? `<span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${Math.round((node.netProfitSell || 0) / (node.totalBuildSeconds / 3600)).toLocaleString()} ISK</span>`
+            : `<span class="text-slate-500 italic">No Time Data</span>`}
         </div>
       ` : ''}
     </div>
