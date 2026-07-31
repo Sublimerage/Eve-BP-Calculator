@@ -183,13 +183,21 @@ if (searchInput) {
       return;
     }
     if (searchResults) {
-      searchResults.innerHTML = hits.map(item => `
+      searchResults.innerHTML = hits.map(item => {
+        const lowerName = item.name.toLowerCase();
+        const isBp = lowerName.includes('blueprint') || lowerName.includes('formula') || lowerName.includes('reaction');
+        // Blueprints aren't valid /icon items - show the manufactured product's icon instead.
+        const displayIconId = isBp
+          ? (window.resolveProductIdFromBlueprintName(item.name) || window.BLUEPRINT_TO_PRODUCT_MAP[item.id] || item.id)
+          : item.id;
+        return `
         <div class="px-3 py-2 hover:bg-[#1e3348] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#1e3348]/40"
              onclick="selectItem(${item.id}, '${window.esc(item.name)}')">
-          <img src="https://images.evetech.net/types/${item.id}/icon?size=32" class="w-6 h-6 rounded" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.id}/render?size=32';">
+          <img src="https://images.evetech.net/types/${displayIconId}/icon?size=32" class="w-6 h-6 rounded" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${displayIconId}/render?size=32';">
           <span class="font-semibold text-slate-200">${window.esc(item.name)}</span>
         </div>
-      `).join('');
+      `;
+      }).join('');
       searchResults.classList.remove('hidden');
     }
   });

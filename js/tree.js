@@ -293,7 +293,14 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
       node.productTypeId = (!isNaN(recipeProductId) && recipeProductId > 0 && recipeProductId !== blueprintTypeId)
         ? recipeProductId
         : productTypeId;
-      node.productName = recipe.productName || window.TYPE_ID_TO_NAME[node.productTypeId] || productName;
+      // Prefer the authoritative name registered for the resolved productTypeId. Fall back to a
+      // cleaned copy of the recipe's own productName - some SDE/Fuzzwork entries store the raw
+      // blueprint name there (e.g. "Item Blueprint") instead of the manufactured item's name, which
+      // was leaking the word "Blueprint" onto cards even after productTypeId itself was corrected.
+      const cleanRecipeProductName = recipe.productName
+        ? recipe.productName.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()
+        : '';
+      node.productName = window.TYPE_ID_TO_NAME[node.productTypeId] || cleanRecipeProductName || productName;
       node.isManufacturable = true;
       
       const allowReactions = document.getElementById('include-reactions')?.value === 'true';
@@ -351,7 +358,13 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
           const childPromises = activeMaterials.map(async mat => {
             try {
               const childQty = calculateInputQuantity(mat.baseQty, runsNeeded, me, facility, isReaction);
-              const childBlueprintTypeId = findBlueprintTypeIdForProduct(mat.typeId);
+              // findBlueprintTypeIdForProduct relies on the recipe map already being reverse-indexed by
+              // product id - which fails for materials whose SDE/Fuzzwork entry never populated a usable
+              // productTypeID/product/p field (the same data gap that broke Vargur/Leshak). Fall back to
+              // a name-based lookup ("X" -> "X Blueprint"/"X Formula") so genuinely buildable materials
+              // still get recognized and get their Build/Buy button instead of being silently treated
+              // as raw, non-manufacturable items.
+              const childBlueprintTypeId = findBlueprintTypeIdForProduct(mat.typeId) || resolveBlueprintIdFromProductName(mat.name);
 
               if (childBlueprintTypeId) {
                 return await buildRecursiveRecipeTree(childBlueprintTypeId, mat.name + ' Blueprint', childQty, currentDepth + 1, maxDepth, nextVisited, node);

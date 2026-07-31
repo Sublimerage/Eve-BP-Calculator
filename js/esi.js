@@ -215,6 +215,11 @@ async function startEsiSSOLogin() {
   const hashed = await sha256(verifier);
   const challenge = base64urlEncode(hashed);
   const redirectUri = getCleanRedirectUri();
+  // "invalid_request: redirect URL does not match" comes directly from login.eveonline.com and means
+  // this exact string isn't registered as a Callback URL on the app's EVE Developer Application page
+  // (https://developers.eveonline.com) for this Client ID. Log it so it can be copied verbatim -
+  // including the trailing slash, which EVE matches exactly.
+  console.info(`[EVE SSO] Sending redirect_uri: "${redirectUri}" - this exact string must be registered as a Callback URL for Client ID ${clientId} at https://developers.eveonline.com`);
   const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1';
   const state = generateRandomString(16);
   localStorage.setItem('esi_auth_state', state);
@@ -224,6 +229,19 @@ async function startEsiSSOLogin() {
 
 async function handleEsiSSOCallback() {
   const urlParams = new URLSearchParams(window.location.search);
+  const ssoError = urlParams.get('error');
+  if (ssoError) {
+    // Some SSO failures (e.g. the user declining consent) do redirect back with ?error=... instead of
+    // failing directly on login.eveonline.com - surface those instead of failing silently.
+    const desc = decodeURIComponent((urlParams.get('error_description') || '').replace(/\+/g, ' '));
+    console.error('EVE SSO Error:', ssoError, desc);
+    window.history.replaceState({}, document.title, window.location.pathname);
+    const statusText = document.getElementById('status-text');
+    const statusDot = document.getElementById('status-dot');
+    if (statusText) statusText.textContent = `EVE SSO LOGIN FAILED: ${desc || ssoError}`;
+    if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-red-500';
+    return;
+  }
   const code = urlParams.get('code');
   if (!code) {
     const charName = localStorage.getItem('esi_char_name');
