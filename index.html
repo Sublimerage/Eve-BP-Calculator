@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Industry Ledger</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=3.0.5">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=3.0.6">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -259,7 +259,7 @@
   </section>
 
   <!-- Dashboard Summary Bar (Ultra-Compact) -->
-  <section class="p-1.5 grid grid-cols-1 md:grid-cols-6 gap-2 bg-[#070b0f] relative z-10 border-b border-[#1e3348]/40">
+  <section class="p-1.5 grid grid-cols-1 md:grid-cols-5 gap-2 bg-[#070b0f] relative z-10 border-b border-[#1e3348]/40">
     <div class="bg-[#0d1922] border border-[#1e3348]/60 px-3 py-1.5 rounded shadow flex flex-col justify-center">
       <div class="text-[9px] text-slate-400 uppercase font-bold mono truncate">Total Production Cost</div>
       <div id="summary-build-cost" class="text-sm font-bold text-cyan-400 mono leading-tight">0 ISK</div>
@@ -287,12 +287,6 @@
       <div class="text-[9px] text-slate-400 uppercase font-bold mono truncate">Net Profit (Instant Buy)</div>
       <div id="summary-profit-buy" class="text-sm font-bold text-green-400 mono leading-tight">0 ISK</div>
       <div id="summary-roi-buy" class="text-[8px] text-green-400 truncate">ROI: 0%</div>
-    </div>
-
-    <div class="bg-[#0d1922] border border-purple-500/30 px-3 py-1.5 rounded shadow flex flex-col justify-center" title="Total time to build the full tree - includes every sub-component you're manufacturing yourself, adjusted for your skills and facility.">
-      <div class="text-[9px] text-purple-300 uppercase font-bold mono truncate">Est. Total Build Time</div>
-      <div id="summary-build-time" class="text-sm font-bold text-purple-300 mono leading-tight">—</div>
-      <div id="summary-isk-per-hour" class="text-[8px] text-slate-500 truncate">ISK/Hr: —</div>
     </div>
   </section>
 
@@ -375,11 +369,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=3.0.5"></script>
-  <script src="js/config.js?v=3.0.5"></script>
-  <script src="js/esi.js?v=3.0.5"></script>
-  <script src="js/tree.js?v=3.0.5"></script>
-  <script src="js/optimizers.js?v=3.0.5"></script>
-  <script src="js/app.js?v=3.0.5"></script>
+  <script src="eve_db.js?v=3.0.6"></script>
+  <script src="js/config.js?v=3.0.6"></script>
+  <script src="js/esi.js?v=3.0.6"></script>
+  <script src="js/tree.js?v=3.0.6"></script>
+  <script src="js/optimizers.js?v=3.0.6"></script>
+  <script src="js/app.js?v=3.0.6"></script>
 </body>
 </html>
