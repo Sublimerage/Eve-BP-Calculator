@@ -245,7 +245,11 @@ async function fetchBlueprintData(typeId) {
 
 // Parallel Multi-Layer SDE Blueprint-Centric Tree Generator
 async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, currentDepth, maxDepth, visitedPath = new Set(), parentNode = null) {
-  let productTypeId = window.recipeTreeRootProductTypeId || window.BLUEPRINT_TO_PRODUCT_MAP[blueprintTypeId] || resolveProductIdFromBlueprintName(name) || blueprintTypeId;
+  // NOTE: window.recipeTreeRootProductTypeId is only valid for the ROOT node (depth 0) - it is
+  // set once per selectItem() call for the item the user searched for. It must never be consulted
+  // on recursive sub-component calls, or a child material would silently inherit the ROOT's
+  // product ID whenever its own recipe/name resolution came up empty.
+  let productTypeId = (currentDepth === 0 && window.recipeTreeRootProductTypeId) || window.BLUEPRINT_TO_PRODUCT_MAP[blueprintTypeId] || resolveProductIdFromBlueprintName(name) || blueprintTypeId;
   let productName = name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
 
   const defaultBuildState = (currentDepth === 0) ? true : false;
@@ -278,7 +282,17 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
   try {
     const recipe = await fetchBlueprintData(blueprintTypeId);
     if (recipe) {
-      node.productTypeId = recipe.productTypeID || recipe.product || recipe.p || productTypeId;
+      // Safe resolution: a recipe's product-id field is only trustworthy if it actually points to a
+      // DIFFERENT item than the blueprint itself. Some SDE/Fuzzwork entries (seen on Marauder- and
+      // Triglavian-tier hulls like the Vargur/Leshak) leave this field empty or self-referential, which
+      // previously caused node.productTypeId to silently fall back to the blueprint's own type ID -
+      // breaking icons (blueprints aren't `/icon` items), prices (blueprints aren't market-traded), and
+      // build costs (buying "the blueprint" instead of the ship). When that happens, trust the
+      // independently name/BLUEPRINT_TO_PRODUCT_MAP-resolved productTypeId computed above instead.
+      const recipeProductId = parseInt(recipe.productTypeID || recipe.product || recipe.p);
+      node.productTypeId = (!isNaN(recipeProductId) && recipeProductId > 0 && recipeProductId !== blueprintTypeId)
+        ? recipeProductId
+        : productTypeId;
       node.productName = recipe.productName || window.TYPE_ID_TO_NAME[node.productTypeId] || productName;
       node.isManufacturable = true;
       

@@ -158,7 +158,10 @@ async function applyBuildProfitOptimizer() {
     const profitBuild = simulateProfit();
 
     const recipe = window.recipeMap[typeId];
-    const productTypeId = recipe ? (recipe.productTypeID || recipe.product || recipe.p || typeId) : typeId;
+    const recipeProductId = recipe ? parseInt(recipe.productTypeID || recipe.product || recipe.p) : NaN;
+    // A recipe's product id must differ from the blueprint's own id, or it's missing/bad data - fall
+    // back to the blueprint's typeId only as a last resort rather than pricing the blueprint itself.
+    const productTypeId = (!isNaN(recipeProductId) && recipeProductId > 0 && recipeProductId !== typeId) ? recipeProductId : typeId;
     const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
     const unitPrice = prices.sell || prices.buy || (typeof window.getEIV === 'function' ? window.getEIV(productTypeId) : 0) || 1;
     const baseCost = unitPrice * (window.recipeTreeRoot.qtyNeeded || 1);
@@ -190,8 +193,8 @@ function applyComponentSpreadOptimizer() {
     
     if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
       const typeId = node.displayTypeId || node.typeId;
-      const recipe = window.recipeMap[typeId];
-      const productTypeId = recipe ? (recipe.productTypeID || recipe.product || recipe.p || typeId) : typeId;
+      // Use the tree-resolved productTypeId (never the blueprint's own id) for pricing.
+      const productTypeId = node.productTypeId || typeId;
       const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
       
       if (prices.sell > 0 && prices.buy > 0 && prices.sell > prices.buy) {
@@ -227,8 +230,8 @@ function applyBudgetImpactOptimizer() {
     
     if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
       const typeId = node.displayTypeId || node.typeId;
-      const recipe = window.recipeMap[typeId];
-      const productTypeId = recipe ? (recipe.productTypeID || recipe.product || recipe.p || typeId) : typeId;
+      // Use the tree-resolved productTypeId (never the blueprint's own id) for pricing.
+      const productTypeId = node.productTypeId || typeId;
       const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
       
       const deductModeInput = document.getElementById('deduct-stock-mode');
