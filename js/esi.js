@@ -1,5 +1,7 @@
 'use strict';
 
+// Centralized helpers (esc, safeParseJSON, formatDuration) are loaded globally from js/config.js
+
 // Decodes unpadded Base64URL JWT payloads securely
 function decodeJwt(token) {
   try {
@@ -987,8 +989,8 @@ async function selectSolarSystem(systemId, systemName) {
   const searchInputEl = document.getElementById('system-search');
   if (searchInputEl) searchInputEl.value = systemName.toUpperCase();
   
-  const resultsEl = document.getElementById('system-results');
-  if (resultsEl) resultsEl.classList.add('hidden');
+  const MathSearchResults = document.getElementById('system-results');
+  if (MathSearchResults) MathSearchResults.classList.add('hidden');
   
   try {
     localStorage.setItem('eve_selected_system', JSON.stringify({ id: systemId, name: systemName.toUpperCase() }));
