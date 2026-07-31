@@ -17,6 +17,25 @@ function safeParseJSON(str, fallback) {
   }
 }
 
+// Decodes unpadded Base64URL JWT payloads securely
+function decodeJwt(token) {
+  try {
+    if (!token) return null;
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = base64.length % 4;
+    const paddedBase64 = pad ? base64 + '='.repeat(4 - pad) : base64;
+    
+    return JSON.parse(atob(paddedBase64));
+  } catch (e) {
+    console.error('JWT Decode failed:', e);
+    return null;
+  }
+}
+
 // Fast O(1) Helper to look up exact item type name from TYPE_ID_TO_NAME or EVE_ITEMS database
 function getItemTypeName(typeId) {
   if (!typeId) return '';
@@ -225,7 +244,6 @@ async function startEsiSSOLogin() {
   }
   const redirectUri = window.location.origin + pathname;
 
-  // Added 'esi-skills.read_skills.v1' to SSO scope parameters
   const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1';
   const state = generateRandomString(16);
   sessionStorage.setItem('esi_auth_state', state);
@@ -281,16 +299,18 @@ async function handleEsiSSOCallback() {
       const tokenData = await res.json();
       const accessToken = tokenData.access_token;
       
-      const jwtPayload = JSON.parse(atob(accessToken.split('.')[1]));
-      const charId = jwtPayload.sub.split(':')[2];
-      const charName = jwtPayload.name;
+      const jwtPayload = decodeJwt(accessToken);
+      if (jwtPayload) {
+        const charId = jwtPayload.sub.split(':')[2];
+        const charName = jwtPayload.name;
 
-      localStorage.setItem('esi_access_token', accessToken);
-      localStorage.setItem('esi_char_id', charId);
-      localStorage.setItem('esi_char_name', charName);
+        localStorage.setItem('esi_access_token', accessToken);
+        localStorage.setItem('esi_char_id', charId);
+        localStorage.setItem('esi_char_name', charName);
 
-      updateEsiUserUI(charName, charId);
-      await fetchUserAndCorpAssets(charId, accessToken);
+        updateEsiUserUI(charName, charId);
+        await fetchUserAndCorpAssets(charId, accessToken);
+      }
     }
   } catch (err) {
     console.error('ESI SSO Token Error:', err);

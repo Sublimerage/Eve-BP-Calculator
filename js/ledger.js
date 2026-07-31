@@ -16,22 +16,6 @@ function safeParseJSON(str, fallback) {
   }
 }
 
-// Convert seconds into human-readable EVE duration format (e.g. 1d 4h 12m)
-function formatDuration(seconds) {
-  if (!seconds || isNaN(seconds) || seconds <= 0) return 'N/A';
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-
-  const parts = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0) parts.push(`${hours}h`);
-  if (mins > 0) parts.push(`${mins}m`);
-  if (parts.length === 0) parts.push(`${secs}s`);
-  return parts.join(' ');
-}
-
 // Global Ledger Queue State (relying on global userStockMap from config.js)
 let activeJobs = [];
 let buildHistory = [];
