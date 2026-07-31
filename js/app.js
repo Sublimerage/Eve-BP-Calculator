@@ -1,15 +1,10 @@
 'use strict';
 
-// Retrieve globally centralized helpers from window context (strict-mode compliant)
-const esc = window.esc;
-const safeParseJSON = window.safeParseJSON;
-const formatDuration = window.formatDuration;
-
 if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sell';
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
 if (window.globalRuns === undefined) window.globalRuns = 1;
 
-// Strictly queries exact unreduced SDE manufacturing durations directly from your SDE database
+// Queries unreduced SDE manufacturing durations directly from SDE database
 function extractBuildTime(recipe) {
   if (!recipe) return 0;
   return parseInt(recipe.time || recipe.t || recipe.timeSeconds || recipe.duration || recipe.mfgTime || recipe.productionTime || 0);
@@ -19,12 +14,12 @@ function extractBuildTime(recipe) {
 function syncTreeOverrides(node) {
   if (!node) return;
   const tId = node.typeId;
-  const meMap = (typeof window.customMEOverrides !== 'undefined' && window.customMEOverrides) ? window.customMEOverrides : {};
-  const teMap = (typeof window.customTEOverrides !== 'undefined' && window.customTEOverrides) ? window.customTEOverrides : {};
+  const meMap = window.customMEOverrides || {};
+  const teMap = window.customTEOverrides || {};
   node.customME = meMap[tId] !== undefined ? meMap[tId] : 0;
   node.customTE = teMap[tId] !== undefined ? teMap[tId] : 0;
   if (node.children) {
-    node.children.forEach(child => syncTreeOverrides(child));
+    node.children.forEach(syncTreeOverrides);
   }
 }
 
@@ -57,7 +52,7 @@ function loadTaxSettings() {
   try {
     const saved = localStorage.getItem('eve_tax_settings');
     if (saved) {
-      const settings = safeParseJSON(saved, {});
+      const settings = window.safeParseJSON(saved, {});
       if (settings.facilityTax !== undefined && document.getElementById('facility-tax')) document.getElementById('facility-tax').value = settings.facilityTax;
       if (settings.sccSurcharge !== undefined && document.getElementById('scc-surcharge')) document.getElementById('scc-surcharge').value = settings.sccSurcharge;
       if (settings.salesTax !== undefined && document.getElementById('sales-tax')) document.getElementById('sales-tax').value = settings.salesTax;
@@ -74,8 +69,7 @@ function searchItems(query) {
   const q = query.toLowerCase().trim();
   if (!q) return [];
   const exact = [], starts = [], contains = [];
-  for (const [k, v] of Object.entries(IDX)) {
-    // Filter autocomplete to strictly index blueprints and reaction formulas
+  for (const [k, v] of Object.entries(window.IDX || {})) {
     const isBlueprint = k.includes('blueprint') || k.includes('formula') || k.includes('reaction');
     if (!isBlueprint) continue;
 
@@ -90,7 +84,7 @@ function searchSolarSystemsLocally(query) {
   const q = query.toLowerCase().trim();
   if (!q) return [];
   const exact = [], starts = [], contains = [];
-  for (const [k, v] of Object.entries(SYSTEM_IDX)) {
+  for (const [k, v] of Object.entries(window.SYSTEM_IDX || {})) {
     if (k === q) exact.push(v);
     else if (k.startsWith(q)) starts.push(v);
     else if (k.includes(q)) contains.push(v);
@@ -113,8 +107,8 @@ async function fetchEsiSystemSearch(query) {
       if (idsData && idsData.systems) {
         idsData.systems.forEach(sys => {
           const item = { id: sys.id, name: sys.name.toUpperCase() };
-          SYSTEM_IDX[sys.name.toLowerCase()] = item;
-          systemNameCache[sys.id] = item.name;
+          window.SYSTEM_IDX[sys.name.toLowerCase()] = item;
+          window.systemNameCache[sys.id] = item.name;
           results.push(item);
         });
       }
@@ -141,7 +135,7 @@ async function fetchEsiSearchResults(query) {
     const results = [];
     namesData.forEach(item => {
       const obj = { id: item.id, name: item.name };
-      IDX[item.name.toLowerCase()] = obj;
+      window.IDX[item.name.toLowerCase()] = obj;
       results.push(obj);
     });
     return results;
@@ -166,7 +160,7 @@ if (searchInput) {
       onlineHits.forEach(h => map.set(h.id, h));
       hits = Array.from(map.values()).slice(0, 15);
     }
-    const safeQ = esc(q);
+    const safeQ = window.esc(q);
     if (!hits.length) {
       if (searchResults) {
         searchResults.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">No matching items found for "${safeQ}"</div>`;
@@ -177,9 +171,9 @@ if (searchInput) {
     if (searchResults) {
       searchResults.innerHTML = hits.map(item => `
         <div class="px-3 py-2 hover:bg-[#1e3348] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#1e3348]/40"
-             onclick="selectItem(${item.id}, '${esc(item.name)}')">
+             onclick="selectItem(${item.id}, '${window.esc(item.name)}')">
           <img src="https://images.evetech.net/types/${item.id}/icon?size=32" class="w-6 h-6 rounded" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.id}/render?size=32';">
-          <span class="font-semibold text-slate-200">${esc(item.name)}</span>
+          <span class="font-semibold text-slate-200">${window.esc(item.name)}</span>
         </div>
       `).join('');
       searchResults.classList.remove('hidden');
@@ -221,8 +215,8 @@ if (systemSearchInput) {
     if (systemSearchResults) {
       systemSearchResults.innerHTML = hits.map(sys => `
         <div class="px-3 py-1.5 hover:bg-[#1e3348] cursor-pointer text-xs font-bold text-cyan-300 border-b border-[#1e3348]/40 mono"
-             onclick="selectSolarSystem(${sys.id}, '${esc(sys.name)}')">
-          ${esc(sys.name)}
+             onclick="selectSolarSystem(${sys.id}, '${window.esc(sys.name)}')">
+          ${window.esc(sys.name)}
         </div>
       `).join('');
       systemSearchResults.classList.remove('hidden');
@@ -246,10 +240,10 @@ document.addEventListener('click', (e) => {
 async function selectItem(typeId, name, preserveView = false) {
   if (searchInput) searchInput.value = name;
   if (searchResults) searchResults.classList.add('hidden');
-  currentProduct = { id: typeId, name };
+  window.currentProduct = { id: typeId, name };
   if (!preserveView) {
-    selectedInstanceId = null;
-    isolatedInstanceId = null;
+    window.selectedInstanceId = null;
+    window.isolatedInstanceId = null;
     window.rootSellStrategy = 'market-sell';
     window.rootCustomPrice = 0;
     window.globalRuns = 1;
@@ -262,7 +256,7 @@ async function selectItem(typeId, name, preserveView = false) {
     window.customTEOverrides = {};
   }
   const maxDepth = 10;
-  recipeTreeRoot = await buildRecursiveRecipeTree(typeId, name, 1, 0, maxDepth, new Set(), null);
+  window.recipeTreeRoot = await buildRecursiveRecipeTree(typeId, name, 1, 0, maxDepth, new Set(), null);
   recalculate();
   if (!preserveView) { resetPanZoom(); } else { setTimeout(drawConnectingLines, 50); }
 
@@ -272,7 +266,7 @@ async function selectItem(typeId, name, preserveView = false) {
   if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
 
   const allTypeIds = new Set();
-  collectAllTypeIds(recipeTreeRoot, allTypeIds);
+  collectAllTypeIds(window.recipeTreeRoot, allTypeIds);
   fetchMarketPrices(Array.from(allTypeIds)).finally(() => {
     if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
     if (statusText) statusText.textContent = 'RECIPES & PRICES LOADED';
@@ -296,11 +290,11 @@ function collectGlobalDemand(node, demandMap = {}) {
 
 function saveActiveState() {
   try {
-    localStorage.setItem('eve_active_product', JSON.stringify(currentProduct));
-    localStorage.setItem('eve_build_self_overrides', JSON.stringify(buildSelfOverrides));
-    localStorage.setItem('eve_custom_buy_modes', JSON.stringify(customBuyModes));
-    localStorage.setItem('eve_custom_me_overrides', JSON.stringify(customMEOverrides));
-    localStorage.setItem('eve_custom_te_overrides', JSON.stringify(customTEOverrides));
+    localStorage.setItem('eve_active_product', JSON.stringify(window.currentProduct));
+    localStorage.setItem('eve_build_self_overrides', JSON.stringify(window.buildSelfOverrides));
+    localStorage.setItem('eve_custom_buy_modes', JSON.stringify(window.customBuyModes));
+    localStorage.setItem('eve_custom_me_overrides', JSON.stringify(window.customMEOverrides));
+    localStorage.setItem('eve_custom_te_overrides', JSON.stringify(window.customTEOverrides));
     localStorage.setItem('eve_global_runs', window.globalRuns);
     localStorage.setItem('eve_root_sell_strategy', window.rootSellStrategy);
     localStorage.setItem('eve_root_custom_price', window.rootCustomPrice);
@@ -309,15 +303,15 @@ function saveActiveState() {
 
 function loadSavedState() {
   try {
-    window.buildSelfOverrides = safeParseJSON(localStorage.getItem('eve_build_self_overrides'), {});
-    window.customBuyModes = safeParseJSON(localStorage.getItem('eve_custom_buy_modes'), {});
-    window.customMEOverrides = safeParseJSON(localStorage.getItem('eve_custom_me_overrides'), {});
-    window.customTEOverrides = safeParseJSON(localStorage.getItem('eve_custom_te_overrides'), {});
+    window.buildSelfOverrides = window.safeParseJSON(localStorage.getItem('eve_build_self_overrides'), {});
+    window.customBuyModes = window.safeParseJSON(localStorage.getItem('eve_custom_buy_modes'), {});
+    window.customMEOverrides = window.safeParseJSON(localStorage.getItem('eve_custom_me_overrides'), {});
+    window.customTEOverrides = window.safeParseJSON(localStorage.getItem('eve_custom_te_overrides'), {});
     window.globalRuns = parseInt(localStorage.getItem('eve_global_runs')) || 1;
     window.rootSellStrategy = localStorage.getItem('eve_root_sell_strategy') || 'market-sell';
     window.rootCustomPrice = parseFloat(localStorage.getItem('eve_root_custom_price')) || 0;
 
-    const savedProduct = safeParseJSON(localStorage.getItem('eve_active_product'), null);
+    const savedProduct = window.safeParseJSON(localStorage.getItem('eve_active_product'), null);
     if (savedProduct && savedProduct.id && savedProduct.name) {
       selectItem(savedProduct.id, savedProduct.name, true);
     } else {
@@ -327,11 +321,11 @@ function loadSavedState() {
 }
 
 function recalculate() {
-  if (!recipeTreeRoot) return;
+  if (!window.recipeTreeRoot) return;
   const activeEl = document.activeElement;
   const activeId = activeEl ? activeEl.id : null;
 
-  syncTreeOverrides(recipeTreeRoot);
+  syncTreeOverrides(window.recipeTreeRoot);
   const inputVal = Math.max(1, window.globalRuns || 1);
 
   const salesTax = (parseFloat(document.getElementById('sales-tax')?.value) || 3.6) / 100;
@@ -348,17 +342,17 @@ function recalculate() {
   const facility = document.getElementById('facility-select')?.value || '0.01';
   const priceStrategy = document.getElementById('input-price-mode')?.value || 'sell';
 
-  const rootYield = recipeTreeRoot.batchYield || 1;
+  const rootYield = window.recipeTreeRoot.batchYield || 1;
   const rootRunsNeeded = inputVal;
   const totalRootOutputQty = rootYield * inputVal;
 
-  recipeTreeRoot.qtyNeeded = totalRootOutputQty;
-  recipeTreeRoot.runsNeeded = rootRunsNeeded;
+  window.recipeTreeRoot.qtyNeeded = totalRootOutputQty;
+  window.recipeTreeRoot.runsNeeded = rootRunsNeeded;
 
-  scaleTreeQuantities(recipeTreeRoot, facility);
-  calculateNodeEIV(recipeTreeRoot);
+  scaleTreeQuantities(window.recipeTreeRoot, facility);
+  calculateNodeEIV(window.recipeTreeRoot);
 
-  const globalDemand = collectGlobalDemand(recipeTreeRoot);
+  const globalDemand = collectGlobalDemand(window.recipeTreeRoot);
   let totalSurplusMaterialValue = 0;
 
   Object.values(globalDemand).forEach(item => {
@@ -367,9 +361,8 @@ function recalculate() {
       const totalProduced = runs * item.batchYield;
       const netSurplusQty = totalProduced - item.totalQtyNeeded;
       if (netSurplusQty > 0) {
-        // Query prices using the correct produced item product ID, not the blueprint scroll ID
         const productTypeId = item.productTypeId || item.typeId;
-        const prices = priceCache[productTypeId] || { sell: 0, buy: 0 };
+        const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
         const unitPrice = prices.sell || prices.buy || getEIV(item.typeId) || 0;
         totalSurplusMaterialValue += netSurplusQty * unitPrice;
       }
@@ -377,27 +370,27 @@ function recalculate() {
   });
 
   let rawMaterialCost = 0;
-  if (recipeTreeRoot.isBuildingSelf && recipeTreeRoot.children && recipeTreeRoot.children.length > 0) {
-    recipeTreeRoot.children.forEach(child => { rawMaterialCost += calculateTreeNodeCost(child); });
+  if (window.recipeTreeRoot.isBuildingSelf && window.recipeTreeRoot.children && window.recipeTreeRoot.children.length > 0) {
+    window.recipeTreeRoot.children.forEach(child => { rawMaterialCost += calculateTreeNodeCost(child); });
   } else {
-    const rootStrategy = getNodePriceStrategy(recipeTreeRoot);
-    const productTypeId = recipeTreeRoot.productTypeId || recipeTreeRoot.typeId;
-    const prices = priceCache[productTypeId] || { sell: 0, buy: 0 };
+    const rootStrategy = getNodePriceStrategy(window.recipeTreeRoot);
+    const productTypeId = window.recipeTreeRoot.productTypeId || window.recipeTreeRoot.typeId;
+    const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
     let unitPrice = rootStrategy === 'sell' ? prices.sell : prices.buy;
     if (rootStrategy === 'buy') { unitPrice = unitPrice * (1 + brokerFee); }
     const deductModeInput = document.getElementById('deduct-stock-mode');
     const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-    const stockQty = isStockDeductEnabled ? (userStockMap[productTypeId] || userStockMap[recipeTreeRoot.typeId] || 0) : 0;
+    const stockQty = isStockDeductEnabled ? (window.userStockMap[productTypeId] || window.userStockMap[window.recipeTreeRoot.typeId] || 0) : 0;
     const netRootQty = Math.max(0, totalRootOutputQty - stockQty);
     rawMaterialCost = unitPrice * netRootQty;
   }
 
   let effectiveMaterialCost = rawMaterialCost;
-  let totalJobFees = calculateNodeJobFee(recipeTreeRoot, facilityTax, sccSurcharge, structureRoleBonus);
+  let totalJobFees = calculateNodeJobFee(window.recipeTreeRoot, facilityTax, sccSurcharge, structureRoleBonus);
   let totalProductionCost = effectiveMaterialCost + totalJobFees;
 
-  const rootProductTypeId = recipeTreeRoot.productTypeId || recipeTreeRoot.typeId;
-  const outputPrices = priceCache[rootProductTypeId] || { sell: 0, buy: 0 };
+  const rootProductTypeId = window.recipeTreeRoot.productTypeId || window.recipeTreeRoot.typeId;
+  const outputPrices = window.priceCache[rootProductTypeId] || { sell: 0, buy: 0 };
   const selectedStrategy = window.rootSellStrategy || 'market-sell';
   let unitSellPrice = 0;
   let isContractMode = selectedStrategy === 'custom-contract';
@@ -408,8 +401,8 @@ function recalculate() {
   const grossSellRevenue = unitSellPrice * totalRootOutputQty;
   const grossBuyRevenue = outputPrices.buy * totalRootOutputQty;
 
-  recipeTreeRoot.calculatedCost = totalProductionCost;
-  recipeTreeRoot.outputMarketValue = grossSellRevenue;
+  window.recipeTreeRoot.calculatedCost = totalProductionCost;
+  window.recipeTreeRoot.outputMarketValue = grossSellRevenue;
 
   let netSellRevenue = grossSellRevenue;
   let netBuyRevenue = grossBuyRevenue * (1 - salesTax);
@@ -418,8 +411,8 @@ function recalculate() {
     const cSalesTax = grossSellRevenue * contractTaxRate;
     const cBrokerFee = (grossSellRevenue * contractBrokerRate) + 10000;
     netSellRevenue = grossSellRevenue - cSalesTax - cBrokerFee;
-    recipeTreeRoot.contractSalesTax = cSalesTax;
-    recipeTreeRoot.contractBrokerFee = cBrokerFee;
+    window.recipeTreeRoot.contractSalesTax = cSalesTax;
+    window.recipeTreeRoot.contractBrokerFee = cBrokerFee;
   } else {
     netSellRevenue = grossSellRevenue * (1 - salesTax - brokerFee);
   }
@@ -427,8 +420,8 @@ function recalculate() {
   const profitSell = netSellRevenue + totalSurplusMaterialValue - totalProductionCost;
   const profitBuy = netBuyRevenue + totalSurplusMaterialValue - totalProductionCost;
   
-  recipeTreeRoot.netProfitSell = profitSell;
-  recipeTreeRoot.netProfitBuy = profitBuy;
+  window.recipeTreeRoot.netProfitSell = profitSell;
+  window.recipeTreeRoot.netProfitBuy = profitBuy;
 
   const roiSell = totalProductionCost > 0 ? ((profitSell / totalProductionCost) * 100).toFixed(1) : 0;
   const roiBuy = totalProductionCost > 0 ? ((profitBuy / totalProductionCost) * 100).toFixed(1) : 0;
@@ -458,7 +451,7 @@ function recalculate() {
   const roiSellEl = document.getElementById('summary-roi-sell');
   if (roiSellEl) {
     const finalRoi = totalProductionCost > 0 ? ((profitSell / totalProductionCost) * 100).toFixed(1) : 0;
-    let label = (selectedStrategy === 'custom-contract') ? 'Contract ROI' : 'Sell ROI';
+    let label = (window.rootSellStrategy === 'custom-contract') ? 'Contract ROI' : 'Sell ROI';
     roiSellEl.textContent = `${label}: ${finalRoi}%`;
   }
 
@@ -470,14 +463,12 @@ function recalculate() {
   const roiBuyEl = document.getElementById('summary-roi-buy');
   if (roiBuyEl) roiBuyEl.textContent = `ROI: ${roiBuy}%`;
 
-  const curStrategy = window.rootSellStrategy || 'market-sell';
-
-  if (isolatedInstanceId) {
-    const isoNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
-    if (isoNode) { renderIsolatedDiagram(); } else { isolatedInstanceId = null; renderTreeDiagram(recipeTreeRoot, priceStrategy, profitSell, roiSell); }
-  } else { renderTreeDiagram(recipeTreeRoot, priceStrategy, profitSell, roiSell); }
+  if (window.isolatedInstanceId) {
+    const isoNode = findNodeByInstanceId(window.recipeTreeRoot, window.isolatedInstanceId);
+    if (isoNode) { renderIsolatedDiagram(); } else { window.isolatedInstanceId = null; renderTreeDiagram(window.recipeTreeRoot, priceStrategy, profitSell, roiSell); }
+  } else { renderTreeDiagram(window.recipeTreeRoot, priceStrategy, profitSell, roiSell); }
   
-  renderBillOfMaterials(recipeTreeRoot, brokerFee);
+  renderBillOfMaterials(window.recipeTreeRoot, brokerFee);
   setTimeout(drawConnectingLines, 50);
 
   saveActiveState();
@@ -523,12 +514,12 @@ function renderTreeDiagram(rootNode, priceStrategy, profitSell, roiSell) {
 
 function createNodeCard(node) {
   const productTypeId = node.productTypeId || node.typeId;
-  const prices = priceCache[productTypeId] || { sell: 0, buy: 0 };
+  const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
   const isRoot = node.depth === 0;
-  const isIsolated = node.instanceId === isolatedInstanceId;
+  const isIsolated = node.instanceId === window.isolatedInstanceId;
   const deductModeInput = document.getElementById('deduct-stock-mode');
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-  const stockQty = isStockDeductEnabled ? (userStockMap[productTypeId] || userStockMap[node.typeId] || 0) : 0;
+  const stockQty = isStockDeductEnabled ? (window.userStockMap[productTypeId] || window.userStockMap[node.typeId] || 0) : 0;
 
   const card = document.createElement('div');
   card.id = `node-card-${node.instanceId}`;
@@ -544,9 +535,6 @@ function createNodeCard(node) {
   const totalProduced = node.runsNeeded * node.batchYield;
   const surplus = totalProduced - node.qtyNeeded;
   
-  // Immersive Graphic Selection:
-  // Manufacturable nodes (Blueprint jobs) fetch the official blueprint scroll overlay with product thumbnail.
-  // Raw materials (minerals, reactants) fetch their normal high-fidelity item icons natively from SDE [1, 2].
   const iconUrl = node.isManufacturable
     ? `https://images.evetech.net/blueprints/${node.typeId}/blueprint?size=128`
     : `https://images.evetech.net/types/${node.typeId}/icon?size=128`;
@@ -587,7 +575,7 @@ function createNodeCard(node) {
             <div class="text-[9px] text-green-400 text-right font-bold mt-1">${Math.round(window.rootCustomPrice || 0).toLocaleString()} ISK</div>
           </div>
         ` : ''}
-        <button onclick="addCurrentJobToLedger(event)" class="w-full mt-2 py-1.5 bg-purple-800 hover:bg-purple-700 text-purple-100 font-bold rounded transition text-[11px] mono flex items-center justify-center gap-1 border border-purple-500/30 shadow-md" title="Add this build job with its compiled materials to your manufacturing queue">➕ ADD TO JOB QUEUE</button>
+        <button onclick="addCurrentJobToLedger(event)" class="w-full mt-2 py-1.5 bg-purple-800 hover:bg-purple-700 text-purple-100 font-bold rounded transition text-[11px] mono flex items-center justify-center gap-1 border border-purple-500/30 shadow-md">➕ ADD TO JOB QUEUE</button>
       </div>
     `;
   }
@@ -596,7 +584,7 @@ function createNodeCard(node) {
   if (node.isBuildingSelf && node.recipe) {
     const baseTime = extractBuildTime(node.recipe, node.typeId, node.name);
     if (baseTime > 0) {
-      const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
+      const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
       const indFactor = 1 - (0.04 * (skills.industry || 0));
       const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
       const skillTimeFactor = indFactor * advIndFactor;
@@ -612,12 +600,12 @@ function createNodeCard(node) {
       else if (activeFacilityKey === 'raitaru') { facilityFactor = 0.85; structureName = 'Raitaru'; structureTEBonus = '15%'; }
 
       const totalSeconds = baseTime * teFactor * skillTimeFactor * facilityFactor * node.runsNeeded;
-      const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)\n• Base SDE Time: ${formatDuration(baseTime)}`;
+      const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)\n• Base SDE Time: ${window.formatDuration(baseTime)}`;
 
       buildTimeUI = `
-        <div class="flex justify-between text-[10px] text-slate-400 mono border-t border-[#1e3348]/40 pt-1 mt-1 cursor-help" title="${esc(hoverTitle)}">
+        <div class="flex justify-between text-[10px] text-slate-400 mono border-t border-[#1e3348]/40 pt-1 mt-1 cursor-help" title="${window.esc(hoverTitle)}">
           <span>Est. Build Time:</span>
-          <span class="text-slate-300 font-semibold">${formatDuration(totalSeconds)}</span>
+          <span class="text-slate-300 font-semibold">${window.formatDuration(totalSeconds)}</span>
         </div>
       `;
     }
@@ -626,7 +614,7 @@ function createNodeCard(node) {
   card.className = `diagram-node rounded p-3 shadow-2xl transition-all ${cardStyle}`;
   card.innerHTML = `
     <div class="flex items-center space-x-3 border-b border-[#1e3348] pb-2 mb-2">
-      <img src="${iconUrl}" class="w-10 h-10 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/icon?size=64';">
+      <img src="${iconUrl}" class="w-10 h-10 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
       <div class="min-w-0 flex-1">
         <div class="font-bold text-sm text-white truncate flex items-center justify-between">
           <span class="truncate">${node.name}</span>
@@ -642,9 +630,9 @@ function createNodeCard(node) {
               </div>
             ` : ''}
             ${isIsolated ? `
-              <button onclick="exitIsolation(event)" class="text-[9px] bg-amber-600 hover:bg-amber-500 text-black font-bold px-2 py-0.5 rounded mono transition shadow" title="Exit Isolation Mode">Exit ✖</button>
+              <button onclick="exitIsolation(event)" class="text-[9px] bg-amber-600 hover:bg-amber-500 text-black font-bold px-2 py-0.5 rounded mono transition shadow">Exit ✖</button>
             ` : `
-              <button onclick="isolateComponent(event, ${node.instanceId})" class="text-[9px] bg-[#1e3348] hover:bg-cyan-600 text-cyan-200 px-1.5 py-0.5 rounded mono transition" title="Isolate Inputs & Output">🔍 Isolate</button>
+              <button onclick="isolateComponent(event, ${node.instanceId})" class="text-[9px] bg-[#1e3348] hover:bg-cyan-600 text-cyan-200 px-1.5 py-0.5 rounded mono transition">🔍 Isolate</button>
             `}
           </div>
         </div>
@@ -691,9 +679,9 @@ function createNodeCard(node) {
       <div class="flex items-center justify-between mb-2 px-1 text-[10px] mono border-b border-[#1e3348]/40 pb-1">
         <span class="text-slate-400 font-semibold">Job ME/TE:</span>
         <div class="flex items-center space-x-1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">
-          <input type="number" id="card-me-${node.instanceId}" min="0" max="10" value="${node.customME}" oninput="onCardMEChange(event, ${node.typeId}, ${node.instanceId})" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onkeydown="event.stopPropagation()" class="w-10 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-400 font-bold rounded p-0.5 outline-none focus:border-cyan-500" title="Component ME">
+          <input type="number" id="card-me-${node.instanceId}" min="0" max="10" value="${node.customME}" oninput="onCardMEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-400 font-bold rounded p-0.5 outline-none focus:border-cyan-500">
           <span class="text-slate-500">%</span>
-          <input type="number" id="card-te-${node.instanceId}" min="0" max="20" value="${node.customTE}" oninput="onCardTEChange(event, ${node.typeId}, ${node.instanceId})" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()" onkeydown="event.stopPropagation()" class="w-10 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-400 font-bold rounded p-0.5 outline-none focus:border-cyan-500" title="Component TE">
+          <input type="number" id="card-te-${node.instanceId}" min="0" max="20" value="${node.customTE}" oninput="onCardTEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-400 font-bold rounded p-0.5 outline-none focus:border-cyan-500">
           <span class="text-slate-500">%</span>
         </div>
       </div>
@@ -744,7 +732,7 @@ function syncSellStrategy(e) {
 
 function addCurrentJobToLedger(e) {
   if (e) e.stopPropagation();
-  if (!recipeTreeRoot) return;
+  if (!window.recipeTreeRoot) return;
 
   recalculate();
 
@@ -759,11 +747,11 @@ function addCurrentJobToLedger(e) {
   }
 
   const selectedStrategy = window.rootSellStrategy || 'market-sell';
-  const rootProductTypeId = recipeTreeRoot.productTypeId || recipeTreeRoot.typeId;
-  const outputPrices = priceCache[rootProductTypeId] || { sell: 0, buy: 0 };
+  const rootProductTypeId = window.recipeTreeRoot.productTypeId || window.recipeTreeRoot.typeId;
+  const outputPrices = window.priceCache[rootProductTypeId] || { sell: 0, buy: 0 };
   let customPrice = window.rootCustomPrice || 0;
   let unitSellPrice = selectedStrategy.startsWith('custom-') ? customPrice : outputPrices.sell;
-  const baseTime = extractBuildTime(recipeTreeRoot.recipe, recipeTreeRoot.typeId, recipeTreeRoot.name);
+  const baseTime = extractBuildTime(window.recipeTreeRoot.recipe, window.recipeTreeRoot.typeId, window.recipeTreeRoot.name);
 
   const materials = [];
   function extractBOM(node) {
@@ -775,10 +763,10 @@ function addCurrentJobToLedger(e) {
       const deductModeInput = document.getElementById('deduct-stock-mode');
       const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
       const productTypeId = node.productTypeId || node.typeId;
-      const stockQty = isStockDeductEnabled ? (userStockMap[productTypeId] || userStockMap[node.typeId] || 0) : 0;
+      const stockQty = isStockDeductEnabled ? (window.userStockMap[productTypeId] || window.userStockMap[node.typeId] || 0) : 0;
       const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
 
-      const prices = priceCache[productTypeId] || { sell: 0, buy: 0 };
+      const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
       let unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
       
       materials.push({
@@ -798,24 +786,24 @@ function addCurrentJobToLedger(e) {
     }
   }
 
-  if (recipeTreeRoot.isBuildingSelf && recipeTreeRoot.children && recipeTreeRoot.children.length > 0) {
-    recipeTreeRoot.children.forEach(c => {
+  if (window.recipeTreeRoot.isBuildingSelf && window.recipeTreeRoot.children && window.recipeTreeRoot.children.length > 0) {
+    window.recipeTreeRoot.children.forEach(c => {
       if (c) extractBOM(c);
     });
   } else {
-    const rootTypeId = recipeTreeRoot.productTypeId || recipeTreeRoot.typeId;
-    const strategy = getNodePriceStrategy(recipeTreeRoot);
+    const rootTypeId = window.recipeTreeRoot.productTypeId || window.recipeTreeRoot.typeId;
+    const strategy = getNodePriceStrategy(window.recipeTreeRoot);
     const deductModeInput = document.getElementById('deduct-stock-mode');
     const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-    const stockQty = isStockDeductEnabled ? (userStockMap[rootTypeId] || userStockMap[recipeTreeRoot.typeId] || 0) : 0;
-    const netQtyNeeded = Math.max(0, recipeTreeRoot.qtyNeeded - stockQty);
-    const prices = priceCache[rootTypeId] || { sell: 0, buy: 0 };
+    const stockQty = isStockDeductEnabled ? (window.userStockMap[rootTypeId] || window.userStockMap[window.recipeTreeRoot.typeId] || 0) : 0;
+    const netQtyNeeded = Math.max(0, window.recipeTreeRoot.qtyNeeded - stockQty);
+    const prices = window.priceCache[rootTypeId] || { sell: 0, buy: 0 };
     let unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
 
     materials.push({
       typeId: rootTypeId,
-      name: recipeTreeRoot.productName || recipeTreeRoot.name.replace(' Blueprint', ''),
-      qtyNeeded: recipeTreeRoot.qtyNeeded,
+      name: window.recipeTreeRoot.productName || window.recipeTreeRoot.name.replace(' Blueprint', ''),
+      qtyNeeded: window.recipeTreeRoot.qtyNeeded,
       stockQty: stockQty,
       netQtyNeeded: netQtyNeeded,
       strategy: strategy,
@@ -825,13 +813,13 @@ function addCurrentJobToLedger(e) {
   }
 
   const job = {
-    id: Date.now() + Math.floor(Math.random() * 1000), // Secure timestamp-based unique ID
-    typeId: recipeTreeRoot.typeId,
-    name: recipeTreeRoot.name,
-    runsNeeded: recipeTreeRoot.runsNeeded,
-    qtyNeeded: recipeTreeRoot.qtyNeeded,
-    calculatedCost: recipeTreeRoot.calculatedCost || 0,
-    baseTime: baseTime, // Serialized here for SDE duration on the Ledger page
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    typeId: window.recipeTreeRoot.typeId,
+    name: window.recipeTreeRoot.name,
+    runsNeeded: window.recipeTreeRoot.runsNeeded,
+    qtyNeeded: window.recipeTreeRoot.qtyNeeded,
+    calculatedCost: window.recipeTreeRoot.calculatedCost || 0,
+    baseTime: baseTime,
     sellStrategy: selectedStrategy,
     unitSellPrice: unitSellPrice,
     materials: materials,
@@ -840,8 +828,6 @@ function addCurrentJobToLedger(e) {
 
   queue.push(job);
   localStorage.setItem('eve_ledger_jobs', JSON.stringify(queue));
-
-  // Sync active stock map to localStorage so the ledger page can read it too
   localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap || {}));
 
   updateHeaderLedgerCount();
@@ -878,18 +864,14 @@ function updateHeaderLedgerCount() {
 
 function onNodeClick(e, instanceId) {
   e.stopPropagation();
-  if (selectedInstanceId === instanceId) {
-    selectedInstanceId = null;
-  } else {
-    selectedInstanceId = instanceId;
-  }
+  window.selectedInstanceId = (window.selectedInstanceId === instanceId) ? null : instanceId;
   applyNodeHighlightClasses();
   drawConnectingLines();
 }
 
 function clearHighlight() {
-  if (selectedInstanceId !== null) {
-    selectedInstanceId = null;
+  if (window.selectedInstanceId !== null) {
+    window.selectedInstanceId = null;
     applyNodeHighlightClasses();
     drawConnectingLines();
   }
@@ -912,14 +894,14 @@ function findNodeByInstanceId(root, id) {
 function applyNodeHighlightClasses() {
   const allCards = document.querySelectorAll('.diagram-node');
   
-  if (!selectedInstanceId) {
+  if (!window.selectedInstanceId) {
     allCards.forEach(card => {
       card.classList.remove('node-selected', 'node-child-highlight', 'node-parent-highlight', 'node-dimmed');
     });
     return;
   }
 
-  const selectedNode = findNodeByInstanceId(recipeTreeRoot, selectedInstanceId);
+  const selectedNode = findNodeByInstanceId(window.recipeTreeRoot, window.selectedInstanceId);
   const childInstanceIds = new Set(selectedNode ? selectedNode.children.map(c => c.instanceId) : []);
   const parentInstanceId = selectedNode ? selectedNode.parentInstanceId : null;
 
@@ -927,7 +909,7 @@ function applyNodeHighlightClasses() {
     const instanceId = parseInt(card.getAttribute('data-instance-id'));
     card.classList.remove('node-selected', 'node-child-highlight', 'node-parent-highlight', 'node-dimmed');
 
-    if (instanceId === selectedInstanceId) {
+    if (instanceId === window.selectedInstanceId) {
       card.classList.add('node-selected');
     } else if (childInstanceIds.has(instanceId)) {
       card.classList.add('node-child-highlight');
@@ -939,7 +921,6 @@ function applyNodeHighlightClasses() {
   });
 }
 
-// Selects and centers camera dead-center on a diagram node when clicking a row in the Bill of Materials sidebar
 function highlightNodeByTypeId(typeId) {
   function findMatchingNode(node) {
     if (!node) return null;
@@ -955,9 +936,9 @@ function highlightNodeByTypeId(typeId) {
     return null;
   }
 
-  const targetNode = findMatchingNode(recipeTreeRoot);
+  const targetNode = findMatchingNode(window.recipeTreeRoot);
   if (targetNode) {
-    selectedInstanceId = targetNode.instanceId;
+    window.selectedInstanceId = targetNode.instanceId;
     applyNodeHighlightClasses();
     drawConnectingLines();
     centerOnSelectedNode();
@@ -966,8 +947,8 @@ function highlightNodeByTypeId(typeId) {
 
 function isolateComponent(e, instanceId) {
   if (e) e.stopPropagation();
-  isolatedInstanceId = instanceId;
-  selectedInstanceId = instanceId;
+  window.isolatedInstanceId = instanceId;
+  window.selectedInstanceId = instanceId;
   renderIsolatedDiagram();
   setTimeout(drawConnectingLines, 50);
   setTimeout(centerOnSelectedNode, 60);
@@ -975,11 +956,11 @@ function isolateComponent(e, instanceId) {
 
 function exitIsolation(e) {
   if (e) e.stopPropagation();
-  const targetId = isolatedInstanceId || selectedInstanceId;
-  isolatedInstanceId = null;
+  const targetId = window.isolatedInstanceId || window.selectedInstanceId;
+  window.isolatedInstanceId = null;
   recalculate();
   setTimeout(() => {
-    selectedInstanceId = targetId;
+    window.selectedInstanceId = targetId;
     applyNodeHighlightClasses();
     drawConnectingLines();
     centerOnSelectedNode();
@@ -991,10 +972,10 @@ function renderIsolatedDiagram() {
   if (!container) return;
   container.innerHTML = '';
 
-  const isolatedNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
+  const isolatedNode = findNodeByInstanceId(window.recipeTreeRoot, window.isolatedInstanceId);
   if (!isolatedNode) return;
 
-  const parentNode = isolatedNode.parentInstanceId ? findNodeByInstanceId(recipeTreeRoot, isolatedNode.parentInstanceId) : null;
+  const parentNode = isolatedNode.parentInstanceId ? findNodeByInstanceId(window.recipeTreeRoot, isolatedNode.parentInstanceId) : null;
 
   const inputCol = document.createElement('div');
   inputCol.className = 'flex flex-col space-y-4 justify-center';
@@ -1027,12 +1008,11 @@ function renderIsolatedDiagram() {
   applyNodeHighlightClasses();
 }
 
-// Accurate Camera Centering using absolute content-space coordinates
 function centerOnSelectedNode() {
-  let targetId = isolatedInstanceId || selectedInstanceId;
+  let targetId = window.isolatedInstanceId || window.selectedInstanceId;
   
-  if (!targetId && recipeTreeRoot) {
-    targetId = recipeTreeRoot.instanceId;
+  if (!targetId && window.recipeTreeRoot) {
+    targetId = window.recipeTreeRoot.instanceId;
   }
 
   if (!targetId) return;
@@ -1043,7 +1023,6 @@ function centerOnSelectedNode() {
 
   if (!card || !viewport || !content) return;
 
-  // Neutralize any browser-native auto-scroll offsets inside the viewport container
   viewport.scrollTop = 0;
   viewport.scrollLeft = 0;
 
@@ -1051,21 +1030,17 @@ function centerOnSelectedNode() {
   const contentRect = content.getBoundingClientRect();
   const cardRect = card.getBoundingClientRect();
 
-  // 1. Calculate the card's static, unscaled position relative to the content container
-  const cardContentX = (cardRect.left - contentRect.left) / zoomScale;
-  const cardContentY = (cardRect.top - contentRect.top) / zoomScale;
+  const cardContentX = (cardRect.left - contentRect.left) / window.zoomScale;
+  const cardContentY = (cardRect.top - contentRect.top) / window.zoomScale;
 
-  // 2. Calculate the card's unscaled dimensions
-  const cardContentWidth = cardRect.width / zoomScale;
-  const cardContentHeight = cardRect.height / zoomScale;
+  const cardContentWidth = cardRect.width / window.zoomScale;
+  const cardContentHeight = cardRect.height / window.zoomScale;
 
-  // 3. Find the exact center of the card in unscaled content space
   const cardContentCenterX = cardContentX + cardContentWidth / 2;
   const cardContentCenterY = cardContentY + cardContentHeight / 2;
 
-  // 4. Calculate the absolute panX and panY required to align the card's center with the viewport's center
-  panX = (viewportRect.width / 2) - cardContentCenterX * zoomScale;
-  panY = (viewportRect.height / 2) - cardContentCenterY * zoomScale;
+  window.panX = (viewportRect.width / 2) - cardContentCenterX * window.zoomScale;
+  window.panY = (viewportRect.height / 2) - cardContentCenterY * window.zoomScale;
 
   updateTransform();
   drawConnectingLines();
@@ -1083,21 +1058,21 @@ function drawConnectingLines() {
   svg.setAttribute('height', container.scrollHeight);
   svg.innerHTML = '';
 
-  if (!recipeTreeRoot) return;
+  if (!window.recipeTreeRoot) return;
 
   const containerRect = container.getBoundingClientRect();
 
-  if (isolatedInstanceId !== null) {
-    const isolatedNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
+  if (window.isolatedInstanceId !== null) {
+    const isolatedNode = findNodeByInstanceId(window.recipeTreeRoot, window.isolatedInstanceId);
     if (!isolatedNode) return;
 
     const MathEl = document.getElementById(`node-card-${isolatedNode.instanceId}`);
     if (!MathEl) return;
 
     const isoRect = MathEl.getBoundingClientRect();
-    const isoLeftX = (isoRect.left - containerRect.left) / zoomScale;
-    const isoRightX = (isoRect.right - containerRect.left) / zoomScale;
-    const isoCenterY = (isoRect.top + isoRect.height / 2 - containerRect.top) / zoomScale;
+    const isoLeftX = (isoRect.left - containerRect.left) / window.zoomScale;
+    const isoRightX = (isoRect.right - containerRect.left) / window.zoomScale;
+    const isoCenterY = (isoRect.top + isoRect.height / 2 - containerRect.top) / window.zoomScale;
 
     if (isolatedNode.isBuildingSelf && isolatedNode.children) {
       isolatedNode.children.forEach(child => {
@@ -1105,8 +1080,8 @@ function drawConnectingLines() {
           const childEl = document.getElementById(`node-card-${child.instanceId}`);
           if (childEl) {
             const childRect = childEl.getBoundingClientRect();
-            const startX = (childRect.right - containerRect.left) / zoomScale;
-            const startY = (childRect.top + childRect.height / 2 - containerRect.top) / zoomScale;
+            const startX = (childRect.right - containerRect.left) / window.zoomScale;
+            const startY = (childRect.top + childRect.height / 2 - containerRect.top) / window.zoomScale;
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.setAttribute('d', `M ${startX} ${startY} C ${startX + 40} ${startY}, ${isoLeftX - 40} ${isoCenterY}, ${isoLeftX} ${isoCenterY}`);
@@ -1121,13 +1096,13 @@ function drawConnectingLines() {
     }
 
     if (isolatedNode.parentInstanceId) {
-      const parentNode = findNodeByInstanceId(recipeTreeRoot, isolatedNode.parentInstanceId);
+      const parentNode = findNodeByInstanceId(window.recipeTreeRoot, isolatedNode.parentInstanceId);
       if (parentNode) {
         const parentEl = document.getElementById(`node-card-${parentNode.instanceId}`);
         if (parentEl) {
           const parentRect = parentEl.getBoundingClientRect();
-          const endX = (parentRect.left - containerRect.left) / zoomScale;
-          const endY = (parentRect.top + parentRect.height / 2 - containerRect.top) / zoomScale;
+          const endX = (parentRect.left - containerRect.left) / window.zoomScale;
+          const endY = (parentRect.top + parentRect.height / 2 - containerRect.top) / window.zoomScale;
 
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           path.setAttribute('d', `M ${isoRightX} ${isoCenterY} C ${isoRightX + 40} ${isoCenterY}, ${endX - 40} ${endY}, ${endX} ${endY}`);
@@ -1142,7 +1117,7 @@ function drawConnectingLines() {
     return;
   }
 
-  drawConnectingLinesForTree(recipeTreeRoot);
+  drawConnectingLinesForTree(window.recipeTreeRoot);
 }
 
 function drawConnectingLinesForTree(root) {
@@ -1153,7 +1128,7 @@ function drawConnectingLinesForTree(root) {
   if (!svg || !container) return;
 
   const containerRect = container.getBoundingClientRect();
-  const selectedNode = selectedInstanceId ? findNodeByInstanceId(recipeTreeRoot, selectedInstanceId) : null;
+  const selectedNode = window.selectedInstanceId ? findNodeByInstanceId(window.recipeTreeRoot, window.selectedInstanceId) : null;
   const activeChildIds = new Set(selectedNode ? selectedNode.children.map(c => c.instanceId) : []);
   const parentInstanceId = selectedNode ? selectedNode.parentInstanceId : null;
 
@@ -1165,8 +1140,8 @@ function drawConnectingLinesForTree(root) {
 
     const parentRect = parentEl.getBoundingClientRect();
     
-    const endX = (parentRect.left - containerRect.left) / zoomScale;
-    const endY = (parentRect.top + parentRect.height / 2 - containerRect.top) / zoomScale;
+    const endX = (parentRect.left - containerRect.left) / window.zoomScale;
+    const endY = (parentRect.top + parentRect.height / 2 - containerRect.top) / window.zoomScale;
 
     node.children.forEach(child => {
       if (child) {
@@ -1174,20 +1149,20 @@ function drawConnectingLinesForTree(root) {
         if (childEl) {
           const childRect = childEl.getBoundingClientRect();
           
-          const startX = (childRect.right - containerRect.left) / zoomScale;
-          const startY = (childRect.top + childRect.height / 2 - containerRect.top) / zoomScale;
+          const startX = (childRect.right - containerRect.left) / window.zoomScale;
+          const startY = (childRect.top + childRect.height / 2 - containerRect.top) / window.zoomScale;
 
           const controlX1 = startX + 40;
           const controlX2 = endX - 40;
 
-          const isInputConnection = (selectedInstanceId !== null) && 
-            (node.instanceId === selectedInstanceId && activeChildIds.has(child.instanceId));
+          const isInputConnection = (window.selectedInstanceId !== null) && 
+            (node.instanceId === window.selectedInstanceId && activeChildIds.has(child.instanceId));
 
-          const isOutputConnection = (selectedInstanceId !== null) && 
-            (child.instanceId === selectedInstanceId && node.instanceId === parentInstanceId);
+          const isOutputConnection = (window.selectedInstanceId !== null) && 
+            (child.instanceId === window.selectedInstanceId && node.instanceId === parentInstanceId);
 
           const isHighlightedConnection = isInputConnection || isOutputConnection;
-          const isDimmedConnection = (selectedInstanceId !== null) && !isHighlightedConnection;
+          const isDimmedConnection = (window.selectedInstanceId !== null) && !isHighlightedConnection;
 
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           path.setAttribute('d', `M ${startX} ${startY} C ${controlX1} ${startY}, ${controlX2} ${endY}, ${endX} ${endY}`);
@@ -1235,7 +1210,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
       const strategy = getNodePriceStrategy(node);
       
       const productTypeId = node.productTypeId || node.typeId;
-      const stockQty = isStockDeductEnabled ? (userStockMap[productTypeId] || userStockMap[node.typeId] || 0) : 0;
+      const stockQty = isStockDeductEnabled ? (window.userStockMap[productTypeId] || window.userStockMap[node.typeId] || 0) : 0;
       const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
 
       if (!bomMap[productTypeId]) {
@@ -1260,8 +1235,8 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
     });
   } else {
     const rootTypeId = rootNode.productTypeId || rootNode.typeId;
-    const strategy = getNodeStrategyOnly(rootNode); // safe strategy getter
-    const stockQty = isStockDeductEnabled ? (userStockMap[rootTypeId] || userStockMap[rootNode.typeId] || 0) : 0;
+    const strategy = getNodeStrategyOnly(rootNode);
+    const stockQty = isStockDeductEnabled ? (window.userStockMap[rootTypeId] || window.userStockMap[rootNode.typeId] || 0) : 0;
     const netQtyNeeded = Math.max(0, rootNode.qtyNeeded - stockQty);
 
     bomMap[rootTypeId] = { typeId: rootTypeId, name: rootNode.productName || rootNode.name.replace(' Blueprint', ''), qty: netQtyNeeded, strategy: strategy };
@@ -1271,7 +1246,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
   let totalBOMCost = 0;
 
   bomItems.forEach(item => {
-    const prices = priceCache[item.typeId] || { sell: 0, buy: 0 };
+    const prices = window.priceCache[item.typeId] || { sell: 0, buy: 0 };
     let unitPrice = item.strategy === 'sell' ? prices.sell : prices.buy;
     if (item.strategy === 'buy') {
       unitPrice = unitPrice * (1 + brokerFee);
@@ -1322,7 +1297,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
 function getNodeStrategyOnly(node) {
   if (!node) return 'sell';
   const globalStrategy = document.getElementById('input-price-mode')?.value || 'sell';
-  return customBuyModes[node.typeId] || globalStrategy;
+  return window.customBuyModes[node.typeId] || globalStrategy;
 }
 
 function copyMultibuyText() {
@@ -1341,7 +1316,6 @@ function copyMultibuyText() {
   });
 }
 
-// Smooth Pan and Zoom Engine
 const viewport = document.getElementById('viewport');
 const content = document.getElementById('pan-zoom-content');
 
@@ -1349,24 +1323,24 @@ if (viewport) {
   viewport.addEventListener('mousedown', (e) => {
     if (e.button === 1) {
       e.preventDefault();
-      isPanning = true;
-      startX = e.clientX - panX;
-      startY = e.clientY - panY;
+      window.isPanning = true;
+      window.startX = e.clientX - window.panX;
+      window.startY = e.clientY - window.panY;
       viewport.style.cursor = 'grabbing';
     }
   });
 
   window.addEventListener('mousemove', (e) => {
-    if (isPanning) {
-      panX = e.clientX - startX;
-      panY = e.clientY - startY;
+    if (window.isPanning) {
+      window.panX = e.clientX - window.startX;
+      window.panY = e.clientY - window.startY;
       updateTransform();
     }
   });
 
   window.addEventListener('mouseup', (e) => {
-    if (e.button === 1 && isPanning) {
-      isPanning = false;
+    if (e.button === 1 && window.isPanning) {
+      window.isPanning = false;
       viewport.style.cursor = 'grab';
     }
   });
@@ -1374,15 +1348,15 @@ if (viewport) {
   viewport.addEventListener('wheel', (e) => {
     e.preventDefault();
     const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
-    const newScale = Math.min(Math.max(0.2, zoomScale * zoomFactor), 3.0);
+    const newScale = Math.min(Math.max(0.2, window.zoomScale * zoomFactor), 3.0);
 
     const rect = viewport.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    panX = mouseX - (mouseX - panX) * (newScale / zoomScale);
-    panY = mouseY - (mouseY - panY) * (newScale / zoomScale);
-    zoomScale = newScale;
+    window.panX = mouseX - (mouseX - window.panX) * (newScale / window.zoomScale);
+    window.panY = mouseY - (mouseY - window.panY) * (newScale / window.zoomScale);
+    window.zoomScale = newScale;
 
     updateTransform();
     drawConnectingLines();
@@ -1390,17 +1364,17 @@ if (viewport) {
 }
 
 function updateTransform() {
-  const roundedPanX = Math.round(panX);
-  const roundedPanY = Math.round(panY);
-  if (content) content.style.transform = `translate(${roundedPanX}px, ${roundedPanY}px) scale(${zoomScale})`;
+  const roundedPanX = Math.round(window.panX);
+  const roundedPanY = Math.round(window.panY);
+  if (content) content.style.transform = `translate(${roundedPanX}px, ${roundedPanY}px) scale(${window.zoomScale})`;
   const zoomText = document.getElementById('zoom-level-text');
-  if (zoomText) zoomText.textContent = `Zoom: ${Math.round(zoomScale * 100)}%`;
+  if (zoomText) zoomText.textContent = `Zoom: ${Math.round(window.zoomScale * 100)}%`;
 }
 
 function resetPanZoom() {
-  zoomScale = 1.0;
-  panX = 0;
-  panY = 0;
+  window.zoomScale = 1.0;
+  window.panX = 0;
+  window.panY = 0;
   updateTransform();
   drawConnectingLines();
 }
@@ -1422,27 +1396,23 @@ window.centerOnSelectedNode = centerOnSelectedNode;
 window.resetPanZoom = resetPanZoom;
 window.copyMultibuyText = copyMultibuyText;
 
-// Initialize Application
 window.onload = async () => {
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
 
-  // Load static local states instantly so the app is interactive immediately!
   try {
-    loadTaxSettings(); // Load custom taxes from localStorage!
-    loadSavedState(); // Load previous product & overrides persistently from localStorage!
-    updateHeaderLedgerCount(); // Update badge on load!
+    loadTaxSettings();
+    loadSavedState();
+    updateHeaderLedgerCount();
   } catch (err) {
     console.error("State restoration error:", err);
   }
 
-  // Handle SSO Callback and assets asynchronously in the background
   if (typeof handleEsiSSOCallback === 'function') {
     handleEsiSSOCallback().catch(err => console.error("SSO Callback error:", err));
   }
 
-  // Fetch adjusted prices asynchronously in the background
   if (typeof fetchAdjustedPrices === 'function') {
     fetchAdjustedPrices().catch(err => console.error("Adjusted prices fetch error:", err));
   }
