@@ -35,17 +35,16 @@ function formatDuration(seconds) {
 // Global Ledger Queue State
 let activeJobs = [];
 let buildHistory = [];
-let userStockMap = {};
 
 // Active BOM Filter States
 let activeOrderFilter = 'all'; // 'all', 'buy', 'sell'
 let activeCategoryFilter = 'all'; // 'all', 'minerals', 'pigas', 'fuel', 'ships', 'others'
 
-// Load states from shared LocalStorage
+// Load states defensively from shared LocalStorage (avoiding global reference mutations)
 function loadJournalState() {
   try {
     const savedJobs = localStorage.getItem('eve_ledger_jobs');
-    activeJobs = savedJobs ? JSON.parse(savedJobs) : [];
+    activeJobs = safeParseJSON(savedJobs, []);
     if (!Array.isArray(activeJobs)) activeJobs = [];
   } catch (e) {
     activeJobs = [];
@@ -53,28 +52,64 @@ function loadJournalState() {
 
   try {
     const savedHistory = localStorage.getItem('eve_ledger_history');
-    buildHistory = savedHistory ? JSON.parse(savedHistory) : [];
+    buildHistory = safeParseJSON(savedHistory, []);
     if (!Array.isArray(buildHistory)) buildHistory = [];
   } catch (e) {
     buildHistory = [];
   }
 
-  // Load custom location names and assets
+  // Safely empty and refill rawAssetItems (Array)
   try {
-    window.rawAssetItems = safeParseJSON(localStorage.getItem('eve_raw_assets'), []);
-    window.resolvedLocationNames = safeParseJSON(localStorage.getItem('eve_resolved_location_names'), {});
-    window.corpDivisionNames = safeParseJSON(localStorage.getItem('eve_corp_division_names'), {});
+    const rawSaved = localStorage.getItem('eve_raw_assets');
+    const parsedRaw = safeParseJSON(rawSaved, []);
+    rawAssetItems.length = 0; 
+    parsedRaw.forEach(item => {
+      if (item) rawAssetItems.push(item);
+    });
   } catch (e) {
-    window.rawAssetItems = [];
-    window.resolvedLocationNames = {};
-    window.corpDivisionNames = {};
+    rawAssetItems.length = 0;
   }
 
+  // Safely empty and refill resolvedLocationNames (Object)
+  try {
+    const resolvedSaved = localStorage.getItem('eve_resolved_location_names');
+    const parsedResolved = safeParseJSON(resolvedSaved, {});
+    for (const key in resolvedLocationNames) {
+      delete resolvedLocationNames[key];
+    }
+    Object.assign(resolvedLocationNames, parsedResolved);
+  } catch (e) {
+    for (const key in resolvedLocationNames) {
+      delete resolvedLocationNames[key];
+    }
+  }
+
+  // Safely empty and refill corpDivisionNames (Object)
+  try {
+    const corpSaved = localStorage.getItem('eve_corp_division_names');
+    const parsedCorp = safeParseJSON(corpSaved, {});
+    for (const key in corpDivisionNames) {
+      delete corpDivisionNames[key];
+    }
+    Object.assign(corpDivisionNames, parsedCorp);
+  } catch (e) {
+    for (const key in corpDivisionNames) {
+      delete corpDivisionNames[key];
+    }
+  }
+
+  // Safely empty and refill userStockMap (Object)
   try {
     const savedStocks = localStorage.getItem('eve_user_stock_map');
-    userStockMap = safeParseJSON(savedStocks, {});
+    const parsedStocks = safeParseJSON(savedStocks, {});
+    for (const key in userStockMap) {
+      delete userStockMap[key];
+    }
+    Object.assign(userStockMap, parsedStocks);
   } catch (e) {
-    userStockMap = {};
+    for (const key in userStockMap) {
+      delete userStockMap[key];
+    }
   }
 }
 
@@ -126,7 +161,7 @@ function renderJournalPage() {
   if (activeJobsCountEl) activeJobsCountEl.textContent = activeJobs.length.toLocaleString();
   if (totalCostEl) totalCostEl.textContent = Math.round(totalActiveCost).toLocaleString() + ' ISK';
 
-  // 2. Compile Consolidated BOM across ALL active jobs (respecting strategy filters)
+  // 2. Compile Consolidated BOM across ALL active jobs (respecting strategy & category filters)
   const consolidatedBOM = {};
   activeJobs.forEach(job => {
     if (job && Array.isArray(job.materials)) {
@@ -213,14 +248,14 @@ function renderActiveJobsList(allocatedStock) {
     const iconTypeId = job.typeId;
     const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
 
-    // 1. Stockpile Allocation Priority (FIFO): Subtract required quantities from stock clone in order
+    // Generate individual BOM breakdown defensively with prioritized FIFO allocation
     const individualBOMHTML = Array.isArray(job.materials) ? job.materials.map(mat => {
       if (!mat) return '';
       
       const availableInStock = isStockDeductEnabled ? (allocatedStock[mat.typeId] || 0) : 0;
       const consumedQty = Math.min(mat.qtyNeeded, availableInStock);
 
-      // Subtract consumed parts from our prioritized, in-memory stock clone
+      // Subtract consumed parts iteratively from our prioritized in-memory stock clone
       if (isStockDeductEnabled && allocatedStock[mat.typeId] !== undefined) {
         allocatedStock[mat.typeId] = Math.max(0, allocatedStock[mat.typeId] - consumedQty);
       }
@@ -315,7 +350,7 @@ function copyIndividualJobMultibuy(e, jobId) {
   const allocatedStock = { ...userStockMap };
   const targetIndex = activeJobs.findIndex(j => j && j.id === jobId);
   
-  // Deduct previous jobs first to match FIFO priority bounds!
+  // Deduct previous jobs first to match FIFO priority bounds
   for (let i = 0; i < targetIndex; i++) {
     const prevJob = activeJobs[i];
     if (prevJob && Array.isArray(prevJob.materials)) {
