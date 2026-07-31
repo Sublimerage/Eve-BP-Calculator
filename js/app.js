@@ -5,7 +5,7 @@ if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sel
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
 if (window.globalRuns === undefined) window.globalRuns = 1;
 
-// Centralized helpers are now loaded globally from js/config.js (esc, safeParseJSON, formatDuration)
+// Centralized helpers are loaded globally from js/config.js (window.esc, window.safeParseJSON, window.formatDuration)
 
 // Structural helper to extract the base build time of a recipe or resolve intelligent fallbacks
 function extractBuildTime(recipe, typeId, name) {
@@ -103,7 +103,7 @@ function loadTaxSettings() {
   try {
     const saved = localStorage.getItem('eve_tax_settings');
     if (saved) {
-      const settings = safeParseJSON(saved, {});
+      const settings = window.safeParseJSON(saved, {});
       if (settings.facilityTax !== undefined && document.getElementById('facility-tax')) document.getElementById('facility-tax').value = settings.facilityTax;
       if (settings.sccSurcharge !== undefined && document.getElementById('scc-surcharge')) document.getElementById('scc-surcharge').value = settings.sccSurcharge;
       if (settings.salesTax !== undefined && document.getElementById('sales-tax')) document.getElementById('sales-tax').value = settings.salesTax;
@@ -222,7 +222,7 @@ if (searchInput) {
       hits = Array.from(map.values()).slice(0, 15);
     }
 
-    const safeQ = esc(q);
+    const safeQ = window.esc(q);
 
     if (!hits.length) {
       if (searchResults) {
@@ -235,9 +235,9 @@ if (searchInput) {
     if (searchResults) {
       searchResults.innerHTML = hits.map(item => `
         <div class="px-3 py-2 hover:bg-[#1e3348] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#1e3348]/40"
-             onclick="selectItem(${item.id}, '${esc(item.name)}')">
+             onclick="selectItem(${item.id}, '${window.esc(item.name)}')">
           <img src="https://images.evetech.net/types/${item.id}/icon?size=32" class="w-6 h-6 rounded" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.id}/render?size=32';">
-          <span class="font-semibold text-slate-200">${esc(item.name)}</span>
+          <span class="font-semibold text-slate-200">${window.esc(item.name)}</span>
         </div>
       `).join('');
       searchResults.classList.remove('hidden');
@@ -284,8 +284,8 @@ if (systemSearchInput) {
     if (systemSearchResults) {
       systemSearchResults.innerHTML = hits.map(sys => `
         <div class="px-3 py-1.5 hover:bg-[#1e3348] cursor-pointer text-xs font-bold text-cyan-300 border-b border-[#1e3348]/40 mono"
-             onclick="selectSolarSystem(${sys.id}, '${esc(sys.name)}')">
-          ${esc(sys.name)}
+             onclick="selectSolarSystem(${sys.id}, '${window.esc(sys.name)}')">
+          ${window.esc(sys.name)}
         </div>
       `).join('');
       systemSearchResults.classList.remove('hidden');
@@ -405,10 +405,10 @@ function saveActiveState() {
 // Load settings defensively on window load
 function loadSavedState() {
   try {
-    buildSelfOverrides = safeParseJSON(localStorage.getItem('eve_build_self_overrides'), {});
-    customBuyModes = safeParseJSON(localStorage.getItem('eve_custom_buy_modes'), {});
-    customMEOverrides = safeParseJSON(localStorage.getItem('eve_custom_me_overrides'), {});
-    customTEOverrides = safeParseJSON(localStorage.getItem('eve_custom_te_overrides'), {});
+    buildSelfOverrides = window.safeParseJSON(localStorage.getItem('eve_build_self_overrides'), {});
+    customBuyModes = window.safeParseJSON(localStorage.getItem('eve_custom_buy_modes'), {});
+    customMEOverrides = window.safeParseJSON(localStorage.getItem('eve_custom_me_overrides'), {});
+    customTEOverrides = window.safeParseJSON(localStorage.getItem('eve_custom_te_overrides'), {});
     window.globalRuns = parseInt(localStorage.getItem('eve_global_runs')) || 1;
     window.rootSellStrategy = localStorage.getItem('eve_root_sell_strategy') || 'market-sell';
     window.rootCustomPrice = parseFloat(localStorage.getItem('eve_root_custom_price')) || 0;
@@ -419,7 +419,7 @@ function loadSavedState() {
     window.customMEOverrides = customMEOverrides;
     window.customTEOverrides = customTEOverrides;
 
-    const savedProduct = safeParseJSON(localStorage.getItem('eve_active_product'), null);
+    const savedProduct = window.safeParseJSON(localStorage.getItem('eve_active_product'), null);
     if (savedProduct && savedProduct.id && savedProduct.name) {
       selectItem(savedProduct.id, savedProduct.name, true);
     } else {
@@ -785,7 +785,7 @@ function createNodeCard(node) {
     const baseTime = extractBuildTime(node.recipe, node.typeId, node.name);
     if (baseTime > 0) {
       // Default to Max Level 5 fallback if guest/not logged in, otherwise load character sheets
-      const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
+      const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
       const indFactor = 1 - (0.04 * (skills.industry || 0));
       const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
       const skillTimeFactor = indFactor * advIndFactor;
@@ -804,7 +804,7 @@ function createNodeCard(node) {
       buildTimeUI = `
         <div class="flex justify-between text-[10px] text-slate-400 mono border-t border-[#1e3348]/40 pt-1 mt-1">
           <span>Est. Build Time:</span>
-          <span class="text-slate-300 font-semibold">${formatDuration(totalSeconds)}</span>
+          <span class="text-slate-300 font-semibold">${window.formatDuration(totalSeconds)}</span>
         </div>
       `;
     }
@@ -973,11 +973,6 @@ function syncCardRunsToGlobal(e) {
   recalculate();
 }
 
-function syncSellStrategy(e) {
-  window.rootSellStrategy = e.target.value;
-  recalculate();
-}
-
 function syncCustomPrice(e) {
   const val = parseFloat(e.target.value) || 0;
   window.rootCustomPrice = val >= 0 ? val : 0;
@@ -987,6 +982,11 @@ function syncCustomPrice(e) {
 function syncCustomTax(e) {
   const val = parseFloat(e.target.value) || 0;
   window.rootCustomTax = val >= 0 ? val : 0;
+  recalculate();
+}
+
+function syncSellStrategy(e) {
+  window.rootSellStrategy = e.target.value;
   recalculate();
 }
 
@@ -1122,6 +1122,534 @@ function updateHeaderLedgerCount() {
   }
 }
 
+function onNodeClick(e, instanceId) {
+  e.stopPropagation();
+  if (selectedInstanceId === instanceId) {
+    selectedInstanceId = null;
+  } else {
+    selectedInstanceId = instanceId;
+  }
+  applyNodeHighlightClasses();
+  drawConnectingLines();
+}
+
+function clearHighlight() {
+  if (selectedInstanceId !== null) {
+    selectedInstanceId = null;
+    applyNodeHighlightClasses();
+    drawConnectingLines();
+  }
+}
+
+function findNodeByInstanceId(root, id) {
+  if (!root) return null;
+  if (root.instanceId === id) return root;
+  if (root.children) {
+    for (const child of root.children) {
+      if (child) {
+        const found = findNodeByInstanceId(child, id);
+        if (found) return found;
+      }
+    }
+  }
+  return null;
+}
+
+function applyNodeHighlightClasses() {
+  const allCards = document.querySelectorAll('.diagram-node');
+  
+  if (!selectedInstanceId) {
+    allCards.forEach(card => {
+      card.classList.remove('node-selected', 'node-child-highlight', 'node-parent-highlight', 'node-dimmed');
+    });
+    return;
+  }
+
+  const selectedNode = findNodeByInstanceId(recipeTreeRoot, selectedInstanceId);
+  const childInstanceIds = new Set(selectedNode ? selectedNode.children.map(c => c.instanceId) : []);
+  const parentInstanceId = selectedNode ? selectedNode.parentInstanceId : null;
+
+  allCards.forEach(card => {
+    const instanceId = parseInt(card.getAttribute('data-instance-id'));
+    card.classList.remove('node-selected', 'node-child-highlight', 'node-parent-highlight', 'node-dimmed');
+
+    if (instanceId === selectedInstanceId) {
+      card.classList.add('node-selected');
+    } else if (childInstanceIds.has(instanceId)) {
+      card.classList.add('node-child-highlight');
+    } else if (instanceId === parentInstanceId) {
+      card.classList.add('node-parent-highlight');
+    } else {
+      card.classList.add('node-dimmed');
+    }
+  });
+}
+
+// Selects and centers camera dead-center on a diagram node when clicking a row in the Bill of Materials sidebar
+function highlightNodeByTypeId(typeId) {
+  function findMatchingNode(node) {
+    if (!node) return null;
+    if (node.typeId === typeId || node.displayTypeId === typeId) return node;
+    if (node.children) {
+      for (const child of node.children) {
+        if (child) {
+          const found = findMatchingNode(child);
+          if (found) return found;
+        }
+      }
+    }
+    return null;
+  }
+
+  const targetNode = findMatchingNode(recipeTreeRoot);
+  if (targetNode) {
+    selectedInstanceId = targetNode.instanceId;
+    applyNodeHighlightClasses();
+    drawConnectingLines();
+    centerOnSelectedNode();
+  }
+}
+
+function isolateComponent(e, instanceId) {
+  if (e) e.stopPropagation();
+  isolatedInstanceId = instanceId;
+  selectedInstanceId = instanceId;
+  renderIsolatedDiagram();
+  setTimeout(drawConnectingLines, 50);
+  setTimeout(centerOnSelectedNode, 60);
+}
+
+function exitIsolation(e) {
+  if (e) e.stopPropagation();
+  const targetId = isolatedInstanceId || selectedInstanceId;
+  isolatedInstanceId = null;
+  recalculate();
+  setTimeout(() => {
+    selectedInstanceId = targetId;
+    applyNodeHighlightClasses();
+    drawConnectingLines();
+    centerOnSelectedNode();
+  }, 60);
+}
+
+function renderIsolatedDiagram() {
+  const container = document.getElementById('tree-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const isolatedNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
+  if (!isolatedNode) return;
+
+  const parentNode = isolatedNode.parentInstanceId ? findNodeByInstanceId(recipeTreeRoot, isolatedNode.parentInstanceId) : null;
+
+  const inputCol = document.createElement('div');
+  inputCol.className = 'flex flex-col space-y-4 justify-center';
+  
+  if (!isolatedNode.isBuildingSelf || isolatedNode.children.length === 0) {
+    inputCol.innerHTML = `<div class="bg-[#0c1318] border border-[#1e3348] p-3 text-xs text-slate-400 mono rounded">${!isolatedNode.isBuildingSelf ? 'Purchased off Market (No decomposed inputs)' : 'No inputs (Base Material)'}</div>`;
+  } else {
+    isolatedNode.children.forEach(child => {
+      if (child) inputCol.appendChild(createNodeCard(child));
+    });
+  }
+
+  const centerCol = document.createElement('div');
+  centerCol.className = 'flex flex-col justify-center';
+  centerCol.appendChild(createNodeCard(isolatedNode));
+
+  const outputCol = document.createElement('div');
+  outputCol.className = 'flex flex-col justify-center';
+  
+  if (parentNode) {
+    outputCol.appendChild(createNodeCard(parentNode));
+  } else {
+    outputCol.innerHTML = `<div class="bg-[#0c1318] border border-amber-500/50 p-3 text-xs text-amber-300 font-bold mono rounded">Final Target Job Output</div>`;
+  }
+
+  container.appendChild(inputCol);
+  container.appendChild(centerCol);
+  container.appendChild(outputCol);
+
+  applyNodeHighlightClasses();
+}
+
+// Accurate Camera Centering using absolute content-space coordinates
+function centerOnSelectedNode() {
+  let targetId = isolatedInstanceId || selectedInstanceId;
+  
+  if (!targetId && recipeTreeRoot) {
+    targetId = recipeTreeRoot.instanceId;
+  }
+
+  if (!targetId) return;
+
+  const card = document.getElementById(`node-card-${targetId}`);
+  const viewport = document.getElementById('viewport');
+  const content = document.getElementById('pan-zoom-content');
+
+  if (!card || !viewport || !content) return;
+
+  // Neutralize any browser-native auto-scroll offsets inside the viewport container
+  viewport.scrollTop = 0;
+  viewport.scrollLeft = 0;
+
+  const viewportRect = viewport.getBoundingClientRect();
+  const contentRect = content.getBoundingClientRect();
+  const cardRect = card.getBoundingClientRect();
+
+  // 1. Calculate the card's static, unscaled position relative to the content container
+  const cardContentX = (cardRect.left - contentRect.left) / zoomScale;
+  const cardContentY = (cardRect.top - contentRect.top) / zoomScale;
+
+  // 2. Calculate the card's unscaled dimensions
+  const cardContentWidth = cardRect.width / zoomScale;
+  const cardContentHeight = cardRect.height / zoomScale;
+
+  // 3. Find the exact center of the card in unscaled content space
+  const cardContentCenterX = cardContentX + cardContentWidth / 2;
+  const cardContentCenterY = cardContentY + cardContentHeight / 2;
+
+  // 4. Calculate the absolute panX and panY required to align the card's center with the viewport's center
+  panX = (viewportRect.width / 2) - cardContentCenterX * zoomScale;
+  panY = (viewportRect.height / 2) - cardContentCenterY * zoomScale;
+
+  updateTransform();
+  drawConnectingLines();
+
+  card.classList.add('ring-4', 'ring-cyan-400');
+  setTimeout(() => card.classList.remove('ring-4', 'ring-cyan-400'), 800);
+}
+
+function drawConnectingLines() {
+  const svg = document.getElementById('tree-svg');
+  const container = document.getElementById('tree-container');
+  if (!svg || !container) return;
+  
+  svg.setAttribute('width', container.scrollWidth);
+  svg.setAttribute('height', container.scrollHeight);
+  svg.innerHTML = '';
+
+  if (!recipeTreeRoot) return;
+
+  const containerRect = container.getBoundingClientRect();
+
+  if (isolatedInstanceId !== null) {
+    const isolatedNode = findNodeByInstanceId(recipeTreeRoot, isolatedInstanceId);
+    if (!isolatedNode) return;
+
+    const MathEl = document.getElementById(`node-card-${isolatedNode.instanceId}`);
+    if (!MathEl) return;
+
+    const isoRect = MathEl.getBoundingClientRect();
+    const isoLeftX = (isoRect.left - containerRect.left) / zoomScale;
+    const isoRightX = (isoRect.right - containerRect.left) / zoomScale;
+    const isoCenterY = (isoRect.top + isoRect.height / 2 - containerRect.top) / zoomScale;
+
+    if (isolatedNode.isBuildingSelf && isolatedNode.children) {
+      isolatedNode.children.forEach(child => {
+        if (child) {
+          const childEl = document.getElementById(`node-card-${child.instanceId}`);
+          if (childEl) {
+            const childRect = childEl.getBoundingClientRect();
+            const startX = (childRect.right - containerRect.left) / zoomScale;
+            const startY = (childRect.top + childRect.height / 2 - containerRect.top) / zoomScale;
+
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', `M ${startX} ${startY} C ${startX + 40} ${startY}, ${isoLeftX - 40} ${isoCenterY}, ${isoLeftX} ${isoCenterY}`);
+            path.setAttribute('stroke', '#4caf6f');
+            path.setAttribute('stroke-width', '3.5');
+            path.setAttribute('stroke-opacity', '1.0');
+            path.setAttribute('fill', 'none');
+            svg.appendChild(path);
+          }
+        }
+      });
+    }
+
+    if (isolatedNode.parentInstanceId) {
+      const parentNode = findNodeByInstanceId(recipeTreeRoot, isolatedNode.parentInstanceId);
+      if (parentNode) {
+        const parentEl = document.getElementById(`node-card-${parentNode.instanceId}`);
+        if (parentEl) {
+          const parentRect = parentEl.getBoundingClientRect();
+          const endX = (parentRect.left - containerRect.left) / zoomScale;
+          const endY = (parentRect.top + parentRect.height / 2 - containerRect.top) / zoomScale;
+
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', `M ${isoRightX} ${isoCenterY} C ${isoRightX + 40} ${isoCenterY}, ${endX - 40} ${endY}, ${endX} ${endY}`);
+          path.setAttribute('stroke', '#e8c96a');
+          path.setAttribute('stroke-width', '3.5');
+          path.setAttribute('stroke-opacity', '1.0');
+          path.setAttribute('fill', 'none');
+          svg.appendChild(path);
+        }
+      }
+    }
+    return;
+  }
+
+  drawConnectingLinesForTree(recipeTreeRoot);
+}
+
+function drawConnectingLinesForTree(root) {
+  if (!root) return;
+  
+  const container = document.getElementById('tree-container');
+  const svg = document.getElementById('tree-svg');
+  if (!svg || !container) return;
+
+  const containerRect = container.getBoundingClientRect();
+  const selectedNode = selectedInstanceId ? findNodeByInstanceId(recipeTreeRoot, selectedInstanceId) : null;
+  const activeChildIds = new Set(selectedNode ? selectedNode.children.map(c => c.instanceId) : []);
+  const parentInstanceId = selectedNode ? selectedNode.parentInstanceId : null;
+
+  function drawLinesForNode(node) {
+    if (!node.isBuildingSelf || !node.children || node.children.length === 0) return;
+
+    const parentEl = document.getElementById(`node-card-${node.instanceId}`);
+    if (!parentEl) return;
+
+    const parentRect = parentEl.getBoundingClientRect();
+    
+    const endX = (parentRect.left - containerRect.left) / zoomScale;
+    const endY = (parentRect.top + parentRect.height / 2 - containerRect.top) / zoomScale;
+
+    node.children.forEach(child => {
+      if (child) {
+        const childEl = document.getElementById(`node-card-${child.instanceId}`);
+        if (childEl) {
+          const childRect = childEl.getBoundingClientRect();
+          
+          const startX = (childRect.right - containerRect.left) / zoomScale;
+          const startY = (childRect.top + childRect.height / 2 - containerRect.top) / zoomScale;
+
+          const controlX1 = startX + 40;
+          const controlX2 = endX - 40;
+
+          const isInputConnection = (selectedInstanceId !== null) && 
+            (node.instanceId === selectedInstanceId && activeChildIds.has(child.instanceId));
+
+          const isOutputConnection = (selectedInstanceId !== null) && 
+            (child.instanceId === selectedInstanceId && node.instanceId === parentInstanceId);
+
+          const isHighlightedConnection = isInputConnection || isOutputConnection;
+          const isDimmedConnection = (selectedInstanceId !== null) && !isHighlightedConnection;
+
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', `M ${startX} ${startY} C ${controlX1} ${startY}, ${controlX2} ${endY}, ${endX} ${endY}`);
+          
+          if (isHighlightedConnection) {
+            path.setAttribute('stroke', isOutputConnection ? '#e8c96a' : '#4caf6f');
+            path.setAttribute('stroke-width', '3.5');
+            path.setAttribute('stroke-opacity', '1.0');
+          } else if (isDimmedConnection) {
+            path.setAttribute('stroke', '#06b6d4');
+            path.setAttribute('stroke-width', '1.5');
+            path.setAttribute('stroke-opacity', '0.12');
+          } else {
+            path.setAttribute('stroke', '#06b6d4');
+            path.setAttribute('stroke-width', '2');
+            path.setAttribute('stroke-opacity', '0.75');
+          }
+
+          path.setAttribute('fill', 'none');
+          svg.appendChild(path);
+        }
+      }
+      drawLinesForNode(child);
+    });
+  }
+
+  drawLinesForNode(root);
+}
+
+function renderBillOfMaterials(rootNode, brokerFee = 0) {
+  const listContainer = document.getElementById('bom-items-list');
+  if (!listContainer) return;
+  listContainer.innerHTML = '';
+
+  if (!rootNode) return;
+
+  const deductModeInput = document.getElementById('deduct-stock-mode');
+  const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+  const bomMap = {};
+
+  function generateBOM(node) {
+    if (!node) return;
+    if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
+      const typeId = node.displayTypeId || node.typeId;
+      const strategy = getNodePriceStrategy(node);
+      
+      const stockQty = isStockDeductEnabled ? (userStockMap[typeId] || userStockMap[node.typeId] || 0) : 0;
+      const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
+
+      if (!bomMap[typeId]) {
+        bomMap[typeId] = {
+          typeId: typeId,
+          name: node.name,
+          qty: 0,
+          strategy: strategy
+        };
+      }
+      bomMap[typeId].qty += netQtyNeeded;
+    } else {
+      node.children.forEach(child => {
+        if (child) generateBOM(child);
+      });
+    }
+  }
+
+  if (rootNode.isBuildingSelf && rootNode.children && rootNode.children.length > 0) {
+    rootNode.children.forEach(c => {
+      if (c) generateBOM(c);
+    });
+  } else {
+    const rootTypeId = rootNode.displayTypeId || rootNode.typeId;
+    const strategy = getNodeStrategyOnly(rootNode); // safe strategy getter
+    const stockQty = isStockDeductEnabled ? (userStockMap[rootTypeId] || userStockMap[rootNode.typeId] || 0) : 0;
+    const netQtyNeeded = Math.max(0, rootNode.qtyNeeded - stockQty);
+
+    bomMap[rootTypeId] = { typeId: rootTypeId, name: rootNode.name, qty: netQtyNeeded, strategy: strategy };
+  }
+
+  const bomItems = Object.values(bomMap);
+  let totalBOMCost = 0;
+
+  bomItems.forEach(item => {
+    const prices = priceCache[item.typeId] || { sell: 0, buy: 0 };
+    let unitPrice = item.strategy === 'sell' ? prices.sell : prices.buy;
+    if (item.strategy === 'buy') {
+      unitPrice = unitPrice * (1 + brokerFee);
+    }
+    item.unitPrice = unitPrice;
+    item.lineCost = unitPrice * item.qty;
+    totalBOMCost += item.lineCost;
+  });
+
+  bomItems.sort((a, b) => b.lineCost - a.lineCost);
+
+  bomItems.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'bg-[#0c1318] border border-[#1e3348] hover:border-cyan-500 hover:bg-[#101d2a] rounded p-2 flex items-center justify-between cursor-pointer transition shadow-sm';
+    row.title = 'Click to find and focus this material in the build diagram';
+    row.onclick = () => highlightNodeByTypeId(item.typeId);
+
+    row.innerHTML = `
+      <div class="flex items-center space-x-2.5 min-w-0">
+        <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-7 h-7 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
+        <div class="min-w-0 flex-1">
+          <div class="font-semibold text-slate-200 truncate flex items-center gap-1.5">
+            <span class="truncate">${item.name}</span>
+            <span class="text-[9px] px-1 rounded font-bold mono ${item.strategy === 'sell' ? 'bg-amber-900/60 text-amber-300' : 'bg-cyan-900/60 text-cyan-300'}">
+              ${item.strategy === 'sell' ? 'SELL' : 'BUY'}
+            </span>
+          </div>
+          <div class="text-[10px] text-slate-400 mono font-semibold">Qty: ${item.qty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK</div>
+        </div>
+      </div>
+      <div class="text-right mono font-bold text-cyan-400 flex-shrink-0 ml-2">
+        ${Math.round(item.lineCost).toLocaleString()} ISK
+      </div>
+    `;
+
+    listContainer.appendChild(row);
+  });
+
+  const countEl = document.getElementById('bom-type-count');
+  if (countEl) countEl.textContent = bomItems.length.toString();
+
+  const totalEl = document.getElementById('bom-total-isk');
+  if (totalEl) totalEl.textContent = Math.round(totalBOMCost).toLocaleString() + ' ISK';
+
+  window.currentBOMText = bomItems.map(i => `${i.name} x${i.qty}`).join('\n');
+}
+
+function getNodeStrategyOnly(node) {
+  if (!node) return 'sell';
+  const globalStrategy = document.getElementById('input-price-mode')?.value || 'sell';
+  return customBuyModes[node.typeId] || globalStrategy;
+}
+
+function copyMultibuyText() {
+  if (!window.currentBOMText) return;
+  navigator.clipboard.writeText(window.currentBOMText).then(() => {
+    const btn = document.querySelector('button[onclick="copyMultibuyText()"]');
+    if (btn) {
+      const orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      btn.className = 'px-3.5 py-1.5 bg-green-600 text-white font-bold text-xs rounded mono transition';
+      setTimeout(() => {
+        btn.textContent = orig;
+        btn.className = 'px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded mono transition shadow';
+      }, 1500);
+    }
+  });
+}
+
+// Smooth Pan and Zoom Engine
+const viewport = document.getElementById('viewport');
+const content = document.getElementById('pan-zoom-content');
+
+if (viewport) {
+  viewport.addEventListener('mousedown', (e) => {
+    if (e.button === 1) {
+      e.preventDefault();
+      isPanning = true;
+      startX = e.clientX - panX;
+      startY = e.clientY - panY;
+      viewport.style.cursor = 'grabbing';
+    }
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (isPanning) {
+      panX = e.clientX - startX;
+      panY = e.clientY - startY;
+      updateTransform();
+    }
+  });
+
+  window.addEventListener('mouseup', (e) => {
+    if (e.button === 1 && isPanning) {
+      isPanning = false;
+      viewport.style.cursor = 'grab';
+    }
+  });
+
+  viewport.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
+    const newScale = Math.min(Math.max(0.2, zoomScale * zoomFactor), 3.0);
+
+    const rect = viewport.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    panX = mouseX - (mouseX - panX) * (newScale / zoomScale);
+    panY = mouseY - (mouseY - panY) * (newScale / zoomScale);
+    zoomScale = newScale;
+
+    updateTransform();
+    drawConnectingLines();
+  }, { passive: false });
+}
+
+function updateTransform() {
+  const roundedPanX = Math.round(panX);
+  const roundedPanY = Math.round(panY);
+  if (content) content.style.transform = `translate(${roundedPanX}px, ${roundedPanY}px) scale(${zoomScale})`;
+  const zoomText = document.getElementById('zoom-level-text');
+  if (zoomText) zoomText.textContent = `Zoom: ${Math.round(zoomScale * 100)}%`;
+}
+
+function resetPanZoom() {
+  zoomScale = 1.0;
+  panX = 0;
+  panY = 0;
+  updateTransform();
+  drawConnectingLines();
+}
+
 // Bind to window for HTML accessibility
 window.addCurrentJobToLedger = addCurrentJobToLedger;
 window.updateHeaderLedgerCount = updateHeaderLedgerCount;
@@ -1129,6 +1657,16 @@ window.syncSellStrategy = syncSellStrategy;
 window.syncCustomPrice = syncCustomPrice;
 window.syncCustomTax = syncCustomTax;
 window.syncCardRunsToGlobal = syncCardRunsToGlobal;
+window.selectItem = selectItem;
+window.selectSolarSystem = selectSolarSystem;
+window.clearHighlight = clearHighlight;
+window.isolateComponent = isolateComponent;
+window.exitIsolation = exitIsolation;
+window.onNodeClick = onNodeClick;
+window.highlightNodeByTypeId = highlightNodeByTypeId;
+window.centerOnSelectedNode = centerOnSelectedNode;
+window.resetPanZoom = resetPanZoom;
+window.copyMultibuyText = copyMultibuyText;
 
 // Initialize Application
 window.onload = async () => {
