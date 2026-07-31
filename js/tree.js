@@ -1,5 +1,7 @@
 'use strict';
 
+// Centralized HTML Escaper and JSON Parser Helpers are loaded globally from js/config.js
+
 // Structural helper to recursively search and extract the output batch yield/quantity of a product in any recipe format
 function extractSdeYield(recipe, targetProductTypeId) {
   if (!recipe) return 1;
@@ -458,7 +460,7 @@ function calculateInputQuantity(baseQty, runs, me, facilityBonus, isReaction = f
 }
 
 function scaleTreeQuantities(node, facility) {
-  if (!node.recipe || !node.children) return;
+  if (!node.recipe || !node.recipe.materials || !node.children) return;
 
   const batchYield = node.batchYield || getBatchYield(node.recipe, node.isReaction) || 1;
   node.batchYield = batchYield;
@@ -468,7 +470,7 @@ function scaleTreeQuantities(node, facility) {
   const effectiveME = node.isReaction ? 0 : (node.customME || 0);
 
   node.children.forEach(child => {
-    const mat = node.recipe.materials.find(m => m.typeId === child.typeId);
+    const mat = Array.isArray(node.recipe.materials) ? node.recipe.materials.find(m => m.typeId === child.typeId) : null;
     if (mat) {
       child.qtyNeeded = calculateInputQuantity(mat.baseQty, runsNeeded, effectiveME, facility, node.isReaction);
     }

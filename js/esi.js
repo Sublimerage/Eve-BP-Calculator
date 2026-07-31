@@ -337,7 +337,7 @@ function updateEsiUserUI(charName, charId) {
   if (container) {
     container.innerHTML = `
       <div class="flex items-center space-x-2 text-xs mono bg-[#0d1922] px-3 py-1.5 rounded-md border border-cyan-500/50 shadow">
-        <img src="https://images.evetech.net/characters/${charId}/portrait?size=64" class="w-5 h-5 rounded-full border border-cyan-400">
+        <img src="https://images.evetech.net/characters/${charId}/portrait?size=64" class="w-5 h-5 rounded-full border border-cyan-400" onerror="this.onerror=null; this.src='https://images.evetech.net/characters/1/portrait?size=64';">
         <span class="text-cyan-300 font-bold">${safeName}</span>
         <button onclick="logoutEsiSSO()" class="text-slate-400 hover:text-red-400 font-bold ml-1.5" title="Log out ESI Character">✖</button>
       </div>
@@ -842,6 +842,7 @@ function filterLocationDropdownOptions() {
   }
 }
 
+// Global stock badge counter
 function updateStockDisplayCount() {
   const el = document.getElementById('stock-count-display');
   if (!el) return;
