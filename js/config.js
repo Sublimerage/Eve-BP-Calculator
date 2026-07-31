@@ -107,6 +107,7 @@ window.panY = panY;
 window.isPanning = isPanning;
 window.startX = startX;
 window.startY = startY;
+window.BLUEPRINT_TO_PRODUCT_MAP = {};
 
 // Known Base Raw Materials
 const RAW_BASE_MATERIALS = new Set([
@@ -188,7 +189,6 @@ window.extractRecipeYield = extractRecipeYield;
 
 // Corrected Live EVE Client SDE Material Quantities & Verified Type IDs
 const BUILTIN_RECIPES = {
-  // Tungsten Carbide Reaction (10,000 Output Yield per 1 Run Batch)
   16681: {
     blueprintTypeID: 17730, productTypeID: 16681, productName: "Tungsten Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000, time: 600,
     reactionMaterials: [
@@ -205,7 +205,6 @@ const BUILTIN_RECIPES = {
       { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
     ]
   },
-  // Titanium Carbide Reaction (10,000 Output Yield)
   16680: {
     blueprintTypeID: 17729, productTypeID: 16680, productName: "Titanium Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000, time: 600,
     reactionMaterials: [
@@ -222,7 +221,6 @@ const BUILTIN_RECIPES = {
       { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
     ]
   },
-  // Crystalline Carbonide Reaction (10,000 Output Yield)
   16679: {
     blueprintTypeID: 17728, productTypeID: 16679, productName: "Crystalline Carbonide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000, time: 600,
     reactionMaterials: [
@@ -239,14 +237,12 @@ const BUILTIN_RECIPES = {
       { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
     ]
   },
-  // Hydrogen Fuel Block (40 Output Yield)
   4247: {
     blueprintTypeID: 4248, productTypeID: 4247, productName: "Hydrogen Fuel Block", mfgQtyPerRun: 40, productQtyPerRun: 40, portionSize: 40, qty: 40, time: 15
   },
   4248: {
     blueprintTypeID: 4248, productTypeID: 4247, productName: "Hydrogen Fuel Block", mfgQtyPerRun: 40, productQtyPerRun: 40, portionSize: 40, qty: 40, time: 15
   },
-  // Gila
   17715: {
     blueprintTypeID: 17714, productTypeID: 17715, productName: "Gila", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 24000,
     mfgMaterials: [
@@ -265,7 +261,6 @@ const BUILTIN_RECIPES = {
       { typeId: 57479, name: "Core Temperature Regulator", baseQty: 1 }
     ]
   },
-  // Auto-Integrity Preservation Seal
   57478: {
     blueprintTypeID: 57515, productTypeID: 57478, productName: "Auto-Integrity Preservation Seal", mfgQtyPerRun: 3, productQtyPerRun: 3, portionSize: 3, qty: 3, time: 240,
     mfgMaterials: [
@@ -282,7 +277,6 @@ const BUILTIN_RECIPES = {
       { typeId: 57457, name: "Reinforced Carbon Fiber", baseQty: 10 }
     ]
   },
-  // Life Support Backup Unit
   57486: {
     blueprintTypeID: 57523, productTypeID: 57486, productName: "Life Support Backup Unit", mfgQtyPerRun: 3, productQtyPerRun: 3, portionSize: 3, qty: 3, time: 240,
     mfgMaterials: [
@@ -299,7 +293,6 @@ const BUILTIN_RECIPES = {
       { typeId: 57457, name: "Reinforced Carbon Fiber", baseQty: 10 }
     ]
   },
-  // Core Temperature Regulator
   57479: {
     blueprintTypeID: 57516, productTypeID: 57479, productName: "Core Temperature Regulator", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 1200,
     mfgMaterials: [
@@ -316,7 +309,6 @@ const BUILTIN_RECIPES = {
       { typeId: 57457, name: "Reinforced Carbon Fiber", baseQty: 500 }
     ]
   },
-  // Caracal
   621: {
     blueprintTypeID: 622, productTypeID: 621, productName: "Caracal", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 6000,
     mfgMaterials: [
@@ -388,6 +380,30 @@ window.buildPrepackedIndexes = function() {
       recipeMap[keyId] = recipe;
       if (recipe.blueprintTypeID) recipeMap[recipe.blueprintTypeID] = recipe;
       if (recipe.productTypeID) recipeMap[recipe.productTypeID] = recipe;
+    }
+
+    // Dynamically build the Blueprint-to-Product map locally on load [1]
+    window.BLUEPRINT_TO_PRODUCT_MAP = window.BLUEPRINT_TO_PRODUCT_MAP || {};
+    const blueprintSuffix = " blueprint";
+    const formulaSuffix = " reaction formula";
+    const formulaSuffix2 = " formula";
+
+    for (const [name, item] of Object.entries(IDX)) {
+      let pName = null;
+      if (name.endsWith(blueprintSuffix)) {
+        pName = name.slice(0, -blueprintSuffix.length);
+      } else if (name.endsWith(formulaSuffix)) {
+        pName = name.slice(0, -formulaSuffix.length);
+      } else if (name.endsWith(formulaSuffix2)) {
+        pName = name.slice(0, -formulaSuffix2.length);
+      }
+
+      if (pName) {
+        const pItem = IDX[pName.trim()];
+        if (pItem) {
+          window.BLUEPRINT_TO_PRODUCT_MAP[item.id] = pItem.id;
+        }
+      }
     }
 
     if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';

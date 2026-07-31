@@ -170,7 +170,7 @@ async function fetchBlueprintData(typeId) {
     for (const url of tryUrls) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // Stable proxy fallback bounds
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
 
         const res = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
@@ -236,7 +236,7 @@ async function fetchBlueprintData(typeId) {
 
 // Parallel Multi-Layer SDE Blueprint-Centric Tree Generator
 async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, currentDepth, maxDepth, visitedPath = new Set(), parentNode = null) {
-  let productTypeId = window.recipeTreeRootProductTypeId || resolveProductIdFromBlueprintName(name) || BLUEPRINT_TO_PRODUCT_MAP[blueprintTypeId] || blueprintTypeId;
+  let productTypeId = window.recipeTreeRootProductTypeId || window.BLUEPRINT_TO_PRODUCT_MAP[blueprintTypeId] || resolveProductIdFromBlueprintName(name) || blueprintTypeId;
   let productName = name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
 
   const defaultBuildState = (currentDepth === 0) ? true : false;
