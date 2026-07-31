@@ -1,9 +1,7 @@
 'use strict';
 
-// Retrieve globally centralized helpers from window context (strict-mode compliant)
-const esc = window.esc;
-const safeParseJSON = window.safeParseJSON;
-const formatDuration = window.formatDuration;
+// Centralized helpers (esc, safeParseJSON, formatDuration) are loaded globally from js/config.js.
+// They MUST NOT be re-declared here with "const" or "let" to prevent duplicate declaration SyntaxErrors.
 
 if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sell';
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
@@ -12,7 +10,7 @@ if (window.globalRuns === undefined) window.globalRuns = 1;
 // Strictly queries exact unreduced SDE manufacturing durations directly from your SDE database
 function extractBuildTime(recipe) {
   if (!recipe) return 0;
-  return parseInt(recipe.t || recipe.time || recipe.timeSeconds || recipe.duration || recipe.mfgTime || recipe.productionTime || 0);
+  return parseInt(recipe.time || recipe.t || recipe.timeSeconds || recipe.duration || recipe.mfgTime || recipe.productionTime || 0);
 }
 
 // Binds custom card overrides directly to tree node structures before calculations
@@ -316,6 +314,12 @@ function loadSavedState() {
     window.globalRuns = parseInt(localStorage.getItem('eve_global_runs')) || 1;
     window.rootSellStrategy = localStorage.getItem('eve_root_sell_strategy') || 'market-sell';
     window.rootCustomPrice = parseFloat(localStorage.getItem('eve_root_custom_price')) || 0;
+    
+    // Sync window objects
+    window.buildSelfOverrides = buildSelfOverrides;
+    window.customBuyModes = customBuyModes;
+    window.customMEOverrides = customMEOverrides;
+    window.customTEOverrides = customTEOverrides;
 
     const savedProduct = safeParseJSON(localStorage.getItem('eve_active_product'), null);
     if (savedProduct && savedProduct.id && savedProduct.name) {
@@ -588,13 +592,16 @@ function createNodeCard(node) {
   if (node.isBuildingSelf && node.recipe) {
     const baseTime = extractBuildTime(node.recipe, node.typeId, node.name);
     if (baseTime > 0) {
+      // Default to Max Level 5 fallback if guest/not logged in, otherwise load character sheets
       const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
       const indFactor = 1 - (0.04 * (skills.industry || 0));
       const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
       const skillTimeFactor = indFactor * advIndFactor;
+
       const te = node.customTE || 0;
       const teFactor = 1 - (te / 100);
 
+      // Resolve specific Upwell Engineering Complex Time bonuses (Sotiyo: 30%, Azbel: 20%, Raitaru: 15%, NPC: 0%)
       const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
       let facilityFactor = 1.0;
       let structureName = 'NPC Station';
@@ -1397,7 +1404,7 @@ function resetPanZoom() {
   drawConnectingLines();
 }
 
-// Bind window handlers explicitly
+// Bind to window namespaces cleanly for direct strict-mode support
 window.addCurrentJobToLedger = addCurrentJobToLedger;
 window.updateHeaderLedgerCount = updateHeaderLedgerCount;
 window.syncSellStrategy = syncSellStrategy;

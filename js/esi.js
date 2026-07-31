@@ -1,7 +1,5 @@
 'use strict';
 
-// Centralized helpers (esc, safeParseJSON, formatDuration) are loaded globally from js/config.js
-
 // Decodes unpadded Base64URL JWT payloads securely
 function decodeJwt(token) {
   try {
@@ -84,7 +82,7 @@ function isShipType(typeId) {
     601, 606, 608, 596, 33079, 33081, 33083, 33085,
     621, 622, 12005, 587, 24698, 644, 642, 643, 12015, 11987, 11989
   ]);
-  if (rookieShipIds.has(typeId)) return true;
+  if (typeId && rookieShipIds.has(typeId)) return true;
 
   const typeName = getItemTypeName(typeId);
   if (!typeName) return false;
@@ -989,8 +987,8 @@ async function selectSolarSystem(systemId, systemName) {
   const searchInputEl = document.getElementById('system-search');
   if (searchInputEl) searchInputEl.value = systemName.toUpperCase();
   
-  const MathSearchResults = document.getElementById('system-results');
-  if (MathSearchResults) MathSearchResults.classList.add('hidden');
+  const resultsEl = document.getElementById('system-results');
+  if (resultsEl) resultsEl.classList.add('hidden');
   
   try {
     localStorage.setItem('eve_selected_system', JSON.stringify({ id: systemId, name: systemName.toUpperCase() }));
