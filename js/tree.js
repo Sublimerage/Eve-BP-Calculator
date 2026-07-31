@@ -9,7 +9,6 @@ function resolveProductIdFromBlueprintName(blueprintName) {
                            .trim()
                            .toLowerCase();
 
-  // Try thorough multi-scoping scans to guarantee match regardless of caching state
   if (window.IDX[pName]) return window.IDX[pName].id;
   for (const [k, v] of Object.entries(window.IDX)) {
     if (k === pName || k.replace(/ /g, '') === pName.replace(/ /g, '')) {
@@ -176,7 +175,7 @@ async function fetchBlueprintData(typeId) {
     for (const url of tryUrls) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // stable timeout
+        const timeoutId = setTimeout(() => controller.abort(), 8000); 
 
         const res = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
@@ -196,7 +195,11 @@ async function fetchBlueprintData(typeId) {
               baseQty: parseInt(m.quantity)
             })) : null;
 
-            let outputBatchYield = parseInt(data.productQtyPerRun) || parseInt(data.portionSize) || 1;
+            // Safe parsing of nested Fuzzwork Data Contracts
+            let resolvedProductTypeId = parseInt(data.productTypeID) || (data.blueprintDetails ? parseInt(data.blueprintDetails.productTypeID) : null) || window.BLUEPRINT_TO_PRODUCT_MAP[typeId] || typeId;
+            let resolvedProductName = data.productTypeName || (data.blueprintDetails ? data.blueprintDetails.productTypeName : '') || '';
+
+            let outputBatchYield = parseInt(data.productQtyPerRun) || (data.blueprintDetails ? parseInt(data.blueprintDetails.productQtyPerRun) : null) || parseInt(data.portionSize) || 1;
             if (data.activityProducts && typeof data.activityProducts === 'object') {
               const act1 = data.activityProducts['1'] || data.activityProducts[1];
               const act11 = data.activityProducts['11'] || data.activityProducts[11];
@@ -211,8 +214,8 @@ async function fetchBlueprintData(typeId) {
               const parsed = {
                 blueprintTypeID: data.blueprintTypeID,
                 blueprintTypeName: data.blueprintTypeName || '',
-                productTypeID: parseInt(data.productTypeID) || typeId,
-                productName: data.productTypeName || '',
+                productTypeID: resolvedProductTypeId,
+                productName: resolvedProductName,
                 activityProducts: data.activityProducts || null,
                 productQtyPerRun: outputBatchYield,
                 mfgQtyPerRun: outputBatchYield,
