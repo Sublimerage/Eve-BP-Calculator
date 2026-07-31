@@ -32,6 +32,38 @@ function formatDuration(seconds) {
   return parts.join(' ');
 }
 
+// Structural helper to extract the base build time/duration of a recipe from all possible SDE properties
+function extractBuildTime(recipe) {
+  if (!recipe) return 0;
+  const candidates = [
+    recipe.time,
+    recipe.timeSeconds,
+    recipe.duration,
+    recipe.productionTime,
+    recipe.mfgTime,
+    recipe.reactionTime,
+    recipe.activityTime,
+    recipe.activityDuration
+  ];
+  for (const c of candidates) {
+    const val = parseInt(c);
+    if (!isNaN(val) && val > 0) return val;
+  }
+  if (recipe.activityProducts && typeof recipe.activityProducts === 'object') {
+    const act1 = recipe.activityProducts['1'] || recipe.activityProducts[1];
+    const act11 = recipe.activityProducts['11'] || recipe.activityProducts[11];
+    if (act1 && act1[0] && act1[0].time) {
+      const val = parseInt(act1[0].time);
+      if (!isNaN(val) && val > 0) return val;
+    }
+    if (act11 && act11[0] && act11[0].time) {
+      const val = parseInt(act11[0].time);
+      if (!isNaN(val) && val > 0) return val;
+    }
+  }
+  return 0;
+}
+
 function saveTaxSettings() {
   try {
     const settings = {
@@ -592,17 +624,11 @@ function recalculate() {
     localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap || {}));
   } catch (err) {}
 
-  // Restore active input focus dynamically, using temporary type conversion to prevent cursor jumping
+  // Restore active input focus dynamically (avoiding value clearing loops that trigger recursion)
   if (isCardRunsFocused) {
     const newRunsInput = document.getElementById('card-bp-runs');
     if (newRunsInput) {
       newRunsInput.focus();
-      try {
-        const temp = newRunsInput.type;
-        newRunsInput.type = 'text';
-        newRunsInput.setSelectionRange(newRunsInput.value.length, newRunsInput.value.length);
-        newRunsInput.type = temp;
-      } catch (e) {}
     }
   }
 
@@ -610,12 +636,6 @@ function recalculate() {
     const newPriceInput = document.getElementById('card-custom-price');
     if (newPriceInput) {
       newPriceInput.focus();
-      try {
-        const temp = newPriceInput.type;
-        newPriceInput.type = 'text';
-        newPriceInput.setSelectionRange(newPriceInput.value.length, newPriceInput.value.length);
-        newPriceInput.type = temp;
-      } catch (e) {}
     }
   }
 }
@@ -742,29 +762,31 @@ function createNodeCard(node) {
     `;
   }
 
-  // Calculate Est. Build Time defensively (Accounting for skills, facility type, TE)
+  // Calculate Est. Build Time defensively (Accounting for ESI skills, Sotiyo rigs, custom TE overrides)
   let buildTimeUI = '';
-  if (node.isBuildingSelf && node.recipe && node.recipe.time) {
-    const baseTime = node.recipe.time || 0;
-    const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 0, advIndustry: 0 });
-    const indFactor = 1 - (0.04 * (skills.industry || 0));
-    const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
-    const skillTimeFactor = indFactor * advIndFactor;
+  if (node.isBuildingSelf && node.recipe) {
+    const baseTime = extractBuildTime(node.recipe);
+    if (baseTime > 0) {
+      const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 0, advIndustry: 0 });
+      const indFactor = 1 - (0.04 * (skills.industry || 0));
+      const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
+      const skillTimeFactor = indFactor * advIndFactor;
 
-    const te = node.customTE || 0;
-    const teFactor = 1 - (te / 100);
+      const te = node.customTE || 0;
+      const teFactor = 1 - (te / 100);
 
-    const facility = document.getElementById('facility-select')?.value || '0.01';
-    const facilityTimeBonus = (facility === '0.01') ? 0.05 : 0; // Sotiyo offers 5% manufacturing time rigs
-    const facilityFactor = 1 - facilityTimeBonus;
+      const facility = document.getElementById('facility-select')?.value || '0.01';
+      const facilityTimeBonus = (facility === '0.01') ? 0.05 : 0; // Sotiyo offers 5% base manufacturing time reduction
+      const facilityFactor = 1 - facilityTimeBonus;
 
-    const totalSeconds = baseTime * teFactor * skillTimeFactor * facilityFactor * node.runsNeeded;
-    buildTimeUI = `
-      <div class="flex justify-between text-[10px] text-slate-400 mono border-t border-[#1e3348]/40 pt-1 mt-1">
-        <span>Est. Build Time:</span>
-        <span class="text-slate-300 font-semibold">${formatDuration(totalSeconds)}</span>
-      </div>
-    `;
+      const totalSeconds = baseTime * teFactor * skillTimeFactor * facilityFactor * node.runsNeeded;
+      buildTimeUI = `
+        <div class="flex justify-between text-[10px] text-slate-400 mono border-t border-[#1e3348]/40 pt-1 mt-1">
+          <span>Est. Build Time:</span>
+          <span class="text-slate-300 font-semibold">${formatDuration(totalSeconds)}</span>
+        </div>
+      `;
+    }
   }
 
   card.className = `diagram-node rounded p-3 shadow-2xl transition-all ${cardStyle}`;
@@ -1573,6 +1595,7 @@ function addCurrentJobToLedger(e) {
   const outputPrices = priceCache[recipeTreeRoot.typeId] || { sell: 0, buy: 0 };
   let customPrice = window.rootCustomPrice || 0;
   let unitSellPrice = selectedStrategy.startsWith('custom-') ? customPrice : outputPrices.sell;
+  const baseTime = extractBuildTime(recipeTreeRoot.recipe);
 
   const materials = [];
   function extractBOM(node) {
@@ -1639,6 +1662,7 @@ function addCurrentJobToLedger(e) {
     runsNeeded: recipeTreeRoot.runsNeeded,
     qtyNeeded: recipeTreeRoot.qtyNeeded,
     calculatedCost: recipeTreeRoot.calculatedCost || 0,
+    baseTime: baseTime, // Serialized here for SDE duration on the Ledger page
     sellStrategy: selectedStrategy,
     unitSellPrice: unitSellPrice,
     materials: materials,

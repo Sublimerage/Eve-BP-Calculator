@@ -16,6 +16,22 @@ function safeParseJSON(str, fallback) {
   }
 }
 
+// Convert seconds into human-readable EVE duration format (e.g. 1d 4h 12m)
+function formatDuration(seconds) {
+  if (!seconds || isNaN(seconds) || seconds <= 0) return 'N/A';
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0) parts.push(`${mins}m`);
+  if (parts.length === 0) parts.push(`${secs}s`);
+  return parts.join(' ');
+}
+
 // Global Ledger Queue State (relying on global userStockMap from config.js)
 let activeJobs = [];
 let buildHistory = [];
@@ -127,7 +143,7 @@ function getItemCategory(typeId, name) {
   return 'others';
 }
 
-// Render overall dashboard KPIs and list details
+// Render overall ledger KPIs, consolidated BOM lists, and history ledger rows
 function renderJournalPage() {
   loadJournalState();
 
@@ -204,7 +220,7 @@ function renderJournalPage() {
   renderBuildHistoryLedger();
 }
 
-// Render active queued jobs
+// Render active queued jobs with skills-aware times, priority sorters, and inline Copy BOM
 function renderActiveJobsList(allocatedStock) {
   const container = document.getElementById('active-jobs-list');
   if (!container) return;
@@ -221,7 +237,7 @@ function renderActiveJobsList(allocatedStock) {
   const deductModeInput = document.getElementById('deduct-stock-mode');
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
 
-  // Retrieve Character skills for accurate TE Calculations
+  // Retrieve Character skills defensively for accurate TE Calculations
   const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 0, advIndustry: 0 });
   const indFactor = 1 - (0.04 * (skills.industry || 0));
   const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
@@ -232,7 +248,19 @@ function renderActiveJobsList(allocatedStock) {
     const iconTypeId = job.typeId;
     const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
 
-    // Generate individual BOM breakdown defensively with prioritized FIFO allocation
+    // Priority move buttons layout
+    const priorityButtonsHTML = `
+      <div class="flex items-center space-x-1 flex-shrink-0" onclick="event.stopPropagation()">
+        <button onclick="moveJobUp(${job.id})" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold px-1.5 py-0.5 rounded text-[9px] mono border border-[#1e3348]" title="Move up in priority (increases stock allocation preference)">
+          ▲ Up
+        </button>
+        <button onclick="moveJobDown(${job.id})" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold px-1.5 py-0.5 rounded text-[9px] mono border border-[#1e3348]" title="Move down in priority">
+          ▼ Down
+        </button>
+      </div>
+    `;
+
+    // Generate individual BOM breakdown with prioritized FIFO allocation
     const individualBOMHTML = Array.isArray(job.materials) ? job.materials.map(mat => {
       if (!mat) return '';
       
@@ -255,11 +283,10 @@ function renderActiveJobsList(allocatedStock) {
       `;
     }).join('') : '<div class="text-[10px] text-slate-500 italic py-1">No materials logged for this build.</div>';
 
-    // 2. Skill-adjusted Build Duration calculation per card
+    // Skill and Sotiyo-adjusted Build Duration calculation per card
     let buildTimeUI = '';
-    const recipe = window.recipeMap ? (window.recipeMap[job.typeId] || null) : null;
-    if (recipe && recipe.time) {
-      const baseTime = recipe.time || 0;
+    const baseTime = job.baseTime || 0;
+    if (baseTime > 0) {
       const teFactor = 1.0; // standard default TE factor fallback
       const facility = document.getElementById('facility-select')?.value || '0.01';
       const facilityTimeBonus = (facility === '0.01') ? 0.05 : 0; // Sotiyo offers 5% manufacturing time rigs
@@ -276,15 +303,20 @@ function renderActiveJobsList(allocatedStock) {
 
     return `
       <div class="bg-[#0c1318] border border-[#1e3348] hover:border-purple-500/40 rounded p-4 flex flex-col justify-between shadow-md transition space-y-3">
-        <div class="flex items-start space-x-3">
-          <img src="https://images.evetech.net/types/${iconTypeId}/icon?size=64" class="w-12 h-12 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
-          <div class="min-w-0 flex-1">
-            <h3 class="font-bold text-sm text-white truncate">${esc(job.name)}</h3>
-            <div class="text-[10px] mono text-slate-400 mt-0.5">Added on: ${formattedDate}</div>
-            <div class="text-[11px] text-purple-300 font-bold mono mt-1">
-              ${job.runsNeeded.toLocaleString()} Run${job.runsNeeded > 1 ? 's' : ''} @ ${job.qtyNeeded.toLocaleString()} total units
+        <div class="flex items-start justify-between">
+          <div class="flex items-start space-x-3 min-w-0 flex-1">
+            <img src="https://images.evetech.net/types/${iconTypeId}/icon?size=64" class="w-12 h-12 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
+            <div class="min-w-0 flex-1">
+              <h3 class="font-bold text-sm text-white truncate">${esc(job.name)}</h3>
+              <div class="text-[10px] mono text-slate-400 mt-0.5">Added on: ${formattedDate}</div>
             </div>
           </div>
+          <!-- Priority Sorters -->
+          ${priorityButtonsHTML}
+        </div>
+
+        <div class="text-[11px] text-purple-300 font-bold mono mt-1">
+          ${job.runsNeeded.toLocaleString()} Run${job.runsNeeded > 1 ? 's' : ''} @ ${job.qtyNeeded.toLocaleString()} total units
         </div>
 
         <!-- Individual Material BOM breakdown area with Priority allocation -->
@@ -573,6 +605,33 @@ function clearJournalHistory() {
   renderJournalPage();
 }
 
+// --- Priority Move Actions (Swaps list positioning defensively inside local storage array) ---
+function moveJobUp(jobId) {
+  loadJournalState();
+  const index = activeJobs.findIndex(j => j && j.id === jobId);
+  if (index > 0) {
+    const temp = activeJobs[index];
+    activeJobs[index] = activeJobs[index - 1];
+    activeJobs[index - 1] = temp;
+
+    localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
+    renderJournalPage();
+  }
+}
+
+function moveJobDown(jobId) {
+  loadJournalState();
+  const index = activeJobs.findIndex(j => j && j.id === jobId);
+  if (index !== -1 && index < activeJobs.length - 1) {
+    const temp = activeJobs[index];
+    activeJobs[index] = activeJobs[index + 1];
+    activeJobs[index + 1] = temp;
+
+    localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
+    renderJournalPage();
+  }
+}
+
 // --- Live stock location / Container filter panel ---
 function populateJournalLocationDropdown() {
   const filterSelect = document.getElementById('stock-location-filter');
@@ -805,6 +864,8 @@ window.filterJournalLocationOptions = filterJournalLocationOptions;
 window.recalculateJournalStock = recalculateJournalStock;
 window.setBOMOrderFilter = setBOMOrderFilter;
 window.setBOMCategoryFilter = setBOMCategoryFilter;
+window.moveJobUp = moveJobUp;
+window.moveJobDown = moveJobDown;
 
 // Initialize Ledger page on window load
 window.onload = () => {

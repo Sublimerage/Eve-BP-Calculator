@@ -237,12 +237,8 @@ async function startEsiSSOLogin() {
   const hashed = await sha256(verifier);
   const challenge = base64urlEncode(hashed);
 
-  // Dynamically strip out filenames to guarantee the Redirect URI matches the directory root on GitHub Pages
-  let pathname = window.location.pathname;
-  if (pathname.endsWith('.html')) {
-    pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1);
-  }
-  const redirectUri = window.location.origin + pathname;
+  // Restored exact Redirect URI calculation to match the CCP developer portal's configured addresses
+  const redirectUri = window.location.origin + window.location.pathname;
 
   const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1';
   const state = generateRandomString(16);
@@ -275,11 +271,7 @@ async function handleEsiSSOCallback() {
   window.history.replaceState({}, document.title, window.location.pathname);
 
   try {
-    let pathname = window.location.pathname;
-    if (pathname.endsWith('.html')) {
-      pathname = pathname.substring(0, pathname.lastIndexOf('/') + 1);
-    }
-    const redirectUri = window.location.origin + pathname;
+    const redirectUri = window.location.origin + window.location.pathname;
 
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
