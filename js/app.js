@@ -676,24 +676,24 @@ function createNodeCard(node) {
   }
 
   let buildTimeUI = '';
-  if (node.isBuildingSelf && node.recipe) {
-    const baseTime = extractBuildTime(node.recipe, node.typeId, node.name);
+  if (node.isBuildingSelf && node.isManufacturable) {
+    const baseTime = extractBuildTime(node.recipe);
+    const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
+    const indFactor = 1 - (0.04 * (skills.industry || 0));
+    const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
+    const skillTimeFactor = indFactor * advIndFactor;
+    const te = node.customTE || 0;
+    const teFactor = 1 - (te / 100);
+
+    const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
+    let facilityFactor = 1.0;
+    let structureName = 'NPC Station';
+    let structureTEBonus = '0%';
+    if (activeFacilityKey === 'sotiyo') { facilityFactor = 0.70; structureName = 'Sotiyo'; structureTEBonus = '30%'; }
+    else if (activeFacilityKey === 'azbel') { facilityFactor = 0.80; structureName = 'Azbel'; structureTEBonus = '20%'; }
+    else if (activeFacilityKey === 'raitaru') { facilityFactor = 0.85; structureName = 'Raitaru'; structureTEBonus = '15%'; }
+
     if (baseTime > 0) {
-      const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
-      const indFactor = 1 - (0.04 * (skills.industry || 0));
-      const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
-      const skillTimeFactor = indFactor * advIndFactor;
-      const te = node.customTE || 0;
-      const teFactor = 1 - (te / 100);
-
-      const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
-      let facilityFactor = 1.0;
-      let structureName = 'NPC Station';
-      let structureTEBonus = '0%';
-      if (activeFacilityKey === 'sotiyo') { facilityFactor = 0.70; structureName = 'Sotiyo'; structureTEBonus = '30%'; }
-      else if (activeFacilityKey === 'azbel') { facilityFactor = 0.80; structureName = 'Azbel'; structureTEBonus = '20%'; }
-      else if (activeFacilityKey === 'raitaru') { facilityFactor = 0.85; structureName = 'Raitaru'; structureTEBonus = '15%'; }
-
       const totalSeconds = baseTime * teFactor * skillTimeFactor * facilityFactor * node.runsNeeded;
       const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)\n• Base SDE Time: ${window.formatDuration(baseTime)}`;
 
@@ -701,6 +701,15 @@ function createNodeCard(node) {
         <div class="flex justify-between text-[10px] text-slate-400 mono border-t border-[#1e3348]/40 pt-1 mt-1 cursor-help" title="${window.esc(hoverTitle)}">
           <span>Est. Build Time:</span>
           <span class="text-slate-300 font-semibold">${window.formatDuration(totalSeconds)}</span>
+        </div>
+      `;
+    } else {
+      // Be honest that the line exists but the underlying duration data is missing, instead of
+      // silently disappearing - a permanently blank line with no data at all looks identical to a bug.
+      buildTimeUI = `
+        <div class="flex justify-between text-[10px] text-slate-400 mono border-t border-[#1e3348]/40 pt-1 mt-1 cursor-help" title="No manufacturing time data found for this blueprint in the local database or Fuzzwork lookup.">
+          <span>Est. Build Time:</span>
+          <span class="text-slate-500 italic">No Time Data</span>
         </div>
       `;
     }

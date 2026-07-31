@@ -236,13 +236,14 @@ function renderActiveJobsList(allocatedStock) {
         totalBuildSeconds = 0;
       }
     }
+    const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
+    const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
+    let structureName = 'NPC Station';
+    if (activeFacilityKey === 'sotiyo') structureName = 'Sotiyo';
+    else if (activeFacilityKey === 'azbel') structureName = 'Azbel';
+    else if (activeFacilityKey === 'raitaru') structureName = 'Raitaru';
+
     if (totalBuildSeconds > 0) {
-      const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
-      const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
-      let structureName = 'NPC Station';
-      if (activeFacilityKey === 'sotiyo') structureName = 'Sotiyo';
-      else if (activeFacilityKey === 'azbel') structureName = 'Azbel';
-      else if (activeFacilityKey === 'raitaru') structureName = 'Raitaru';
       const hoverTitle = `Total time to build this item and every sub-component you're manufacturing yourself.\nIndustry: ${skills.industry}/5 | Advanced Industry: ${skills.advIndustry}/5 | Facility: ${structureName}`;
 
       const iskPerHour = job.netProfit !== undefined ? (job.netProfit / (totalBuildSeconds / 3600)) : null;
@@ -256,6 +257,15 @@ function renderActiveJobsList(allocatedStock) {
           <span class="text-slate-300 font-semibold">${window.formatDuration(totalBuildSeconds)}</span>
         </div>
         ${iskPerHourUI}
+      `;
+    } else {
+      // Be honest that no time data was found, rather than silently omitting the line entirely -
+      // a permanently missing line with no data looks identical to a rendering bug.
+      buildTimeUI = `
+        <div class="flex justify-between text-[10px] text-slate-400 mono cursor-help" title="No manufacturing time data was found for this job's blueprint at the time it was added.">
+          <span>Est. Build Time:</span>
+          <span class="text-slate-500 italic">No Time Data</span>
+        </div>
       `;
     }
 
