@@ -1,10 +1,39 @@
 'use strict';
 
-// Global HTML Escaper Helper Function
+// Centralized HTML Escaper Helper (Globally shared)
 function esc(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 window.esc = esc;
+
+// Centralized JSON Parser Helper (Globally shared)
+function safeParseJSON(str, fallback) {
+  if (!str || str === 'undefined' || str === 'null') return fallback;
+  try {
+    const parsed = JSON.parse(str);
+    return parsed !== null && parsed !== undefined ? parsed : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+window.safeParseJSON = safeParseJSON;
+
+// Centralized Duration Formatter Helper (Globally shared)
+function formatDuration(seconds) {
+  if (!seconds || isNaN(seconds) || seconds <= 0) return 'N/A';
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0) parts.push(`${mins}m`);
+  if (parts.length === 0) parts.push(`${secs}s`);
+  return parts.join(' ');
+}
+window.formatDuration = formatDuration;
 
 // Hardcoded EVE Developer Application Client ID for instant 1-click SSO
 window.HARDCODED_CLIENT_ID = '20e4087a1f564a3e897aaaa6daebbecd';

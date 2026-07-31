@@ -1,37 +1,5 @@
 'use strict';
 
-// Local HTML Escaper Helper
-function esc(s) {
-  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-// Safe JSON parser to prevent legacy data from crash-blocking script compilation
-function safeParseJSON(str, fallback) {
-  if (!str || str === 'undefined' || str === 'null') return fallback;
-  try {
-    const parsed = JSON.parse(str);
-    return parsed !== null && parsed !== undefined ? parsed : fallback;
-  } catch (e) {
-    return fallback;
-  }
-}
-
-// Convert seconds into human-readable EVE duration format (e.g. 1d 4h 12m)
-function formatDuration(seconds) {
-  if (!seconds || isNaN(seconds) || seconds <= 0) return 'N/A';
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-
-  const parts = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0) parts.push(`${hours}h`);
-  if (mins > 0) parts.push(`${mins}m`);
-  if (parts.length === 0) parts.push(`${secs}s`);
-  return parts.join(' ');
-}
-
 // Global Ledger Queue State (relying on global userStockMap from config.js)
 let activeJobs = [];
 let buildHistory = [];
@@ -237,12 +205,6 @@ function renderActiveJobsList(allocatedStock) {
   const deductModeInput = document.getElementById('deduct-stock-mode');
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
 
-  // Retrieve Character skills defensively for accurate TE Calculations
-  const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 0, advIndustry: 0 });
-  const indFactor = 1 - (0.04 * (skills.industry || 0));
-  const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
-  const skillTimeFactor = indFactor * advIndFactor;
-
   container.innerHTML = activeJobs.map(job => {
     if (!job) return '';
     const iconTypeId = job.typeId;
@@ -287,10 +249,21 @@ function renderActiveJobsList(allocatedStock) {
     let buildTimeUI = '';
     const baseTime = job.baseTime || 0;
     if (baseTime > 0) {
-      const teFactor = 1.0; // standard default TE factor fallback
-      const facility = document.getElementById('facility-select')?.value || '0.01';
-      const facilityTimeBonus = (facility === '0.01') ? 0.05 : 0; // Sotiyo offers 5% manufacturing time rigs
-      const facilityFactor = 1 - facilityTimeBonus;
+      // Standard default TE factor fallback (T1 BPCs are typically TE 0, researched TE 10 is 20% reduction)
+      const teFactor = 1.0; 
+      
+      // EVE Skill multipliers: Industry (4% per level) and Adv Industry (3% per level)
+      const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
+      const indFactor = 1 - (0.04 * (skills.industry || 0));
+      const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
+      const skillTimeFactor = indFactor * advIndFactor;
+
+      // Official Upwell Engineering Complex Time Reduction:
+      const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
+      let facilityFactor = 1.0;
+      if (activeFacilityKey === 'sotiyo') facilityFactor = 0.70;      // 30% reduction
+      else if (activeFacilityKey === 'azbel') facilityFactor = 0.80;    // 20% reduction
+      else if (activeFacilityKey === 'raitaru') facilityFactor = 0.85;  // 15% reduction
 
       const totalSeconds = baseTime * teFactor * skillTimeFactor * facilityFactor * job.runsNeeded;
       buildTimeUI = `
@@ -498,8 +471,6 @@ function markJobAsBuilt(jobId) {
 
   const job = activeJobs[jobIndex];
 
-  // Hangar stockpile quantities are left untouched as requested to ensure stock data relies strictly on ESI API and clipboard hangar pastes.
-
   // 1. Ledger Logging: Archive job records into completed build history array
   const record = {
     id: job.id,
@@ -605,7 +576,7 @@ function clearJournalHistory() {
   renderJournalPage();
 }
 
-// --- Priority Move Actions (Swaps list positioning defensively inside local storage array) ---
+// --- Priority Move Actions ---
 function moveJobUp(jobId) {
   loadJournalState();
   const index = activeJobs.findIndex(j => j && j.id === jobId);
@@ -873,19 +844,24 @@ window.onload = async () => {
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
-  
-  // Process SSO authentication and restore asset profiles
+
+  // Load local cached states instantly so the ledger is fully interactive immediately!
+  try {
+    loadJournalState();
+    populateJournalLocationDropdown();
+    updateJournalStockCountBadge();
+    renderJournalPage();
+  } catch (err) {
+    console.error("Ledger state load error:", err);
+  }
+
+  // Process SSO authentication and restore asset profiles asynchronously in background
   if (typeof handleEsiSSOCallback === 'function') {
-    await handleEsiSSOCallback();
+    handleEsiSSOCallback().catch(err => console.error("SSO Callback error:", err));
   }
 
-  // Fetch adjusted prices immediately
+  // Fetch adjusted prices asynchronously in the background
   if (typeof fetchAdjustedPrices === 'function') {
-    await fetchAdjustedPrices();
+    fetchAdjustedPrices().catch(err => console.error("Adjusted prices fetch error:", err));
   }
-
-  loadJournalState();
-  populateJournalLocationDropdown();
-  updateJournalStockCountBadge();
-  renderJournalPage();
 };

@@ -1,22 +1,5 @@
 'use strict';
 
-// Local HTML Escaper Helper
-function esc(s) {
-  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-if (!window.esc) window.esc = esc;
-
-// Safe JSON parser to prevent legacy data from crash-blocking script compilation
-function safeParseJSON(str, fallback) {
-  if (!str || str === 'undefined' || str === 'null') return fallback;
-  try {
-    const parsed = JSON.parse(str);
-    return parsed !== null && parsed !== undefined ? parsed : fallback;
-  } catch (e) {
-    return fallback;
-  }
-}
-
 // Decodes unpadded Base64URL JWT payloads securely
 function decodeJwt(token) {
   try {
@@ -339,6 +322,9 @@ async function handleEsiSSOCallback() {
         updateEsiUserUI(charName, charId);
         await fetchUserAndCorpAssets(charId, accessToken);
       }
+    } else {
+      const errText = await res.text();
+      console.error("SSO Code Exchange Failed:", res.status, errText);
     }
   } catch (err) {
     console.error('ESI SSO Token Error:', err);
