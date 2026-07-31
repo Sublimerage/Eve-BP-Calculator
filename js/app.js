@@ -5,32 +5,7 @@ if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sel
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
 if (window.globalRuns === undefined) window.globalRuns = 1;
 
-// Safe JSON parser to prevent legacy data from crash-blocking script compilation
-function safeParseJSON(str, fallback) {
-  if (!str || str === 'undefined' || str === 'null') return fallback;
-  try {
-    const parsed = JSON.parse(str);
-    return parsed !== null && parsed !== undefined ? parsed : fallback;
-  } catch (e) {
-    return fallback;
-  }
-}
-
-// Convert seconds into human-readable EVE duration format (e.g. 1d 4h 12m)
-function formatDuration(seconds) {
-  if (!seconds || isNaN(seconds) || seconds <= 0) return 'N/A';
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-
-  const parts = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0) parts.push(`${hours}h`);
-  if (mins > 0) parts.push(`${mins}m`);
-  if (parts.length === 0) parts.push(`${secs}s`);
-  return parts.join(' ');
-}
+// Centralized helpers are now loaded globally from js/config.js (esc, safeParseJSON, formatDuration)
 
 // Structural helper to extract the base build time of a recipe or resolve intelligent fallbacks
 function extractBuildTime(recipe, typeId, name) {
@@ -86,8 +61,13 @@ function extractBuildTime(recipe, typeId, name) {
 function syncTreeOverrides(node) {
   if (!node) return;
   const tId = node.typeId;
-  node.customME = customMEOverrides[tId] !== undefined ? customMEOverrides[tId] : 0;
-  node.customTE = customTEOverrides[tId] !== undefined ? customTEOverrides[tId] : 0;
+
+  // Guard against uninitialized variables on initial loads
+  const meMap = (typeof customMEOverrides !== 'undefined' && customMEOverrides) ? customMEOverrides : {};
+  const teMap = (typeof customTEOverrides !== 'undefined' && customTEOverrides) ? customTEOverrides : {};
+
+  node.customME = meMap[tId] !== undefined ? meMap[tId] : 0;
+  node.customTE = teMap[tId] !== undefined ? teMap[tId] : 0;
   
   if (node.children) {
     node.children.forEach(child => syncTreeOverrides(child));
@@ -1008,6 +988,138 @@ function syncCustomTax(e) {
   const val = parseFloat(e.target.value) || 0;
   window.rootCustomTax = val >= 0 ? val : 0;
   recalculate();
+}
+
+function addCurrentJobToLedger(e) {
+  if (e) e.stopPropagation();
+  if (!recipeTreeRoot) return;
+
+  recalculate();
+
+  let queue = [];
+  try {
+    const saved = localStorage.getItem('eve_ledger_jobs');
+    if (saved) {
+      queue = JSON.parse(saved);
+    }
+  } catch (err) {
+    queue = [];
+  }
+
+  const selectedStrategy = window.rootSellStrategy || 'market-sell';
+  const outputPrices = priceCache[recipeTreeRoot.typeId] || { sell: 0, buy: 0 };
+  let customPrice = window.rootCustomPrice || 0;
+  let unitSellPrice = selectedStrategy.startsWith('custom-') ? customPrice : outputPrices.sell;
+  const baseTime = extractBuildTime(recipeTreeRoot.recipe, recipeTreeRoot.typeId, recipeTreeRoot.name);
+
+  const materials = [];
+  function extractBOM(node) {
+    if (!node) return;
+    if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
+      const typeId = node.displayTypeId || node.typeId;
+      const strategy = getNodePriceStrategy(node);
+      
+      const deductModeInput = document.getElementById('deduct-stock-mode');
+      const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+      const stockQty = isStockDeductEnabled ? (userStockMap[typeId] || userStockMap[node.typeId] || 0) : 0;
+      const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
+
+      const prices = priceCache[typeId] || { sell: 0, buy: 0 };
+      let unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
+      
+      materials.push({
+        typeId: typeId,
+        name: node.name,
+        qtyNeeded: node.qtyNeeded,
+        stockQty: stockQty,
+        netQtyNeeded: netQtyNeeded,
+        strategy: strategy,
+        unitPrice: unitPrice,
+        lineCost: unitPrice * netQtyNeeded
+      });
+    } else {
+      node.children.forEach(child => {
+        if (child) extractBOM(child);
+      });
+    }
+  }
+
+  if (recipeTreeRoot.isBuildingSelf && recipeTreeRoot.children && recipeTreeRoot.children.length > 0) {
+    recipeTreeRoot.children.forEach(c => {
+      if (c) extractBOM(c);
+    });
+  } else {
+    const rootTypeId = recipeTreeRoot.displayTypeId || recipeTreeRoot.typeId;
+    const strategy = getNodePriceStrategy(recipeTreeRoot);
+    const deductModeInput = document.getElementById('deduct-stock-mode');
+    const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+    const stockQty = isStockDeductEnabled ? (userStockMap[rootTypeId] || userStockMap[recipeTreeRoot.typeId] || 0) : 0;
+    const netQtyNeeded = Math.max(0, recipeTreeRoot.qtyNeeded - stockQty);
+    const prices = priceCache[rootTypeId] || { sell: 0, buy: 0 };
+    let unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
+
+    materials.push({
+      typeId: rootTypeId,
+      name: recipeTreeRoot.name,
+      qtyNeeded: recipeTreeRoot.qtyNeeded,
+      stockQty: stockQty,
+      netQtyNeeded: netQtyNeeded,
+      strategy: strategy,
+      unitPrice: unitPrice,
+      lineCost: unitPrice * netQtyNeeded
+    });
+  }
+
+  const job = {
+    id: Date.now() + Math.floor(Math.random() * 1000), // Secure timestamp-based unique ID
+    typeId: recipeTreeRoot.displayTypeId || recipeTreeRoot.typeId,
+    name: recipeTreeRoot.name,
+    runsNeeded: recipeTreeRoot.runsNeeded,
+    qtyNeeded: recipeTreeRoot.qtyNeeded,
+    calculatedCost: recipeTreeRoot.calculatedCost || 0,
+    baseTime: baseTime, // Serialized here for SDE duration on the Ledger page
+    sellStrategy: selectedStrategy,
+    unitSellPrice: unitSellPrice,
+    materials: materials,
+    addedAt: new Date().toISOString()
+  };
+
+  queue.push(job);
+  localStorage.setItem('eve_ledger_jobs', JSON.stringify(queue));
+
+  // Sync active stock map to localStorage so the ledger page can read it too
+  localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap || {}));
+
+  updateHeaderLedgerCount();
+
+  const btn = e.target.closest('button');
+  if (btn) {
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '✔ ADDED TO QUEUE';
+    btn.classList.remove('bg-purple-800', 'hover:bg-purple-700', 'text-purple-100');
+    btn.classList.add('bg-green-700', 'text-white');
+    setTimeout(() => {
+      btn.innerHTML = originalText;
+      btn.classList.remove('bg-green-700', 'text-white');
+      btn.classList.add('bg-purple-800', 'hover:bg-purple-700', 'text-purple-100');
+    }, 1500);
+  }
+}
+
+function updateHeaderLedgerCount() {
+  const badge = document.getElementById('header-journal-count');
+  if (!badge) return;
+  try {
+    const saved = localStorage.getItem('eve_ledger_jobs');
+    if (saved) {
+      const queue = JSON.parse(saved);
+      badge.textContent = Array.isArray(queue) ? queue.length.toString() : '0';
+    } else {
+      badge.textContent = '0';
+    }
+  } catch (e) {
+    badge.textContent = '0';
+  }
 }
 
 // Bind to window for HTML accessibility
