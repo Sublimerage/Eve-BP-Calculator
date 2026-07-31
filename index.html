@@ -61,7 +61,7 @@
   <!-- Toolbar Row 1: Primary Search, Build Actions, Smart Optimizers, Pricing Strategy -->
   <section class="bg-[#0d1922] border-b border-[#1e3348] p-1.5 flex flex-wrap items-center gap-2 text-xs relative z-50">
     
-    <!-- Item Search & Global Pricing Combined (Highly Compact - Narrower!) -->
+    <!-- Item Search & Global Pricing Combined -->
     <div class="bg-[#0c1318] p-1.5 rounded border border-[#1e3348] relative z-50 flex items-center space-x-1.5 shadow">
       <span class="text-cyan-400 font-bold uppercase text-[9px] rajdhani leading-none">Search &amp; Price:</span>
       <div class="relative w-44">
@@ -107,7 +107,7 @@
       </div>
     </div>
 
-    <!-- SMART ORDER OPTIMIZERS CARD (Compact Inline List) -->
+    <!-- SMART ORDER OPTIMIZERS CARD -->
     <div class="bg-[#0c1318] p-1.5 rounded border border-amber-500/50 shadow flex items-center space-x-2">
       <span class="text-amber-300 font-bold uppercase text-[9px] rajdhani leading-none">Smart Optimizers:</span>
       
@@ -143,7 +143,7 @@
   <!-- Toolbar Row 2: Compact Settings, Taxes, Hangar Stock & SCI Status -->
   <section class="bg-[#0c1318] border-b border-[#1e3348] p-1.5 flex flex-wrap items-stretch gap-2.5 text-xs relative z-40">
     
-    <!-- System & Structure Panel (With inline SCI and EIV stats directly underneath!) -->
+    <!-- System & Structure Panel -->
     <div class="flex flex-col bg-[#0d1922] p-1.5 rounded-lg border border-[#1e3348] shadow flex-grow max-w-[390px]">
       <div class="flex items-center space-x-1.5">
         <span class="text-cyan-400 text-[10px] font-bold uppercase rajdhani flex-shrink-0">System & Structure:</span>
@@ -153,9 +153,10 @@
           <div id="system-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
         </div>
         <select id="facility-select" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-white font-semibold text-[10px] outline-none w-24">
-          <option value="0.0">NPC Station (0%)</option>
-          <option value="0.01">Raitaru / Azbel (1%)</option>
-          <option value="0.01" selected>Sotiyo (1% Bonus)</option>
+          <option value="0.0">NPC Station (0% ME / 0% TE)</option>
+          <option value="0.01">Raitaru (1% ME / 15% TE)</option>
+          <option value="0.01">Azbel (1% ME / 20% TE)</option>
+          <option value="0.01" selected>Sotiyo (1% ME / 30% TE)</option>
         </select>
         <select id="structure-role-bonus" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-amber-300 font-bold text-[10px] outline-none w-28">
           <option value="0.03" selected>Sotiyo (-3% Fee)</option>
