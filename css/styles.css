@@ -6,7 +6,7 @@
   --bg3: #0d1922;
   --border: #1e3348;
   --glow: #2a5a8a;
-  --accent: #4da6e8;
+  --accent: #06b6d4;
   --accent2: #7ec8f5;
   --gold: #c8a84b;
   --gold2: #e8c96a;
@@ -20,9 +20,16 @@ body {
   font-family: 'Exo 2', sans-serif;
   min-height: 100vh;
   user-select: none;
+  -webkit-user-select: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+/* Ensure inputs, textareas, and designated text sections are freely highlightable and copyable */
+input, textarea, select, [contenteditable="true"], .mono, aside, .selectable {
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
 .mono { font-family: 'Share Tech Mono', monospace; }
@@ -64,7 +71,7 @@ img {
   cursor: pointer;
   transform: translateZ(0);
   backface-visibility: hidden;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .diagram-node:hover {
@@ -94,8 +101,38 @@ img {
   opacity: 0.25 !important;
 }
 
-/* Custom Scrollbars */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+/* Dynamic Centering feedback ring animation */
+.ring-4 {
+  animation: pulse-ring 0.8s ease-out;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0px rgba(6, 182, 212, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 0 15px rgba(6, 182, 212, 0);
+  }
+}
+
+/* Cross-Browser Custom Thin Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) var(--bg);
+}
+
+/* Webkit Scrollbars fallback */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
