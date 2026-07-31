@@ -4,7 +4,7 @@ if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sel
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
 if (window.globalRuns === undefined) window.globalRuns = 1;
 
-// Queries unreduced SDE manufacturing durations directly from SDE database
+// Strictly queries exact unreduced SDE manufacturing durations directly from SDE database
 function extractBuildTime(recipe) {
   if (!recipe) return 0;
   return parseInt(recipe.time || recipe.t || recipe.timeSeconds || recipe.duration || recipe.mfgTime || recipe.productionTime || 0);
@@ -379,7 +379,7 @@ function recalculate() {
   let totalSurplusMaterialValue = 0;
 
   Object.values(globalDemand).forEach(item => {
-    // Exclude the root node's typeId (both blueprint and product IDs) from surplus credit! [1]
+    // CORRECTION: Exclude the root node's typeId (both blueprint and product IDs) from surplus credit! [1]
     const rootProductTypeId = window.recipeTreeRoot.productTypeId || window.recipeTreeRoot.typeId;
     if (item.typeId === window.recipeTreeRoot.typeId || item.typeId === rootProductTypeId || item.productTypeId === rootProductTypeId) {
       return;
@@ -564,9 +564,8 @@ function createNodeCard(node) {
   const totalProduced = node.runsNeeded * node.batchYield;
   const surplus = totalProduced - node.qtyNeeded;
   
-  const iconUrl = node.isManufacturable
-    ? `https://images.evetech.net/types/${node.typeId}/bp?size=128`
-    : `https://images.evetech.net/types/${node.typeId}/icon?size=128`;
+  // CORRECTION: Strictly display the final physical product's high-fidelity icon instead of blueprint scrolls! [1]
+  const iconUrl = `https://images.evetech.net/types/${productTypeId}/icon?size=128`;
 
   const unitEIV = node.unitEIV || 0;
   const totalEIV = node.jobEIV || (unitEIV * node.qtyNeeded);
