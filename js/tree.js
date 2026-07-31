@@ -267,6 +267,12 @@ async function fetchBlueprintTimeOnly(blueprintTypeId) {
           return t;
         }
         console.warn(`[BuildTime] Fuzzwork responded for blueprint ${blueprintTypeId} but had no usable time field. Response keys: ${Object.keys(data || {}).join(', ')}`);
+        if (data.blueprintDetails) {
+          console.warn(`[BuildTime] blueprintDetails contents for ${blueprintTypeId}:`, JSON.stringify(data.blueprintDetails));
+        }
+        if (data.activityMaterials) {
+          console.warn(`[BuildTime] activityMaterials keys for ${blueprintTypeId}: ${Object.keys(data.activityMaterials).join(', ')}`);
+        }
       } else {
         console.warn(`[BuildTime] Fuzzwork request for blueprint ${blueprintTypeId} via ${url.startsWith('https://corsproxy') ? 'corsproxy.io' : 'direct'} returned HTTP ${res.status}`);
       }
