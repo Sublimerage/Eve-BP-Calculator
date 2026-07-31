@@ -243,6 +243,39 @@ async function fetchBlueprintData(typeId) {
   return null;
 }
 
+const blueprintTimeCache = {};
+// Local/offline recipe data (recipeMap, EVE_RECIPES, BUILTIN_RECIPES) apparently never carries a
+// build-time field - only recipes resolved through the online Fuzzwork fallback ever populated one.
+// Since almost everything resolves locally first, this made "Est. Build Time" silently show nothing
+// almost everywhere. Fetch just the time field from Fuzzwork (cached per blueprint) whenever the
+// local recipe is missing it, so build time is available regardless of which path resolved the recipe.
+async function fetchBlueprintTimeOnly(blueprintTypeId) {
+  if (blueprintTimeCache[blueprintTypeId] !== undefined) return blueprintTimeCache[blueprintTypeId];
+  const fuzzworkUrl = `https://www.fuzzwork.co.uk/blueprint/api/blueprint.php?typeid=${blueprintTypeId}`;
+  const tryUrls = [fuzzworkUrl, `https://corsproxy.io/?${encodeURIComponent(fuzzworkUrl)}`];
+  for (const url of tryUrls) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const data = await res.json();
+        const t = parseInt(data.time) || (data.blueprintDetails ? parseInt(data.blueprintDetails.time) : 0) || 0;
+        if (t > 0) {
+          blueprintTimeCache[blueprintTypeId] = t;
+          return t;
+        }
+      }
+    } catch (e) {
+      // Try next URL
+    }
+  }
+  blueprintTimeCache[blueprintTypeId] = 0;
+  return 0;
+}
+window.fetchBlueprintTimeOnly = fetchBlueprintTimeOnly;
+
 // Parallel Multi-Layer SDE Blueprint-Centric Tree Generator
 async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, currentDepth, maxDepth, visitedPath = new Set(), parentNode = null) {
   // NOTE: window.recipeTreeRootProductTypeId is only valid for the ROOT node (depth 0) - it is
@@ -339,6 +372,16 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
         node.recipe = { ...recipe, materials: activeMaterials, productQtyPerRun: batchYield, portionSize: batchYield, batchYield: batchYield };
         node.isReaction = isReaction;
         node.batchYield = batchYield;
+
+        const existingTime = typeof window.extractBuildTime === 'function'
+          ? window.extractBuildTime(node.recipe)
+          : parseInt(node.recipe.time || node.recipe.t || node.recipe.timeSeconds || node.recipe.duration || node.recipe.mfgTime || node.recipe.productionTime || 0);
+        if (!(existingTime > 0)) {
+          try {
+            const fetchedTime = await fetchBlueprintTimeOnly(blueprintTypeId);
+            if (fetchedTime > 0) node.recipe.time = fetchedTime;
+          } catch (e) {}
+        }
 
         const me = isReaction ? 0 : node.customME;
         const facility = document.getElementById('facility-select')?.value || '0.01';

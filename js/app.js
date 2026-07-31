@@ -43,6 +43,7 @@ function calculateTotalBuildSeconds(node) {
   return total;
 }
 window.calculateAdjustedJobSeconds = calculateAdjustedJobSeconds;
+window.extractBuildTime = extractBuildTime;
 window.calculateTotalBuildSeconds = calculateTotalBuildSeconds;
 
 // Binds custom card overrides directly to tree node structures before calculations
