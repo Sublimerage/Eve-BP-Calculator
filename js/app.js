@@ -1,14 +1,11 @@
 'use strict';
 
-// Bind globally centralized helpers explicitly to satisfy strict-mode compilation
-const esc = window.esc;
-const safeParseJSON = window.safeParseJSON;
-const formatDuration = window.formatDuration;
-
 // Initialize global variables securely in memory to prevent DOM-sync issues
 if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sell';
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
 if (window.globalRuns === undefined) window.globalRuns = 1;
+
+// Centralized helpers are loaded globally from js/config.js (esc, safeParseJSON, formatDuration)
 
 // Structural helper to extract the base build time of a recipe or resolve intelligent fallbacks
 function extractBuildTime(recipe, typeId, name) {

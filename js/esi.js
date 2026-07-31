@@ -1,10 +1,5 @@
 'use strict';
 
-// Bind globally centralized helpers explicitly to satisfy strict-mode compilation
-const esc = window.esc;
-const safeParseJSON = window.safeParseJSON;
-const formatDuration = window.formatDuration;
-
 // Decodes unpadded Base64URL JWT payloads securely
 function decodeJwt(token) {
   try {
