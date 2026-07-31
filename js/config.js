@@ -1,12 +1,10 @@
 'use strict';
 
-// Centralized HTML Escaper Helper (Globally shared)
 function esc(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 window.esc = esc;
 
-// Centralized JSON Parser Helper (Globally shared)
 function safeParseJSON(str, fallback) {
   if (!str || str === 'undefined' || str === 'null') return fallback;
   try {
@@ -18,58 +16,46 @@ function safeParseJSON(str, fallback) {
 }
 window.safeParseJSON = safeParseJSON;
 
-// Centralized Exact Duration Formatter (Displays precise Days, Hours, Minutes, and Seconds)
 function formatDuration(seconds) {
   if (!seconds || isNaN(seconds) || seconds <= 0) return '0s';
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-
   const parts = [];
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0) parts.push(`${hours}h`);
   if (mins > 0) parts.push(`${mins}m`);
   if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
-  
   return parts.join(' ');
 }
 window.formatDuration = formatDuration;
 
-// Hardcoded EVE Developer Application Client ID for instant 1-click SSO
 window.HARDCODED_CLIENT_ID = '20e4087a1f564a3e897aaaa6daebbecd';
 
-// Shared Lexical Global Declarations (Strict-mode compliant across all files)
-var IDX = {};                  // Full Item Index (Keyed by lowercase name)
-var TYPE_ID_TO_NAME = {};      // Fast O(1) Direct Lookup Index (Keyed by integer Type ID)
-var SYSTEM_IDX = {};           // Full Solar System Index
-var recipeMap = {};            // Dual-Key Recipe Map
-var currentProduct = null;      // Selected root item metadata
-var recipeTreeRoot = null;      // Recursive blueprint tree
-var blueprintCache = {};        // Cached blueprint responses
-var priceCache = {};            // Cached Jita 4-4 prices
-var eivCache = {};              // Cached EVE ESI Adjusted Prices
-var rawAssetItems = [];         // Raw ESI / Pasted asset records
-var userStockMap = {};          // Filtered stock quantities
-var systemNameCache = {};       // Cached system names
-var resolvedLocationNames = {}; // Cached location names
-var corpDivisionNames = {};     // Custom Corporation Hangar Division Names
-var instanceCounter = 0;        // Node instance ID counter
-
-// User Overrides State
-var buildSelfOverrides = {};    // { typeId: boolean }
-var customBuyModes = {};        // { typeId: 'sell' | 'buy' }
-var customMEOverrides = {};     // { typeId: number }
-var customTEOverrides = {};     // { typeId: number }
-
+var IDX = {};                  
+var TYPE_ID_TO_NAME = {};      
+var SYSTEM_IDX = {};           
+var recipeMap = {};            
+var currentProduct = null;      
+var recipeTreeRoot = null;      
+var blueprintCache = {};        
+var priceCache = {};            
+var eivCache = {};              
+var rawAssetItems = [];         
+var userStockMap = {};          
+var systemNameCache = {};       
+var resolvedLocationNames = {}; 
+var corpDivisionNames = {};     
+var instanceCounter = 0;        
+var buildSelfOverrides = {};    
+var customBuyModes = {};        
+var customMEOverrides = {};     
+var customTEOverrides = {};     
 var selectedInstanceId = null;  
 var isolatedInstanceId = null;  
-
-// Live ESI System Cost Indices
 var activeMfgSCI = 0.0425;
 var activeReactSCI = 0.0110;
-
-// Pan & Zoom State
 var zoomScale = 1.0;
 var panX = 0;
 var panY = 0;
@@ -77,7 +63,6 @@ var isPanning = false;
 var startX = 0;
 var startY = 0;
 
-// Explicitly attach to window for cross-module compatibility
 window.IDX = IDX;
 window.TYPE_ID_TO_NAME = TYPE_ID_TO_NAME;
 window.SYSTEM_IDX = SYSTEM_IDX;
@@ -107,19 +92,23 @@ window.panY = panY;
 window.isPanning = isPanning;
 window.startX = startX;
 window.startY = startY;
-window.BLUEPRINT_TO_PRODUCT_MAP = {};
 
-// Known Base Raw Materials
+window.BLUEPRINT_TO_PRODUCT_MAP = {
+  57523: 57486, // Life Support Backup Unit Blueprint -> Life Support Backup Unit
+  57515: 57478, // Auto-Integrity Preservation Seal Blueprint -> Auto-Integrity Preservation Seal
+  57516: 57479, // Core Temperature Regulator Blueprint -> Core Temperature Regulator
+  17714: 17715  // Gila Blueprint -> Gila
+};
+
 const RAW_BASE_MATERIALS = new Set([
-  34, 35, 36, 37, 38, 39, 40, 11399, // Minerals
-  16274, 16275, 17887, 17888,        // Isotopes
-  16272, 16273,                      // Heavy Water, Liquid Ozone
-  3689, 3683, 9848,                  // Coolant, Enriched Uranium, Robotics
-  2267, 2268, 2270, 2272, 2305       // Gas / Ores
+  34, 35, 36, 37, 38, 39, 40, 11399, 
+  16274, 16275, 17887, 17888,        
+  16272, 16273,                      
+  3689, 3683, 9848,                  
+  2267, 2268, 2270, 2272, 2305       
 ]);
 window.RAW_BASE_MATERIALS = RAW_BASE_MATERIALS;
 
-// Popular Items Map
 const POPULAR_ITEMS = [
   { id: 48519, bpId: 49715, name: "Drekavac" },
   { id: 47271, bpId: 47968, name: "Leshak" },
@@ -146,7 +135,6 @@ const POPULAR_ITEMS = [
 ];
 window.POPULAR_ITEMS = POPULAR_ITEMS;
 
-// Built-in Popular Solar Systems Index
 const POPULAR_SYSTEMS = [
   { id: 30000142, name: "JITA" }, { id: 30000144, name: "PERIMETER" },
   { id: 30002187, name: "AMARR" }, { id: 30002659, name: "DODIXIE" },
@@ -155,28 +143,15 @@ const POPULAR_SYSTEMS = [
 ];
 window.POPULAR_SYSTEMS = POPULAR_SYSTEMS;
 
-// Safe Read-Only Helper to extract yield from any recipe object format without mutating it
 function extractRecipeYield(recipe) {
   if (!recipe) return 1;
   const candidates = [
-    recipe.productQtyPerRun,
-    recipe.mfgQtyPerRun,
-    recipe.reactionQtyPerRun,
-    recipe.outputQty,
-    recipe.portionSize,
-    recipe.quantity,
-    recipe.qty,
-    recipe.productQty,
-    recipe.pQty,
-    recipe.yield,
-    recipe.batchYield,
-    recipe.amount,
-    recipe.qtyPerRun,
-    recipe.products?.[0]?.quantity,
-    recipe.products?.[0]?.qty,
-    recipe.activityProducts?.[1]?.[0]?.quantity,
-    recipe.activityProducts?.[11]?.[0]?.quantity,
-    recipe.activityProducts?.['1']?.[0]?.quantity,
+    recipe.productQtyPerRun, recipe.mfgQtyPerRun, recipe.reactionQtyPerRun,
+    recipe.outputQty, recipe.portionSize, recipe.quantity, recipe.qty,
+    recipe.productQty, recipe.pQty, recipe.yield, recipe.batchYield,
+    recipe.amount, recipe.qtyPerRun, recipe.products?.[0]?.quantity,
+    recipe.products?.[0]?.qty, recipe.activityProducts?.[1]?.[0]?.quantity,
+    recipe.activityProducts?.[11]?.[0]?.quantity, recipe.activityProducts?.['1']?.[0]?.quantity,
     recipe.activityProducts?.['11']?.[0]?.quantity
   ];
   for (const c of candidates) {
@@ -187,7 +162,6 @@ function extractRecipeYield(recipe) {
 }
 window.extractRecipeYield = extractRecipeYield;
 
-// Corrected Live EVE Client SDE Material Quantities & Verified Type IDs
 const BUILTIN_RECIPES = {
   16681: {
     blueprintTypeID: 17730, productTypeID: 16681, productName: "Tungsten Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000, time: 600,
@@ -324,11 +298,9 @@ const BUILTIN_RECIPES = {
 };
 window.BUILTIN_RECIPES = BUILTIN_RECIPES;
 
-// Global Prepacked Index Builder (Resolves EVE_ITEMS & EVE_RECIPES from eve_db.js)
 window.buildPrepackedIndexes = function() {
   const statusText = document.getElementById('status-text');
   const statusDot = document.getElementById('status-dot');
-
   try {
     const itemsObj = (typeof EVE_ITEMS !== 'undefined') ? EVE_ITEMS : (window.EVE_ITEMS || null);
     const recipesObj = (typeof EVE_RECIPES !== 'undefined') ? EVE_RECIPES : (window.EVE_RECIPES || null);
@@ -338,7 +310,7 @@ window.buildPrepackedIndexes = function() {
       for (const [idStr, name] of Object.entries(itemsObj)) {
         const numericId = parseInt(idStr);
         IDX[name.toLowerCase()] = { id: numericId, name: name };
-        TYPE_ID_TO_NAME[numericId] = name; // FAST O(1) DIRECT LOOKUP MAP
+        TYPE_ID_TO_NAME[numericId] = name; 
       }
     } else {
       POPULAR_ITEMS.forEach(r => {
@@ -364,17 +336,13 @@ window.buildPrepackedIndexes = function() {
         if (!recipe) continue;
         const keyId = parseInt(idStr);
         recipeMap[keyId] = recipe;
-        
-        // Map all candidate key fields without mutating recipe object directly
         const bpId = recipe.blueprintTypeID || recipe.bp || recipe.bpId;
         const pId = recipe.productTypeID || recipe.product || recipe.p || recipe.pId;
-
         if (bpId) recipeMap[parseInt(bpId)] = recipe;
         if (pId) recipeMap[parseInt(pId)] = recipe;
       }
     }
 
-    // Explicitly override built-in recipes
     for (const [idStr, recipe] of Object.entries(BUILTIN_RECIPES)) {
       const keyId = parseInt(idStr);
       recipeMap[keyId] = recipe;
@@ -382,8 +350,7 @@ window.buildPrepackedIndexes = function() {
       if (recipe.productTypeID) recipeMap[recipe.productTypeID] = recipe;
     }
 
-    // Dynamically build the Blueprint-to-Product map locally on load [1]
-    window.BLUEPRINT_TO_PRODUCT_MAP = window.BLUEPRINT_TO_PRODUCT_MAP || {};
+    // Dynamic SDE local index builder to match any Blueprint to its Product ID
     const blueprintSuffix = " blueprint";
     const formulaSuffix = " reaction formula";
     const formulaSuffix2 = " formula";
@@ -407,7 +374,7 @@ window.buildPrepackedIndexes = function() {
     }
 
     if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
-    if (statusText) statusText.textContent = `INDEX READY (${Object.keys(IDX).length.toLocaleString()} ITEMS | ${Object.keys(recipeMap).length.toLocaleString()} RECIPES)`;
+    if (statusText) statusText.textContent = `INDEX READY (${Object.keys(IDX).length.toLocaleString()} ITEMS)`;
   } catch (err) {
     console.error('buildPrepackedIndexes error:', err);
     if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-red-500';

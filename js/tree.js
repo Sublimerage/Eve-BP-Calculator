@@ -1,12 +1,5 @@
 'use strict';
 
-const BLUEPRINT_TO_PRODUCT_MAP = {
-  57523: 57486, // Life Support Backup Unit Blueprint -> Life Support Backup Unit
-  57515: 57478, // Auto-Integrity Preservation Seal Blueprint -> Auto-Integrity Preservation Seal
-  57516: 57479, // Core Temperature Regulator Blueprint -> Core Temperature Regulator
-  17714: 17715  // Gila Blueprint -> Gila
-};
-
 // Robust SDE Suffix Strip-and-Match Helper to resolve Product ID from any Blueprint Name
 function resolveProductIdFromBlueprintName(blueprintName) {
   if (!blueprintName) return null;
@@ -30,7 +23,7 @@ function resolveBlueprintIdFromProductName(productName) {
   return null;
 }
 
-// Strict SDE Batch Yield Extractor (Uses exact database output quantity)
+// Strict SDE Batch Yield Extractor (Uses exact SDE database quantities, avoiding deep-search collisions)
 function getBatchYield(recipe, isReaction) {
   if (!recipe) return 1;
 
@@ -39,7 +32,7 @@ function getBatchYield(recipe, isReaction) {
     if (explicit > 0) return explicit;
   }
 
-  // Candidates for direct property check
+  // Direct root-level output qty properties
   const rootCandidates = [
     recipe.productQtyPerRun,
     recipe.mfgQtyPerRun,
@@ -59,7 +52,7 @@ function getBatchYield(recipe, isReaction) {
     if (!isNaN(val) && val > 0) return val;
   }
 
-  // Standard SDE fallback rules based on item categories
+  // Standard EVE SDE fallback rules based on item name matching
   const name = ((recipe.productName || '') + ' ' + (recipe.blueprintTypeName || '')).toLowerCase();
   if (name.includes('carbide')) return 10000;
   if (name.includes('fuel block')) return 40;
@@ -170,7 +163,7 @@ async function fetchBlueprintData(typeId) {
     for (const url of tryUrls) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second window to resolve proxy blocks safely
 
         const res = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
@@ -403,7 +396,6 @@ function scaleTreeQuantities(node, facility) {
 }
 
 // Explicit window bindings
-window.BLUEPRINT_TO_PRODUCT_MAP = BLUEPRINT_TO_PRODUCT_MAP;
 window.resolveProductIdFromBlueprintName = resolveProductIdFromBlueprintName;
 window.resolveBlueprintIdFromProductName = resolveBlueprintIdFromProductName;
 window.getBatchYield = getBatchYield;
