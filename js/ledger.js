@@ -32,7 +32,7 @@ function formatDuration(seconds) {
   return parts.join(' ');
 }
 
-// Global Ledger Queue State
+// Global Ledger Queue State (relying on global userStockMap from config.js)
 let activeJobs = [];
 let buildHistory = [];
 
@@ -417,8 +417,13 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
     const isCompleted = item.netMissingQty === 0;
     const rowBg = isCompleted ? 'bg-[#0a0f14]/50 border-green-950 opacity-60' : 'bg-[#0c1318] border-[#1e3348] hover:border-purple-500/40';
     const statusBadge = isCompleted 
-      ? `<span class="bg-green-950 text-green-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5">Acquired</span>` 
-      : `<span class="bg-amber-950 text-amber-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5">Missing</span>`;
+      ? `<span class="bg-green-950 text-green-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">Acquired</span>` 
+      : `<span class="bg-amber-950 text-amber-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">Missing</span>`;
+
+    // Dynamic Buy/Sell strategy badge
+    const strategyBadge = item.strategy === 'sell' 
+      ? `<span class="bg-amber-900/60 text-amber-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">SELL</span>` 
+      : `<span class="bg-cyan-900/60 text-cyan-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">BUY</span>`;
 
     return `
       <div class="rounded border p-2 flex items-center justify-between transition shadow-sm ${rowBg}">
@@ -428,6 +433,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
             <div class="font-semibold text-slate-200 truncate flex items-center">
               <span class="truncate">${esc(item.name)}</span>
               ${statusBadge}
+              ${strategyBadge}
             </div>
             <div class="text-[10px] text-slate-400 mono mt-0.5">
               Needed: ${item.totalQtyNeeded.toLocaleString()} | Stock: ${item.stockQty.toLocaleString()}
@@ -818,6 +824,9 @@ window.setBOMCategoryFilter = setBOMCategoryFilter;
 
 // Initialize Ledger page on window load
 window.onload = () => {
+  if (typeof window.buildPrepackedIndexes === 'function') {
+    window.buildPrepackedIndexes();
+  }
   loadJournalState();
   populateJournalLocationDropdown();
   updateJournalStockCountBadge();

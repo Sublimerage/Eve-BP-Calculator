@@ -271,6 +271,16 @@ async function selectItem(typeId, name, preserveView = false) {
     window.globalRuns = 1;
     const globalInput = document.getElementById('bp-runs');
     if (globalInput) globalInput.value = 1;
+
+    // Reset build overrides on fresh select
+    buildSelfOverrides = {};
+    customBuyModes = {};
+    customMEOverrides = {};
+    customTEOverrides = {};
+    window.buildSelfOverrides = buildSelfOverrides;
+    window.customBuyModes = customBuyModes;
+    window.customMEOverrides = customMEOverrides;
+    window.customTEOverrides = customTEOverrides;
   }
 
   const maxDepth = 10;
@@ -325,6 +335,48 @@ function collectGlobalDemand(node, demandMap = {}) {
   }
 
   return demandMap;
+}
+
+// Write the active settings and root state to localStorage for seamless Ledger transitions
+function saveActiveState() {
+  try {
+    localStorage.setItem('eve_active_product', JSON.stringify(currentProduct));
+    localStorage.setItem('eve_build_self_overrides', JSON.stringify(buildSelfOverrides));
+    localStorage.setItem('eve_custom_buy_modes', JSON.stringify(customBuyModes));
+    localStorage.setItem('eve_custom_me_overrides', JSON.stringify(customMEOverrides));
+    localStorage.setItem('eve_custom_te_overrides', JSON.stringify(customTEOverrides));
+    localStorage.setItem('eve_global_runs', window.globalRuns);
+    localStorage.setItem('eve_root_sell_strategy', window.rootSellStrategy);
+    localStorage.setItem('eve_root_custom_price', window.rootCustomPrice);
+  } catch (e) {}
+}
+
+// Load settings defensively on window load
+function loadSavedState() {
+  try {
+    buildSelfOverrides = safeParseJSON(localStorage.getItem('eve_build_self_overrides'), {});
+    customBuyModes = safeParseJSON(localStorage.getItem('eve_custom_buy_modes'), {});
+    customMEOverrides = safeParseJSON(localStorage.getItem('eve_custom_me_overrides'), {});
+    customTEOverrides = safeParseJSON(localStorage.getItem('eve_custom_te_overrides'), {});
+    window.globalRuns = parseInt(localStorage.getItem('eve_global_runs')) || 1;
+    window.rootSellStrategy = localStorage.getItem('eve_root_sell_strategy') || 'market-sell';
+    window.rootCustomPrice = parseFloat(localStorage.getItem('eve_root_custom_price')) || 0;
+    
+    // Sync window objects
+    window.buildSelfOverrides = buildSelfOverrides;
+    window.customBuyModes = customBuyModes;
+    window.customMEOverrides = customMEOverrides;
+    window.customTEOverrides = customTEOverrides;
+
+    const savedProduct = safeParseJSON(localStorage.getItem('eve_active_product'), null);
+    if (savedProduct && savedProduct.id && savedProduct.name) {
+      selectItem(savedProduct.id, savedProduct.name, true);
+    } else {
+      selectItem(48519, 'Drekavac'); // default fallback
+    }
+  } catch (e) {
+    selectItem(48519, 'Drekavac'); // default fallback
+  }
 }
 
 function recalculate() {
@@ -530,7 +582,9 @@ function recalculate() {
   renderBillOfMaterials(recipeTreeRoot, brokerFee);
   setTimeout(drawConnectingLines, 50);
 
-  // Synchronize raw inventory parameters to LocalStorage for cross-page ledger access
+  // Synchronize raw inventory and active parameters to LocalStorage
+  saveActiveState();
+
   try {
     localStorage.setItem('eve_raw_assets', JSON.stringify(window.rawAssetItems || []));
     localStorage.setItem('eve_resolved_location_names', JSON.stringify(window.resolvedLocationNames || {}));
@@ -695,16 +749,16 @@ function createNodeCard(node) {
     const skills = safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 0, advIndustry: 0 });
     const indFactor = 1 - (0.04 * (skills.industry || 0));
     const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
-    const skillFactor = indFactor * advIndFactor;
+    const skillTimeFactor = indFactor * advIndFactor;
 
     const te = node.customTE || 0;
     const teFactor = 1 - (te / 100);
 
     const facility = document.getElementById('facility-select')?.value || '0.01';
-    const facilityTimeBonus = (facility === '0.01') ? 0.05 : 0; // Sotiyo offers 5% base manufacturing time reduction
+    const facilityTimeBonus = (facility === '0.01') ? 0.05 : 0; // Sotiyo offers 5% manufacturing time rigs
     const facilityFactor = 1 - facilityTimeBonus;
 
-    const totalSeconds = baseTime * teFactor * skillFactor * facilityFactor * node.runsNeeded;
+    const totalSeconds = baseTime * teFactor * skillTimeFactor * facilityFactor * node.runsNeeded;
     buildTimeUI = `
       <div class="flex justify-between text-[10px] text-slate-400 mono border-t border-[#1e3348]/40 pt-1 mt-1">
         <span>Est. Build Time:</span>
@@ -1640,25 +1694,8 @@ window.onload = async () => {
   }
 
   loadTaxSettings(); // Load custom taxes from localStorage!
+  loadSavedState(); // Load previous product & overrides persistently from localStorage!
   updateHeaderLedgerCount(); // Update badge on load!
-
-  // 1. Render default item
-  try {
-    if (window.IDX && window.IDX['drekavac']) {
-      await selectItem(48519, 'Drekavac');
-    } else if (window.IDX && window.IDX['caracal']) {
-      await selectItem(621, 'Caracal');
-    } else {
-      await selectItem(48519, 'Drekavac');
-    }
-  } catch (e) {
-    console.error('Initial selectItem error:', e);
-  }
-
-  // 2. Fetch background prices & SSO in parallel
-  fetchAdjustedPrices().catch(e => console.warn('Adjusted prices error:', e));
-  handleEsiSSOCallback().catch(e => console.warn('SSO Callback Error:', e));
-  loadSavedSystem().catch(e => console.warn('Load system error:', e));
 
   window.addEventListener('resize', drawConnectingLines);
 };
