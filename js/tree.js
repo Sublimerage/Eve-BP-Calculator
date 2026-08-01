@@ -247,13 +247,16 @@ async function fetchBlueprintData(typeId) {
   return null;
 }
 
-const blueprintTimeCache = {};
+const blueprintTimeCache = {}; // stores {time, batchYield} per blueprintTypeId - name kept for minimal diff
 // Local/offline recipe data (recipeMap, EVE_RECIPES, BUILTIN_RECIPES) apparently never carries a
 // build-time field - only recipes resolved through the online Fuzzwork fallback ever populated one.
 // Since almost everything resolves locally first, this made "Est. Build Time" silently show nothing
 // almost everywhere. Fetch just the time field from Fuzzwork (cached per blueprint) whenever the
 // local recipe is missing it, so build time is available regardless of which path resolved the recipe.
-async function fetchBlueprintTimeOnly(blueprintTypeId) {
+// Also resolves batch yield (units produced per run) the same way - blueprintDetails.productQuantity
+// has been observed to be unreliable for batch items (e.g. ammo/charges producing thousands of units
+// per run), so activityProducts (the blueprint's own product listing) is checked first when present.
+async function fetchBlueprintSupplementalData(blueprintTypeId) {
   if (blueprintTimeCache[blueprintTypeId] !== undefined) return blueprintTimeCache[blueprintTypeId];
   const fuzzworkUrl = `https://www.fuzzwork.co.uk/blueprint/api/blueprint.php?typeid=${blueprintTypeId}`;
   const tryUrls = [fuzzworkUrl, `https://corsproxy.io/?${encodeURIComponent(fuzzworkUrl)}`];
@@ -265,26 +268,54 @@ async function fetchBlueprintTimeOnly(blueprintTypeId) {
       clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
-        const times = (data.blueprintDetails && data.blueprintDetails.times) || {};
-        // Fuzzwork nests durations under blueprintDetails.times, keyed by activity id:
+        const bpDetails = data.blueprintDetails || {};
+        const times = bpDetails.times || {};
         // 1 = manufacturing, 11 = reaction. Prefer manufacturing, fall back to reaction.
         const t = parseInt(times['1'] ?? times[1]) || parseInt(times['11'] ?? times[11]) || 0;
-        if (t > 0) {
-          blueprintTimeCache[blueprintTypeId] = t;
-          return t;
+
+        let batchYield = 0;
+        const actProducts = data.activityProducts || {};
+        const act1 = actProducts['1'] || actProducts[1];
+        const act11 = actProducts['11'] || actProducts[11];
+        if (act1 && act1[0] && act1[0].quantity) batchYield = parseInt(act1[0].quantity);
+        else if (act11 && act11[0] && act11[0].quantity) batchYield = parseInt(act11[0].quantity);
+        if (!batchYield) batchYield = parseInt(bpDetails.productQuantity) || 0;
+
+        if (t > 0 || batchYield > 0) {
+          const result = { time: t, batchYield };
+          blueprintTimeCache[blueprintTypeId] = result;
+          if (t <= 0) console.warn(`[BuildTime] Fuzzwork responded for blueprint ${blueprintTypeId} but blueprintDetails.times had no manufacturing/reaction entry. times: ${JSON.stringify(times)}`);
+          if (batchYield <= 0) console.warn(`[BatchYield] Fuzzwork responded for blueprint ${blueprintTypeId} but no usable per-run quantity was found. blueprintDetails: ${JSON.stringify(bpDetails)}, activityProducts keys: ${Object.keys(actProducts).join(', ')}`);
+          return result;
         }
-        console.warn(`[BuildTime] Fuzzwork responded for blueprint ${blueprintTypeId} but blueprintDetails.times had no manufacturing/reaction entry. times: ${JSON.stringify(times)}`);
+        console.warn(`[BuildTime/BatchYield] Fuzzwork responded for blueprint ${blueprintTypeId} but had neither a usable time nor batch yield. blueprintDetails: ${JSON.stringify(bpDetails)}`);
       } else {
-        console.warn(`[BuildTime] Fuzzwork request for blueprint ${blueprintTypeId} via ${url.startsWith('https://corsproxy') ? 'corsproxy.io' : 'direct'} returned HTTP ${res.status}`);
+        console.warn(`[BuildTime/BatchYield] Fuzzwork request for blueprint ${blueprintTypeId} via ${url.startsWith('https://corsproxy') ? 'corsproxy.io' : 'direct'} returned HTTP ${res.status}`);
       }
     } catch (e) {
-      console.warn(`[BuildTime] Fuzzwork request for blueprint ${blueprintTypeId} via ${url.startsWith('https://corsproxy') ? 'corsproxy.io' : 'direct'} failed (likely CORS/network block):`, e.message || e);
+      console.warn(`[BuildTime/BatchYield] Fuzzwork request for blueprint ${blueprintTypeId} via ${url.startsWith('https://corsproxy') ? 'corsproxy.io' : 'direct'} failed (likely CORS/network block):`, e.message || e);
     }
   }
-  blueprintTimeCache[blueprintTypeId] = 0;
-  return 0;
+  const empty = { time: 0, batchYield: 0 };
+  blueprintTimeCache[blueprintTypeId] = empty;
+  return empty;
 }
-window.fetchBlueprintTimeOnly = fetchBlueprintTimeOnly;
+window.fetchBlueprintSupplementalData = fetchBlueprintSupplementalData;
+
+// Checks only the direct, explicit per-run-quantity fields on a recipe - no name-based guessing.
+// Used to decide whether a live Fuzzwork lookup is warranted (local data has nothing concrete to
+// go on), as opposed to trusting a value that's already present but happens to be wrong.
+function hasExplicitBatchYield(recipe) {
+  if (!recipe) return false;
+  if (typeof window.extractRecipeYield === 'function' && window.extractRecipeYield(recipe) > 0) return true;
+  const rootCandidates = [
+    recipe.productQtyPerRun, recipe.mfgQtyPerRun, recipe.reactionQtyPerRun, recipe.outputQty,
+    recipe.portionSize, recipe.qty, recipe.productQty, recipe.pQty, recipe.yield,
+    recipe.batchYield, recipe.amount, recipe.qtyPerRun
+  ];
+  return rootCandidates.some(c => { const v = parseInt(c); return !isNaN(v) && v > 0; });
+}
+window.hasExplicitBatchYield = hasExplicitBatchYield;
 
 // Parallel Multi-Layer SDE Blueprint-Centric Tree Generator
 async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, currentDepth, maxDepth, visitedPath = new Set(), parentNode = null) {
@@ -377,7 +408,8 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
           }
         });
 
-        const batchYield = getBatchYield(recipe, isReaction);
+        let batchYield = getBatchYield(recipe, isReaction);
+        const batchYieldIsExplicit = hasExplicitBatchYield(recipe);
 
         node.recipe = { ...recipe, materials: activeMaterials, productQtyPerRun: batchYield, portionSize: batchYield, batchYield: batchYield };
         node.isReaction = isReaction;
@@ -386,16 +418,32 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
         const existingTime = typeof window.extractBuildTime === 'function'
           ? window.extractBuildTime(node.recipe)
           : parseInt(node.recipe.time || node.recipe.t || node.recipe.timeSeconds || node.recipe.duration || node.recipe.mfgTime || node.recipe.productionTime || 0);
-        if (!(existingTime > 0)) {
+
+        if (!(existingTime > 0) || !batchYieldIsExplicit) {
           try {
-            const fetchedTime = await fetchBlueprintTimeOnly(blueprintTypeId);
-            if (fetchedTime > 0) {
-              node.recipe.time = fetchedTime;
-            } else {
+            const supplemental = await fetchBlueprintSupplementalData(blueprintTypeId);
+
+            if (supplemental.time > 0) {
+              node.recipe.time = supplemental.time;
+            } else if (!(existingTime > 0)) {
               console.warn(`[BuildTime] No time data for "${node.productName || name}" (blueprint ${blueprintTypeId}). Local recipe had no usable time field, and the live Fuzzwork lookup also returned nothing (network/CORS block, or Fuzzwork has no data for this blueprint). Local recipe keys: ${Object.keys(node.recipe).join(', ')}`);
             }
+
+            if (!batchYieldIsExplicit) {
+              if (supplemental.batchYield > 0) {
+                // Local data had nothing concrete (only a name-based guess or the bare default of 1) -
+                // the live per-run quantity from Fuzzwork's own product listing is authoritative here.
+                batchYield = supplemental.batchYield;
+                node.batchYield = batchYield;
+                node.recipe.batchYield = batchYield;
+                node.recipe.productQtyPerRun = batchYield;
+                node.recipe.portionSize = batchYield;
+              } else {
+                console.warn(`[BatchYield] No real per-run quantity found locally or via live Fuzzwork lookup for "${node.productName || name}" (blueprint ${blueprintTypeId}). Falling back to a heuristic/default guess of ${batchYield} units per run - this is likely wrong. Regenerating your local database (generate_db.py) may fix this once its own data is available.`);
+              }
+            }
           } catch (e) {
-            console.warn(`[BuildTime] Fuzzwork time lookup threw an error for blueprint ${blueprintTypeId}:`, e);
+            console.warn(`[BuildTime/BatchYield] Fuzzwork lookup threw an error for blueprint ${blueprintTypeId}:`, e);
           }
         }
 
