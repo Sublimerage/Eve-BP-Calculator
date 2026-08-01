@@ -216,16 +216,25 @@ async function fetchBlueprintData(typeId) {
 
             if (mfgMat || reactionMat) {
               // Required skills each grant their own 1%/level manufacturing time bonus for items
-              // requiring them (e.g. Triglavian Quantum Engineering), same field used in generate_db.py.
-              const blueprintSkillsRaw = data.blueprintSkills || [];
+              // requiring them (e.g. Triglavian Quantum Engineering). blueprintSkills is keyed by
+              // ACTIVITY id (1=manufacturing, 8=invention, 11=reaction) - only manufacturing/reaction
+              // skills actually affect build time here; invention-only skills (needed to invent a T2
+              // BPC, not to run a job with one you already have) must be excluded, and so must
+              // Industry/Advanced Industry (skill ids 3380/3388), which already get their own
+              // dedicated, larger bonus elsewhere.
+              const blueprintSkillsRaw = data.blueprintSkills || {};
+              const mfgSkillsRaw = (blueprintSkillsRaw && typeof blueprintSkillsRaw === 'object')
+                ? (blueprintSkillsRaw['1'] || blueprintSkillsRaw['11'] || [])
+                : [];
               const requiredSkills = [];
-              blueprintSkillsRaw.forEach(sk => {
+              (Array.isArray(mfgSkillsRaw) ? mfgSkillsRaw : []).forEach(sk => {
                 if (!sk || typeof sk !== 'object') return;
                 const skillId = sk.typeid || sk.typeID || sk.skillID || sk.skill_id;
                 const skillLevel = sk.level || sk.skillLevel || sk.requiredLevel;
-                if (skillId !== undefined && skillLevel !== undefined) {
-                  requiredSkills.push({ skillId: parseInt(skillId), level: parseInt(skillLevel) });
-                }
+                if (skillId === undefined || skillLevel === undefined) return;
+                const skillIdInt = parseInt(skillId);
+                if (skillIdInt === 3380 || skillIdInt === 3388) return; // Industry, Advanced Industry
+                requiredSkills.push({ skillId: skillIdInt, level: parseInt(skillLevel) });
               });
 
               const parsed = {
