@@ -72,13 +72,11 @@ function saveTaxSettings() {
 
     localStorage.setItem('eve_active_facility_key', facilityKey);
 
-    // Each rig slot stores its own key directly (read by getEffectiveRigBonusForTypeId in config.js).
-    const rigSlot1 = document.getElementById('rig-slot-1')?.value || 'none';
-    const rigSlot2 = document.getElementById('rig-slot-2')?.value || 'none';
-    const rigSlot3 = document.getElementById('rig-slot-3')?.value || 'none';
-    localStorage.setItem('eve_rig_slot_1', rigSlot1);
-    localStorage.setItem('eve_rig_slot_2', rigSlot2);
-    localStorage.setItem('eve_rig_slot_3', rigSlot3);
+    // Rig slot typeIds are written directly by selectRigForSlot() when the user picks one from the
+    // search results - just read them back here to include in the settings snapshot.
+    const rigSlot1 = localStorage.getItem('eve_rig_slot_1') || '';
+    const rigSlot2 = localStorage.getItem('eve_rig_slot_2') || '';
+    const rigSlot3 = localStorage.getItem('eve_rig_slot_3') || '';
 
     const settings = {
       facilityTax: document.getElementById('facility-tax')?.value,
@@ -110,21 +108,54 @@ function loadTaxSettings() {
       if (settings.structureRoleBonus !== undefined && document.getElementById('structure-role-bonus')) document.getElementById('structure-role-bonus').value = settings.structureRoleBonus;
       if (settings.contractTax !== undefined && document.getElementById('contract-tax')) document.getElementById('contract-tax').value = settings.contractTax;
       if (settings.contractBroker !== undefined && document.getElementById('contract-broker')) document.getElementById('contract-broker').value = settings.contractBroker;
-      if (settings.rigSlot1 !== undefined && document.getElementById('rig-slot-1')) document.getElementById('rig-slot-1').value = settings.rigSlot1;
-      if (settings.rigSlot2 !== undefined && document.getElementById('rig-slot-2')) document.getElementById('rig-slot-2').value = settings.rigSlot2;
-      if (settings.rigSlot3 !== undefined && document.getElementById('rig-slot-3')) document.getElementById('rig-slot-3').value = settings.rigSlot3;
     }
   } catch (e) {}
 }
 
-// Populates the 3 rig slot dropdowns with the shared option list (must run before loadTaxSettings()
-// so there are matching <option> elements to restore a saved selection onto).
-function initRigSlotDropdowns() {
-  const optionsHTML = typeof window.buildRigSlotOptionsHTML === 'function' ? window.buildRigSlotOptionsHTML() : '<option value="none">None</option>';
-  ['rig-slot-1', 'rig-slot-2', 'rig-slot-3'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = optionsHTML;
-  });
+// Filters the real rig item catalog (pulled from the generated database) as the user types, and
+// renders matching results in the dropdown below the search box.
+function searchRigSlot(slotNum, query) {
+  const resultsEl = document.getElementById(`rig-slot-${slotNum}-results`);
+  if (!resultsEl) return;
+  const catalog = typeof window.getRigItemCatalog === 'function' ? window.getRigItemCatalog() : [];
+  if (catalog.length === 0) {
+    resultsEl.innerHTML = `<div class="p-1.5 text-slate-500">No rig data found - regenerate your database (generate_db.py) to enable rig search.</div>`;
+    resultsEl.classList.remove('hidden');
+    return;
+  }
+  const q = (query || '').trim().toLowerCase();
+  const matches = (q ? catalog.filter(r => r.name.toLowerCase().includes(q)) : catalog).slice(0, 25);
+  const noneRow = `<div class="px-1.5 py-1 hover:bg-[#1e3348] cursor-pointer text-slate-400 border-b border-[#1e3348]/40" onmousedown="selectRigForSlot(${slotNum}, 0, '')">— None —</div>`;
+  const matchRows = matches.length > 0
+    ? matches.map(r => `<div class="px-1.5 py-1 hover:bg-[#1e3348] cursor-pointer border-b border-[#1e3348]/20" onmousedown="selectRigForSlot(${slotNum}, ${r.typeId}, '${window.esc(r.name)}')">${window.esc(r.name)}</div>`).join('')
+    : `<div class="p-1.5 text-slate-500">No matching rigs found.</div>`;
+  resultsEl.innerHTML = noneRow + matchRows;
+  resultsEl.classList.remove('hidden');
+}
+window.searchRigSlot = searchRigSlot;
+
+// Applies a rig selection (or clears it with typeId 0) for the given slot, persists it, and
+// recalculates. Uses onmousedown (not onclick) in the results list above so it fires before the
+// search input's onblur hides the dropdown.
+function selectRigForSlot(slotNum, typeId, name) {
+  const inputEl = document.getElementById(`rig-slot-${slotNum}-input`);
+  const resultsEl = document.getElementById(`rig-slot-${slotNum}-results`);
+  if (inputEl) inputEl.value = typeId ? name : '';
+  if (resultsEl) resultsEl.classList.add('hidden');
+  localStorage.setItem(`eve_rig_slot_${slotNum}`, typeId ? String(typeId) : '');
+  saveTaxSettings();
+  recalculate();
+}
+window.selectRigForSlot = selectRigForSlot;
+
+// Restores each rig slot's search input to show the saved rig's real name (looked up by the stored
+// typeId), since the input just displays text - the typeId in localStorage is the actual saved state.
+function restoreRigSlotInputs() {
+  for (let slot = 1; slot <= 3; slot++) {
+    const rigTypeId = parseInt(localStorage.getItem(`eve_rig_slot_${slot}`));
+    const inputEl = document.getElementById(`rig-slot-${slot}-input`);
+    if (inputEl) inputEl.value = (rigTypeId && window.EVE_ITEMS && window.EVE_ITEMS[rigTypeId]) ? window.EVE_ITEMS[rigTypeId] : '';
+  }
 }
 
 function searchItems(query) {
@@ -1535,7 +1566,7 @@ window.onload = async () => {
 
   // Load static local states instantly so the app is interactive immediately!
   try {
-    initRigSlotDropdowns(); // Populate rig slot option lists before restoring any saved selection
+    restoreRigSlotInputs(); // Show each rig slot's saved rig name (if any) before restoring other tax settings
     loadTaxSettings(); // Load custom taxes from localStorage!
     loadSavedState(); // Load previous product & overrides persistently from localStorage!
     updateHeaderLedgerCount(); // Update badge on load!
