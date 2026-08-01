@@ -88,6 +88,13 @@ function getItemCategory(typeId, name) {
       n.includes('plastics') || n.includes('chiral') || n.includes('cultures') || n.includes('viral') || n.includes('fiber') || n.includes('nanites')) {
     return 'pigas';
   }
+  // Prefer real category classification (from generate_db.py's EVE Ref data) over name-keyword
+  // matching - the keyword list below only recognizes hull-class words and a curated list of T1
+  // ship names, so faction/pirate/T2 hulls (e.g. "Vargur", "Leshak") that don't contain any of those
+  // words were silently miscategorized as "Others" even though they're genuinely ships.
+  const catId = window.EVE_CATEGORIES ? window.EVE_CATEGORIES[typeId] : undefined;
+  if (catId === 6) return 'ships';
+  if (catId !== undefined && catId !== null) return 'others';
   if (typeof window.isShipType === 'function' && window.isShipType(typeId)) {
     return 'ships';
   }
@@ -231,7 +238,7 @@ function renderActiveJobsList(allocatedStock) {
         if (activeFacilityKey === 'sotiyo') facilityFactor = 0.70;
         else if (activeFacilityKey === 'azbel') facilityFactor = 0.80;
         else if (activeFacilityKey === 'raitaru') facilityFactor = 0.85;
-        const rigTEBonus = parseFloat(localStorage.getItem('eve_rig_te_bonus')) || 0;
+        const rigTEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(job.productTypeId, 'TE') : 0;
         const rigFactor = 1 - (rigTEBonus / 100);
         totalBuildSeconds = baseTime * skillTimeFactor * facilityFactor * rigFactor * (job.runsNeeded || 1);
       } else {
@@ -244,10 +251,10 @@ function renderActiveJobsList(allocatedStock) {
     if (activeFacilityKey === 'sotiyo') structureName = 'Sotiyo';
     else if (activeFacilityKey === 'azbel') structureName = 'Azbel';
     else if (activeFacilityKey === 'raitaru') structureName = 'Raitaru';
-    const rigTEBonusDisplay = parseFloat(localStorage.getItem('eve_rig_te_bonus')) || 0;
+    const rigTEBonusDisplay = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(job.productTypeId, 'TE') : 0;
 
     if (totalBuildSeconds > 0) {
-      const hoverTitle = `Total time to build this item and every sub-component you're manufacturing yourself.\nIndustry: ${skills.industry}/5 | Advanced Industry: ${skills.advIndustry}/5 | Facility: ${structureName}${rigTEBonusDisplay > 0 ? ` | Rig: -${rigTEBonusDisplay}% TE` : ''}`;
+      const hoverTitle = `Total time to build this item and every sub-component you're manufacturing yourself.\nIndustry: ${skills.industry}/5 | Advanced Industry: ${skills.advIndustry}/5 | Facility: ${structureName}${rigTEBonusDisplay > 0 ? ` | Rig: -${rigTEBonusDisplay.toFixed(2)}% TE` : ''}`;
 
       const iskPerHour = job.netProfit !== undefined ? (job.netProfit / (totalBuildSeconds / 3600)) : null;
       const iskPerHourUI = iskPerHour !== null
@@ -284,7 +291,7 @@ function renderActiveJobsList(allocatedStock) {
       .replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
 
     return `
-      <div class="bg-[#0c1318] border border-[#1e3348] hover:border-purple-500/40 rounded p-4 flex flex-col justify-between shadow-md transition space-y-3">
+      <div class="bg-[#0c1318] border border-[#1e3348] hover:border-purple-500/40 rounded p-3 flex flex-col justify-between shadow-md transition space-y-2">
         <div class="flex items-start justify-between">
           <div class="flex items-start space-x-3 min-w-0 flex-1">
             <img src="${jobIconUrl}" class="w-12 h-12 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
@@ -316,6 +323,12 @@ function renderActiveJobsList(allocatedStock) {
               <span class="text-slate-300">Total Build Cost:</span>
               <span class="text-cyan-400">${Math.round(job.calculatedCost).toLocaleString()} ISK</span>
             </div>
+            ${job.netProfit !== undefined ? `
+              <div class="flex justify-between items-center">
+                <span class="text-slate-300">Total Profit:</span>
+                <span class="${job.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}">${Math.round(job.netProfit).toLocaleString()} ISK</span>
+              </div>
+            ` : ''}
           </div>
         </div>
 

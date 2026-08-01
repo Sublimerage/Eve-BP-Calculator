@@ -975,9 +975,27 @@ async function fetchSystemSCIById(systemId, systemName) {
     }
     window.activeMfgSCI = mfgSCI;
     window.activeReactSCI = reactSCI;
+
+    // Security status drives the rig bonus multiplier (highsec x1.0, lowsec x1.9, null/WH x2.1).
+    let secLabel = '';
+    try {
+      const secRes = await fetch(`https://esi.evetech.net/latest/universe/systems/${systemId}/?datasource=tranquility`);
+      if (secRes.ok) {
+        const secData = await secRes.json();
+        window.activeSystemSecurity = typeof secData.security_status === 'number' ? secData.security_status : null;
+        if (window.activeSystemSecurity !== null) {
+          const sec = window.activeSystemSecurity;
+          secLabel = sec >= 0.45 ? ` | ${sec.toFixed(1)} (Highsec)` : (sec > 0.0 ? ` | ${sec.toFixed(1)} (Lowsec)` : ` | ${sec.toFixed(1)} (Null/WH)`);
+        }
+      }
+    } catch (secErr) {
+      window.activeSystemSecurity = null;
+      console.warn('System security status fetch error:', secErr);
+    }
+
     const sciBadgeEl = document.getElementById('sci-badge');
     if (sciBadgeEl) {
-      sciBadgeEl.textContent = `System: ${systemName.toUpperCase()} | SCI: ${(mfgSCI * 100).toFixed(2)}% (Mfg) / ${(reactSCI * 100).toFixed(2)}% (React)`;
+      sciBadgeEl.textContent = `System: ${systemName.toUpperCase()}${secLabel} | SCI: ${(mfgSCI * 100).toFixed(2)}% (Mfg) / ${(reactSCI * 100).toFixed(2)}% (React)`;
     }
     if (typeof recalculate === 'function') recalculate();
   } catch (err) {

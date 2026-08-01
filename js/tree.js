@@ -449,7 +449,10 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
 
         const me = isReaction ? 0 : node.customME;
         const facility = document.getElementById('facility-select')?.value || '0.01';
-        const rigMEBonus = document.getElementById('rig-me-bonus')?.value || 0;
+        // Rig ME bonus matches the category of what THIS node is manufacturing (its own product),
+        // not the raw materials being consumed - an Ammunition rig reduces materials needed to BUILD
+        // ammo, regardless of which specific minerals/components go into it.
+        const rigMEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(node.productTypeId, 'ME') : 0;
 
         const runsNeeded = Math.ceil(qtyNeeded / batchYield);
         node.runsNeeded = runsNeeded;
@@ -536,7 +539,7 @@ function scaleTreeQuantities(node, facility) {
   node.runsNeeded = runsNeeded;
 
   const effectiveME = node.isReaction ? 0 : (node.customME || 0);
-  const rigMEBonus = document.getElementById('rig-me-bonus')?.value || 0;
+  const rigMEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(node.productTypeId, 'ME') : 0;
 
   node.children.forEach(child => {
     const childProductTypeId = child.productTypeId || child.typeId;

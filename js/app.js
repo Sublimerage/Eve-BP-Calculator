@@ -13,7 +13,7 @@ function extractBuildTime(recipe) {
 // Applies TE research, character skills (Industry/Advanced Industry), and the selected facility's
 // time bonus to a single job's raw SDE duration. Reactions can't be TE-researched, so TE is ignored
 // for them. Shared by the per-card time display, the total-tree time summary, and the ledger.
-function calculateAdjustedJobSeconds(baseTimeSeconds, customTE, runsNeeded, isReaction) {
+function calculateAdjustedJobSeconds(baseTimeSeconds, customTE, runsNeeded, isReaction, productTypeId) {
   if (!baseTimeSeconds || baseTimeSeconds <= 0) return 0;
   const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
   const indFactor = 1 - (0.04 * (skills.industry || 0));
@@ -26,7 +26,7 @@ function calculateAdjustedJobSeconds(baseTimeSeconds, customTE, runsNeeded, isRe
   if (activeFacilityKey === 'sotiyo') facilityFactor = 0.70;
   else if (activeFacilityKey === 'azbel') facilityFactor = 0.80;
   else if (activeFacilityKey === 'raitaru') facilityFactor = 0.85;
-  const rigTEBonus = parseFloat(localStorage.getItem('eve_rig_te_bonus')) || 0;
+  const rigTEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(productTypeId, 'TE') : 0;
   const rigFactor = 1 - (rigTEBonus / 100);
   return baseTimeSeconds * teFactor * skillTimeFactor * facilityFactor * rigFactor * (runsNeeded || 1);
 }
@@ -37,7 +37,7 @@ function calculateTotalBuildSeconds(node) {
   if (!node || !node.isBuildingSelf) return 0;
   let total = 0;
   if (node.recipe) {
-    total += calculateAdjustedJobSeconds(extractBuildTime(node.recipe), node.customTE, node.runsNeeded, node.isReaction);
+    total += calculateAdjustedJobSeconds(extractBuildTime(node.recipe), node.customTE, node.runsNeeded, node.isReaction, node.productTypeId);
   }
   if (node.children) {
     node.children.forEach(child => { if (child) total += calculateTotalBuildSeconds(child); });
@@ -72,12 +72,13 @@ function saveTaxSettings() {
 
     localStorage.setItem('eve_active_facility_key', facilityKey);
 
-    const rigMEBonus = document.getElementById('rig-me-bonus')?.value || '0';
-    const rigTEBonus = document.getElementById('rig-te-bonus')?.value || '0';
-    // Dedicated keys (not just the JSON blob below) so ledger.js - which has no facility/rig inputs of
-    // its own - can read the player's rig bonuses directly, the same way it already reads facility key.
-    localStorage.setItem('eve_rig_me_bonus', rigMEBonus);
-    localStorage.setItem('eve_rig_te_bonus', rigTEBonus);
+    // Each rig slot stores its own key directly (read by getEffectiveRigBonusForTypeId in config.js).
+    const rigSlot1 = document.getElementById('rig-slot-1')?.value || 'none';
+    const rigSlot2 = document.getElementById('rig-slot-2')?.value || 'none';
+    const rigSlot3 = document.getElementById('rig-slot-3')?.value || 'none';
+    localStorage.setItem('eve_rig_slot_1', rigSlot1);
+    localStorage.setItem('eve_rig_slot_2', rigSlot2);
+    localStorage.setItem('eve_rig_slot_3', rigSlot3);
 
     const settings = {
       facilityTax: document.getElementById('facility-tax')?.value,
@@ -88,8 +89,9 @@ function saveTaxSettings() {
       structureRoleBonus: document.getElementById('structure-role-bonus')?.value,
       contractTax: document.getElementById('contract-tax')?.value,
       contractBroker: document.getElementById('contract-broker')?.value,
-      rigMEBonus: rigMEBonus,
-      rigTEBonus: rigTEBonus
+      rigSlot1: rigSlot1,
+      rigSlot2: rigSlot2,
+      rigSlot3: rigSlot3
     };
     localStorage.setItem('eve_tax_settings', JSON.stringify(settings));
   } catch (e) {}
@@ -108,10 +110,21 @@ function loadTaxSettings() {
       if (settings.structureRoleBonus !== undefined && document.getElementById('structure-role-bonus')) document.getElementById('structure-role-bonus').value = settings.structureRoleBonus;
       if (settings.contractTax !== undefined && document.getElementById('contract-tax')) document.getElementById('contract-tax').value = settings.contractTax;
       if (settings.contractBroker !== undefined && document.getElementById('contract-broker')) document.getElementById('contract-broker').value = settings.contractBroker;
-      if (settings.rigMEBonus !== undefined && document.getElementById('rig-me-bonus')) document.getElementById('rig-me-bonus').value = settings.rigMEBonus;
-      if (settings.rigTEBonus !== undefined && document.getElementById('rig-te-bonus')) document.getElementById('rig-te-bonus').value = settings.rigTEBonus;
+      if (settings.rigSlot1 !== undefined && document.getElementById('rig-slot-1')) document.getElementById('rig-slot-1').value = settings.rigSlot1;
+      if (settings.rigSlot2 !== undefined && document.getElementById('rig-slot-2')) document.getElementById('rig-slot-2').value = settings.rigSlot2;
+      if (settings.rigSlot3 !== undefined && document.getElementById('rig-slot-3')) document.getElementById('rig-slot-3').value = settings.rigSlot3;
     }
   } catch (e) {}
+}
+
+// Populates the 3 rig slot dropdowns with the shared option list (must run before loadTaxSettings()
+// so there are matching <option> elements to restore a saved selection onto).
+function initRigSlotDropdowns() {
+  const optionsHTML = typeof window.buildRigSlotOptionsHTML === 'function' ? window.buildRigSlotOptionsHTML() : '<option value="none">None</option>';
+  ['rig-slot-1', 'rig-slot-2', 'rig-slot-3'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = optionsHTML;
+  });
 }
 
 function searchItems(query) {
@@ -685,14 +698,14 @@ function createNodeCard(node) {
     if (activeFacilityKey === 'sotiyo') { structureName = 'Sotiyo'; structureTEBonus = '30%'; }
     else if (activeFacilityKey === 'azbel') { structureName = 'Azbel'; structureTEBonus = '20%'; }
     else if (activeFacilityKey === 'raitaru') { structureName = 'Raitaru'; structureTEBonus = '15%'; }
-    const rigTEBonus = parseFloat(localStorage.getItem('eve_rig_te_bonus')) || 0;
+    const rigTEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(node.productTypeId, 'TE') : 0;
 
     if (baseTime > 0) {
-      const totalSeconds = calculateAdjustedJobSeconds(baseTime, node.customTE, node.runsNeeded, node.isReaction);
-      const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)${rigTEBonus > 0 ? `\n• Rig Bonus: -${rigTEBonus}% TE` : ''}\n• Base SDE Time: ${window.formatDuration(baseTime)}`;
+      const totalSeconds = calculateAdjustedJobSeconds(baseTime, node.customTE, node.runsNeeded, node.isReaction, node.productTypeId);
+      const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)${rigTEBonus > 0 ? `\n• Rig Bonus: -${rigTEBonus.toFixed(2)}% TE` : ''}\n• Base SDE Time: ${window.formatDuration(baseTime)}`;
 
       buildTimeUI = `
-        <div class="flex justify-between text-[10px] text-slate-400 mono border-t border-[#1e3348]/40 pt-1 mt-1 cursor-help" title="${window.esc(hoverTitle)}">
+        <div class="flex justify-between text-[10px] text-slate-400 mono cursor-help" title="${window.esc(hoverTitle)}">
           <span>Est. Build Time:</span>
           <span class="text-slate-300 font-semibold">${window.formatDuration(totalSeconds)}</span>
         </div>
@@ -701,7 +714,7 @@ function createNodeCard(node) {
       // Be honest that the line exists but the underlying duration data is missing, instead of
       // silently disappearing - a permanently blank line with no data at all looks identical to a bug.
       buildTimeUI = `
-        <div class="flex justify-between text-[10px] text-slate-400 mono border-t border-[#1e3348]/40 pt-1 mt-1 cursor-help" title="No manufacturing time data found for this blueprint in the local database or Fuzzwork lookup.">
+        <div class="flex justify-between text-[10px] text-slate-400 mono cursor-help" title="No manufacturing time data found for this blueprint in the local database or Fuzzwork lookup.">
           <span>Est. Build Time:</span>
           <span class="text-slate-500 italic">No Time Data</span>
         </div>
@@ -792,20 +805,29 @@ function createNodeCard(node) {
       ${!isRoot && savingsPct !== null ? `<div class="flex justify-between text-green-400 font-semibold text-[10px]"><span>Order Savings:</span><span>${savingsPct}%</span></div>` : ''}
       ${node.jobFee > 0 && node.isBuildingSelf ? `<div class="flex justify-between text-[#e85555] font-semibold border-t border-[#1e3348]/40 pt-1"><span>Job Inst. Fee:</span><span>+${Math.round(node.jobFee).toLocaleString()} ISK</span></div>` : ''}
       <div class="flex justify-between font-bold border-t border-[#1e3348]/60 pt-1 mt-1"><span class="text-slate-300">${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span><span class="text-amber-400 font-bold">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span></div>
-      ${buildTimeUI}
       ${isRoot ? `
         <div class="flex justify-between font-bold border-t border-green-500/40 pt-1 mt-1 bg-green-950/30 p-1 rounded">
           <span class="text-slate-300">${window.rootSellStrategy === 'custom-contract' ? 'Net Profit (Contract Output):' : 'Net Profit (Sell Output):'}</span>
           <span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${Math.round(node.netProfitSell || 0).toLocaleString()} ISK</span>
         </div>
-        <div class="flex justify-between font-bold" title="Total net sell profit divided by the total time to build this item and every sub-component you're manufacturing yourself.">
-          <span class="text-slate-300">Est. ISK/Hour:</span>
-          ${node.totalBuildSeconds > 0
-            ? `<span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${Math.round((node.netProfitSell || 0) / (node.totalBuildSeconds / 3600)).toLocaleString()} ISK</span>`
-            : `<span class="text-slate-500 italic">No Time Data</span>`}
-        </div>
       ` : ''}
     </div>
+    ${(buildTimeUI || isRoot) ? `
+      <div class="mt-2 pt-1.5 border-t-2 border-dashed border-purple-500/30">
+        <div class="text-[8px] text-purple-300 uppercase font-bold tracking-wider mb-1">Time &amp; Efficiency</div>
+        <div class="text-[11px] mono space-y-1">
+          ${buildTimeUI}
+          ${isRoot ? `
+            <div class="flex justify-between font-bold" title="Total net sell profit divided by the total time to build this item and every sub-component you're manufacturing yourself.">
+              <span class="text-slate-300">Est. ISK/Hour:</span>
+              ${node.totalBuildSeconds > 0
+                ? `<span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${Math.round((node.netProfitSell || 0) / (node.totalBuildSeconds / 3600)).toLocaleString()} ISK</span>`
+                : `<span class="text-slate-500 italic">No Time Data</span>`}
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    ` : ''}
   `;
   return card;
 }
@@ -1513,6 +1535,7 @@ window.onload = async () => {
 
   // Load static local states instantly so the app is interactive immediately!
   try {
+    initRigSlotDropdowns(); // Populate rig slot option lists before restoring any saved selection
     loadTaxSettings(); // Load custom taxes from localStorage!
     loadSavedState(); // Load previous product & overrides persistently from localStorage!
     updateHeaderLedgerCount(); // Update badge on load!
