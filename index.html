@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Industry Ledger</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=3.6.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=3.8.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -123,7 +123,7 @@
             class="w-14 bg-[#0d1922] border border-green-500/40 text-center text-green-300 font-bold rounded p-1 outline-none text-xs">
           <span class="text-slate-500 text-xs flex-shrink-0">%</span>
           <button onclick="applyBuildProfitOptimizer()" class="ml-auto bg-green-800 hover:bg-green-700 text-white font-semibold py-1 px-2 rounded text-[10px] transition shadow mono flex-shrink-0">
-            ⚡ Apply
+            ⚡ Optimize
           </button>
         </div>
       </div>
@@ -299,6 +299,12 @@
       <!-- Floating viewport controls: view-related actions live on the canvas they act on -->
       <div class="absolute top-3 right-3 z-40 flex items-center gap-2 mono text-xs" onclick="event.stopPropagation()">
         <span id="zoom-level-text" class="px-2.5 py-1.5 bg-[#0c1318]/90 border border-[#1e3348] rounded-md text-slate-400 shadow-lg">Zoom: 100%</span>
+        <button onclick="collapseAllNodes()" class="px-3 py-1.5 bg-[#0c1318]/90 hover:bg-amber-700 border border-[#1e3348] text-white font-bold rounded-md transition shadow-lg" title="Collapse every branch that has inputs, to shrink very tall builds">
+          ▼⇥ Collapse All
+        </button>
+        <button onclick="expandAllNodes()" class="px-3 py-1.5 bg-[#0c1318]/90 hover:bg-amber-700 border border-[#1e3348] text-white font-bold rounded-md transition shadow-lg" title="Expand every collapsed branch">
+          ▶⇥ Expand All
+        </button>
         <button onclick="centerOnSelectedNode()" class="px-3 py-1.5 bg-[#0c1318]/90 hover:bg-cyan-600 border border-[#1e3348] text-white font-bold rounded-md transition shadow-lg" title="Center on selected card, or the final output if nothing is selected">
           🎯 Center [F]
         </button>
@@ -373,11 +379,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=3.6.0"></script>
-  <script src="js/config.js?v=3.6.0"></script>
-  <script src="js/esi.js?v=3.6.0"></script>
-  <script src="js/tree.js?v=3.6.0"></script>
-  <script src="js/optimizers.js?v=3.6.0"></script>
-  <script src="js/app.js?v=3.6.0"></script>
+  <script src="eve_db.js?v=3.8.0"></script>
+  <script src="js/config.js?v=3.8.0"></script>
+  <script src="js/esi.js?v=3.8.0"></script>
+  <script src="js/tree.js?v=3.8.0"></script>
+  <script src="js/optimizers.js?v=3.8.0"></script>
+  <script src="js/app.js?v=3.8.0"></script>
 </body>
 </html>
