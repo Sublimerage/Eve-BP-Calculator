@@ -9,312 +9,283 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Industry Ledger</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=3.5.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=3.6.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
-  <!-- Header -->
-  <header class="bg-[#0c1318] border-b border-[#1e3348] px-6 py-3 flex flex-wrap justify-between items-center shadow-xl z-30">
+  <!-- Header: branding + primary account/nav actions only -->
+  <header class="bg-[#0c1318] border-b border-[#1e3348] px-5 py-2.5 flex flex-wrap justify-between items-center gap-2 shadow-xl z-30">
     <div class="flex items-center space-x-3">
-      <div class="w-9 h-9 bg-cyan-500 rounded flex items-center justify-center font-bold text-black text-xl rajdhani shadow-lg shadow-cyan-500/20">E</div>
-      <div>
-        <h1 class="text-xl font-bold tracking-widest text-white rajdhani">EVE DEEP-INDUSTRY ENGINE</h1>
-      </div>
+      <div class="w-10 h-10 bg-cyan-500 rounded flex items-center justify-center font-bold text-black text-2xl rajdhani shadow-lg shadow-cyan-500/20">E</div>
+      <h1 class="text-lg font-bold tracking-widest text-white rajdhani leading-none">EVE DEEP-INDUSTRY ENGINE</h1>
     </div>
-    
-    <div class="flex items-center space-x-3 text-xs mono">
-      <!-- ESI SSO Character Status / Login Button -->
+
+    <div class="flex items-center gap-2 text-xs mono flex-wrap">
       <div id="esi-login-container">
-        <button onclick="startEsiSSOLogin()" class="px-4 py-2 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-md transition flex items-center gap-2 shadow text-xs" title="Login with EVE Online to import your character assets">
-          🔐 EVE SSO Login
+        <button onclick="startEsiSSOLogin()" class="px-3.5 py-2 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-md transition flex items-center gap-1.5 shadow text-xs" title="Login with EVE Online to import your character assets">
+          🔐 <span class="hidden sm:inline">EVE SSO Login</span>
         </button>
       </div>
 
-      <!-- Live Asset Refresh Button -->
-      <button onclick="refreshLiveAssets()" class="px-3.5 py-2 bg-cyan-900/80 hover:bg-cyan-700 text-cyan-200 font-bold rounded-md transition text-xs shadow border border-cyan-500/40 flex items-center gap-1" title="Fetch latest live character and corp assets from EVE Online">
-        🔄 Refresh Assets
+      <button onclick="refreshLiveAssets()" class="px-3 py-2 bg-cyan-900/80 hover:bg-cyan-700 text-cyan-200 font-bold rounded-md transition text-xs shadow border border-cyan-500/40 flex items-center gap-1.5" title="Fetch latest live character and corp assets from EVE Online">
+        🔄 <span class="hidden md:inline">Refresh Assets</span>
       </button>
 
-      <!-- Clipboard Hangar Stock Import Button -->
-      <button onclick="openPasteModal()" class="px-4 py-2 bg-[#1e3348] hover:bg-slate-600 text-slate-100 font-bold rounded-md transition text-xs shadow" title="Paste in-game inventory text to import stock">
-        📋 Paste Hangar
+      <button onclick="openPasteModal()" class="px-3 py-2 bg-[#1e3348] hover:bg-slate-600 text-slate-100 font-bold rounded-md transition text-xs shadow flex items-center gap-1.5" title="Paste in-game inventory text to import stock">
+        📋 <span class="hidden md:inline">Paste Hangar</span>
       </button>
 
-      <!-- Consolidated Manufacturing Queue (Ledger) Header Button -->
-      <a href="ledger.html" class="px-4 py-2 bg-purple-700 hover:bg-purple-600 text-purple-100 font-bold rounded-md transition text-xs shadow flex items-center gap-1.5" title="View your consolidated manufacturing jobs queue">
-        📖 View Ledger <span id="header-journal-count" class="bg-purple-950 text-purple-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">0</span>
+      <a href="ledger.html" class="px-3.5 py-2 bg-purple-700 hover:bg-purple-600 text-purple-100 font-bold rounded-md transition text-xs shadow flex items-center gap-1.5" title="View your consolidated manufacturing jobs queue">
+        📖 <span class="hidden sm:inline">View Ledger</span> <span id="header-journal-count" class="bg-purple-950 text-purple-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">0</span>
       </a>
 
-      <button onclick="centerOnSelectedNode()" class="px-3.5 py-2 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded-md transition text-xs shadow">
-        Center [F]
-      </button>
-      <button onclick="resetPanZoom()" class="px-3.5 py-2 bg-[#1e3348] hover:bg-cyan-600 text-white font-bold rounded-md transition text-xs shadow">
-        Reset View
-      </button>
       <div id="status-badge" class="px-3 py-2 bg-[#0d1922] border border-[#1e3348] rounded-md flex items-center gap-2 text-xs shadow">
-        <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-        <span id="status-text" class="text-slate-300 font-semibold">INITIALIZING INDEX...</span>
+        <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0"></span>
+        <span id="status-text" class="text-slate-300 font-semibold hidden sm:inline">INITIALIZING INDEX...</span>
       </div>
     </div>
   </header>
 
-  <!-- Toolbar Row 1: Primary Search, Build Actions, Smart Optimizers, Pricing Strategy -->
-  <section class="bg-[#0d1922] border-b border-[#1e3348] p-1.5 flex flex-wrap items-center gap-2 text-xs relative z-50">
-    
-    <!-- Item Search & Global Pricing Combined (Highly Compact - Narrower!) -->
-    <div class="bg-[#0c1318] p-1.5 rounded border border-[#1e3348] relative z-50 flex items-center space-x-1.5 shadow">
-      <span class="text-cyan-400 font-bold uppercase text-[9px] rajdhani leading-none">Search &amp; Price:</span>
-      <div class="relative w-44">
-        <!-- Compact Autocomplete Input -->
-        <input type="text" id="item-search" autocomplete="off" placeholder="Search item..." 
-          class="w-full bg-[#070b0f] border border-[#1e3348] rounded p-1 text-white font-bold focus:border-cyan-500 outline-none mono text-[11px] shadow-inner">
-        <div id="search-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
-      </div>
-      
-      <!-- Pricing Mode -->
-      <select id="input-price-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-white font-bold text-[10px] outline-none w-20">
-        <option value="sell" selected>Sell (Inst.)</option>
-        <option value="buy">Buy Order</option>
-      </select>
-      
-      <!-- Reactions -->
-      <select id="include-reactions" onchange="if(currentProduct) selectItem(currentProduct.id, currentProduct.name, true)" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-purple-300 font-bold text-[10px] outline-none w-20">
-        <option value="true" selected>React ON</option>
-        <option value="false">React OFF</option>
-      </select>
+  <!-- Dashboard Summary Bar: live metrics for whatever is currently selected -->
+  <section class="p-2.5 grid grid-cols-2 md:grid-cols-5 gap-2.5 bg-[#0a0f14] relative z-10 border-b border-[#1e3348]">
+    <div class="bg-[#0d1922] border border-[#1e3348] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Production Cost</div>
+      <div id="summary-build-cost" class="text-lg font-bold text-cyan-400 mono leading-tight">0 ISK</div>
+      <div id="summary-runs-subtext" class="text-[9px] text-slate-500 truncate mt-0.5">Mat: 0 + Fee: 0</div>
     </div>
 
-    <!-- Tree Build / Buy Actions (Compact) -->
-    <div class="bg-[#0c1318] p-1.5 rounded border border-[#1e3348] flex items-center space-x-2 shadow">
-      <span class="text-green-400 font-bold uppercase text-[9px] rajdhani leading-none">Build Mode:</span>
-      <div class="flex items-center space-x-1">
-        <button onclick="buildAllComponents()" class="bg-green-800/80 hover:bg-green-700 text-white font-bold py-1 px-2 rounded text-[10px] mono transition shadow border border-green-600/30">
-          🔨 Build All
-        </button>
-        <button onclick="buyAllSubComponents()" class="bg-slate-700/80 hover:bg-slate-600 text-white font-bold py-1 px-2 rounded text-[10px] mono transition shadow border border-slate-500/30">
-          🛒 Buy All
-        </button>
-      </div>
-      <!-- Built profit optimizer inline -->
-      <div class="bg-[#070b0f] px-1 py-0.5 rounded border border-[#1e3348] flex items-center space-x-1" title="Build Margin Threshold">
-        <span class="text-slate-400 text-[9px] font-bold">Min:</span>
-        <input type="number" id="build-profit-threshold" value="5.0" step="0.5" min="0" max="100" 
-          class="w-12 bg-[#0d1922] border border-green-500/40 text-center text-green-300 font-bold rounded p-0.5 outline-none text-[10px]">
-        <span class="text-slate-500 text-[9px] font-bold">%</span>
-        <button onclick="applyBuildProfitOptimizer()" class="bg-green-800 hover:bg-green-700 text-white font-semibold py-0.5 px-1.5 rounded text-[9px] transition shadow mono">
-          ⚡ Apply
-        </button>
-      </div>
+    <div class="bg-[#0d1922] border border-amber-500/40 px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+      <div class="text-[10px] text-amber-300 uppercase font-bold mono tracking-wide truncate">Surplus Leftovers Credit</div>
+      <div id="summary-surplus-credit" class="text-lg font-bold text-amber-300 mono leading-tight">0 ISK</div>
     </div>
 
-    <!-- SMART ORDER OPTIMIZERS CARD (Compact Inline List) -->
-    <div class="bg-[#0c1318] p-1.5 rounded border border-amber-500/50 shadow flex items-center space-x-2">
-      <span class="text-amber-300 font-bold uppercase text-[9px] rajdhani leading-none">Smart Optimizers:</span>
-      
-      <!-- Optimizer 1: Component Spread -->
-      <div class="bg-[#070b0f] p-1 rounded border border-[#1e3348] flex items-center space-x-1" title="Spread Optimizer">
-        <span class="text-slate-400 text-[9px]">Spread:</span>
-        <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100" 
-          class="w-12 bg-[#0d1922] border border-amber-500/40 text-center text-amber-300 font-bold rounded p-0.5 outline-none text-[9px]">
-        <span class="text-slate-500 text-[9px] font-bold">%</span>
-        <button onclick="applyComponentSpreadOptimizer()" class="bg-amber-700 hover:bg-amber-600 text-white font-semibold py-0.5 px-1.5 rounded text-[9px] transition">
-          Opt
-        </button>
-      </div>
-
-      <!-- Optimizer 2: Budget Impact -->
-      <div class="bg-[#070b0f] p-1 rounded border border-[#1e3348] flex items-center space-x-1" title="Budget Impact Optimizer">
-        <span class="text-slate-400 text-[9px]">Budget:</span>
-        <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100" 
-          class="w-12 bg-[#0d1922] border border-cyan-500/40 text-center text-cyan-300 font-bold rounded p-0.5 outline-none text-[9px]">
-        <span class="text-slate-500 text-[9px] font-bold">%</span>
-        <button onclick="applyBudgetImpactOptimizer()" class="bg-cyan-700 hover:bg-cyan-600 text-white font-semibold py-0.5 px-1.5 rounded text-[9px] transition">
-          Opt
-        </button>
-      </div>
-
-      <button onclick="resetSmartBuyModes()" class="text-slate-400 hover:text-slate-300 text-[9px] mono transition" title="Reset buy modes">
-        Reset
-      </button>
+    <div class="bg-[#0d1922] border border-[#1e3348] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Net Output Revenue</div>
+      <div id="summary-output-sell" class="text-lg font-bold text-amber-300 mono leading-tight">0 ISK</div>
+      <div id="summary-output-buy" class="text-[9px] text-slate-500 truncate mt-0.5">Instant Buy: 0 ISK</div>
     </div>
 
-  </section>
-
-  <!-- Toolbar Row 2: Compact Settings, Taxes, Hangar Stock & SCI Status -->
-  <section class="bg-[#0c1318] border-b border-[#1e3348] p-1.5 flex flex-wrap items-stretch gap-2.5 text-xs relative z-40">
-    
-    <!-- System & Structure Panel -->
-    <div class="flex flex-col bg-[#0d1922] p-1.5 rounded-lg border border-[#1e3348] shadow flex-grow max-w-[620px]">
-      <div class="flex items-center flex-wrap gap-y-1 space-x-1.5">
-        <span class="text-cyan-400 text-[10px] font-bold uppercase rajdhani flex-shrink-0">System & Structure:</span>
-        <div class="relative w-36">
-          <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="System..." 
-            class="w-full bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-bold mono uppercase focus:border-cyan-500 outline-none text-[11px]">
-          <div id="system-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
-        </div>
-        <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-white font-semibold text-[10px] outline-none w-40" title="A structure is one thing at a time - this single selection now drives ME, TE, AND job-fee bonuses together, instead of the old two separate (and occasionally contradictory) dropdowns.">
-          <option value="npc">NPC Station (0% ME / 0% TE / 0% Fee)</option>
-          <option value="raitaru">Raitaru - M EC (1% ME / 15% TE / 3% Fee)</option>
-          <option value="azbel">Azbel - L EC (1% ME / 20% TE / 4% Fee)</option>
-          <option value="sotiyo" selected>Sotiyo - XL EC (1% ME / 30% TE / 5% Fee)</option>
-        </select>
-      </div>
-      <div class="flex items-center gap-1 flex-wrap mt-1" title="Search and select the actual rigs fitted in your structure (each Engineering Complex has 3 rig slots). Rigs only affect the specific item category and ship size they're built for - e.g. a Small Ship rig won't help you build a Battleship. Bonus strength scales with your system's security status automatically.">
-        <span class="text-slate-400 font-semibold text-[9px] flex-shrink-0">Rigs:</span>
-        <div class="relative flex-1" style="min-width:100px">
-          <input type="text" id="rig-slot-1-input" placeholder="Rig Slot 1: None" autocomplete="off"
-            oninput="searchRigSlot(1, this.value)" onfocus="searchRigSlot(1, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-1-results'); if (el) el.classList.add('hidden'); }, 200)"
-            class="w-full bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-semibold text-[9px] outline-none focus:border-cyan-500">
-          <div id="rig-slot-1-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[9px]"></div>
-        </div>
-        <div class="relative flex-1" style="min-width:100px">
-          <input type="text" id="rig-slot-2-input" placeholder="Rig Slot 2: None" autocomplete="off"
-            oninput="searchRigSlot(2, this.value)" onfocus="searchRigSlot(2, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-2-results'); if (el) el.classList.add('hidden'); }, 200)"
-            class="w-full bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-semibold text-[9px] outline-none focus:border-cyan-500">
-          <div id="rig-slot-2-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[9px]"></div>
-        </div>
-        <div class="relative flex-1" style="min-width:100px">
-          <input type="text" id="rig-slot-3-input" placeholder="Rig Slot 3: None" autocomplete="off"
-            oninput="searchRigSlot(3, this.value)" onfocus="searchRigSlot(3, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-3-results'); if (el) el.classList.add('hidden'); }, 200)"
-            class="w-full bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-semibold text-[9px] outline-none focus:border-cyan-500">
-          <div id="rig-slot-3-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[9px]"></div>
-        </div>
-      </div>
-      <!-- SCI, Stock, and EIV Prices Status directly underneath! -->
-      <div class="flex items-center justify-between text-[9px] mono text-slate-400 border-t border-[#1e3348]/40 pt-1 mt-1">
-        <span id="sci-badge" class="text-amber-300 font-bold">SCI: 4.25% (Mfg) / 1.10% (React)</span>
-        <span class="text-slate-500 font-bold">|</span>
-        <span id="stock-status-text" class="text-cyan-400 font-bold"><span id="stock-count-display">0 items</span> in Stock</span>
-        <span class="text-slate-500 font-bold">|</span>
-        <span id="eiv-status-text" class="text-amber-400 font-bold">EIV: Fetching...</span>
-      </div>
+    <div class="bg-[#0d1922] border border-green-600/40 px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+      <div id="summary-profit-sell-label" class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Net Profit (Sell Output)</div>
+      <div id="summary-profit-sell" class="text-lg font-bold text-green-400 mono leading-tight">0 ISK</div>
+      <div id="summary-roi-sell" class="text-[9px] text-green-400 truncate mt-0.5">ROI: 0%</div>
     </div>
 
-    <!-- Taxes & Broker Fees -->
-    <div class="flex items-center bg-[#0d1922] p-1.5 rounded-lg border border-[#1e3348] text-[10px] mono shadow flex-grow min-w-[340px] max-w-[380px]">
-      <div class="flex flex-col space-y-1 w-full">
-        <span class="text-amber-400 font-bold text-[9px] uppercase rajdhani leading-none">Taxes &amp; Fees:</span>
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-0.5" title="Facility Structure Tax %">
-            <span class="text-slate-400 font-semibold">Fac:</span>
-            <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-14 bg-[#070b0f] border border-[#1e3348] rounded text-center text-cyan-400 font-bold p-0.5 outline-none text-[10px]">
-            <span class="text-slate-500">%</span>
-          </div>
-          <div class="flex items-center space-x-0.5" title="SCC Surcharge %">
-            <span class="text-slate-400 font-semibold">SCC:</span>
-            <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-14 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-400 font-bold p-0.5 outline-none text-[10px]">
-            <span class="text-slate-500">%</span>
-          </div>
-          <div class="flex items-center space-x-0.5" title="Sales Tax %">
-            <span class="text-slate-400 font-semibold">Sales:</span>
-            <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-14 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-0.5 outline-none text-[10px]">
-            <span class="text-slate-500">%</span>
-          </div>
-          <div class="flex items-center space-x-0.5" title="Broker Fee %">
-            <span class="text-slate-400 font-semibold">Broker:</span>
-            <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-14 bg-[#070b0f] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-0.5 outline-none text-[10px]">
-            <span class="text-slate-500">%</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Contract Settings Panel -->
-    <div class="flex items-center bg-[#0d1922] p-1.5 rounded-lg border border-purple-500/40 text-[10px] mono shadow flex-grow max-w-[240px]">
-      <div class="flex flex-col space-y-1 w-full">
-        <span class="text-purple-400 font-bold text-[9px] uppercase rajdhani leading-none">Contract Settings:</span>
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-0.5" title="Contract Sales Tax %">
-            <span class="text-slate-400 font-semibold">C. Tax:</span>
-            <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-14 bg-[#070b0f] border border-[#1e3348] rounded text-center text-purple-400 font-bold p-0.5 outline-none text-[10px]">
-            <span class="text-slate-500">%</span>
-          </div>
-          <div class="flex items-center space-x-0.5" title="Contract Broker Fee %">
-            <span class="text-slate-400 font-semibold">C. Broker:</span>
-            <input type="number" id="contract-broker" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-14 bg-[#070b0f] border border-[#1e3348] rounded text-center text-purple-400 font-bold p-0.5 outline-none text-[10px]">
-            <span class="text-slate-500">%</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Hangar Stock Location / Container Filter Panel (Absorbs the remaining width of the screen cleanly!) -->
-    <div class="flex flex-col bg-[#0d1922] p-1.5 rounded-lg border border-[#1e3348] shadow flex-grow min-w-[360px]">
-      <div class="flex items-center justify-between mb-1">
-        <span class="text-cyan-400 text-[9px] font-bold uppercase rajdhani">Stock &amp; Location Filters:</span>
-        <span id="location-search-feedback" class="text-[8px] text-amber-300 font-mono font-bold hidden"></span>
-      </div>
-
-      <div class="flex items-center gap-1.5">
-        <select id="deduct-stock-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-bold text-[10px] outline-none">
-          <option value="true" selected>Deduct (ON)</option>
-          <option value="false">Off</option>
-        </select>
-
-        <label class="flex items-center space-x-0.5 cursor-pointer text-[#c8d8e8] font-bold text-[9px] mono">
-          <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3 h-3 accent-cyan-500">
-          <span>Pers</span>
-        </label>
-
-        <label class="flex items-center space-x-0.5 cursor-pointer text-[#c8d8e8] font-bold text-[9px] mono">
-          <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()" class="w-3 h-3 accent-cyan-500">
-          <span>Corp</span>
-        </label>
-
-        <!-- Search Station Box -->
-        <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter..." oninput="filterLocationDropdownOptions()" 
-          class="w-16 bg-[#070b0f] border border-[#1e3348] rounded p-1 text-slate-200 text-[10px] mono outline-none focus:border-cyan-500">
-
-        <!-- Station Dropdown -->
-        <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded p-1 text-amber-300 font-bold text-[10px] outline-none truncate w-32">
-          <option value="all" selected>All Locations (Combined Assets)</option>
-          <option value="industry_system">Current System Only (JITA)</option>
-        </select>
-      </div>
-    </div>
-
-  </section>
-
-  <!-- Dashboard Summary Bar (Ultra-Compact) -->
-  <section class="p-1.5 grid grid-cols-1 md:grid-cols-5 gap-2 bg-[#070b0f] relative z-10 border-b border-[#1e3348]/40">
-    <div class="bg-[#0d1922] border border-[#1e3348]/60 px-3 py-1.5 rounded shadow flex flex-col justify-center">
-      <div class="text-[9px] text-slate-400 uppercase font-bold mono truncate">Total Production Cost</div>
-      <div id="summary-build-cost" class="text-sm font-bold text-cyan-400 mono leading-tight">0 ISK</div>
-      <div id="summary-runs-subtext" class="text-[8px] text-slate-500 truncate">Mat: 0 + Fee: 0</div>
-    </div>
-
-    <div class="bg-[#0d1922] border border-amber-500/30 px-3 py-1.5 rounded shadow flex flex-col justify-center">
-      <div class="text-[9px] text-amber-300 uppercase font-bold mono truncate">Surplus Leftovers Credit</div>
-      <div id="summary-surplus-credit" class="text-sm font-bold text-amber-300 mono leading-tight">0 ISK</div>
-    </div>
-
-    <div class="bg-[#0d1922] border border-[#1e3348]/60 px-3 py-1.5 rounded shadow flex flex-col justify-center">
-      <div class="text-[9px] text-slate-400 uppercase font-bold mono truncate">Net Output Revenue</div>
-      <div id="summary-output-sell" class="text-sm font-bold text-amber-300 mono leading-tight">0 ISK</div>
-      <div id="summary-output-buy" class="text-[8px] text-slate-500 truncate">Instant Buy: 0 ISK</div>
-    </div>
-
-    <div class="bg-[#0d1922] border border-[#1e3348]/60 px-3 py-1.5 rounded shadow flex flex-col justify-center">
-      <div id="summary-profit-sell-label" class="text-[9px] text-slate-400 uppercase font-bold mono truncate">Net Profit (Sell Output)</div>
-      <div id="summary-profit-sell" class="text-sm font-bold text-green-400 mono leading-tight">0 ISK</div>
-      <div id="summary-roi-sell" class="text-[8px] text-green-400 truncate">ROI: 0%</div>
-    </div>
-
-    <div class="bg-[#0d1922] border border-[#1e3348]/60 px-3 py-1.5 rounded shadow flex flex-col justify-center">
-      <div class="text-[9px] text-slate-400 uppercase font-bold mono truncate">Net Profit (Instant Buy)</div>
-      <div id="summary-profit-buy" class="text-sm font-bold text-green-400 mono leading-tight">0 ISK</div>
-      <div id="summary-roi-buy" class="text-[8px] text-green-400 truncate">ROI: 0%</div>
+    <div class="bg-[#0d1922] border border-[#1e3348] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Net Profit (Instant Buy)</div>
+      <div id="summary-profit-buy" class="text-lg font-bold text-green-400 mono leading-tight">0 ISK</div>
+      <div id="summary-roi-buy" class="text-[9px] text-green-400 truncate mt-0.5">ROI: 0%</div>
     </div>
   </section>
 
-  <!-- Controls Navigation Hint Bar -->
-  <div class="bg-[#070b0f] border-t border-[#1e3348] px-6 py-1 mono text-slate-400 flex justify-between z-10 text-xs">
-    <span>💡 <b>Click Card:</b> Highlight Inputs &amp; Output | <b>Click BOM Row:</b> Center Material in Diagram | <b>Press [F]:</b> Center Target Output</span>
-    <span id="zoom-level-text">Zoom: 100%</span>
-  </div>
-
-  <!-- Main Split Layout -->
+  <!-- Main Split Layout: Control Sidebar | Diagram Viewport | Bill of Materials -->
   <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- Control Sidebar: everything that used to be crammed into two toolbar rows, now grouped into
+         clear, spacious, labeled sections. Frequently-used sections (Search, Build, Optimizers,
+         System, Stock) are open by default; set-once sections (Taxes, Contracts) start collapsed. -->
+    <aside id="control-sidebar" class="w-full md:w-[300px] xl:w-[320px] bg-[#0c1318] border-r border-[#1e3348] flex flex-col overflow-y-auto shadow-2xl z-30 flex-shrink-0 scrollbar-thin">
+
+      <!-- Search & Pricing -->
+      <div class="p-3.5 border-b border-[#1e3348]">
+        <h2 class="text-cyan-400 font-bold uppercase text-xs rajdhani tracking-wider mb-2 flex items-center gap-1.5">🔍 Search &amp; Pricing</h2>
+        <div class="relative mb-2">
+          <input type="text" id="item-search" autocomplete="off" placeholder="Search item to build..."
+            class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-2 text-white font-bold focus:border-cyan-500 outline-none mono text-sm shadow-inner">
+          <div id="search-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
+        </div>
+        <div class="flex gap-2">
+          <select id="input-price-mode" onchange="recalculate()" class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-white font-bold text-[11px] outline-none">
+            <option value="sell" selected>Sell (Instant)</option>
+            <option value="buy">Buy Order</option>
+          </select>
+          <select id="include-reactions" onchange="if(currentProduct) selectItem(currentProduct.id, currentProduct.name, true)" class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-purple-300 font-bold text-[11px] outline-none">
+            <option value="true" selected>Reactions ON</option>
+            <option value="false">Reactions OFF</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Build Actions -->
+      <div class="p-3.5 border-b border-[#1e3348]">
+        <h2 class="text-green-400 font-bold uppercase text-xs rajdhani tracking-wider mb-2 flex items-center gap-1.5">🔨 Build Actions</h2>
+        <div class="grid grid-cols-2 gap-2 mb-2">
+          <button onclick="buildAllComponents()" class="bg-green-800/90 hover:bg-green-700 text-white font-bold py-2 px-2 rounded-md text-xs mono transition shadow border border-green-600/40">
+            🔨 Build All
+          </button>
+          <button onclick="buyAllSubComponents()" class="bg-slate-700/90 hover:bg-slate-600 text-white font-bold py-2 px-2 rounded-md text-xs mono transition shadow border border-slate-500/40">
+            🛒 Buy All
+          </button>
+        </div>
+        <div class="bg-[#070b0f] p-2 rounded-md border border-green-500/30 flex items-center gap-1.5" title="Build Margin Threshold">
+          <span class="text-slate-400 text-[10px] font-bold flex-shrink-0">Min Profit:</span>
+          <input type="number" id="build-profit-threshold" value="5.0" step="0.5" min="0" max="100"
+            class="w-14 bg-[#0d1922] border border-green-500/40 text-center text-green-300 font-bold rounded p-1 outline-none text-xs">
+          <span class="text-slate-500 text-xs flex-shrink-0">%</span>
+          <button onclick="applyBuildProfitOptimizer()" class="ml-auto bg-green-800 hover:bg-green-700 text-white font-semibold py-1 px-2 rounded text-[10px] transition shadow mono flex-shrink-0">
+            ⚡ Apply
+          </button>
+        </div>
+      </div>
+
+      <!-- Smart Optimizers -->
+      <div class="p-3.5 border-b border-[#1e3348]">
+        <h2 class="text-amber-300 font-bold uppercase text-xs rajdhani tracking-wider mb-2 flex items-center gap-1.5">⚡ Smart Optimizers</h2>
+        <div class="space-y-2">
+          <div class="bg-[#070b0f] p-2 rounded-md border border-[#1e3348] flex items-center gap-1.5" title="Component Market Spread Threshold">
+            <span class="text-slate-400 text-[10px] flex-shrink-0">Spread:</span>
+            <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100"
+              class="w-14 bg-[#0d1922] border border-amber-500/40 text-center text-amber-300 font-bold rounded p-1 outline-none text-xs">
+            <span class="text-slate-500 text-xs flex-shrink-0">%</span>
+            <button onclick="applyComponentSpreadOptimizer()" class="ml-auto bg-amber-700 hover:bg-amber-600 text-white font-semibold py-1 px-2 rounded text-[10px] transition flex-shrink-0">
+              Optimize
+            </button>
+          </div>
+          <div class="bg-[#070b0f] p-2 rounded-md border border-[#1e3348] flex items-center gap-1.5" title="Build Cost Savings Impact Threshold">
+            <span class="text-slate-400 text-[10px] flex-shrink-0">Budget:</span>
+            <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100"
+              class="w-14 bg-[#0d1922] border border-cyan-500/40 text-center text-cyan-300 font-bold rounded p-1 outline-none text-xs">
+            <span class="text-slate-500 text-xs flex-shrink-0">%</span>
+            <button onclick="applyBudgetImpactOptimizer()" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-white font-semibold py-1 px-2 rounded text-[10px] transition flex-shrink-0">
+              Optimize
+            </button>
+          </div>
+          <button onclick="resetSmartBuyModes()" class="w-full text-slate-400 hover:text-white hover:border-slate-500 text-[11px] mono transition py-1.5 border border-[#1e3348] rounded-md" title="Reset buy modes">
+            Reset Buy Modes
+          </button>
+        </div>
+      </div>
+
+      <!-- System & Structure -->
+      <details open class="border-b border-[#1e3348] group">
+        <summary class="p-3.5 cursor-pointer text-cyan-400 font-bold uppercase text-xs rajdhani tracking-wider select-none hover:bg-[#0d1922] flex items-center justify-between list-none">
+          <span class="flex items-center gap-1.5">🏭 System &amp; Structure</span>
+          <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
+        </summary>
+        <div class="px-3.5 pb-3.5 space-y-2">
+          <div class="relative">
+            <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="System..."
+              class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-2 text-cyan-300 font-bold mono uppercase focus:border-cyan-500 outline-none text-sm">
+            <div id="system-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
+          </div>
+          <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); recalculate();" class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-2 text-white font-semibold text-xs outline-none" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
+            <option value="npc">NPC Station (0% ME / 0% TE / 0% Fee)</option>
+            <option value="raitaru">Raitaru - M EC (1% ME / 15% TE / 3% Fee)</option>
+            <option value="azbel">Azbel - L EC (1% ME / 20% TE / 4% Fee)</option>
+            <option value="sotiyo" selected>Sotiyo - XL EC (1% ME / 30% TE / 5% Fee)</option>
+          </select>
+          <div title="Search and select the actual rigs fitted in your structure (each Engineering Complex has 3 rig slots). Rigs only affect the specific item category and ship size they're built for. Bonus strength scales with your system's security status automatically.">
+            <div class="text-slate-400 text-[10px] font-bold uppercase tracking-wide mb-1">Rig Slots (search to fit)</div>
+            <div class="space-y-1.5">
+              <div class="relative">
+                <input type="text" id="rig-slot-1-input" placeholder="Rig Slot 1: None" autocomplete="off"
+                  oninput="searchRigSlot(1, this.value)" onfocus="searchRigSlot(1, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-1-results'); if (el) el.classList.add('hidden'); }, 200)"
+                  class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-cyan-300 font-semibold text-[11px] outline-none focus:border-cyan-500">
+                <div id="rig-slot-1-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+              </div>
+              <div class="relative">
+                <input type="text" id="rig-slot-2-input" placeholder="Rig Slot 2: None" autocomplete="off"
+                  oninput="searchRigSlot(2, this.value)" onfocus="searchRigSlot(2, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-2-results'); if (el) el.classList.add('hidden'); }, 200)"
+                  class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-cyan-300 font-semibold text-[11px] outline-none focus:border-cyan-500">
+                <div id="rig-slot-2-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+              </div>
+              <div class="relative">
+                <input type="text" id="rig-slot-3-input" placeholder="Rig Slot 3: None" autocomplete="off"
+                  oninput="searchRigSlot(3, this.value)" onfocus="searchRigSlot(3, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-3-results'); if (el) el.classList.add('hidden'); }, 200)"
+                  class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-cyan-300 font-semibold text-[11px] outline-none focus:border-cyan-500">
+                <div id="rig-slot-3-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+              </div>
+            </div>
+          </div>
+          <div class="bg-[#070b0f] rounded-md p-2 border border-[#1e3348] space-y-1 text-[10px] mono">
+            <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">SCI:</span><span id="sci-badge" class="text-amber-300 font-bold text-right truncate">SCI: 4.25% (Mfg) / 1.10% (React)</span></div>
+            <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">Stock:</span><span id="stock-status-text" class="text-cyan-400 font-bold text-right truncate"><span id="stock-count-display">0 items</span> in Stock</span></div>
+            <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">EIV:</span><span id="eiv-status-text" class="text-amber-400 font-bold text-right truncate">Fetching...</span></div>
+          </div>
+        </div>
+      </details>
+
+      <!-- Taxes & Fees (collapsed by default - set-once values) -->
+      <details class="border-b border-[#1e3348] group">
+        <summary class="p-3.5 cursor-pointer text-amber-400 font-bold uppercase text-xs rajdhani tracking-wider select-none hover:bg-[#0d1922] flex items-center justify-between list-none">
+          <span class="flex items-center gap-1.5">💰 Taxes &amp; Fees</span>
+          <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
+        </summary>
+        <div class="px-3.5 pb-3.5 grid grid-cols-2 gap-2 text-[11px] mono">
+          <div class="flex items-center gap-1.5 bg-[#070b0f] rounded-md p-1.5 border border-[#1e3348]" title="Facility Structure Tax %">
+            <span class="text-slate-400 font-semibold flex-shrink-0">Fac:</span>
+            <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#0d1922] border border-[#1e3348] rounded text-center text-cyan-400 font-bold p-1 outline-none text-[11px]">
+            <span class="text-slate-500 flex-shrink-0">%</span>
+          </div>
+          <div class="flex items-center gap-1.5 bg-[#070b0f] rounded-md p-1.5 border border-[#1e3348]" title="SCC Surcharge %">
+            <span class="text-slate-400 font-semibold flex-shrink-0">SCC:</span>
+            <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#0d1922] border border-[#1e3348] rounded text-center text-amber-400 font-bold p-1 outline-none text-[11px]">
+            <span class="text-slate-500 flex-shrink-0">%</span>
+          </div>
+          <div class="flex items-center gap-1.5 bg-[#070b0f] rounded-md p-1.5 border border-[#1e3348]" title="Sales Tax %">
+            <span class="text-slate-400 font-semibold flex-shrink-0">Sales:</span>
+            <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#0d1922] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-1 outline-none text-[11px]">
+            <span class="text-slate-500 flex-shrink-0">%</span>
+          </div>
+          <div class="flex items-center gap-1.5 bg-[#070b0f] rounded-md p-1.5 border border-[#1e3348]" title="Broker Fee %">
+            <span class="text-slate-400 font-semibold flex-shrink-0">Broker:</span>
+            <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#0d1922] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-1 outline-none text-[11px]">
+            <span class="text-slate-500 flex-shrink-0">%</span>
+          </div>
+        </div>
+      </details>
+
+      <!-- Contract Settings (collapsed by default - set-once values) -->
+      <details class="border-b border-[#1e3348] group">
+        <summary class="p-3.5 cursor-pointer text-purple-400 font-bold uppercase text-xs rajdhani tracking-wider select-none hover:bg-[#0d1922] flex items-center justify-between list-none">
+          <span class="flex items-center gap-1.5">📜 Contract Settings</span>
+          <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
+        </summary>
+        <div class="px-3.5 pb-3.5 grid grid-cols-2 gap-2 text-[11px] mono">
+          <div class="flex items-center gap-1.5 bg-[#070b0f] rounded-md p-1.5 border border-[#1e3348]" title="Contract Sales Tax %">
+            <span class="text-slate-400 font-semibold flex-shrink-0">C.Tax:</span>
+            <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#0d1922] border border-[#1e3348] rounded text-center text-purple-400 font-bold p-1 outline-none text-[11px]">
+            <span class="text-slate-500 flex-shrink-0">%</span>
+          </div>
+          <div class="flex items-center gap-1.5 bg-[#070b0f] rounded-md p-1.5 border border-[#1e3348]" title="Contract Broker Fee %">
+            <span class="text-slate-400 font-semibold flex-shrink-0">C.Brk:</span>
+            <input type="number" id="contract-broker" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#0d1922] border border-[#1e3348] rounded text-center text-purple-400 font-bold p-1 outline-none text-[11px]">
+            <span class="text-slate-500 flex-shrink-0">%</span>
+          </div>
+        </div>
+      </details>
+
+      <!-- Stock & Location Filters -->
+      <details open class="group">
+        <summary class="p-3.5 cursor-pointer text-cyan-400 font-bold uppercase text-xs rajdhani tracking-wider select-none hover:bg-[#0d1922] flex items-center justify-between list-none">
+          <span class="flex items-center gap-1.5">📦 Stock &amp; Location <span id="location-search-feedback" class="text-[9px] text-amber-300 font-mono font-bold normal-case hidden"></span></span>
+          <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
+        </summary>
+        <div class="px-3.5 pb-3.5 space-y-2">
+          <div class="flex items-center gap-2">
+            <select id="deduct-stock-mode" onchange="recalculate()" class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-cyan-300 font-bold text-[11px] outline-none">
+              <option value="true" selected>Deduct (ON)</option>
+              <option value="false">Off</option>
+            </select>
+            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+              <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
+              <span>Pers</span>
+            </label>
+            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+              <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
+              <span>Corp</span>
+            </label>
+          </div>
+          <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterLocationDropdownOptions()"
+            class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-cyan-500">
+          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-amber-300 font-bold text-[11px] outline-none truncate">
+            <option value="all" selected>All Locations (Combined Assets)</option>
+            <option value="industry_system">Current System Only (JITA)</option>
+          </select>
+        </div>
+      </details>
+
+    </aside>
 
     <!-- Interactive Diagram Viewport -->
     <main class="flex-1 relative bg-[#05080c] border-t border-[#1e3348]" id="viewport" onclick="clearHighlight()">
@@ -323,6 +294,22 @@
         <div id="tree-container" class="relative flex justify-center items-center space-x-24 p-24 min-w-max min-h-max">
           <!-- Diagram nodes rendered here -->
         </div>
+      </div>
+
+      <!-- Floating viewport controls: view-related actions live on the canvas they act on -->
+      <div class="absolute top-3 right-3 z-40 flex items-center gap-2 mono text-xs" onclick="event.stopPropagation()">
+        <span id="zoom-level-text" class="px-2.5 py-1.5 bg-[#0c1318]/90 border border-[#1e3348] rounded-md text-slate-400 shadow-lg">Zoom: 100%</span>
+        <button onclick="centerOnSelectedNode()" class="px-3 py-1.5 bg-[#0c1318]/90 hover:bg-cyan-600 border border-[#1e3348] text-white font-bold rounded-md transition shadow-lg" title="Center on selected card, or the final output if nothing is selected">
+          🎯 Center [F]
+        </button>
+        <button onclick="resetPanZoom()" class="px-3 py-1.5 bg-[#0c1318]/90 hover:bg-cyan-600 border border-[#1e3348] text-white font-bold rounded-md transition shadow-lg">
+          ⟳ Reset View
+        </button>
+      </div>
+
+      <!-- Floating controls hint -->
+      <div class="absolute bottom-3 left-3 z-40 px-3 py-1.5 bg-[#0c1318]/90 border border-[#1e3348] rounded-md mono text-slate-400 text-[11px] shadow-lg max-w-lg">
+        💡 <b>Click Card:</b> Highlight Inputs &amp; Output &nbsp;|&nbsp; <b>Click BOM Row:</b> Center Material &nbsp;|&nbsp; <b>[F]:</b> Center Output
       </div>
     </main>
 
@@ -386,11 +373,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=3.5.0"></script>
-  <script src="js/config.js?v=3.5.0"></script>
-  <script src="js/esi.js?v=3.5.0"></script>
-  <script src="js/tree.js?v=3.5.0"></script>
-  <script src="js/optimizers.js?v=3.5.0"></script>
-  <script src="js/app.js?v=3.5.0"></script>
+  <script src="eve_db.js?v=3.6.0"></script>
+  <script src="js/config.js?v=3.6.0"></script>
+  <script src="js/esi.js?v=3.6.0"></script>
+  <script src="js/tree.js?v=3.6.0"></script>
+  <script src="js/optimizers.js?v=3.6.0"></script>
+  <script src="js/app.js?v=3.6.0"></script>
 </body>
 </html>
