@@ -448,7 +448,7 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
         }
 
         const me = isReaction ? 0 : node.customME;
-        const facility = document.getElementById('facility-select')?.value || '0.01';
+        const facility = (window.getActiveStructureType ? window.getActiveStructureType().meBonus : 1.0) / 100;
         // Rig ME bonus matches the category of what THIS node is manufacturing (its own product),
         // not the raw materials being consumed - an Ammunition rig reduces materials needed to BUILD
         // ammo, regardless of which specific minerals/components go into it.

@@ -135,7 +135,34 @@ const POPULAR_ITEMS = [
 ];
 window.POPULAR_ITEMS = POPULAR_ITEMS;
 
-// --- Structure Rig System ---
+// --- Unified Structure Type System ---
+// A station/structure is ONE thing - it can't simultaneously be "Raitaru" in one dropdown and
+// "Sotiyo" in another. This table is the single source of truth for every bonus a structure type
+// grants (ME, TE, and job-fee/cost reduction), replacing what used to be two separate, and therefore
+// occasionally self-contradictory, dropdowns.
+// Numbers confirmed via CCP's official "Building Dreams: Introducing Engineering Complexes" dev blog:
+// Raitaru: 1% ME / 15% TE (cost bonus not directly quoted in that source - 3% is inferred from the
+// clear ascending progression 3/4/5 that matches the 15/20/30 TE progression, not independently
+// confirmed the way Azbel/Sotiyo's cost bonus is). Azbel: 1% ME / 20% TE / 4% cost (confirmed).
+// Sotiyo: 1% ME / 30% TE / 5% cost (confirmed). NOTE: this corrects a bug in this app's own prior
+// dropdown, which had listed Sotiyo's fee bonus as -3% instead of the correct -5%.
+const STRUCTURE_TYPES = {
+  npc:     { label: 'NPC Station',        shortLabel: 'NPC Station', meBonus: 0.0, teBonus: 0.0,  costBonus: 0.0 },
+  raitaru: { label: 'Raitaru (M Engineering Complex)', shortLabel: 'Raitaru', meBonus: 1.0, teBonus: 15.0, costBonus: 3.0 },
+  azbel:   { label: 'Azbel (L Engineering Complex)',   shortLabel: 'Azbel',   meBonus: 1.0, teBonus: 20.0, costBonus: 4.0 },
+  sotiyo:  { label: 'Sotiyo (XL Engineering Complex)', shortLabel: 'Sotiyo',  meBonus: 1.0, teBonus: 30.0, costBonus: 5.0 }
+};
+window.STRUCTURE_TYPES = STRUCTURE_TYPES;
+
+// The single canonical read of "what structure am I in" - everything (ME calc, TE calc, job fee calc)
+// should call this instead of reading separate DOM elements or maintaining its own copy of the numbers.
+function getActiveStructureType() {
+  const key = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
+  return STRUCTURE_TYPES[key] || STRUCTURE_TYPES.npc;
+}
+window.getActiveStructureType = getActiveStructureType;
+
+
 // Real rig items are discovered directly from the generated database (window.EVE_ITEMS +
 // window.EVE_GROUP_NAMES), not hand-typed - there are dozens of distinct rigs (per size tier, per
 // ship-size class, per tech tier), and a fixed 5-bucket list can't represent that. A rig only affects
@@ -225,16 +252,40 @@ function classifyShipSize(groupName) {
 }
 window.classifyShipSize = classifyShipSize;
 
+// Classifies whether a ship is "Basic" (Tech 1, including most faction/pirate hulls which typically
+// share a T1 group) or "Advanced" (Tech 2/Tech 3), from its real item group name. T1 hulls sit in a
+// small, fixed set of generic group names; T2/T3 hulls almost always get their own distinct group
+// (e.g. "Assault Frigate", "Heavy Assault Cruiser", "Strategic Cruiser") - this avoids needing
+// per-item tech-level data, which ESI doesn't expose in bulk (only one-call-per-item, impractical for
+// 35,000+ items). Confirmed via in-game rig description: "Advanced" rigs affect "Tech 2 frigates,
+// Tech 2 and Tech 3 destroyers" etc.
+const T1_GENERIC_SHIP_GROUPS = new Set([
+  'frigate', 'destroyer', 'cruiser', 'battlecruiser', 'battleship', 'industrial',
+  'mining barge', 'freighter', 'shuttle', 'corvette', 'capsule'
+]);
+function classifyShipTechClass(groupName) {
+  if (!groupName) return null;
+  const g = groupName.toLowerCase().trim();
+  if (T1_GENERIC_SHIP_GROUPS.has(g)) return 'basic';
+  return 'advanced'; // specialized/named group - T2, T3, or similar
+}
+window.classifyShipTechClass = classifyShipTechClass;
+
 // Checks whether a parsed rig actually affects a given product, based on real category/group data.
-// NOTE (disclosed limitation): "Basic" vs "Advanced" (T1 vs T2/T3 hulls) can't be distinguished here -
-// this app doesn't have tech-level data per item, so both match any hull of the stated size.
 function doesRigMatchProduct(parsed, typeId) {
   const catId = window.EVE_CATEGORIES ? window.EVE_CATEGORIES[typeId] : undefined;
   const label = parsed.categoryLabel.toLowerCase();
   if (label === 'ship' || label.includes('ship')) {
     if (catId !== 6) return false;
-    if (label === 'ship') return true; // sizeless XL-tier rig - any ship
-    const sizeClass = classifyShipSize(window.EVE_GROUP_NAMES ? window.EVE_GROUP_NAMES[typeId] : null);
+    const groupName = window.EVE_GROUP_NAMES ? window.EVE_GROUP_NAMES[typeId] : null;
+    // "Basic" rigs affect Tech 1 hulls, "Advanced" rigs affect Tech 2/3 hulls - confirmed via the
+    // in-game rig description. A sizeless XL-tier "Ship" rig has no spec and matches any tech class.
+    if (parsed.spec) {
+      const techClass = classifyShipTechClass(groupName);
+      if (techClass !== parsed.spec.toLowerCase()) return false;
+    }
+    if (label === 'ship') return true; // sizeless XL-tier rig - any ship, tech class already checked above
+    const sizeClass = classifyShipSize(groupName);
     if (label.includes('small')) return sizeClass === 'small';
     if (label.includes('medium')) return sizeClass === 'medium';
     if (label.includes('large')) return sizeClass === 'large';

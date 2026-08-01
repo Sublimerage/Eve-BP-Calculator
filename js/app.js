@@ -21,11 +21,8 @@ function calculateAdjustedJobSeconds(baseTimeSeconds, customTE, runsNeeded, isRe
   const skillTimeFactor = indFactor * advIndFactor;
   const te = isReaction ? 0 : (customTE || 0);
   const teFactor = 1 - (te / 100);
-  const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
-  let facilityFactor = 1.0;
-  if (activeFacilityKey === 'sotiyo') facilityFactor = 0.70;
-  else if (activeFacilityKey === 'azbel') facilityFactor = 0.80;
-  else if (activeFacilityKey === 'raitaru') facilityFactor = 0.85;
+  const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { teBonus: 30.0 };
+  const facilityFactor = 1 - (structureType.teBonus / 100);
   const rigTEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(productTypeId, 'TE') : 0;
   const rigFactor = 1 - (rigTEBonus / 100);
   return baseTimeSeconds * teFactor * skillTimeFactor * facilityFactor * rigFactor * (runsNeeded || 1);
@@ -63,13 +60,9 @@ function syncTreeOverrides(node) {
 
 function saveTaxSettings() {
   try {
-    const facilitySelectEl = document.getElementById('facility-select');
-    const selectedText = facilitySelectEl ? facilitySelectEl.options[facilitySelectEl.selectedIndex].text.toLowerCase() : 'npc';
-    let facilityKey = 'npc';
-    if (selectedText.includes('sotiyo')) facilityKey = 'sotiyo';
-    else if (selectedText.includes('azbel')) facilityKey = 'azbel';
-    else if (selectedText.includes('raitaru')) facilityKey = 'raitaru';
-
+    // facility-select's value is now the structure key itself (npc/raitaru/azbel/sotiyo) - a structure
+    // is one thing at a time, so there's exactly one place this is read from.
+    const facilityKey = document.getElementById('facility-select')?.value || 'sotiyo';
     localStorage.setItem('eve_active_facility_key', facilityKey);
 
     // Rig slot typeIds are written directly by selectRigForSlot() when the user picks one from the
@@ -83,8 +76,7 @@ function saveTaxSettings() {
       sccSurcharge: document.getElementById('scc-surcharge')?.value,
       salesTax: document.getElementById('sales-tax')?.value,
       brokerFee: document.getElementById('broker-fee')?.value,
-      facilitySelect: document.getElementById('facility-select')?.value,
-      structureRoleBonus: document.getElementById('structure-role-bonus')?.value,
+      facilitySelect: facilityKey,
       contractTax: document.getElementById('contract-tax')?.value,
       contractBroker: document.getElementById('contract-broker')?.value,
       rigSlot1: rigSlot1,
@@ -94,6 +86,15 @@ function saveTaxSettings() {
     localStorage.setItem('eve_tax_settings', JSON.stringify(settings));
   } catch (e) {}
 }
+
+// Called immediately when the structure-type dropdown changes, so the canonical localStorage key is
+// updated right away (saveTaxSettings also does this, but this makes the single-source-of-truth
+// intent explicit and keeps it working even if saveTaxSettings' own logic changes later).
+function onStructureTypeChange() {
+  const facilityKey = document.getElementById('facility-select')?.value || 'sotiyo';
+  localStorage.setItem('eve_active_facility_key', facilityKey);
+}
+window.onStructureTypeChange = onStructureTypeChange;
 
 function loadTaxSettings() {
   try {
@@ -105,7 +106,6 @@ function loadTaxSettings() {
       if (settings.salesTax !== undefined && document.getElementById('sales-tax')) document.getElementById('sales-tax').value = settings.salesTax;
       if (settings.brokerFee !== undefined && document.getElementById('broker-fee')) document.getElementById('broker-fee').value = settings.brokerFee;
       if (settings.facilitySelect !== undefined && document.getElementById('facility-select')) document.getElementById('facility-select').value = settings.facilitySelect;
-      if (settings.structureRoleBonus !== undefined && document.getElementById('structure-role-bonus')) document.getElementById('structure-role-bonus').value = settings.structureRoleBonus;
       if (settings.contractTax !== undefined && document.getElementById('contract-tax')) document.getElementById('contract-tax').value = settings.contractTax;
       if (settings.contractBroker !== undefined && document.getElementById('contract-broker')) document.getElementById('contract-broker').value = settings.contractBroker;
     }
@@ -457,14 +457,15 @@ function recalculate() {
   const brokerFee = (parseFloat(document.getElementById('broker-fee')?.value) || 1.0) / 100;
   const facilityTax = (parseFloat(document.getElementById('facility-tax')?.value) || 1.0) / 100;
   const sccSurcharge = (parseFloat(document.getElementById('scc-surcharge')?.value) || 4.0) / 100;
-  const structureRoleBonus = parseFloat(document.getElementById('structure-role-bonus')?.value) || 0.03;
+  const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { costBonus: 5.0, meBonus: 1.0 };
+  const structureRoleBonus = structureType.costBonus / 100;
 
   const contractTaxPercent = parseFloat(document.getElementById('contract-tax')?.value) || 0.5;
   const contractBrokerPercent = parseFloat(document.getElementById('contract-broker')?.value) || 0.5;
   const contractTaxRate = contractTaxPercent / 100;
   const contractBrokerRate = contractBrokerPercent / 100;
 
-  const facility = document.getElementById('facility-select')?.value || '0.01';
+  const facility = structureType.meBonus / 100;
   const priceStrategy = document.getElementById('input-price-mode')?.value || 'sell';
 
   const rootYield = window.recipeTreeRoot.batchYield || 1;
@@ -723,12 +724,9 @@ function createNodeCard(node) {
   if (node.isBuildingSelf && node.isManufacturable) {
     const baseTime = extractBuildTime(node.recipe);
     const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
-    const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
-    let structureName = 'NPC Station';
-    let structureTEBonus = '0%';
-    if (activeFacilityKey === 'sotiyo') { structureName = 'Sotiyo'; structureTEBonus = '30%'; }
-    else if (activeFacilityKey === 'azbel') { structureName = 'Azbel'; structureTEBonus = '20%'; }
-    else if (activeFacilityKey === 'raitaru') { structureName = 'Raitaru'; structureTEBonus = '15%'; }
+    const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { shortLabel: 'Sotiyo', teBonus: 30.0 };
+    const structureName = structureType.shortLabel;
+    const structureTEBonus = `${structureType.teBonus}%`;
     const rigTEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(node.productTypeId, 'TE') : 0;
 
     if (baseTime > 0) {

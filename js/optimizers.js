@@ -112,8 +112,9 @@ async function applyBuildProfitOptimizer() {
 
   const facilityTax = (parseFloat(document.getElementById('facility-tax')?.value) || 1.0) / 100;
   const sccSurcharge = (parseFloat(document.getElementById('scc-surcharge')?.value) || 4.0) / 100;
-  const structureRoleBonus = parseFloat(document.getElementById('structure-role-bonus')?.value) || 0.03;
-  const facility = document.getElementById('facility-select')?.value || '0.01';
+  const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { costBonus: 5.0, meBonus: 1.0 };
+  const structureRoleBonus = structureType.costBonus / 100;
+  const facility = structureType.meBonus / 100;
   const brokerFee = (parseFloat(document.getElementById('broker-fee')?.value) || 1.0) / 100;
 
   // Helper to run a silent simulation test for profit under given build overrides

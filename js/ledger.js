@@ -233,11 +233,8 @@ function renderActiveJobsList(allocatedStock) {
         const indFactor = 1 - (0.04 * (skills.industry || 0));
         const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
         const skillTimeFactor = indFactor * advIndFactor;
-        const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
-        let facilityFactor = 1.0;
-        if (activeFacilityKey === 'sotiyo') facilityFactor = 0.70;
-        else if (activeFacilityKey === 'azbel') facilityFactor = 0.80;
-        else if (activeFacilityKey === 'raitaru') facilityFactor = 0.85;
+        const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { teBonus: 30.0 };
+        const facilityFactor = 1 - (structureType.teBonus / 100);
         const rigTEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(job.productTypeId, 'TE') : 0;
         const rigFactor = 1 - (rigTEBonus / 100);
         totalBuildSeconds = baseTime * skillTimeFactor * facilityFactor * rigFactor * (job.runsNeeded || 1);
@@ -246,11 +243,8 @@ function renderActiveJobsList(allocatedStock) {
       }
     }
     const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
-    const activeFacilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
-    let structureName = 'NPC Station';
-    if (activeFacilityKey === 'sotiyo') structureName = 'Sotiyo';
-    else if (activeFacilityKey === 'azbel') structureName = 'Azbel';
-    else if (activeFacilityKey === 'raitaru') structureName = 'Raitaru';
+    const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { shortLabel: 'Sotiyo' };
+    const structureName = structureType.shortLabel;
     const rigTEBonusDisplay = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(job.productTypeId, 'TE') : 0;
 
     if (totalBuildSeconds > 0) {
