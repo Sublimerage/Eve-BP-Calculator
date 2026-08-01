@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Industry Ledger</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=3.1.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=3.3.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -162,15 +162,11 @@
           <option value="0.03" selected>Sotiyo (-3% Fee)</option>
           <option value="0.0">NPC / None (0%)</option>
         </select>
-        <div class="flex items-center space-x-0.5" title="Additional Material Efficiency bonus from any rig installed in your structure (on top of the structure's base ME bonus above). Depends on rig tier, category, and system security - enter what your own structure's rig provides.">
-          <span class="text-slate-400 font-semibold text-[9px]">Rig ME:</span>
-          <input type="number" id="rig-me-bonus" value="0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-11 bg-[#070b0f] border border-[#1e3348] rounded text-center text-cyan-300 font-bold p-0.5 outline-none text-[10px]">
-          <span class="text-slate-500 text-[9px]">%</span>
-        </div>
-        <div class="flex items-center space-x-0.5" title="Additional Time Efficiency bonus from any rig installed in your structure (on top of the structure's base TE bonus above). Depends on rig tier, category, and system security - enter what your own structure's rig provides.">
-          <span class="text-slate-400 font-semibold text-[9px]">Rig TE:</span>
-          <input type="number" id="rig-te-bonus" value="0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-11 bg-[#070b0f] border border-[#1e3348] rounded text-center text-cyan-300 font-bold p-0.5 outline-none text-[10px]">
-          <span class="text-slate-500 text-[9px]">%</span>
+        <div class="flex items-center space-x-1" title="Select the actual rigs fitted in your structure (each Engineering Complex has 3 rig slots). Rigs only affect the item categories they're built for - e.g. an Ammunition rig won't help you build ships. Bonus strength scales with your system's security status automatically.">
+          <span class="text-slate-400 font-semibold text-[9px]">Rigs:</span>
+          <select id="rig-slot-1" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-semibold text-[9px] outline-none w-20"></select>
+          <select id="rig-slot-2" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-semibold text-[9px] outline-none w-20"></select>
+          <select id="rig-slot-3" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-semibold text-[9px] outline-none w-20"></select>
         </div>
       </div>
       <!-- SCI, Stock, and EIV Prices Status directly underneath! -->
@@ -379,11 +375,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=3.1.0"></script>
-  <script src="js/config.js?v=3.1.0"></script>
-  <script src="js/esi.js?v=3.1.0"></script>
-  <script src="js/tree.js?v=3.1.0"></script>
-  <script src="js/optimizers.js?v=3.1.0"></script>
-  <script src="js/app.js?v=3.1.0"></script>
+  <script src="eve_db.js?v=3.3.0"></script>
+  <script src="js/config.js?v=3.3.0"></script>
+  <script src="js/esi.js?v=3.3.0"></script>
+  <script src="js/tree.js?v=3.3.0"></script>
+  <script src="js/optimizers.js?v=3.3.0"></script>
+  <script src="js/app.js?v=3.3.0"></script>
 </body>
 </html>
