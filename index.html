@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Industry Ledger</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=3.4.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=3.5.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -152,15 +152,11 @@
             class="w-full bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-bold mono uppercase focus:border-cyan-500 outline-none text-[11px]">
           <div id="system-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
         </div>
-        <select id="facility-select" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-white font-semibold text-[10px] outline-none w-24">
-          <option value="0.0">NPC Station (0% ME / 0% TE)</option>
-          <option value="0.01">Raitaru (1% ME / 15% TE)</option>
-          <option value="0.01">Azbel (1% ME / 20% TE)</option>
-          <option value="0.01" selected>Sotiyo (1% ME / 30% TE)</option>
-        </select>
-        <select id="structure-role-bonus" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-amber-300 font-bold text-[10px] outline-none w-28">
-          <option value="0.03" selected>Sotiyo (-3% Fee)</option>
-          <option value="0.0">NPC / None (0%)</option>
+        <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-white font-semibold text-[10px] outline-none w-40" title="A structure is one thing at a time - this single selection now drives ME, TE, AND job-fee bonuses together, instead of the old two separate (and occasionally contradictory) dropdowns.">
+          <option value="npc">NPC Station (0% ME / 0% TE / 0% Fee)</option>
+          <option value="raitaru">Raitaru - M EC (1% ME / 15% TE / 3% Fee)</option>
+          <option value="azbel">Azbel - L EC (1% ME / 20% TE / 4% Fee)</option>
+          <option value="sotiyo" selected>Sotiyo - XL EC (1% ME / 30% TE / 5% Fee)</option>
         </select>
       </div>
       <div class="flex items-center gap-1 flex-wrap mt-1" title="Search and select the actual rigs fitted in your structure (each Engineering Complex has 3 rig slots). Rigs only affect the specific item category and ship size they're built for - e.g. a Small Ship rig won't help you build a Battleship. Bonus strength scales with your system's security status automatically.">
@@ -390,11 +386,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=3.4.0"></script>
-  <script src="js/config.js?v=3.4.0"></script>
-  <script src="js/esi.js?v=3.4.0"></script>
-  <script src="js/tree.js?v=3.4.0"></script>
-  <script src="js/optimizers.js?v=3.4.0"></script>
-  <script src="js/app.js?v=3.4.0"></script>
+  <script src="eve_db.js?v=3.5.0"></script>
+  <script src="js/config.js?v=3.5.0"></script>
+  <script src="js/esi.js?v=3.5.0"></script>
+  <script src="js/tree.js?v=3.5.0"></script>
+  <script src="js/optimizers.js?v=3.5.0"></script>
+  <script src="js/app.js?v=3.5.0"></script>
 </body>
 </html>
