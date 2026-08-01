@@ -13,6 +13,14 @@ function extractBuildTime(recipe) {
 // Applies TE research, character skills (Industry/Advanced Industry), and the selected facility's
 // time bonus to a single job's raw SDE duration. Reactions can't be TE-researched, so TE is ignored
 // for them. Shared by the per-card time display, the total-tree time summary, and the ledger.
+const _loggedSkillDiagnosticIds = new Set();
+function logSkillDiagnosticOnce(typeId, message) {
+  const key = `${typeId}`;
+  if (_loggedSkillDiagnosticIds.has(key)) return;
+  _loggedSkillDiagnosticIds.add(key);
+  console.info(message);
+}
+
 function calculateAdjustedJobSeconds(baseTimeSeconds, customTE, runsNeeded, isReaction, productTypeId, requiredSkills) {
   if (!baseTimeSeconds || baseTimeSeconds <= 0) return 0;
   const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
@@ -26,11 +34,18 @@ function calculateAdjustedJobSeconds(baseTimeSeconds, customTE, runsNeeded, isRe
   // This was previously not accounted for at all, which is why T2/T3/Triglavian build times could
   // run noticeably longer here than in-game.
   let requiredSkillFactor = 1.0;
-  if (Array.isArray(requiredSkills) && requiredSkills.length > 0 && skills.allSkills) {
-    requiredSkills.forEach(reqSkill => {
-      const playerLevel = skills.allSkills[reqSkill.skillId] || 0;
-      requiredSkillFactor *= (1 - (0.01 * playerLevel));
-    });
+  if (Array.isArray(requiredSkills) && requiredSkills.length > 0) {
+    if (!skills.allSkills) {
+      logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId} requires skills but no full skill sheet is loaded (skills.allSkills missing) - log in via ESI SSO to fetch your trained skill levels, otherwise these bonuses stay at 0.`);
+    } else {
+      requiredSkills.forEach(reqSkill => {
+        const playerLevel = skills.allSkills[reqSkill.skillId] || 0;
+        requiredSkillFactor *= (1 - (0.01 * playerLevel));
+      });
+      logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId}: required skills ${JSON.stringify(requiredSkills)}, your trained levels: ${requiredSkills.map(s => `${s.skillId}=${skills.allSkills[s.skillId] || 0}`).join(', ')}, combined factor: ${requiredSkillFactor.toFixed(4)}`);
+    }
+  } else if (requiredSkills !== undefined) {
+    logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId}: recipe has no requiredSkills data (empty array) - either this item genuinely needs none, or your local database predates this feature and needs regenerating (generate_db.py).`);
   }
 
   const skillTimeFactor = indFactor * advIndFactor * requiredSkillFactor;
@@ -768,7 +783,7 @@ function createNodeCard(node) {
             <div class="flex justify-between items-center">
               <span class="text-purple-300 font-bold">Custom Sell Price:</span>
               <div class="flex items-center space-x-1">
-                <input type="number" id="card-custom-price" value="${curCustomPrice}" placeholder="Unit Price" oninput="syncCustomPrice(event)" class="w-24 bg-[#0c1318] border border-[#1e3348] text-center text-green-400 font-bold rounded p-0.5 outline-none text-[10px]">
+                <input type="number" id="card-custom-price" value="${curCustomPrice}" placeholder="Unit Price" onchange="syncCustomPrice(event)" class="w-24 bg-[#0c1318] border border-[#1e3348] text-center text-green-400 font-bold rounded p-0.5 outline-none text-[10px]">
                 <span class="text-slate-500 text-[9px]">ISK</span>
               </div>
             </div>
@@ -854,7 +869,7 @@ function createNodeCard(node) {
       <div class="mb-2 p-1.5 bg-[#070b0f] rounded border border-cyan-500/40 flex items-center justify-between text-[11px] mono" onclick="event.stopPropagation()">
         <span class="text-slate-300 font-bold">Runs:</span>
         <div class="flex items-center space-x-1">
-          <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" oninput="syncCardRunsToGlobal(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-16 bg-[#0c1318] border border-cyan-500/60 text-center text-amber-300 font-bold rounded p-0.5 outline-none">
+          <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" onchange="syncCardRunsToGlobal(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-16 bg-[#0c1318] border border-cyan-500/60 text-center text-amber-300 font-bold rounded p-0.5 outline-none">
           <span class="text-slate-400 text-[10px]">Runs</span>
         </div>
       </div>
@@ -885,9 +900,9 @@ function createNodeCard(node) {
       <div class="flex items-center justify-between mb-2 px-1 text-[10px] mono border-b border-[#1e3348]/40 pb-1">
         <span class="text-slate-400 font-semibold">Job ME/TE:</span>
         <div class="flex items-center space-x-1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">
-          <input type="number" id="card-me-${node.instanceId}" min="0" max="10" value="${node.customME}" oninput="onCardMEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-400 font-bold rounded p-0.5 outline-none focus:border-cyan-500">
+          <input type="number" id="card-me-${node.instanceId}" min="0" max="10" value="${node.customME}" onchange="onCardMEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-400 font-bold rounded p-0.5 outline-none focus:border-cyan-500">
           <span class="text-slate-500">%</span>
-          <input type="number" id="card-te-${node.instanceId}" min="0" max="20" value="${node.customTE}" oninput="onCardTEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-400 font-bold rounded p-0.5 outline-none focus:border-cyan-500">
+          <input type="number" id="card-te-${node.instanceId}" min="0" max="20" value="${node.customTE}" onchange="onCardTEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-400 font-bold rounded p-0.5 outline-none focus:border-cyan-500">
           <span class="text-slate-500">%</span>
         </div>
       </div>

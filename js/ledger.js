@@ -101,6 +101,47 @@ function getItemCategory(typeId, name) {
   return 'others';
 }
 
+// --- Profit-with-stock toggle ---
+function getProfitStockMode() {
+  return localStorage.getItem('eve_ledger_profit_stock_mode') || 'with';
+}
+
+// The ISK value of materials that were already in stock when this job was added, and so weren't
+// charged for - this is exactly the amount that was subtracted from cost (and added to profit) at
+// add-time. Subtracting it back out shows what profit would be if you had to buy those materials too.
+function getJobStockCreditValue(job) {
+  if (!Array.isArray(job.materials)) return 0;
+  return job.materials.reduce((sum, m) => sum + ((m.stockQty || 0) * (m.unitPrice || 0)), 0);
+}
+window.getJobStockCreditValue = getJobStockCreditValue;
+
+function getEffectiveJobProfit(job) {
+  if (job.netProfit === undefined) return undefined;
+  return getProfitStockMode() === 'with' ? job.netProfit : job.netProfit - getJobStockCreditValue(job);
+}
+window.getEffectiveJobProfit = getEffectiveJobProfit;
+
+function toggleProfitStockMode() {
+  localStorage.setItem('eve_ledger_profit_stock_mode', getProfitStockMode() === 'with' ? 'without' : 'with');
+  renderJournalPage();
+}
+window.toggleProfitStockMode = toggleProfitStockMode;
+
+function updateProfitStockToggleButton() {
+  const btn = document.getElementById('profit-stock-toggle');
+  if (!btn) return;
+  const mode = getProfitStockMode();
+  if (mode === 'with') {
+    btn.textContent = 'With Stock';
+    btn.className = 'text-[8px] px-1.5 py-0.5 rounded font-bold mono uppercase tracking-wide bg-cyan-800 text-cyan-100 flex-shrink-0';
+    btn.title = 'Currently crediting materials you already have in stock - click to exclude them';
+  } else {
+    btn.textContent = 'No Stock';
+    btn.className = 'text-[8px] px-1.5 py-0.5 rounded font-bold mono uppercase tracking-wide bg-amber-800 text-amber-100 flex-shrink-0';
+    btn.title = 'Currently excluding stock - click to credit materials you already have';
+  }
+}
+
 function renderJournalPage() {
   loadJournalState();
 
@@ -116,8 +157,9 @@ function renderJournalPage() {
   activeJobs.forEach(job => {
     if (job) {
       totalActiveCost += job.calculatedCost || 0;
-      if (job.netProfit !== undefined) {
-        totalPotentialProfit += job.netProfit;
+      const effProfit = getEffectiveJobProfit(job);
+      if (effProfit !== undefined) {
+        totalPotentialProfit += effProfit;
       } else if (!job.isSubBuild) {
         // Sub-build jobs deliberately have no netProfit (their value is already counted once, in the
         // final job's profit) - only a genuinely legacy job missing this field should raise the flag.
@@ -125,6 +167,7 @@ function renderJournalPage() {
       }
     }
   });
+  updateProfitStockToggleButton();
 
   if (activeJobsCountEl) activeJobsCountEl.textContent = activeJobs.length.toLocaleString();
   if (totalCostEl) totalCostEl.textContent = Math.round(totalActiveCost).toLocaleString() + ' ISK';
@@ -267,7 +310,8 @@ function renderActiveJobsList(allocatedStock) {
     if (totalBuildSeconds > 0) {
       const hoverTitle = `Total time to build this item and every sub-component you're manufacturing yourself.\nIndustry: ${skills.industry}/5 | Advanced Industry: ${skills.advIndustry}/5 | Facility: ${structureName}${rigTEBonusDisplay > 0 ? ` | Rig: -${rigTEBonusDisplay.toFixed(2)}% TE` : ''}`;
 
-      const iskPerHour = job.netProfit !== undefined ? (job.netProfit / (totalBuildSeconds / 3600)) : null;
+      const effJobProfit = getEffectiveJobProfit(job);
+      const iskPerHour = effJobProfit !== undefined ? (effJobProfit / (totalBuildSeconds / 3600)) : null;
       const iskPerHourUI = iskPerHour !== null
         ? `<div class="flex justify-between text-[10px] mono"><span class="text-slate-400">Est. ISK/Hour:</span><span class="font-bold ${iskPerHour >= 0 ? 'text-green-400' : 'text-red-400'}">${Math.round(iskPerHour).toLocaleString()} ISK</span></div>`
         : '';
@@ -335,12 +379,12 @@ function renderActiveJobsList(allocatedStock) {
               <span class="text-slate-300">Total Build Cost:</span>
               <span class="text-cyan-400">${Math.round(job.calculatedCost).toLocaleString()} ISK</span>
             </div>
-            ${job.netProfit !== undefined ? `
+            ${(() => { const p = getEffectiveJobProfit(job); return p !== undefined ? `
               <div class="flex justify-between items-center">
                 <span class="text-slate-300">Total Profit:</span>
-                <span class="${job.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}">${Math.round(job.netProfit).toLocaleString()} ISK</span>
+                <span class="${p >= 0 ? 'text-green-400' : 'text-red-400'}">${Math.round(p).toLocaleString()} ISK</span>
               </div>
-            ` : ''}
+            ` : ''; })()}
           </div>
         </div>
 
@@ -568,8 +612,9 @@ function renderBuildHistoryLedger() {
     let historyProfitMissing = false;
     buildHistory.forEach(record => {
       if (record) {
-        if (record.netProfit !== undefined) {
-          totalHistoryProfit += record.netProfit;
+        const effProfit = getEffectiveJobProfit(record);
+        if (effProfit !== undefined) {
+          totalHistoryProfit += effProfit;
         } else if (!record.isSubBuild) {
           historyProfitMissing = true;
         }
