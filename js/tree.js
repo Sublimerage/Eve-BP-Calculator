@@ -215,6 +215,19 @@ async function fetchBlueprintData(typeId) {
             const resolvedTime = parseInt(data.time) || parseInt(bpTimes['1'] ?? bpTimes[1]) || parseInt(bpTimes['11'] ?? bpTimes[11]) || 0;
 
             if (mfgMat || reactionMat) {
+              // Required skills each grant their own 1%/level manufacturing time bonus for items
+              // requiring them (e.g. Triglavian Quantum Engineering), same field used in generate_db.py.
+              const blueprintSkillsRaw = data.blueprintSkills || [];
+              const requiredSkills = [];
+              blueprintSkillsRaw.forEach(sk => {
+                if (!sk || typeof sk !== 'object') return;
+                const skillId = sk.typeid || sk.typeID || sk.skillID || sk.skill_id;
+                const skillLevel = sk.level || sk.skillLevel || sk.requiredLevel;
+                if (skillId !== undefined && skillLevel !== undefined) {
+                  requiredSkills.push({ skillId: parseInt(skillId), level: parseInt(skillLevel) });
+                }
+              });
+
               const parsed = {
                 blueprintTypeID: data.blueprintTypeID,
                 blueprintTypeName: data.blueprintTypeName || '',
@@ -226,6 +239,7 @@ async function fetchBlueprintData(typeId) {
                 portionSize: outputBatchYield,
                 batchYield: outputBatchYield,
                 time: resolvedTime,
+                requiredSkills: requiredSkills,
                 mfgMaterials: mfgMat,
                 reactionMaterials: reactionMat
               };

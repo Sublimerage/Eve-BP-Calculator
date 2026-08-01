@@ -13,12 +13,27 @@ function extractBuildTime(recipe) {
 // Applies TE research, character skills (Industry/Advanced Industry), and the selected facility's
 // time bonus to a single job's raw SDE duration. Reactions can't be TE-researched, so TE is ignored
 // for them. Shared by the per-card time display, the total-tree time summary, and the ledger.
-function calculateAdjustedJobSeconds(baseTimeSeconds, customTE, runsNeeded, isReaction, productTypeId) {
+function calculateAdjustedJobSeconds(baseTimeSeconds, customTE, runsNeeded, isReaction, productTypeId, requiredSkills) {
   if (!baseTimeSeconds || baseTimeSeconds <= 0) return 0;
   const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
   const indFactor = 1 - (0.04 * (skills.industry || 0));
   const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
-  const skillTimeFactor = indFactor * advIndFactor;
+
+  // Many T2/T3/faction/Triglavian blueprints require specific science/engineering skills (e.g.
+  // Caldari Starship Engineering, Triglavian Quantum Engineering) that EACH grant their own
+  // 1%-per-level manufacturing time reduction for items requiring them - confirmed via EVE
+  // University's skill list - on top of the generic Industry/Advanced Industry bonuses above.
+  // This was previously not accounted for at all, which is why T2/T3/Triglavian build times could
+  // run noticeably longer here than in-game.
+  let requiredSkillFactor = 1.0;
+  if (Array.isArray(requiredSkills) && requiredSkills.length > 0 && skills.allSkills) {
+    requiredSkills.forEach(reqSkill => {
+      const playerLevel = skills.allSkills[reqSkill.skillId] || 0;
+      requiredSkillFactor *= (1 - (0.01 * playerLevel));
+    });
+  }
+
+  const skillTimeFactor = indFactor * advIndFactor * requiredSkillFactor;
   const te = isReaction ? 0 : (customTE || 0);
   const teFactor = 1 - (te / 100);
   const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { teBonus: 30.0 };
@@ -34,7 +49,7 @@ function calculateTotalBuildSeconds(node) {
   if (!node || !node.isBuildingSelf) return 0;
   let total = 0;
   if (node.recipe) {
-    total += calculateAdjustedJobSeconds(extractBuildTime(node.recipe), node.customTE, node.runsNeeded, node.isReaction, node.productTypeId);
+    total += calculateAdjustedJobSeconds(extractBuildTime(node.recipe), node.customTE, node.runsNeeded, node.isReaction, node.productTypeId, node.recipe.requiredSkills);
   }
   if (node.children) {
     node.children.forEach(child => { if (child) total += calculateTotalBuildSeconds(child); });
@@ -637,6 +652,9 @@ function renderTreeDiagram(rootNode, priceStrategy, profitSell, roiSell) {
     if (!node) return;
     if (!levels[node.depth]) levels[node.depth] = [];
     levels[node.depth].push(node);
+    // A collapsed node still renders itself, but its children (and everything beneath them) are
+    // hidden from every depth column - this is what actually shrinks a runaway-tall build.
+    if (window.collapsedInstanceIds.has(node.instanceId)) return;
     if (node.children) { node.children.forEach(child => { if (child) traverse(child); }); }
   }
   traverse(rootNode);
@@ -648,6 +666,48 @@ function renderTreeDiagram(rootNode, priceStrategy, profitSell, roiSell) {
   });
   applyNodeHighlightClasses();
 }
+
+// Counts every descendant currently hidden beneath a collapsed node, for the "N hidden" badge.
+function countDescendants(node) {
+  if (!node || !node.children) return 0;
+  let count = 0;
+  node.children.forEach(child => {
+    if (child) count += 1 + countDescendants(child);
+  });
+  return count;
+}
+
+function toggleNodeCollapse(e, instanceId) {
+  if (e) e.stopPropagation();
+  if (window.collapsedInstanceIds.has(instanceId)) {
+    window.collapsedInstanceIds.delete(instanceId);
+  } else {
+    window.collapsedInstanceIds.add(instanceId);
+  }
+  if (typeof window.recalculate === 'function') window.recalculate();
+}
+window.toggleNodeCollapse = toggleNodeCollapse;
+
+// Collapses every node in the current tree that actually has children to hide.
+function collapseAllNodes() {
+  if (!window.recipeTreeRoot) return;
+  function walk(node) {
+    if (!node) return;
+    if (node.children && node.children.length > 0) {
+      window.collapsedInstanceIds.add(node.instanceId);
+      node.children.forEach(walk);
+    }
+  }
+  walk(window.recipeTreeRoot);
+  if (typeof window.recalculate === 'function') window.recalculate();
+}
+window.collapseAllNodes = collapseAllNodes;
+
+function expandAllNodes() {
+  window.collapsedInstanceIds.clear();
+  if (typeof window.recalculate === 'function') window.recalculate();
+}
+window.expandAllNodes = expandAllNodes;
 
 function createNodeCard(node) {
   const productTypeId = node.productTypeId || node.typeId;
@@ -730,7 +790,7 @@ function createNodeCard(node) {
     const rigTEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(node.productTypeId, 'TE') : 0;
 
     if (baseTime > 0) {
-      const totalSeconds = calculateAdjustedJobSeconds(baseTime, node.customTE, node.runsNeeded, node.isReaction, node.productTypeId);
+      const totalSeconds = calculateAdjustedJobSeconds(baseTime, node.customTE, node.runsNeeded, node.isReaction, node.productTypeId, node.recipe.requiredSkills);
       const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)${rigTEBonus > 0 ? `\n• Rig Bonus: -${rigTEBonus.toFixed(2)}% TE` : ''}\n• Base SDE Time: ${window.formatDuration(baseTime)}`;
 
       buildTimeUI = `
@@ -769,6 +829,11 @@ function createNodeCard(node) {
                   <div class="flex justify-between space-x-4 text-slate-300"><span>Total Job EIV:</span> <span class="text-amber-400 font-bold">${formattedTotalEIV}</span></div>
                 </div>
               </div>
+            ` : ''}
+            ${node.children && node.children.length > 0 ? `
+              <button onclick="toggleNodeCollapse(event, ${node.instanceId})" class="text-[9px] ${window.collapsedInstanceIds.has(node.instanceId) ? 'bg-amber-700 hover:bg-amber-600 text-white' : 'bg-[#1e3348] hover:bg-slate-600 text-slate-300'} px-1.5 py-0.5 rounded mono transition" title="${window.collapsedInstanceIds.has(node.instanceId) ? 'Expand: show inputs again' : 'Collapse: hide inputs'}">
+                ${window.collapsedInstanceIds.has(node.instanceId) ? `▶ +${countDescendants(node)}` : '▼'}
+              </button>
             ` : ''}
             ${isIsolated ? `
               <button onclick="exitIsolation(event)" class="text-[9px] bg-amber-600 hover:bg-amber-500 text-black font-bold px-2 py-0.5 rounded mono transition shadow">Exit ✖</button>
@@ -886,6 +951,64 @@ function syncSellStrategy(e) {
   recalculate();
 }
 
+// Extracts the direct material requirements for manufacturing a given node (flattening through any
+// of its own build-toggled children down to what's actually bought/raw) - the same logic the root
+// job has always used, just usable for any node so sub-build jobs get an equivalent materials list.
+function extractJobMaterialsForNode(startNode) {
+  const materials = [];
+  const deductModeInput = document.getElementById('deduct-stock-mode');
+  const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+
+  function walk(node) {
+    if (!node) return;
+    if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
+      const productTypeId = node.productTypeId || node.typeId;
+      const strategy = window.getNodePriceStrategy(node);
+      const stockQty = isStockDeductEnabled ? (window.userStockMap[productTypeId] || window.userStockMap[node.typeId] || 0) : 0;
+      const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
+      const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
+      const unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
+      materials.push({
+        typeId: productTypeId,
+        name: node.name.replace(' Blueprint', ''),
+        qtyNeeded: node.qtyNeeded,
+        stockQty: stockQty,
+        netQtyNeeded: netQtyNeeded,
+        strategy: strategy,
+        unitPrice: unitPrice,
+        lineCost: unitPrice * netQtyNeeded
+      });
+    } else {
+      node.children.forEach(child => { if (child) walk(child); });
+    }
+  }
+
+  if (startNode.isBuildingSelf && startNode.children && startNode.children.length > 0) {
+    startNode.children.forEach(child => { if (child) walk(child); });
+  } else {
+    walk(startNode);
+  }
+  return materials;
+}
+window.extractJobMaterialsForNode = extractJobMaterialsForNode;
+
+// Finds every sub-assembly (depth > 0) that's toggled to "Build" and actually has its own inputs -
+// i.e. every intermediate manufacturing job the player needs to run before the final product.
+// Returned deepest-first, since prerequisites must be built before whatever depends on them.
+function collectSubBuildNodes(root) {
+  const results = [];
+  function walk(node) {
+    if (!node) return;
+    if (node.depth > 0 && node.isBuildingSelf && node.children && node.children.length > 0) {
+      results.push(node);
+    }
+    if (node.children) node.children.forEach(child => { if (child) walk(child); });
+  }
+  walk(root);
+  results.sort((a, b) => b.depth - a.depth); // deepest (most prerequisite) first
+  return results;
+}
+
 function addCurrentJobToLedger(e) {
   if (e) e.stopPropagation();
   if (!window.recipeTreeRoot) return;
@@ -909,69 +1032,36 @@ function addCurrentJobToLedger(e) {
   let unitSellPrice = selectedStrategy.startsWith('custom-') ? customPrice : outputPrices.sell;
   const baseTime = extractBuildTime(window.recipeTreeRoot.recipe, window.recipeTreeRoot.typeId, window.recipeTreeRoot.name);
 
-  const materials = [];
-  function extractBOM(node) {
-    if (!node) return;
-    if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
-      const typeId = node.displayTypeId || node.typeId;
-      const strategy = window.getNodePriceStrategy(node);
-      
-      const deductModeInput = document.getElementById('deduct-stock-mode');
-      const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-      const productTypeId = node.productTypeId || node.typeId;
-      const stockQty = isStockDeductEnabled ? (window.userStockMap[productTypeId] || window.userStockMap[node.typeId] || 0) : 0;
-      const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
+  const materials = extractJobMaterialsForNode(window.recipeTreeRoot);
 
-      const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
-      let unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
-      
-      materials.push({
-        typeId: productTypeId,
-        name: node.name.replace(' Blueprint', ''),
-        qtyNeeded: node.qtyNeeded,
-        stockQty: stockQty,
-        netQtyNeeded: netQtyNeeded,
-        strategy: strategy,
-        unitPrice: unitPrice,
-        lineCost: unitPrice * netQtyNeeded
-      });
-    } else {
-      node.children.forEach(child => {
-        if (child) extractBOM(child);
-      });
-    }
-  }
+  const rootJobName = window.recipeTreeRoot.productName || window.recipeTreeRoot.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
 
-  if (window.recipeTreeRoot.isBuildingSelf && window.recipeTreeRoot.children && window.recipeTreeRoot.children.length > 0) {
-    window.recipeTreeRoot.children.forEach(c => {
-      if (c) extractBOM(c);
-    });
-  } else {
-    const rootTypeId = window.recipeTreeRoot.productTypeId || window.recipeTreeRoot.typeId;
-    const strategy = window.getNodePriceStrategy(window.recipeTreeRoot);
-    const deductModeInput = document.getElementById('deduct-stock-mode');
-    const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-    const stockQty = isStockDeductEnabled ? (window.userStockMap[rootTypeId] || window.userStockMap[window.recipeTreeRoot.typeId] || 0) : 0;
-    const netQtyNeeded = Math.max(0, window.recipeTreeRoot.qtyNeeded - stockQty);
-    const prices = window.priceCache[rootTypeId] || { sell: 0, buy: 0 };
-    let unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
-
-    materials.push({
-      typeId: rootTypeId,
-      name: window.recipeTreeRoot.productName || window.recipeTreeRoot.name.replace(' Blueprint', ''),
-      qtyNeeded: window.recipeTreeRoot.qtyNeeded,
-      stockQty: stockQty,
-      netQtyNeeded: netQtyNeeded,
-      strategy: strategy,
-      unitPrice: unitPrice,
-      lineCost: unitPrice * netQtyNeeded
-    });
-  }
+  // Every build-toggled sub-assembly becomes its own queued job, inserted before the final job since
+  // it's a prerequisite for it. These deliberately have no netProfit field - the final job's profit
+  // already accounts for the savings from building these instead of buying them, so giving each
+  // sub-build its own "profit" figure would double-count the same value. The ledger's profit totals
+  // already skip any job where netProfit is undefined, so this "just works" without extra bookkeeping.
+  const subBuildNodes = collectSubBuildNodes(window.recipeTreeRoot);
+  const subBuildJobs = subBuildNodes.map(node => ({
+    id: Date.now() + Math.floor(Math.random() * 1000) + node.instanceId,
+    typeId: node.typeId,
+    productTypeId: node.productTypeId,
+    name: node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim(),
+    runsNeeded: node.runsNeeded,
+    qtyNeeded: node.qtyNeeded,
+    calculatedCost: node.calculatedCost || 0,
+    baseTime: extractBuildTime(node.recipe),
+    totalBuildSeconds: calculateTotalBuildSeconds(node),
+    materials: extractJobMaterialsForNode(node),
+    isSubBuild: true,
+    parentJobName: rootJobName,
+    addedAt: new Date().toISOString()
+  }));
 
   const job = {
     id: Date.now() + Math.floor(Math.random() * 1000),
     typeId: window.recipeTreeRoot.typeId,
-    name: window.recipeTreeRoot.productName || window.recipeTreeRoot.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim(),
+    name: rootJobName,
     productTypeId: window.recipeTreeRoot.productTypeId,
     runsNeeded: window.recipeTreeRoot.runsNeeded,
     qtyNeeded: window.recipeTreeRoot.qtyNeeded,
@@ -985,7 +1075,8 @@ function addCurrentJobToLedger(e) {
     addedAt: new Date().toISOString()
   };
 
-  queue.push(job);
+  // Sub-build (prerequisite) jobs go in first, final job last.
+  queue.push(...subBuildJobs, job);
   localStorage.setItem('eve_ledger_jobs', JSON.stringify(queue));
   localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap || {}));
 
@@ -994,7 +1085,7 @@ function addCurrentJobToLedger(e) {
   const btn = e.target.closest('button');
   if (btn) {
     const originalText = btn.innerHTML;
-    btn.innerHTML = '✔ ADDED TO QUEUE';
+    btn.innerHTML = subBuildJobs.length > 0 ? `✔ ADDED ${subBuildJobs.length + 1} JOBS` : '✔ ADDED TO QUEUE';
     btn.classList.remove('bg-purple-800', 'hover:bg-purple-700', 'text-purple-100');
     btn.classList.add('bg-green-700', 'text-white');
     setTimeout(() => {
@@ -1083,7 +1174,12 @@ function applyNodeHighlightClasses() {
 function highlightNodeByTypeId(typeId) {
   function findMatchingNode(node) {
     if (!node) return null;
-    if (node.typeId === typeId || node.displayTypeId === typeId) return node;
+    // BOM rows are keyed by productTypeId (the traded item). For raw materials, typeId and
+    // productTypeId are the same, so the old typeId/displayTypeId-only check happened to work. But
+    // for a manufacturable sub-component toggled to "Buy", node.typeId is the blueprint's own id while
+    // productTypeId is the actual traded item the BOM row represents - only checking typeId/displayTypeId
+    // silently failed to find those nodes, which is why clicking some BOM rows never centered anything.
+    if (node.typeId === typeId || node.displayTypeId === typeId || node.productTypeId === typeId) return node;
     if (node.children) {
       for (const child of node.children) {
         if (child) {

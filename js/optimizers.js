@@ -158,17 +158,14 @@ async function applyBuildProfitOptimizer() {
     window.buildSelfOverrides[typeId] = true;
     const profitBuild = simulateProfit();
 
-    const recipe = window.recipeMap[typeId];
-    const recipeProductId = recipe ? parseInt(recipe.productTypeID || recipe.product || recipe.p) : NaN;
-    // A recipe's product id must differ from the blueprint's own id, or it's missing/bad data - fall
-    // back to the blueprint's typeId only as a last resort rather than pricing the blueprint itself.
-    const productTypeId = (!isNaN(recipeProductId) && recipeProductId > 0 && recipeProductId !== typeId) ? recipeProductId : typeId;
-    const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
-    const unitPrice = prices.sell || prices.buy || (typeof window.getEIV === 'function' ? window.getEIV(productTypeId) : 0) || 1;
-    const baseCost = unitPrice * (window.recipeTreeRoot.qtyNeeded || 1);
-
     const profitGain = profitBuild - profitBuy;
-    const marginGainPct = baseCost > 0 ? (profitGain / baseCost) * 100 : 0;
+    // % impact measured against the whole build's total cost - matches the Budget Impact optimizer's
+    // approach. The previous version normalized against this component's unit price times the ROOT's
+    // quantity (often just 1, for a single ship), a denominator with no real connection to the actual
+    // scale of the decision, which produced near-arbitrary percentages and made the threshold check
+    // effectively meaningless.
+    const rootTotalCost = window.recipeTreeRoot.calculatedCost || 1;
+    const marginGainPct = rootTotalCost > 0 ? (profitGain / rootTotalCost) * 100 : 0;
 
     // Only keep BUILD mode if building actually INCREASES net profit by >= threshold %
     if (profitBuild > profitBuy && marginGainPct >= threshold) {

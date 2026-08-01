@@ -108,14 +108,31 @@ function renderJournalPage() {
   const totalCostEl = document.getElementById('journal-total-cost');
   const uniqueMaterialsEl = document.getElementById('journal-unique-materials');
   const materialsCostEl = document.getElementById('journal-materials-cost');
+  const totalProfitEl = document.getElementById('journal-total-profit');
 
   let totalActiveCost = 0;
+  let totalPotentialProfit = 0;
+  let profitDataMissing = false;
   activeJobs.forEach(job => {
-    if (job) totalActiveCost += job.calculatedCost || 0;
+    if (job) {
+      totalActiveCost += job.calculatedCost || 0;
+      if (job.netProfit !== undefined) {
+        totalPotentialProfit += job.netProfit;
+      } else if (!job.isSubBuild) {
+        // Sub-build jobs deliberately have no netProfit (their value is already counted once, in the
+        // final job's profit) - only a genuinely legacy job missing this field should raise the flag.
+        profitDataMissing = true;
+      }
+    }
   });
 
   if (activeJobsCountEl) activeJobsCountEl.textContent = activeJobs.length.toLocaleString();
   if (totalCostEl) totalCostEl.textContent = Math.round(totalActiveCost).toLocaleString() + ' ISK';
+  if (totalProfitEl) {
+    totalProfitEl.textContent = Math.round(totalPotentialProfit).toLocaleString() + ' ISK' + (profitDataMissing ? ' *' : '');
+    totalProfitEl.className = `text-lg font-bold mono leading-tight ${totalPotentialProfit >= 0 ? 'text-green-400' : 'text-red-400'}`;
+    totalProfitEl.title = profitDataMissing ? 'One or more queued jobs were added before profit tracking existed and are excluded from this total.' : '';
+  }
 
   const consolidatedBOM = {};
   activeJobs.forEach(job => {
@@ -285,12 +302,13 @@ function renderActiveJobsList(allocatedStock) {
       .replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
 
     return `
-      <div class="bg-[#0c1318] border border-[#1e3348] hover:border-purple-500/40 rounded p-3 flex flex-col justify-between shadow-md transition space-y-2">
+      <div class="bg-[#0c1318] border ${job.isSubBuild ? 'border-amber-600/40 hover:border-amber-500/60' : 'border-[#1e3348] hover:border-purple-500/40'} rounded p-3 flex flex-col justify-between shadow-md transition space-y-2">
         <div class="flex items-start justify-between">
           <div class="flex items-start space-x-3 min-w-0 flex-1">
             <img src="${jobIconUrl}" class="w-12 h-12 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
               <h3 class="font-bold text-sm text-white truncate">${window.esc(jobDisplayName)}</h3>
+              ${job.isSubBuild ? `<div class="text-[9px] mono text-amber-400 font-bold uppercase tracking-wide mt-0.5" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
               <div class="text-[10px] mono text-slate-400 mt-0.5">Added on: ${formattedDate}</div>
             </div>
           </div>
@@ -489,6 +507,9 @@ function markJobAsBuilt(jobId) {
     runsNeeded: job.runsNeeded,
     qtyNeeded: job.qtyNeeded,
     calculatedCost: job.calculatedCost,
+    netProfit: job.netProfit,
+    isSubBuild: job.isSubBuild,
+    parentJobName: job.parentJobName,
     materials: job.materials, 
     completedAt: new Date().toISOString()
   };
@@ -539,6 +560,25 @@ function renderBuildHistoryLedger() {
   const container = document.getElementById('journal-history-rows');
   if (!container) return;
 
+  const totalProfitEl = document.getElementById('journal-history-total-profit');
+  const historyCountEl = document.getElementById('journal-history-count');
+  if (historyCountEl) historyCountEl.textContent = buildHistory.length.toLocaleString();
+  if (totalProfitEl) {
+    let totalHistoryProfit = 0;
+    let historyProfitMissing = false;
+    buildHistory.forEach(record => {
+      if (record) {
+        if (record.netProfit !== undefined) {
+          totalHistoryProfit += record.netProfit;
+        } else if (!record.isSubBuild) {
+          historyProfitMissing = true;
+        }
+      }
+    });
+    totalProfitEl.textContent = Math.round(totalHistoryProfit).toLocaleString() + ' ISK' + (historyProfitMissing ? ' *' : '');
+    totalProfitEl.className = `font-bold text-xs ${totalHistoryProfit >= 0 ? 'text-green-400' : 'text-red-400'}`;
+  }
+
   if (buildHistory.length === 0) {
     container.innerHTML = `
       <tr>
@@ -558,7 +598,7 @@ function renderBuildHistoryLedger() {
     return `
       <tr class="hover:bg-[#0c1318]/50 text-slate-300 border-b border-[#1e3348]/20">
         <td class="p-1.5 py-2">${formattedDate}</td>
-        <td class="p-1.5 py-2 font-bold text-white">${window.esc(recordDisplayName)}</td>
+        <td class="p-1.5 py-2 font-bold text-white">${window.esc(recordDisplayName)}${record.isSubBuild ? `<span class="ml-1.5 text-[9px] text-amber-400 font-semibold normal-case" title="Prerequisite for: ${window.esc(record.parentJobName || 'another job')}">⚙ prereq</span>` : ''}</td>
         <td class="p-1.5 py-2 text-right">${record.runsNeeded.toLocaleString()}</td>
         <td class="p-1.5 py-2 text-right text-purple-300 font-bold">${record.qtyNeeded.toLocaleString()}</td>
         <td class="p-1.5 py-2 text-right text-cyan-400 font-bold">${Math.round(record.calculatedCost || 0).toLocaleString()} ISK</td>
@@ -817,6 +857,42 @@ window.setBOMCategoryFilter = setBOMCategoryFilter;
 window.moveJobUp = moveJobUp;
 window.moveJobDown = moveJobDown;
 
+// --- Completed History Drawer ---
+function getHistoryDrawerState() {
+  return localStorage.getItem('eve_history_drawer_state') || 'collapsed';
+}
+
+function applyHistoryDrawerState(state) {
+  const drawer = document.getElementById('history-drawer');
+  const chevron = document.getElementById('history-drawer-chevron');
+  const sizeBtn = document.getElementById('history-drawer-size-btn');
+  if (!drawer) return;
+  if (state === 'collapsed') {
+    drawer.style.height = '44px';
+    if (chevron) chevron.textContent = '▲';
+    if (sizeBtn) sizeBtn.classList.add('hidden');
+  } else if (state === 'tall') {
+    drawer.style.height = '70vh';
+    if (chevron) chevron.textContent = '▼';
+    if (sizeBtn) { sizeBtn.classList.remove('hidden'); sizeBtn.textContent = '⤡ Shorter'; }
+  } else {
+    drawer.style.height = '24rem';
+    if (chevron) chevron.textContent = '▼';
+    if (sizeBtn) { sizeBtn.classList.remove('hidden'); sizeBtn.textContent = '⤢ Taller'; }
+  }
+  localStorage.setItem('eve_history_drawer_state', state);
+}
+
+function toggleHistoryDrawer() {
+  applyHistoryDrawerState(getHistoryDrawerState() === 'collapsed' ? 'normal' : 'collapsed');
+}
+window.toggleHistoryDrawer = toggleHistoryDrawer;
+
+function toggleHistoryDrawerSize() {
+  applyHistoryDrawerState(getHistoryDrawerState() === 'tall' ? 'normal' : 'tall');
+}
+window.toggleHistoryDrawerSize = toggleHistoryDrawerSize;
+
 window.onload = async () => {
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
@@ -827,6 +903,7 @@ window.onload = async () => {
     populateJournalLocationDropdown();
     updateJournalStockCountBadge();
     renderJournalPage();
+    applyHistoryDrawerState(getHistoryDrawerState());
   } catch (err) {
     console.error("Ledger state load error:", err);
   }

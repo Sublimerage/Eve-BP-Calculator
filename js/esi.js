@@ -447,11 +447,19 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
         if (skillsData && Array.isArray(skillsData.skills)) {
           let indLevel = 0;
           let advIndLevel = 0;
+          const allSkills = {};
           skillsData.skills.forEach(sk => {
-            if (sk.skill_id === 3380) indLevel = sk.active_skill_level || sk.trained_skill_level || 0;
-            if (sk.skill_id === 3388) advIndLevel = sk.active_skill_level || sk.trained_skill_level || 0;
+            const level = sk.active_skill_level !== undefined ? sk.active_skill_level : (sk.trained_skill_level || 0);
+            allSkills[sk.skill_id] = level;
+            if (sk.skill_id === 3380) indLevel = level;
+            if (sk.skill_id === 3388) advIndLevel = level;
           });
-          localStorage.setItem('eve_char_skills', JSON.stringify({ industry: indLevel, advIndustry: advIndLevel }));
+          // Store the FULL skill sheet too, not just Industry/Advanced Industry - many blueprints
+          // (T2, T3, faction, Triglavian) require specific science/engineering skills that ALSO grant
+          // their own 1%/level manufacturing time reduction for items requiring that skill, on top of
+          // the generic Industry/Advanced Industry bonuses. Matching those needs the player's actual
+          // trained level in every such skill, not just the two generic ones.
+          localStorage.setItem('eve_char_skills', JSON.stringify({ industry: indLevel, advIndustry: advIndLevel, allSkills: allSkills }));
         }
       }
     } catch (e) {
