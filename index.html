@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Industry Ledger</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=3.3.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=3.4.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -144,7 +144,7 @@
   <section class="bg-[#0c1318] border-b border-[#1e3348] p-1.5 flex flex-wrap items-stretch gap-2.5 text-xs relative z-40">
     
     <!-- System & Structure Panel -->
-    <div class="flex flex-col bg-[#0d1922] p-1.5 rounded-lg border border-[#1e3348] shadow flex-grow max-w-[560px]">
+    <div class="flex flex-col bg-[#0d1922] p-1.5 rounded-lg border border-[#1e3348] shadow flex-grow max-w-[620px]">
       <div class="flex items-center flex-wrap gap-y-1 space-x-1.5">
         <span class="text-cyan-400 text-[10px] font-bold uppercase rajdhani flex-shrink-0">System & Structure:</span>
         <div class="relative w-36">
@@ -162,11 +162,26 @@
           <option value="0.03" selected>Sotiyo (-3% Fee)</option>
           <option value="0.0">NPC / None (0%)</option>
         </select>
-        <div class="flex items-center space-x-1" title="Select the actual rigs fitted in your structure (each Engineering Complex has 3 rig slots). Rigs only affect the item categories they're built for - e.g. an Ammunition rig won't help you build ships. Bonus strength scales with your system's security status automatically.">
-          <span class="text-slate-400 font-semibold text-[9px]">Rigs:</span>
-          <select id="rig-slot-1" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-semibold text-[9px] outline-none w-20"></select>
-          <select id="rig-slot-2" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-semibold text-[9px] outline-none w-20"></select>
-          <select id="rig-slot-3" onchange="saveTaxSettings(); recalculate();" class="bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-semibold text-[9px] outline-none w-20"></select>
+      </div>
+      <div class="flex items-center gap-1 flex-wrap mt-1" title="Search and select the actual rigs fitted in your structure (each Engineering Complex has 3 rig slots). Rigs only affect the specific item category and ship size they're built for - e.g. a Small Ship rig won't help you build a Battleship. Bonus strength scales with your system's security status automatically.">
+        <span class="text-slate-400 font-semibold text-[9px] flex-shrink-0">Rigs:</span>
+        <div class="relative flex-1" style="min-width:100px">
+          <input type="text" id="rig-slot-1-input" placeholder="Rig Slot 1: None" autocomplete="off"
+            oninput="searchRigSlot(1, this.value)" onfocus="searchRigSlot(1, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-1-results'); if (el) el.classList.add('hidden'); }, 200)"
+            class="w-full bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-semibold text-[9px] outline-none focus:border-cyan-500">
+          <div id="rig-slot-1-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[9px]"></div>
+        </div>
+        <div class="relative flex-1" style="min-width:100px">
+          <input type="text" id="rig-slot-2-input" placeholder="Rig Slot 2: None" autocomplete="off"
+            oninput="searchRigSlot(2, this.value)" onfocus="searchRigSlot(2, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-2-results'); if (el) el.classList.add('hidden'); }, 200)"
+            class="w-full bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-semibold text-[9px] outline-none focus:border-cyan-500">
+          <div id="rig-slot-2-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[9px]"></div>
+        </div>
+        <div class="relative flex-1" style="min-width:100px">
+          <input type="text" id="rig-slot-3-input" placeholder="Rig Slot 3: None" autocomplete="off"
+            oninput="searchRigSlot(3, this.value)" onfocus="searchRigSlot(3, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-3-results'); if (el) el.classList.add('hidden'); }, 200)"
+            class="w-full bg-[#070b0f] border border-[#1e3348] rounded p-1 text-cyan-300 font-semibold text-[9px] outline-none focus:border-cyan-500">
+          <div id="rig-slot-3-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[9px]"></div>
         </div>
       </div>
       <!-- SCI, Stock, and EIV Prices Status directly underneath! -->
@@ -375,11 +390,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=3.3.0"></script>
-  <script src="js/config.js?v=3.3.0"></script>
-  <script src="js/esi.js?v=3.3.0"></script>
-  <script src="js/tree.js?v=3.3.0"></script>
-  <script src="js/optimizers.js?v=3.3.0"></script>
-  <script src="js/app.js?v=3.3.0"></script>
+  <script src="eve_db.js?v=3.4.0"></script>
+  <script src="js/config.js?v=3.4.0"></script>
+  <script src="js/esi.js?v=3.4.0"></script>
+  <script src="js/tree.js?v=3.4.0"></script>
+  <script src="js/optimizers.js?v=3.4.0"></script>
+  <script src="js/app.js?v=3.4.0"></script>
 </body>
 </html>
