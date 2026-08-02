@@ -250,14 +250,11 @@ function renderActiveJobsList(allocatedStock) {
     const iconTypeId = job.productTypeId || job.typeId;
     const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
 
-    const priorityButtonsHTML = `
-      <div class="flex items-center space-x-1 flex-shrink-0" onclick="event.stopPropagation()">
-        <button onclick="moveJobUp(${job.id})" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold px-1.5 py-0.5 rounded text-[9px] mono border border-[#1e3348]" title="Move up in priority (increases stock allocation preference)">
-          ▲ Up
-        </button>
-        <button onclick="moveJobDown(${job.id})" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold px-1.5 py-0.5 rounded text-[9px] mono border border-[#1e3348]" title="Move down in priority">
-          ▼ Down
-        </button>
+    const dragHandleHTML = `
+      <div class="flex items-center flex-shrink-0" onclick="event.stopPropagation()">
+        <span class="drag-handle cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-300 px-1.5 py-0.5 text-sm select-none" title="Drag to reorder (changes stock allocation priority)">
+          ⠿
+        </span>
       </div>
     `;
 
@@ -346,7 +343,10 @@ function renderActiveJobsList(allocatedStock) {
       .replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
 
     return `
-      <div class="bg-[#0c1318] border ${job.isSubBuild ? 'border-amber-600/40 hover:border-amber-500/60' : 'border-[#1e3348] hover:border-purple-500/40'} rounded p-3 flex flex-col justify-between shadow-md transition space-y-2">
+      <div class="job-card bg-[#0c1318] border ${job.isSubBuild ? 'border-amber-600/40 hover:border-amber-500/60' : 'border-[#1e3348] hover:border-purple-500/40'} rounded p-3 flex flex-col justify-between shadow-md transition space-y-2"
+           draggable="true" data-job-id="${job.id}"
+           ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
+           ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
         <div class="flex items-start justify-between">
           <div class="flex items-start space-x-3 min-w-0 flex-1">
             <img src="${jobIconUrl}" class="w-12 h-12 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
@@ -356,7 +356,7 @@ function renderActiveJobsList(allocatedStock) {
               <div class="text-[10px] mono text-slate-400 mt-0.5">Added on: ${formattedDate}</div>
             </div>
           </div>
-          ${priorityButtonsHTML}
+          ${dragHandleHTML}
         </div>
 
         <div class="text-[11px] text-purple-300 font-bold mono mt-1">
@@ -387,6 +387,29 @@ function renderActiveJobsList(allocatedStock) {
             ` : ''; })()}
           </div>
         </div>
+
+        ${(() => {
+          if (job.isStarted && job.startedAt) {
+            const elapsedSeconds = (Date.now() - job.startedAt) / 1000;
+            const remaining = (job.totalBuildSeconds || 0) - elapsedSeconds;
+            const ready = remaining <= 0;
+            const text = ready ? '✓ Ready to Collect!' : `⏱ ${window.formatDuration(Math.ceil(remaining))} remaining`;
+            const colorClass = ready ? 'text-green-400' : 'text-cyan-300';
+            return `
+              <div class="job-timer flex items-center justify-between px-2 py-1.5 bg-[#070b0f] rounded border ${ready ? 'border-green-600/50' : 'border-cyan-600/40'}" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}">
+                <span class="text-[10px] text-slate-400 font-bold flex-shrink-0">Job Status:</span>
+                <span class="timer-display text-[11px] font-bold ${colorClass} mono">${text}</span>
+              </div>
+            `;
+          }
+          return `
+            <div class="flex items-center gap-1.5 px-2 py-1.5 bg-[#070b0f] rounded border border-[#1e3348]" onclick="event.stopPropagation()">
+              <span class="text-[10px] text-slate-400 font-bold flex-shrink-0" title="Starting fewer than all runs splits this into a started job plus a still-queued job for the rest, matching how EVE actually queues manufacturing jobs.">Runs to start:</span>
+              <input type="number" id="start-runs-${job.id}" value="${job.runsNeeded}" min="1" max="${job.runsNeeded}" class="w-16 bg-[#0d1922] border border-[#1e3348] text-center text-amber-300 font-bold rounded p-1 outline-none text-[11px]">
+              <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-1 px-2.5 rounded text-[10px] mono transition flex-shrink-0">▶ Start Job</button>
+            </div>
+          `;
+        })()}
 
         <div class="flex items-center space-x-2 pt-1">
           <button onclick="markJobAsBuilt(${job.id})" class="flex-1 py-1.5 bg-green-800/80 hover:bg-green-700 text-white font-bold rounded text-[11px] mono transition border border-green-600/30 flex items-center justify-center gap-1">
@@ -537,6 +560,106 @@ function copyJournalMultibuy() {
   });
 }
 
+// Starts a job (or a portion of it). Starting fewer than all remaining runs splits the job into an
+// "in progress" fragment (started now, with its own timer) and a still-queued fragment for the rest -
+// this mirrors real EVE mechanics, where a queued industry job has one fixed run count and duration,
+// so starting a subset of runs means queuing a genuinely separate job for what's left.
+function startJobRuns(jobId) {
+  const input = document.getElementById(`start-runs-${jobId}`);
+  const requestedRuns = input ? parseInt(input.value) : NaN;
+
+  loadJournalState();
+  const jobIndex = activeJobs.findIndex(j => j && j.id === jobId);
+  if (jobIndex === -1) return;
+  const job = activeJobs[jobIndex];
+  const totalRuns = job.runsNeeded || 1;
+  const startRuns = Math.max(1, Math.min(isNaN(requestedRuns) ? totalRuns : requestedRuns, totalRuns));
+
+  if (startRuns >= totalRuns) {
+    job.startedAt = Date.now();
+    job.isStarted = true;
+    localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
+    renderJournalPage();
+    return;
+  }
+
+  const ratio = startRuns / totalRuns;
+  const remainingRuns = totalRuns - startRuns;
+  const remainingRatio = remainingRuns / totalRuns;
+
+  const scaleMaterials = (r) => Array.isArray(job.materials) ? job.materials.map(m => {
+    const scaledQty = Math.ceil(m.qtyNeeded * r);
+    const scaledStock = Math.min(m.stockQty || 0, scaledQty);
+    return {
+      ...m,
+      qtyNeeded: scaledQty,
+      stockQty: scaledStock,
+      netQtyNeeded: Math.max(0, scaledQty - scaledStock),
+      lineCost: (m.unitPrice || 0) * Math.max(0, scaledQty - scaledStock)
+    };
+  }) : [];
+
+  const activeFragment = {
+    ...job,
+    id: Date.now() + Math.floor(Math.random() * 1000),
+    runsNeeded: startRuns,
+    qtyNeeded: Math.round((job.qtyNeeded || 0) * ratio),
+    calculatedCost: (job.calculatedCost || 0) * ratio,
+    netProfit: job.netProfit !== undefined ? job.netProfit * ratio : undefined,
+    totalBuildSeconds: (job.totalBuildSeconds || 0) * ratio,
+    materials: scaleMaterials(ratio),
+    startedAt: Date.now(),
+    isStarted: true,
+    splitFromId: job.id
+  };
+
+  const remainingFragment = {
+    ...job,
+    id: Date.now() + Math.floor(Math.random() * 1000) + 1,
+    runsNeeded: remainingRuns,
+    qtyNeeded: Math.round((job.qtyNeeded || 0) * remainingRatio),
+    calculatedCost: (job.calculatedCost || 0) * remainingRatio,
+    netProfit: job.netProfit !== undefined ? job.netProfit * remainingRatio : undefined,
+    totalBuildSeconds: (job.totalBuildSeconds || 0) * remainingRatio,
+    materials: scaleMaterials(remainingRatio),
+    startedAt: undefined,
+    isStarted: false,
+    splitFromId: job.id
+  };
+
+  activeJobs.splice(jobIndex, 1, activeFragment, remainingFragment);
+  localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
+  renderJournalPage();
+}
+window.startJobRuns = startJobRuns;
+
+// Refreshes only the countdown text on already-rendered timer elements, without a full re-render -
+// keeps started jobs' timers live every second without disturbing anything else on the page (drag
+// state, scroll position, focused inputs, etc).
+function updateJobTimers() {
+  document.querySelectorAll('.job-timer').forEach(el => {
+    const startedAt = parseInt(el.dataset.startedAt);
+    const totalSeconds = parseFloat(el.dataset.totalSeconds);
+    const display = el.querySelector('.timer-display');
+    if (!display || !startedAt) return;
+    const elapsedSeconds = (Date.now() - startedAt) / 1000;
+    const remaining = totalSeconds - elapsedSeconds;
+    if (remaining <= 0) {
+      display.textContent = '✓ Ready to Collect!';
+      display.className = 'timer-display text-[11px] font-bold text-green-400 mono';
+      el.classList.remove('border-cyan-600/40');
+      el.classList.add('border-green-600/50');
+    } else {
+      display.textContent = `⏱ ${window.formatDuration(Math.ceil(remaining))} remaining`;
+      display.className = 'timer-display text-[11px] font-bold text-cyan-300 mono';
+    }
+  });
+}
+if (!window._jobTimerIntervalStarted) {
+  window._jobTimerIntervalStarted = true;
+  setInterval(updateJobTimers, 1000);
+}
+
 function markJobAsBuilt(jobId) {
   loadJournalState();
   const jobIndex = activeJobs.findIndex(j => j && j.id === jobId);
@@ -665,29 +788,55 @@ function clearJournalHistory() {
   renderJournalPage();
 }
 
-function moveJobUp(jobId) {
-  loadJournalState();
-  const index = activeJobs.findIndex(j => j && j.id === jobId);
-  if (index > 0) {
-    const temp = activeJobs[index];
-    activeJobs[index] = activeJobs[index - 1];
-    activeJobs[index - 1] = temp;
-    localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
-    renderJournalPage();
-  }
-}
+let _draggedJobId = null;
 
-function moveJobDown(jobId) {
-  loadJournalState();
-  const index = activeJobs.findIndex(j => j && j.id === jobId);
-  if (index !== -1 && index < activeJobs.length - 1) {
-    const temp = activeJobs[index];
-    activeJobs[index] = activeJobs[index + 1];
-    activeJobs[index + 1] = temp;
-    localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
-    renderJournalPage();
-  }
+function handleJobDragStart(e, jobId) {
+  _draggedJobId = jobId;
+  e.dataTransfer.effectAllowed = 'move';
+  try { e.dataTransfer.setData('text/plain', String(jobId)); } catch (err) {}
+  if (e.currentTarget) e.currentTarget.classList.add('opacity-40');
 }
+window.handleJobDragStart = handleJobDragStart;
+
+function handleJobDragEnd(e) {
+  if (e.currentTarget) e.currentTarget.classList.remove('opacity-40');
+  document.querySelectorAll('.job-card').forEach(el => el.classList.remove('ring-2', 'ring-cyan-400'));
+  _draggedJobId = null;
+}
+window.handleJobDragEnd = handleJobDragEnd;
+
+function handleJobDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (e.currentTarget) e.currentTarget.classList.add('ring-2', 'ring-cyan-400');
+}
+window.handleJobDragOver = handleJobDragOver;
+
+function handleJobDragLeave(e) {
+  if (e.currentTarget) e.currentTarget.classList.remove('ring-2', 'ring-cyan-400');
+}
+window.handleJobDragLeave = handleJobDragLeave;
+
+// Dragging directly changes the array position, which is what drives stock allocation priority -
+// same effect the old Up/Down buttons had, just without repeated clicking to move something far.
+function handleJobDrop(e, targetJobId) {
+  e.preventDefault();
+  if (e.currentTarget) e.currentTarget.classList.remove('ring-2', 'ring-cyan-400');
+  if (_draggedJobId === null || _draggedJobId === targetJobId) return;
+
+  loadJournalState();
+  const fromIndex = activeJobs.findIndex(j => j && j.id === _draggedJobId);
+  const toIndex = activeJobs.findIndex(j => j && j.id === targetJobId);
+  if (fromIndex === -1 || toIndex === -1) return;
+
+  const [moved] = activeJobs.splice(fromIndex, 1);
+  activeJobs.splice(toIndex, 0, moved);
+
+  localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
+  _draggedJobId = null;
+  renderJournalPage();
+}
+window.handleJobDrop = handleJobDrop;
 
 function populateJournalLocationDropdown() {
   const filterSelect = document.getElementById('stock-location-filter');
@@ -899,8 +1048,6 @@ window.filterJournalLocationOptions = filterJournalLocationOptions;
 window.recalculateJournalStock = recalculateJournalStock;
 window.setBOMOrderFilter = setBOMOrderFilter;
 window.setBOMCategoryFilter = setBOMCategoryFilter;
-window.moveJobUp = moveJobUp;
-window.moveJobDown = moveJobDown;
 
 // --- Completed History Drawer ---
 function getHistoryDrawerState() {
