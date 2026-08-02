@@ -137,6 +137,73 @@ const POPULAR_ITEMS = [
 ];
 window.POPULAR_ITEMS = POPULAR_ITEMS;
 
+// --- Tracked Markets (for the multi-market Compare Markets feature) ---
+// Default hub NAMES only, not hardcoded station/region IDs - those get resolved via ESI at runtime
+// (resolveStationByName + resolveStationRegion in esi.js) and cached, rather than trusting guessed
+// numeric IDs the way the earlier ship-group-id mistake did.
+const DEFAULT_TRADE_HUB_NAMES = [
+  'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+  'Amarr VIII (Oris) - Emperor Family Academy',
+  'Dodixie IX - Moon 20 - Federation Navy Assembly Plant',
+  'Rens VI - Moon 8 - Brutor Tribe Treasury',
+  'Hek VIII - Moon 12 - Boundless Creation Factory'
+];
+
+function getTrackedMarkets() {
+  try {
+    const saved = localStorage.getItem('eve_tracked_markets');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  return [];
+}
+window.getTrackedMarkets = getTrackedMarkets;
+
+function saveTrackedMarkets(markets) {
+  localStorage.setItem('eve_tracked_markets', JSON.stringify(markets));
+}
+window.saveTrackedMarkets = saveTrackedMarkets;
+
+function addTrackedMarket(market) {
+  const markets = getTrackedMarkets();
+  if (markets.some(m => m.stationId === market.stationId)) return; // already tracked
+  markets.push(market);
+  saveTrackedMarkets(markets);
+}
+window.addTrackedMarket = addTrackedMarket;
+
+function removeTrackedMarket(stationId) {
+  const markets = getTrackedMarkets().filter(m => m.stationId !== stationId);
+  saveTrackedMarkets(markets);
+}
+window.removeTrackedMarket = removeTrackedMarket;
+
+// One-time setup: resolves the 5 default hub names to real station/region IDs via ESI and seeds the
+// tracked markets list, if it's empty (first run, or a fresh browser profile).
+async function ensureDefaultTrackedMarkets() {
+  if (getTrackedMarkets().length > 0) return; // already seeded
+  const resolved = [];
+  for (const name of DEFAULT_TRADE_HUB_NAMES) {
+    try {
+      const station = await window.resolveStationByName(name);
+      if (!station) continue;
+      const regionInfo = await window.resolveStationRegion(station.stationId);
+      resolved.push({
+        stationId: station.stationId,
+        stationName: station.stationName,
+        regionId: regionInfo ? regionInfo.regionId : null,
+        systemId: regionInfo ? regionInfo.systemId : null
+      });
+    } catch (e) {
+      console.warn(`Failed to resolve default hub "${name}":`, e);
+    }
+  }
+  if (resolved.length > 0) saveTrackedMarkets(resolved);
+}
+window.ensureDefaultTrackedMarkets = ensureDefaultTrackedMarkets;
+
 // --- Unified Structure Type System ---
 // A station/structure is ONE thing - it can't simultaneously be "Raitaru" in one dropdown and
 // "Sotiyo" in another. This table is the single source of truth for every bonus a structure type

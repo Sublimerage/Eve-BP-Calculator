@@ -188,6 +188,185 @@ function restoreRigSlotInputs() {
   }
 }
 
+// --- Markets: home market search/selection ---
+let _homeMarketSearchToken = 0;
+async function searchHomeMarket(query) {
+  const resultsEl = document.getElementById('home-market-results');
+  if (!resultsEl) return;
+  const token = ++_homeMarketSearchToken;
+  const q = (query || '').trim();
+  if (q.length < 3) {
+    resultsEl.innerHTML = `<div class="p-1.5 text-slate-500">Type at least 3 characters...</div>`;
+    resultsEl.classList.remove('hidden');
+    return;
+  }
+  resultsEl.innerHTML = `<div class="p-1.5 text-slate-500">Searching...</div>`;
+  resultsEl.classList.remove('hidden');
+  const matches = await window.searchStationsByName(q);
+  if (token !== _homeMarketSearchToken) return; // a newer search superseded this one
+  if (matches.length === 0) {
+    resultsEl.innerHTML = `<div class="p-1.5 text-slate-500">No matching stations found.</div>`;
+    return;
+  }
+  resultsEl.innerHTML = matches.map(m => `
+    <div class="px-2 py-1.5 hover:bg-[#1e3348] cursor-pointer border-b border-[#1e3348]/20" onmousedown="selectHomeMarket(${m.stationId}, '${window.esc(m.stationName)}')">
+      ${window.esc(m.stationName)}
+    </div>
+  `).join('');
+}
+window.searchHomeMarket = searchHomeMarket;
+
+function selectHomeMarket(stationId, stationName) {
+  localStorage.setItem('eve_home_station_id', String(stationId));
+  localStorage.setItem('eve_home_station_name', stationName);
+  const inputEl = document.getElementById('home-market-input');
+  if (inputEl) inputEl.value = stationName;
+  const resultsEl = document.getElementById('home-market-results');
+  if (resultsEl) resultsEl.classList.add('hidden');
+  // Prices already cached are all keyed by typeId only (no per-station distinction), so switching
+  // home markets requires clearing them - otherwise stale Jita prices would linger under a new market.
+  window.priceCache = {};
+  if (window.currentProduct) {
+    window.selectItem(window.currentProduct.id, window.currentProduct.name, true);
+  }
+}
+window.selectHomeMarket = selectHomeMarket;
+
+function restoreHomeMarketInput() {
+  const inputEl = document.getElementById('home-market-input');
+  const savedName = localStorage.getItem('eve_home_station_name');
+  if (inputEl) inputEl.value = savedName || 'Jita IV - Moon 4 - Caldari Navy Assembly Plant';
+}
+
+// --- Markets: tracked markets management (for Compare Markets) ---
+function renderTrackedMarketsList() {
+  const listEl = document.getElementById('tracked-markets-list');
+  if (!listEl) return;
+  const markets = window.getTrackedMarkets ? window.getTrackedMarkets() : [];
+  if (markets.length === 0) {
+    listEl.innerHTML = `<div class="text-[10px] text-slate-500 italic">Loading default hubs...</div>`;
+    return;
+  }
+  listEl.innerHTML = markets.map(m => `
+    <div class="flex items-center justify-between bg-[#070b0f] border border-[#1e3348] rounded px-2 py-1 text-[10px]">
+      <span class="text-slate-300 truncate mono">${window.esc(m.stationName)}</span>
+      <button onclick="removeTrackedMarketAndRefresh(${m.stationId})" class="text-red-400 hover:text-red-300 font-bold ml-1.5 flex-shrink-0" title="Stop tracking this market">✖</button>
+    </div>
+  `).join('');
+}
+window.renderTrackedMarketsList = renderTrackedMarketsList;
+
+function removeTrackedMarketAndRefresh(stationId) {
+  window.removeTrackedMarket(stationId);
+  renderTrackedMarketsList();
+}
+window.removeTrackedMarketAndRefresh = removeTrackedMarketAndRefresh;
+
+let _addMarketSearchToken = 0;
+async function searchAddMarket(query) {
+  const resultsEl = document.getElementById('add-market-results');
+  if (!resultsEl) return;
+  const token = ++_addMarketSearchToken;
+  const q = (query || '').trim();
+  if (q.length < 3) {
+    resultsEl.innerHTML = `<div class="p-1.5 text-slate-500">Type at least 3 characters...</div>`;
+    resultsEl.classList.remove('hidden');
+    return;
+  }
+  resultsEl.innerHTML = `<div class="p-1.5 text-slate-500">Searching...</div>`;
+  resultsEl.classList.remove('hidden');
+  const matches = await window.searchStationsByName(q);
+  if (token !== _addMarketSearchToken) return;
+  if (matches.length === 0) {
+    resultsEl.innerHTML = `<div class="p-1.5 text-slate-500">No matching stations found.</div>`;
+    return;
+  }
+  resultsEl.innerHTML = matches.map(m => `
+    <div class="px-2 py-1.5 hover:bg-[#1e3348] cursor-pointer border-b border-[#1e3348]/20" onmousedown="confirmAddMarket(${m.stationId}, '${window.esc(m.stationName)}')">
+      ${window.esc(m.stationName)}
+    </div>
+  `).join('');
+}
+window.searchAddMarket = searchAddMarket;
+
+async function confirmAddMarket(stationId, stationName) {
+  const resultsEl = document.getElementById('add-market-results');
+  const inputEl = document.getElementById('add-market-input');
+  if (resultsEl) { resultsEl.innerHTML = `<div class="p-1.5 text-slate-500">Adding...</div>`; }
+  const regionInfo = await window.resolveStationRegion(stationId);
+  window.addTrackedMarket({
+    stationId: stationId,
+    stationName: stationName,
+    regionId: regionInfo ? regionInfo.regionId : null,
+    systemId: regionInfo ? regionInfo.systemId : null
+  });
+  if (inputEl) inputEl.value = '';
+  if (resultsEl) resultsEl.classList.add('hidden');
+  renderTrackedMarketsList();
+}
+window.confirmAddMarket = confirmAddMarket;
+
+// --- Compare Markets panel ---
+async function openMarketComparison(e, typeId, itemName) {
+  if (e) e.stopPropagation();
+  const existing = document.getElementById('market-comparison-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'market-comparison-modal';
+  modal.className = 'fixed inset-0 bg-black/80 flex items-center justify-center z-[999] p-4';
+  modal.onclick = (evt) => { if (evt.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div class="bg-[#0c1318] border border-cyan-500/80 rounded-lg p-5 w-full max-w-2xl shadow-2xl text-xs mono">
+      <div class="flex justify-between items-center border-b border-[#1e3348] pb-3 mb-3">
+        <h3 class="text-base font-bold text-cyan-300 rajdhani tracking-wider">💹 Compare Markets: ${window.esc(itemName)}</h3>
+        <button onclick="document.getElementById('market-comparison-modal').remove()" class="text-slate-400 hover:text-white font-bold text-base">✖</button>
+      </div>
+      <div id="market-comparison-body" class="text-slate-400">Loading prices and trade volume across tracked markets...</div>
+      <div class="text-[10px] text-slate-500 mt-3 leading-relaxed">
+        Volume is the average units traded per day over the last 7 days (from EVE's market history) - a low price with very low volume may be hard to actually buy/sell at that price. Sorted by price does NOT mean sorted by "best" - liquidity matters too.
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const results = await window.fetchMarketComparison(typeId);
+  const bodyEl = document.getElementById('market-comparison-body');
+  if (!bodyEl) return; // modal was closed before the fetch finished
+
+  if (results.length === 0) {
+    bodyEl.innerHTML = `<div class="text-slate-500 italic">No tracked markets yet - add some in the sidebar's Markets section.</div>`;
+    return;
+  }
+
+  const rows = results.map(r => `
+    <tr class="border-b border-[#1e3348]/40">
+      <td class="p-2 text-slate-200">${window.esc(r.stationName)}</td>
+      <td class="p-2 text-right text-amber-300 font-bold">${r.sell > 0 ? Math.round(r.sell).toLocaleString() : '—'}</td>
+      <td class="p-2 text-right text-cyan-300 font-bold">${r.buy > 0 ? Math.round(r.buy).toLocaleString() : '—'}</td>
+      <td class="p-2 text-right ${r.avgVolume === null ? 'text-slate-500' : (r.avgVolume < 10 ? 'text-red-400' : r.avgVolume < 100 ? 'text-amber-400' : 'text-green-400')} font-bold">
+        ${r.avgVolume === null ? 'Unknown' : r.avgVolume.toLocaleString() + '/day'}
+      </td>
+    </tr>
+  `).join('');
+
+  bodyEl.innerHTML = `
+    <table class="w-full text-left border-collapse">
+      <thead>
+        <tr class="text-slate-400 border-b border-[#1e3348] uppercase text-[10px] font-bold">
+          <th class="p-2">Market</th>
+          <th class="p-2 text-right">Lowest Sell</th>
+          <th class="p-2 text-right">Highest Buy</th>
+          <th class="p-2 text-right">Avg Daily Volume</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+window.openMarketComparison = openMarketComparison;
+
+
 function searchItems(query) {
   const q = query.toLowerCase().trim();
   if (!q) return [];
@@ -909,7 +1088,13 @@ function createNodeCard(node) {
     ` : ''}
 
     <div class="text-[11px] mono space-y-1">
-      <div class="flex justify-between font-semibold"><span class="text-slate-400">Lowest Sell:</span><span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK</span></div>
+      <div class="flex justify-between items-center font-semibold">
+        <span class="text-slate-400">Lowest Sell:</span>
+        <div class="flex items-center gap-1.5">
+          <span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK</span>
+          <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="text-[9px] bg-[#1e3348] hover:bg-cyan-600 text-cyan-200 px-1 py-0.5 rounded transition" title="Compare price and trade volume across your tracked markets">⇄</button>
+        </div>
+      </div>
       <div class="flex justify-between text-slate-400"><span>Highest Buy:</span><span class="text-slate-300">${prices.buy.toLocaleString()} ISK</span></div>
       ${!isRoot && savingsPct !== null ? `<div class="flex justify-between text-green-400 font-semibold text-[10px]"><span>Order Savings:</span><span>${savingsPct}%</span></div>` : ''}
       ${node.jobFee > 0 && node.isBuildingSelf ? `<div class="flex justify-between text-[#e85555] font-semibold border-t border-[#1e3348]/40 pt-1"><span>Job Inst. Fee:</span><span>+${Math.round(node.jobFee).toLocaleString()} ISK</span></div>` : ''}
@@ -1676,6 +1861,11 @@ window.onload = async () => {
   // Load static local states instantly so the app is interactive immediately!
   try {
     restoreRigSlotInputs(); // Show each rig slot's saved rig name (if any) before restoring other tax settings
+    restoreHomeMarketInput();
+    renderTrackedMarketsList();
+    if (typeof window.ensureDefaultTrackedMarkets === 'function') {
+      window.ensureDefaultTrackedMarkets().then(() => renderTrackedMarketsList()).catch(err => console.warn('Default market seeding failed:', err));
+    }
     loadTaxSettings(); // Load custom taxes from localStorage!
     loadSavedState(); // Load previous product & overrides persistently from localStorage!
     updateHeaderLedgerCount(); // Update badge on load!

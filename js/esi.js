@@ -1011,7 +1011,133 @@ async function fetchSystemSCIById(systemId, systemName) {
   }
 }
 
+// --- Market/Station Resolution ---
+// Resolves a station name to its type/system/region IDs via ESI, entirely at runtime - this works
+// for any station (major trade hub or a specific lowsec/null station the user knows), without
+// hardcoding numeric IDs that would need independent verification to trust.
+async function resolveStationByName(stationName) {
+  try {
+    const res = await fetch('https://esi.evetech.net/latest/universe/ids/?datasource=tranquility', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([stationName])
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const station = data.stations && data.stations[0];
+    if (!station) return null;
+    return { stationId: station.id, stationName: station.name };
+  } catch (e) {
+    console.warn('Station name resolution failed:', e);
+    return null;
+  }
+}
+window.resolveStationByName = resolveStationByName;
+
+// Searches for stations matching a partial name (for the search-as-you-type UI), using ESI's public
+// search endpoint.
+async function searchStationsByName(query) {
+  if (!query || query.length < 3) return [];
+  try {
+    const res = await fetch(`https://esi.evetech.net/latest/search/?categories=station&datasource=tranquility&language=en&search=${encodeURIComponent(query)}&strict=false`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const stationIds = (data.station || []).slice(0, 15);
+    if (stationIds.length === 0) return [];
+    const namesRes = await fetch('https://esi.evetech.net/latest/universe/names/?datasource=tranquility', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(stationIds)
+    });
+    if (!namesRes.ok) return [];
+    const namesData = await namesRes.json();
+    return namesData.map(s => ({ stationId: s.id, stationName: s.name }));
+  } catch (e) {
+    console.warn('Station search failed:', e);
+    return [];
+  }
+}
+window.searchStationsByName = searchStationsByName;
+
+// Resolves a station's region id (needed for market history/volume) by walking station -> system ->
+// constellation -> region. Only needed once per newly-tracked market since the result is cached.
+async function resolveStationRegion(stationId) {
+  try {
+    const stationRes = await fetch(`https://esi.evetech.net/latest/universe/stations/${stationId}/?datasource=tranquility`);
+    if (!stationRes.ok) return null;
+    const stationData = await stationRes.json();
+    const systemId = stationData.system_id;
+    if (!systemId) return null;
+
+    const systemRes = await fetch(`https://esi.evetech.net/latest/universe/systems/${systemId}/?datasource=tranquility`);
+    if (!systemRes.ok) return null;
+    const systemData = await systemRes.json();
+    const constellationId = systemData.constellation_id;
+    if (!constellationId) return null;
+
+    const constRes = await fetch(`https://esi.evetech.net/latest/universe/constellations/${constellationId}/?datasource=tranquility`);
+    if (!constRes.ok) return null;
+    const constData = await constRes.json();
+    return { regionId: constData.region_id, systemId: systemId };
+  } catch (e) {
+    console.warn('Station region resolution failed:', e);
+    return null;
+  }
+}
+window.resolveStationRegion = resolveStationRegion;
+
+// Real daily trade volume (not just what's currently listed) comes from ESI market history, averaged
+// over the most recent several days - this is the actual liquidity signal, distinct from Fuzzwork's
+// order-book aggregates which only show what's currently for sale, not how fast it moves.
+async function fetchAverageDailyVolume(regionId, typeId) {
+  try {
+    const res = await fetch(`https://esi.evetech.net/latest/markets/${regionId}/history/?datasource=tranquility&type_id=${typeId}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+    const recent = data.slice(-7); // last 7 days of trading
+    const totalVolume = recent.reduce((sum, day) => sum + (day.volume || 0), 0);
+    return Math.round(totalVolume / recent.length);
+  } catch (e) {
+    console.warn('Market history fetch failed:', e);
+    return null;
+  }
+}
+window.fetchAverageDailyVolume = fetchAverageDailyVolume;
+
+// Fetches price + liquidity for one item across every tracked market in parallel, for the Compare
+// Markets panel. Price comes from Fuzzwork (per-station), volume from ESI history (per-region) -
+// deliberately returned side by side rather than collapsed into a single "best" score, since the
+// cheapest price and the most liquid market are often not the same place.
+async function fetchMarketComparison(typeId) {
+  const markets = typeof window.getTrackedMarkets === 'function' ? window.getTrackedMarkets() : [];
+  const results = await Promise.all(markets.map(async (market) => {
+    let sell = 0, buy = 0, avgVolume = null;
+    try {
+      const priceUrl = `https://market.fuzzwork.co.uk/aggregates/?station=${market.stationId}&types=${typeId}`;
+      const priceRes = await fetch(priceUrl);
+      if (priceRes.ok) {
+        const priceData = await priceRes.json();
+        const entry = priceData[String(typeId)];
+        if (entry) {
+          sell = entry.sell ? parseFloat(entry.sell.min) || 0 : 0;
+          buy = entry.buy ? parseFloat(entry.buy.max) || 0 : 0;
+        }
+      }
+    } catch (e) { /* leave as 0 */ }
+
+    if (market.regionId) {
+      avgVolume = await fetchAverageDailyVolume(market.regionId, typeId);
+    }
+
+    return { stationName: market.stationName, stationId: market.stationId, sell, buy, avgVolume };
+  }));
+  return results;
+}
+window.fetchMarketComparison = fetchMarketComparison;
+
 async function fetchMarketPrices(typeIds) {
+  const homeStationId = localStorage.getItem('eve_home_station_id') || '60003760'; // defaults to Jita IV - Moon 4
   const missing = typeIds.filter(id => !window.priceCache[id]);
   if (!missing.length) return;
   const chunks = [];
@@ -1019,7 +1145,7 @@ async function fetchMarketPrices(typeIds) {
     chunks.push(missing.slice(i, i + 30));
   }
   await Promise.all(chunks.map(async (chunk) => {
-    const targetUrl = `https://market.fuzzwork.co.uk/aggregates/?station=60003760&types=${chunk.join(',')}`;
+    const targetUrl = `https://market.fuzzwork.co.uk/aggregates/?station=${homeStationId}&types=${chunk.join(',')}`;
     const tryUrls = [targetUrl, `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`];
     for (const url of tryUrls) {
       try {
