@@ -365,7 +365,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
         <div class="min-w-0 flex-1">
           <div class="font-bold text-sm text-white truncate">${window.esc(jobDisplayName)}</div>
           ${job.isSubBuild ? `<div class="text-[9px] mono text-amber-400 font-bold uppercase truncate">⚙ Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
-          ${job.autoImported ? `<div class="text-[9px] mono text-cyan-400 font-bold uppercase truncate" title="No matching plan existed - imported from your active EVE job.">📥 Auto-imported</div>` : ''}
+          ${job.autoImported ? `<div class="text-[9px] mono text-cyan-400 font-bold uppercase truncate" title="No matching plan existed - imported from your active EVE job.">📥 Auto-imported ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
         </div>
         <span class="text-lg font-extrabold text-purple-300 mono flex-shrink-0 cursor-pointer hover:text-purple-200" onclick="event.stopPropagation(); copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">${job.runsNeeded.toLocaleString()}</span>
         <span class="text-[10px] text-slate-500 mono flex-shrink-0 w-14">runs</span>
@@ -555,7 +555,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
             <div class="min-w-0 flex-1">
               <h3 class="font-bold text-base text-white truncate">${window.esc(jobDisplayName)}</h3>
               ${job.isSubBuild ? `<div class="text-[9px] mono text-amber-400 font-bold uppercase tracking-wide mt-0.5" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
-              ${job.autoImported ? `<div class="text-[9px] mono text-cyan-400 font-bold uppercase tracking-wide mt-0.5" title="No matching plan existed for this job - imported directly from your active EVE industry job using its real ME/TE and market sell pricing.">📥 Auto-imported from EVE</div>` : ''}
+              ${job.autoImported ? `<div class="text-[9px] mono text-cyan-400 font-bold uppercase tracking-wide mt-0.5" title="No matching plan existed for this job - imported directly from your active EVE industry job using its real ME/TE and market sell pricing.">📥 Auto-imported from EVE ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
               <div class="text-[10px] mono text-slate-500 mt-0.5">Added on: ${formattedDate}</div>
             </div>
           </div>
@@ -1015,6 +1015,16 @@ async function syncWithEveIndustryJobs(silent) {
   });
 
   loadJournalState();
+
+  // Anything already tracked by an existing STARTED ledger job (from a previous sync) must be
+  // skipped entirely here - otherwise every sync re-imports the same still-active real job as a
+  // brand new duplicate, since it's no longer sitting in the pending pool to be "matched" against.
+  const alreadyTrackedEveJobIds = new Set(
+    activeJobs.filter(j => j && j.isStarted && j.eveJobId !== undefined).map(j => j.eveJobId)
+  );
+  const untrackedRealJobs = activeRealJobs.filter(rj => !alreadyTrackedEveJobIds.has(rj.job_id));
+  console.info(`[JobSync] ${activeRealJobs.length - untrackedRealJobs.length} real job(s) already tracked by an existing started ledger job - skipping those, ${untrackedRealJobs.length} remain to match/import.`);
+
   const usedRealJobIds = new Set();
   let matchedCount = 0;
   let importedCount = 0;
@@ -1022,7 +1032,7 @@ async function syncWithEveIndustryJobs(silent) {
   // Pass 1: match against existing PENDING ledger jobs. A real job's run count fitting inside a
   // larger pending job's run count splits it (started fragment + still-queued remainder) - the same
   // thing a manual partial "Start Job" already does - rather than ever creating a redundant duplicate.
-  activeRealJobs.forEach(rj => {
+  untrackedRealJobs.forEach(rj => {
     if (usedRealJobIds.has(rj.job_id)) return;
     const targetProductId = rj.product_type_id;
     const candidates = activeJobs
@@ -1091,7 +1101,7 @@ async function syncWithEveIndustryJobs(silent) {
 
   // Pass 2: any remaining active real job with no ledger counterpart gets auto-imported - built as a
   // real recipe tree using the blueprint's ACTUAL researched ME/TE, priced at market sell only.
-  for (const rj of activeRealJobs) {
+  for (const rj of untrackedRealJobs) {
     if (usedRealJobIds.has(rj.job_id)) continue;
     console.info(`[JobSync]   ⬇ No pending job fits real job_id=${rj.job_id} (product ${rj.product_type_id}, ${rj.runs} runs) - auto-importing.`);
     const imported = await buildAutoImportedJob(rj, blueprintMeTeMap);
@@ -1126,6 +1136,7 @@ async function buildAutoImportedJob(realJob, blueprintMeTeMap) {
     const productTypeId = realJob.product_type_id;
     const runs = realJob.runs;
     const bpInfo = blueprintMeTeMap[realJob.blueprint_id] || { me: 0, te: 0 };
+    console.info(`[JobSync]   Blueprint ME/TE for blueprint_id=${realJob.blueprint_id}: ME=${bpInfo.me}%, TE=${bpInfo.te}% ${blueprintMeTeMap[realJob.blueprint_id] === undefined ? '(not found in your blueprints list - defaulting to 0/0, verify this against the job in-game)' : ''}`);
 
     if (typeof window.buildRecursiveRecipeTree !== 'function') {
       console.warn('[JobSync] Recipe tree builder not available - cannot auto-import.');
@@ -1194,6 +1205,8 @@ async function buildAutoImportedJob(realJob, blueprintMeTeMap) {
       startedAt: new Date(realJob.start_date).getTime(),
       eveJobId: realJob.job_id,
       autoImported: true,
+      meLevel: bpInfo.me,
+      teLevel: bpInfo.te,
       addedAt: new Date().toISOString()
     };
   } catch (e) {
