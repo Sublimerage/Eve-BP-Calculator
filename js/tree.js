@@ -400,7 +400,7 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
       node.productName = window.TYPE_ID_TO_NAME[node.productTypeId] || cleanRecipeProductName || productName;
       node.isManufacturable = true;
       
-      const allowReactions = document.getElementById('include-reactions')?.value === 'true';
+      const allowReactions = document.getElementById('include-reactions')?.value !== 'false';
 
       let rawMaterials = recipe.mfgMaterials || recipe.materials || recipe.mats || recipe.m;
       let isReaction = false;

@@ -266,7 +266,7 @@ async function startEsiSSOLogin() {
   // (https://developers.eveonline.com) for this Client ID. Log it so it can be copied verbatim -
   // including the trailing slash, which EVE matches exactly.
   console.info(`[EVE SSO] Sending redirect_uri: "${redirectUri}" - this exact string must be registered as a Callback URL for Client ID ${clientId} at https://developers.eveonline.com`);
-  const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1 esi-corporations.read_divisions.v1 esi-industry.read_character_jobs.v1 esi-industry.read_corporation_jobs.v1';
+  const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1 esi-corporations.read_divisions.v1 esi-industry.read_character_jobs.v1 esi-industry.read_corporation_jobs.v1 esi-characters.read_blueprints.v1 esi-corporations.read_blueprints.v1';
   const state = generateRandomString(16);
   localStorage.setItem('esi_auth_state', state);
   const authUrl = `https://login.eveonline.com/v2/oauth/authorize/?response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&client_id=${encodeURIComponent(clientId)}&scope=${encodeURIComponent(scope)}&code_challenge=${challenge}&code_challenge_method=S256&state=${state}`;
@@ -1175,6 +1175,41 @@ async function fetchActiveCorpIndustryJobs() {
   }
 }
 window.fetchActiveCorpIndustryJobs = fetchActiveCorpIndustryJobs;
+
+// Fetches the character's owned blueprints (with real ME/TE research levels) from ESI. A job's
+// blueprint_id references a specific blueprint item instance - this is the only place its actual
+// researched ME/TE lives, since the industry jobs endpoint itself doesn't carry that data.
+async function fetchCharacterBlueprints() {
+  const charId = localStorage.getItem('esi_char_id');
+  const accessToken = localStorage.getItem('esi_access_token');
+  if (!charId || !accessToken) return [];
+  try {
+    const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/blueprints/?datasource=tranquility`, {}, accessToken, true);
+    if (!res || !res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.warn('Character blueprints fetch failed:', e);
+    return [];
+  }
+}
+window.fetchCharacterBlueprints = fetchCharacterBlueprints;
+
+async function fetchCorpBlueprints() {
+  const corpId = localStorage.getItem('esi_corp_id');
+  const accessToken = localStorage.getItem('esi_access_token');
+  if (!corpId || !accessToken) return [];
+  try {
+    const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/blueprints/?datasource=tranquility`, {}, accessToken, true);
+    if (!res || !res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.warn('Corp blueprints fetch failed (likely missing role):', e);
+    return [];
+  }
+}
+window.fetchCorpBlueprints = fetchCorpBlueprints;
 
 async function fetchMarketPrices(typeIds) {
   const homeStationId = localStorage.getItem('eve_home_station_id') || '60003760'; // defaults to Jita IV - Moon 4

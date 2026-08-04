@@ -365,6 +365,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
         <div class="min-w-0 flex-1">
           <div class="font-bold text-sm text-white truncate">${window.esc(jobDisplayName)}</div>
           ${job.isSubBuild ? `<div class="text-[9px] mono text-amber-400 font-bold uppercase truncate">⚙ Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
+          ${job.autoImported ? `<div class="text-[9px] mono text-cyan-400 font-bold uppercase truncate" title="No matching plan existed - imported from your active EVE job.">📥 Auto-imported</div>` : ''}
         </div>
         <span class="text-lg font-extrabold text-purple-300 mono flex-shrink-0 cursor-pointer hover:text-purple-200" onclick="event.stopPropagation(); copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">${job.runsNeeded.toLocaleString()}</span>
         <span class="text-[10px] text-slate-500 mono flex-shrink-0 w-14">runs</span>
@@ -554,6 +555,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
             <div class="min-w-0 flex-1">
               <h3 class="font-bold text-base text-white truncate">${window.esc(jobDisplayName)}</h3>
               ${job.isSubBuild ? `<div class="text-[9px] mono text-amber-400 font-bold uppercase tracking-wide mt-0.5" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
+              ${job.autoImported ? `<div class="text-[9px] mono text-cyan-400 font-bold uppercase tracking-wide mt-0.5" title="No matching plan existed for this job - imported directly from your active EVE industry job using its real ME/TE and market sell pricing.">📥 Auto-imported from EVE</div>` : ''}
               <div class="text-[10px] mono text-slate-500 mt-0.5">Added on: ${formattedDate}</div>
             </div>
           </div>
@@ -969,20 +971,16 @@ async function syncWithEveIndustryJobs(silent) {
   const btn = document.getElementById('btn-sync-eve-jobs');
   if (btn && !silent) { btn.disabled = true; btn.textContent = '🔄 Syncing...'; }
 
-  const [charJobs, corpJobs] = await Promise.all([
+  const [charJobs, corpJobs, charBps, corpBps] = await Promise.all([
     typeof window.fetchActiveIndustryJobs === 'function' ? window.fetchActiveIndustryJobs() : null,
-    typeof window.fetchActiveCorpIndustryJobs === 'function' ? window.fetchActiveCorpIndustryJobs() : []
+    typeof window.fetchActiveCorpIndustryJobs === 'function' ? window.fetchActiveCorpIndustryJobs() : [],
+    typeof window.fetchCharacterBlueprints === 'function' ? window.fetchCharacterBlueprints() : [],
+    typeof window.fetchCorpBlueprints === 'function' ? window.fetchCorpBlueprints() : []
   ]);
 
   if (btn) { btn.disabled = false; btn.textContent = '🔄 Sync EVE Jobs'; }
 
-  console.info(`[JobSync] Fetched ${charJobs ? charJobs.length : 'null (fetch failed)'} character job(s), ${corpJobs ? corpJobs.length : 0} corp job(s).`);
-  if (charJobs && charJobs.length > 0) {
-    console.info('[JobSync] Raw character jobs:', JSON.stringify(charJobs, null, 2));
-  }
-  if (corpJobs && corpJobs.length > 0) {
-    console.info('[JobSync] Raw corp jobs:', JSON.stringify(corpJobs, null, 2));
-  }
+  console.info(`[JobSync] Fetched ${charJobs ? charJobs.length : 'null (fetch failed)'} character job(s), ${corpJobs ? corpJobs.length : 0} corp job(s), ${(charBps||[]).length} char blueprint(s), ${(corpBps||[]).length} corp blueprint(s).`);
 
   if (!charJobs && (!corpJobs || corpJobs.length === 0)) {
     if (!silent) alert('Could not fetch active industry jobs. Make sure you are logged in via EVE SSO - if you logged in before this feature existed, log out and back in once to grant the new Industry Jobs permissions.');
@@ -998,60 +996,212 @@ async function syncWithEveIndustryJobs(silent) {
     return true;
   });
 
-  const activeRealJobs = allRealJobs.filter(j => j && j.status === 'active');
-  console.info(`[JobSync] ${activeRealJobs.length} job(s) with status 'active' out of ${allRealJobs.length} total fetched.`);
+  // Only manufacturing (1) and reaction (11) jobs represent "building an item" the way the ledger
+  // models it - research/copying/invention jobs are skipped.
+  const activeRealJobs = allRealJobs.filter(j => j && j.status === 'active' && (j.activity_id === 1 || j.activity_id === 11));
+  console.info(`[JobSync] ${activeRealJobs.length} active manufacturing/reaction job(s) out of ${allRealJobs.length} total fetched.`);
   activeRealJobs.forEach(rj => {
-    console.info(`[JobSync]   Active real job: job_id=${rj.job_id}, product_type_id=${rj.product_type_id}, blueprint_type_id=${rj.blueprint_type_id}, activity_id=${rj.activity_id}, runs=${rj.runs}, status=${rj.status}`);
+    console.info(`[JobSync]   Active real job: job_id=${rj.job_id}, product_type_id=${rj.product_type_id}, blueprint_id=${rj.blueprint_id}, blueprint_type_id=${rj.blueprint_type_id}, activity_id=${rj.activity_id}, runs=${rj.runs}`);
   });
 
-  loadJournalState();
-  const pendingLedgerJobs = activeJobs.filter(j => j && !j.isStarted);
-  console.info(`[JobSync] ${pendingLedgerJobs.length} pending ledger job(s) to try to match:`);
-  pendingLedgerJobs.forEach(j => {
-    console.info(`[JobSync]   Pending ledger job: name="${j.name}", productTypeId=${j.productTypeId}, typeId=${j.typeId}, runsNeeded=${j.runsNeeded}`);
-  });
-
-  const usedRealJobIds = new Set();
-  let matchedCount = 0;
-
-  pendingLedgerJobs.forEach(job => {
-    const targetProductId = job.productTypeId || job.typeId;
-    const match = activeRealJobs.find(rj =>
-      !usedRealJobIds.has(rj.job_id) &&
-      rj.product_type_id === targetProductId &&
-      rj.runs === job.runsNeeded
-    );
-    if (match) {
-      usedRealJobIds.add(match.job_id);
-      job.isStarted = true;
-      job.startedAt = new Date(match.start_date).getTime();
-      job.totalBuildSeconds = Math.max(0, (new Date(match.end_date).getTime() - new Date(match.start_date).getTime()) / 1000);
-      job.eveJobId = match.job_id;
-      matchedCount++;
-      console.info(`[JobSync]   ✔ MATCHED "${job.name}" to real job_id=${match.job_id}`);
-    } else {
-      // Show the closest candidates (same product, different run count) to help diagnose a near-miss.
-      const sameProduct = activeRealJobs.filter(rj => rj.product_type_id === targetProductId);
-      if (sameProduct.length > 0) {
-        console.warn(`[JobSync]   ✘ No match for "${job.name}" (wants runs=${job.runsNeeded}) - found real job(s) for the same product but different run count: ${sameProduct.map(rj => rj.runs).join(', ')}`);
-      } else {
-        console.warn(`[JobSync]   ✘ No match for "${job.name}" (productTypeId=${targetProductId}) - no active real job found for this product at all.`);
-      }
+  // Real ME/TE for the specific blueprint instance used, keyed by blueprint_id (item_id) - this is a
+  // separate endpoint from industry jobs, since a job's blueprint_id only references the item, not
+  // its research level.
+  const blueprintMeTeMap = {};
+  [...(charBps || []), ...(corpBps || [])].forEach(bp => {
+    if (bp && bp.item_id !== undefined) {
+      blueprintMeTeMap[bp.item_id] = { me: bp.material_efficiency || 0, te: bp.time_efficiency || 0 };
     }
   });
 
-  if (matchedCount > 0) {
-    localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
+  loadJournalState();
+  const usedRealJobIds = new Set();
+  let matchedCount = 0;
+  let importedCount = 0;
+
+  // Pass 1: match against existing PENDING ledger jobs. A real job's run count fitting inside a
+  // larger pending job's run count splits it (started fragment + still-queued remainder) - the same
+  // thing a manual partial "Start Job" already does - rather than ever creating a redundant duplicate.
+  activeRealJobs.forEach(rj => {
+    if (usedRealJobIds.has(rj.job_id)) return;
+    const targetProductId = rj.product_type_id;
+    const candidates = activeJobs
+      .filter(j => j && !j.isStarted && (j.productTypeId || j.typeId) === targetProductId && j.runsNeeded >= rj.runs)
+      .sort((a, b) => a.runsNeeded - b.runsNeeded); // smallest sufficient fit first, to avoid attributing a small job to a much larger unrelated one
+    const candidate = candidates[0];
+    if (!candidate) return; // no fit among pending jobs - falls through to auto-import in pass 2
+
+    usedRealJobIds.add(rj.job_id);
+    matchedCount++;
+    const jobIndex = activeJobs.findIndex(j => j.id === candidate.id);
+    if (jobIndex === -1) return;
+
+    const startedAt = new Date(rj.start_date).getTime();
+    const totalBuildSeconds = Math.max(0, (new Date(rj.end_date).getTime() - startedAt) / 1000);
+
+    if (rj.runs >= candidate.runsNeeded) {
+      console.info(`[JobSync]   ✔ MATCHED "${candidate.name}" (full ${candidate.runsNeeded} runs) to real job_id=${rj.job_id}`);
+      activeJobs[jobIndex].isStarted = true;
+      activeJobs[jobIndex].startedAt = startedAt;
+      activeJobs[jobIndex].totalBuildSeconds = totalBuildSeconds;
+      activeJobs[jobIndex].eveJobId = rj.job_id;
+    } else {
+      console.info(`[JobSync]   ✔ MATCHED "${candidate.name}" - splitting: ${rj.runs} of ${candidate.runsNeeded} runs started (job_id=${rj.job_id}), ${candidate.runsNeeded - rj.runs} remain pending`);
+      const totalRuns = candidate.runsNeeded;
+      const startRuns = rj.runs;
+      const ratio = startRuns / totalRuns;
+      const remainingRuns = totalRuns - startRuns;
+      const remainingRatio = remainingRuns / totalRuns;
+      const scaleMaterials = (r) => Array.isArray(candidate.materials) ? candidate.materials.map(m => {
+        const scaledQty = Math.ceil(m.qtyNeeded * r);
+        const scaledStock = Math.min(m.stockQty || 0, scaledQty);
+        return { ...m, qtyNeeded: scaledQty, stockQty: scaledStock, netQtyNeeded: Math.max(0, scaledQty - scaledStock), lineCost: (m.unitPrice || 0) * Math.max(0, scaledQty - scaledStock) };
+      }) : [];
+
+      const activeFragment = {
+        ...candidate,
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        runsNeeded: startRuns,
+        qtyNeeded: Math.round((candidate.qtyNeeded || 0) * ratio),
+        calculatedCost: (candidate.calculatedCost || 0) * ratio,
+        netProfit: candidate.netProfit !== undefined ? candidate.netProfit * ratio : undefined,
+        totalBuildSeconds: totalBuildSeconds,
+        materials: scaleMaterials(ratio),
+        startedAt: startedAt,
+        isStarted: true,
+        eveJobId: rj.job_id,
+        splitFromId: candidate.id
+      };
+      const remainingFragment = {
+        ...candidate,
+        id: Date.now() + Math.floor(Math.random() * 1000) + 1,
+        runsNeeded: remainingRuns,
+        qtyNeeded: Math.round((candidate.qtyNeeded || 0) * remainingRatio),
+        calculatedCost: (candidate.calculatedCost || 0) * remainingRatio,
+        netProfit: candidate.netProfit !== undefined ? candidate.netProfit * remainingRatio : undefined,
+        totalBuildSeconds: (candidate.totalBuildSeconds || 0) * remainingRatio,
+        materials: scaleMaterials(remainingRatio),
+        startedAt: undefined,
+        isStarted: false,
+        splitFromId: candidate.id
+      };
+      activeJobs.splice(jobIndex, 1, activeFragment, remainingFragment);
+    }
+  });
+
+  // Pass 2: any remaining active real job with no ledger counterpart gets auto-imported - built as a
+  // real recipe tree using the blueprint's ACTUAL researched ME/TE, priced at market sell only.
+  for (const rj of activeRealJobs) {
+    if (usedRealJobIds.has(rj.job_id)) continue;
+    console.info(`[JobSync]   ⬇ No pending job fits real job_id=${rj.job_id} (product ${rj.product_type_id}, ${rj.runs} runs) - auto-importing.`);
+    const imported = await buildAutoImportedJob(rj, blueprintMeTeMap);
+    if (imported) {
+      activeJobs.push(imported);
+      importedCount++;
+    } else {
+      console.warn(`[JobSync]   ✘ Auto-import failed for real job_id=${rj.job_id} - see warnings above for why.`);
+    }
   }
+
+  localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
   renderJournalPage();
 
   if (!silent) {
-    alert(matchedCount > 0
-      ? `Synced ${matchedCount} job(s) with your active EVE industry jobs - using EVE's real start time and duration.`
-      : 'No matching pending jobs found among your currently active EVE industry jobs (matched by item + run count). Check the browser console for [JobSync] diagnostic details.');
+    if (matchedCount === 0 && importedCount === 0) {
+      alert('No active EVE industry jobs found to sync (or none matched/imported). Check the browser console for [JobSync] diagnostic details.');
+    } else {
+      alert(`Synced ${matchedCount} job(s) against existing plans, auto-imported ${importedCount} job(s) with no prior plan - using EVE's real start time, duration, and researched ME/TE.`);
+    }
   }
 }
 window.syncWithEveIndustryJobs = syncWithEveIndustryJobs;
+
+// Builds a full ledger job entry for a real EVE industry job that has no matching pending plan,
+// using the tool's own recipe database and the blueprint's ACTUAL researched ME/TE (fetched
+// separately, since the industry jobs endpoint doesn't carry that). Prices materials and output at
+// market sell only, per instruction - no buy/sell strategy modeling for auto-imports.
+async function buildAutoImportedJob(realJob, blueprintMeTeMap) {
+  try {
+    const blueprintTypeId = realJob.blueprint_type_id;
+    const productTypeId = realJob.product_type_id;
+    const runs = realJob.runs;
+    const bpInfo = blueprintMeTeMap[realJob.blueprint_id] || { me: 0, te: 0 };
+
+    if (typeof window.buildRecursiveRecipeTree !== 'function') {
+      console.warn('[JobSync] Recipe tree builder not available - cannot auto-import.');
+      return null;
+    }
+
+    window.customMEOverrides = window.customMEOverrides || {};
+    window.customTEOverrides = window.customTEOverrides || {};
+    window.customMEOverrides[blueprintTypeId] = bpInfo.me;
+    window.customTEOverrides[blueprintTypeId] = bpInfo.te;
+    window.recipeTreeRootProductTypeId = productTypeId; // we already know this for certain from ESI
+
+    const productName = (window.TYPE_ID_TO_NAME && window.TYPE_ID_TO_NAME[productTypeId]) || (window.EVE_ITEMS && window.EVE_ITEMS[productTypeId]) || `Item ${productTypeId}`;
+
+    let root;
+    try {
+      // qty is a rough guess (batch yield unknown until the recipe resolves) - corrected below.
+      root = await window.buildRecursiveRecipeTree(blueprintTypeId, productName + ' Blueprint', runs, 0, 6, new Set(), null);
+    } finally {
+      window.recipeTreeRootProductTypeId = null; // don't leak into unrelated calls
+    }
+
+    if (!root) {
+      console.warn(`[JobSync] Could not resolve a recipe for blueprint_type_id=${blueprintTypeId} (product ${productTypeId}) - this item may not be in your local database. Try regenerating it.`);
+      return null;
+    }
+
+    // Force the EXACT real run count (the tree derives runs from a qty/batchYield guess, which we
+    // don't know in advance) and re-cascade quantities through the tree with the corrected count.
+    root.runsNeeded = runs;
+    root.qtyNeeded = runs * (root.batchYield || 1);
+    const facility = (window.getActiveStructureType ? window.getActiveStructureType().meBonus : 1.0) / 100;
+    if (typeof window.scaleTreeQuantities === 'function') window.scaleTreeQuantities(root, facility);
+
+    const allTypeIds = new Set();
+    if (typeof window.collectAllTypeIds === 'function') window.collectAllTypeIds(root, allTypeIds);
+    if (typeof window.fetchMarketPrices === 'function') await window.fetchMarketPrices(Array.from(allTypeIds));
+    if (typeof window.calculateNodeEIV === 'function') window.calculateNodeEIV(root);
+
+    const materialCost = typeof window.calculateTreeNodeCost === 'function' ? window.calculateTreeNodeCost(root) : 0;
+    // ESI's own reported job installation fee is more accurate here than re-estimating our own -
+    // it's the real ISK EVE actually charged for this specific job.
+    const totalCost = materialCost + (realJob.cost || 0);
+
+    const outputPrices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
+    const grossSell = outputPrices.sell * root.qtyNeeded;
+    const netProfit = grossSell - totalCost;
+
+    const totalBuildSeconds = Math.max(0, (new Date(realJob.end_date).getTime() - new Date(realJob.start_date).getTime()) / 1000);
+    const materials = typeof window.extractJobMaterialsForNode === 'function' ? window.extractJobMaterialsForNode(root) : [];
+
+    return {
+      id: Date.now() + Math.floor(Math.random() * 1000) + realJob.job_id,
+      typeId: blueprintTypeId,
+      productTypeId: productTypeId,
+      name: productName,
+      runsNeeded: runs,
+      qtyNeeded: root.qtyNeeded,
+      calculatedCost: totalCost,
+      totalBuildSeconds: totalBuildSeconds,
+      netProfit: netProfit,
+      sellStrategy: 'market-sell',
+      unitSellPrice: outputPrices.sell,
+      materials: materials,
+      isStarted: true,
+      startedAt: new Date(realJob.start_date).getTime(),
+      eveJobId: realJob.job_id,
+      autoImported: true,
+      addedAt: new Date().toISOString()
+    };
+  } catch (e) {
+    console.warn(`[JobSync] Auto-import threw an error for job_id=${realJob.job_id}:`, e);
+    return null;
+  }
+}
+
 
 function markJobAsBuilt(jobId) {
   loadJournalState();
@@ -1070,6 +1220,7 @@ function markJobAsBuilt(jobId) {
     netProfit: job.netProfit,
     isSubBuild: job.isSubBuild,
     parentJobName: job.parentJobName,
+    autoImported: job.autoImported,
     materials: job.materials, 
     completedAt: new Date().toISOString()
   };

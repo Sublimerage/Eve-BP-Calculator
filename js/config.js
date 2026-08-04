@@ -75,6 +75,48 @@ window.priceCache = priceCache;
 window.eivCache = eivCache;
 window.rawAssetItems = rawAssetItems;
 window.userStockMap = userStockMap;
+
+// Extracts the direct material requirements for manufacturing a given node (flattening through any
+// of its own build-toggled children down to what's actually bought/raw). Used both for jobs added
+// from the calculator and for jobs auto-imported from real EVE industry data on the ledger page.
+function extractJobMaterialsForNode(startNode) {
+  const materials = [];
+  const deductModeInput = document.getElementById('deduct-stock-mode');
+  const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+
+  function walk(node) {
+    if (!node) return;
+    if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
+      const productTypeId = node.productTypeId || node.typeId;
+      const strategy = window.getNodePriceStrategy ? window.getNodePriceStrategy(node) : 'sell';
+      const stockQty = isStockDeductEnabled ? (window.userStockMap[productTypeId] || window.userStockMap[node.typeId] || 0) : 0;
+      const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
+      const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
+      const unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
+      materials.push({
+        typeId: productTypeId,
+        name: node.name.replace(' Blueprint', ''),
+        qtyNeeded: node.qtyNeeded,
+        stockQty: stockQty,
+        netQtyNeeded: netQtyNeeded,
+        strategy: strategy,
+        unitPrice: unitPrice,
+        lineCost: unitPrice * netQtyNeeded
+      });
+    } else {
+      node.children.forEach(child => { if (child) walk(child); });
+    }
+  }
+
+  if (startNode.isBuildingSelf && startNode.children && startNode.children.length > 0) {
+    startNode.children.forEach(child => { if (child) walk(child); });
+  } else {
+    walk(startNode);
+  }
+  return materials;
+}
+window.extractJobMaterialsForNode = extractJobMaterialsForNode;
+
 window.systemNameCache = systemNameCache;
 window.resolvedLocationNames = resolvedLocationNames;
 window.corpDivisionNames = corpDivisionNames;

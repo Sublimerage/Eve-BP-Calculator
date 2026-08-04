@@ -1159,46 +1159,7 @@ function syncSellStrategy(e) {
   recalculate();
 }
 
-// Extracts the direct material requirements for manufacturing a given node (flattening through any
-// of its own build-toggled children down to what's actually bought/raw) - the same logic the root
-// job has always used, just usable for any node so sub-build jobs get an equivalent materials list.
-function extractJobMaterialsForNode(startNode) {
-  const materials = [];
-  const deductModeInput = document.getElementById('deduct-stock-mode');
-  const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-
-  function walk(node) {
-    if (!node) return;
-    if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
-      const productTypeId = node.productTypeId || node.typeId;
-      const strategy = window.getNodePriceStrategy(node);
-      const stockQty = isStockDeductEnabled ? (window.userStockMap[productTypeId] || window.userStockMap[node.typeId] || 0) : 0;
-      const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
-      const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
-      const unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
-      materials.push({
-        typeId: productTypeId,
-        name: node.name.replace(' Blueprint', ''),
-        qtyNeeded: node.qtyNeeded,
-        stockQty: stockQty,
-        netQtyNeeded: netQtyNeeded,
-        strategy: strategy,
-        unitPrice: unitPrice,
-        lineCost: unitPrice * netQtyNeeded
-      });
-    } else {
-      node.children.forEach(child => { if (child) walk(child); });
-    }
-  }
-
-  if (startNode.isBuildingSelf && startNode.children && startNode.children.length > 0) {
-    startNode.children.forEach(child => { if (child) walk(child); });
-  } else {
-    walk(startNode);
-  }
-  return materials;
-}
-window.extractJobMaterialsForNode = extractJobMaterialsForNode;
+// (extractJobMaterialsForNode moved to config.js so both the calculator and ledger pages can use it)
 
 // Finds every sub-assembly (depth > 0) that's toggled to "Build" and actually has its own inputs -
 // i.e. every intermediate manufacturing job the player needs to run before the final product.
