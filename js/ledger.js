@@ -969,16 +969,28 @@ async function syncWithEveIndustryJobs(silent) {
   const btn = document.getElementById('btn-sync-eve-jobs');
   if (btn && !silent) { btn.disabled = true; btn.textContent = '🔄 Syncing...'; }
 
-  const realJobs = typeof window.fetchActiveIndustryJobs === 'function' ? await window.fetchActiveIndustryJobs() : null;
+  const [charJobs, corpJobs] = await Promise.all([
+    typeof window.fetchActiveIndustryJobs === 'function' ? window.fetchActiveIndustryJobs() : null,
+    typeof window.fetchActiveCorpIndustryJobs === 'function' ? window.fetchActiveCorpIndustryJobs() : []
+  ]);
 
   if (btn) { btn.disabled = false; btn.textContent = '🔄 Sync EVE Jobs'; }
 
-  if (!realJobs) {
-    if (!silent) alert('Could not fetch active industry jobs. Make sure you are logged in via EVE SSO - if you logged in before this feature existed, log out and back in once to grant the new Industry Jobs permission.');
+  if (!charJobs && (!corpJobs || corpJobs.length === 0)) {
+    if (!silent) alert('Could not fetch active industry jobs. Make sure you are logged in via EVE SSO - if you logged in before this feature existed, log out and back in once to grant the new Industry Jobs permissions.');
     return;
   }
 
-  const activeRealJobs = realJobs.filter(j => j && j.status === 'active');
+  // Merge character jobs (this character's own) with corp jobs (any corp member's, if this character
+  // has the Factory Manager role) - dedupe by job_id in case the same job appears in both.
+  const seenJobIds = new Set();
+  const allRealJobs = [...(charJobs || []), ...(corpJobs || [])].filter(j => {
+    if (!j || seenJobIds.has(j.job_id)) return false;
+    seenJobIds.add(j.job_id);
+    return true;
+  });
+
+  const activeRealJobs = allRealJobs.filter(j => j && j.status === 'active');
   loadJournalState();
   const usedRealJobIds = new Set();
   let matchedCount = 0;

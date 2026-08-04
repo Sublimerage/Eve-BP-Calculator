@@ -266,7 +266,7 @@ async function startEsiSSOLogin() {
   // (https://developers.eveonline.com) for this Client ID. Log it so it can be copied verbatim -
   // including the trailing slash, which EVE matches exactly.
   console.info(`[EVE SSO] Sending redirect_uri: "${redirectUri}" - this exact string must be registered as a Callback URL for Client ID ${clientId} at https://developers.eveonline.com`);
-  const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1 esi-corporations.read_divisions.v1 esi-industry.read_character_jobs.v1';
+  const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1 esi-corporations.read_divisions.v1 esi-industry.read_character_jobs.v1 esi-industry.read_corporation_jobs.v1';
   const state = generateRandomString(16);
   localStorage.setItem('esi_auth_state', state);
   const authUrl = `https://login.eveonline.com/v2/oauth/authorize/?response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&client_id=${encodeURIComponent(clientId)}&scope=${encodeURIComponent(scope)}&code_challenge=${challenge}&code_challenge_method=S256&state=${state}`;
@@ -424,6 +424,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
     if (charRes.ok) {
       const charData = await charRes.json();
       corpId = charData.corporation_id;
+      if (corpId) localStorage.setItem('esi_corp_id', String(corpId));
     }
     if (corpId && accessToken) {
       try {
@@ -1153,6 +1154,27 @@ async function fetchActiveIndustryJobs() {
   }
 }
 window.fetchActiveIndustryJobs = fetchActiveIndustryJobs;
+
+// Fetches ALL industry jobs installed by ANY member of the character's corporation - requires the
+// Factory Manager role in-game, and a corp ID cached from a prior asset refresh. Returns an empty
+// array (not null) on any failure so callers can safely merge it with character jobs regardless of
+// whether corp access is available - a character without Factory Manager simply contributes nothing
+// here rather than breaking the whole sync.
+async function fetchActiveCorpIndustryJobs() {
+  const corpId = localStorage.getItem('esi_corp_id');
+  const accessToken = localStorage.getItem('esi_access_token');
+  if (!corpId || !accessToken) return [];
+  try {
+    const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/industry/jobs/?datasource=tranquility`, {}, accessToken, true);
+    if (!res || !res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.warn('Corp industry jobs fetch failed (likely missing Factory Manager role):', e);
+    return [];
+  }
+}
+window.fetchActiveCorpIndustryJobs = fetchActiveCorpIndustryJobs;
 
 async function fetchMarketPrices(typeIds) {
   const homeStationId = localStorage.getItem('eve_home_station_id') || '60003760'; // defaults to Jita IV - Moon 4
