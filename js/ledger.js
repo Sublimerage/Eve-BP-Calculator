@@ -976,6 +976,14 @@ async function syncWithEveIndustryJobs(silent) {
 
   if (btn) { btn.disabled = false; btn.textContent = '🔄 Sync EVE Jobs'; }
 
+  console.info(`[JobSync] Fetched ${charJobs ? charJobs.length : 'null (fetch failed)'} character job(s), ${corpJobs ? corpJobs.length : 0} corp job(s).`);
+  if (charJobs && charJobs.length > 0) {
+    console.info('[JobSync] Raw character jobs:', JSON.stringify(charJobs, null, 2));
+  }
+  if (corpJobs && corpJobs.length > 0) {
+    console.info('[JobSync] Raw corp jobs:', JSON.stringify(corpJobs, null, 2));
+  }
+
   if (!charJobs && (!corpJobs || corpJobs.length === 0)) {
     if (!silent) alert('Could not fetch active industry jobs. Make sure you are logged in via EVE SSO - if you logged in before this feature existed, log out and back in once to grant the new Industry Jobs permissions.');
     return;
@@ -991,15 +999,26 @@ async function syncWithEveIndustryJobs(silent) {
   });
 
   const activeRealJobs = allRealJobs.filter(j => j && j.status === 'active');
+  console.info(`[JobSync] ${activeRealJobs.length} job(s) with status 'active' out of ${allRealJobs.length} total fetched.`);
+  activeRealJobs.forEach(rj => {
+    console.info(`[JobSync]   Active real job: job_id=${rj.job_id}, product_type_id=${rj.product_type_id}, blueprint_type_id=${rj.blueprint_type_id}, activity_id=${rj.activity_id}, runs=${rj.runs}, status=${rj.status}`);
+  });
+
   loadJournalState();
+  const pendingLedgerJobs = activeJobs.filter(j => j && !j.isStarted);
+  console.info(`[JobSync] ${pendingLedgerJobs.length} pending ledger job(s) to try to match:`);
+  pendingLedgerJobs.forEach(j => {
+    console.info(`[JobSync]   Pending ledger job: name="${j.name}", productTypeId=${j.productTypeId}, typeId=${j.typeId}, runsNeeded=${j.runsNeeded}`);
+  });
+
   const usedRealJobIds = new Set();
   let matchedCount = 0;
 
-  activeJobs.forEach(job => {
-    if (!job || job.isStarted) return; // only match against still-pending ledger jobs
+  pendingLedgerJobs.forEach(job => {
+    const targetProductId = job.productTypeId || job.typeId;
     const match = activeRealJobs.find(rj =>
       !usedRealJobIds.has(rj.job_id) &&
-      rj.product_type_id === (job.productTypeId || job.typeId) &&
+      rj.product_type_id === targetProductId &&
       rj.runs === job.runsNeeded
     );
     if (match) {
@@ -1009,6 +1028,15 @@ async function syncWithEveIndustryJobs(silent) {
       job.totalBuildSeconds = Math.max(0, (new Date(match.end_date).getTime() - new Date(match.start_date).getTime()) / 1000);
       job.eveJobId = match.job_id;
       matchedCount++;
+      console.info(`[JobSync]   ✔ MATCHED "${job.name}" to real job_id=${match.job_id}`);
+    } else {
+      // Show the closest candidates (same product, different run count) to help diagnose a near-miss.
+      const sameProduct = activeRealJobs.filter(rj => rj.product_type_id === targetProductId);
+      if (sameProduct.length > 0) {
+        console.warn(`[JobSync]   ✘ No match for "${job.name}" (wants runs=${job.runsNeeded}) - found real job(s) for the same product but different run count: ${sameProduct.map(rj => rj.runs).join(', ')}`);
+      } else {
+        console.warn(`[JobSync]   ✘ No match for "${job.name}" (productTypeId=${targetProductId}) - no active real job found for this product at all.`);
+      }
     }
   });
 
@@ -1020,7 +1048,7 @@ async function syncWithEveIndustryJobs(silent) {
   if (!silent) {
     alert(matchedCount > 0
       ? `Synced ${matchedCount} job(s) with your active EVE industry jobs - using EVE's real start time and duration.`
-      : 'No matching pending jobs found among your currently active EVE industry jobs (matched by item + run count).');
+      : 'No matching pending jobs found among your currently active EVE industry jobs (matched by item + run count). Check the browser console for [JobSync] diagnostic details.');
   }
 }
 window.syncWithEveIndustryJobs = syncWithEveIndustryJobs;
