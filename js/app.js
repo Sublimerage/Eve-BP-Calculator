@@ -1112,6 +1112,14 @@ function createNodeCard(node) {
         <div class="text-[11px] mono space-y-1">
           ${buildTimeUI}
           ${isRoot ? `
+            <div class="flex justify-between font-bold" title="This job's own time PLUS every sub-component you're manufacturing yourself (not buying) - this is the number the Ledger's countdown timer actually uses, since building sub-components takes real time before you can even start the final job.">
+              <span class="text-slate-300">Total Project Time:</span>
+              ${node.totalBuildSeconds > 0
+                ? `<span class="text-amber-300 font-bold">${window.formatDuration(node.totalBuildSeconds)}</span>`
+                : `<span class="text-slate-500 italic">No Time Data</span>`}
+            </div>
+          ` : ''}
+          ${isRoot ? `
             <div class="flex justify-between font-bold" title="Total net sell profit divided by the total time to build this item and every sub-component you're manufacturing yourself.">
               <span class="text-slate-300">Est. ISK/Hour:</span>
               ${node.totalBuildSeconds > 0
