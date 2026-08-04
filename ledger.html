@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Industry Ledger</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=4.2.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=4.3.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -126,7 +126,7 @@
           <button onclick="combineDuplicateJobs()" class="px-2 py-1 bg-purple-800 hover:bg-purple-700 text-purple-100 font-semibold rounded text-[10px] mono transition" title="Merge jobs for the same item that are otherwise identical (same build/buy config, same sell strategy, neither already started). Jobs with different settings are left alone.">
             🔗 Combine Duplicates
           </button>
-          <button id="btn-sync-eve-jobs" onclick="syncWithEveIndustryJobs()" class="px-2 py-1 bg-cyan-800 hover:bg-cyan-700 text-cyan-100 font-semibold rounded text-[10px] mono transition" title="Check your real active EVE industry jobs and auto-start any pending ledger job that matches one, using EVE's real start time and duration.">
+          <button id="btn-sync-eve-jobs" onclick="syncWithEveIndustryJobs()" class="px-2 py-1 bg-cyan-800 hover:bg-cyan-700 text-cyan-100 font-semibold rounded text-[10px] mono transition" title="Check your active EVE industry jobs (your own and, if you have Factory Manager role, your corp's) and auto-start any pending ledger job that matches one, using EVE's real start time and duration.">
             🔄 Sync EVE Jobs
           </button>
         </div>
@@ -253,9 +253,9 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=4.2.0"></script>
-  <script src="js/config.js?v=4.2.0"></script>
-  <script src="js/esi.js?v=4.2.0"></script>
-  <script src="js/ledger.js?v=4.2.0"></script>
+  <script src="eve_db.js?v=4.3.0"></script>
+  <script src="js/config.js?v=4.3.0"></script>
+  <script src="js/esi.js?v=4.3.0"></script>
+  <script src="js/ledger.js?v=4.3.0"></script>
 </body>
 </html>
