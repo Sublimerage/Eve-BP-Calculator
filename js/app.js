@@ -422,9 +422,7 @@ async function fetchEsiSystemSearch(query) {
 async function fetchEsiSearchResults(query) {
   try {
     if (!query || query.trim().length < 2) return [];
-    const res = await fetch(`https://esi.evetech.net/latest/search/?categories=inventory_type&search=${encodeURIComponent(query.trim())}&datasource=tranquility&strict=false`);
-    if (!res.ok) return [];
-    const data = await res.json();
+    const data = window.esiCharacterSearch ? await window.esiCharacterSearch(query.trim(), 'inventory_type') : {};
     if (!data.inventory_type || !data.inventory_type.length) return [];
     const ids = data.inventory_type.slice(0, 10);
     const namesRes = await fetch('https://esi.evetech.net/latest/universe/names/', {

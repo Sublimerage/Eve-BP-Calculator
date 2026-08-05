@@ -150,6 +150,8 @@ async function applyBuildProfitOptimizer() {
     return netSell - totalCost;
   }
 
+  console.info(`[BuildOptimizer] Threshold: ${threshold}%, candidates found: ${manufacturableTypeIds.size}`, Array.from(manufacturableTypeIds));
+
   // Test building vs buying for each sub-component from bottom-up
   for (const typeId of Array.from(manufacturableTypeIds)) {
     window.buildSelfOverrides[typeId] = false;
@@ -167,8 +169,11 @@ async function applyBuildProfitOptimizer() {
     const rootTotalCost = window.recipeTreeRoot.calculatedCost || 1;
     const marginGainPct = rootTotalCost > 0 ? (profitGain / rootTotalCost) * 100 : 0;
 
+    const willBuild = profitBuild > profitBuy && marginGainPct >= threshold;
+    console.info(`[BuildOptimizer] typeId=${typeId}: profitBuy=${Math.round(profitBuy).toLocaleString()}, profitBuild=${Math.round(profitBuild).toLocaleString()}, profitGain=${Math.round(profitGain).toLocaleString()}, rootTotalCost=${Math.round(rootTotalCost).toLocaleString()}, marginGainPct=${marginGainPct.toFixed(3)}%, threshold=${threshold}% => ${willBuild ? 'BUILD' : 'buy'}`);
+
     // Only keep BUILD mode if building actually INCREASES net profit by >= threshold %
-    if (profitBuild > profitBuy && marginGainPct >= threshold) {
+    if (willBuild) {
       window.buildSelfOverrides[typeId] = true;
     } else {
       window.buildSelfOverrides[typeId] = false;
@@ -277,11 +282,7 @@ function getNodePriceStrategy(node) {
 }
 
 function calculateTreeNodeCost(node) {
-  const deductModeInput = document.getElementById('deduct-stock-mode');
-  const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
   const productTypeId = node.productTypeId || node.typeId;
-  const stockQty = isStockDeductEnabled ? (window.userStockMap[productTypeId] || window.userStockMap[node.typeId] || 0) : 0;
-  const netNeededQty = Math.max(0, node.qtyNeeded - stockQty);
 
   if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
     const strategy = getNodePriceStrategy(node);
@@ -292,13 +293,11 @@ function calculateTreeNodeCost(node) {
       const brokerFee = brokerFeeInput ? (parseFloat(brokerFeeInput.value) || 0) / 100 : 0.01;
       unitPrice = unitPrice * (1 + brokerFee);
     }
-    const deficitCost = unitPrice * netNeededQty;
-    // Stock-covered materials aren't free - they have real market value, and using them here means
-    // forgoing the ability to sell them (or needing to buy more to replace them for your next build).
-    // Valued at market sell price (replacement cost), regardless of the deficit's buy/sell strategy.
-    const stockReplacementCost = (prices.sell || 0) * stockQty;
-    node.calculatedCost = deficitCost + stockReplacementCost;
-    node.stockReplacementCost = stockReplacementCost; // exposed for a cost breakdown if useful later
+    // Cost/profit always reflects the full economic value of everything this build actually needs,
+    // regardless of what you currently have in stock - a stable, predictable number that doesn't
+    // swing based on stock levels. "Deduct Stock" now only affects the BOM sidebar's shopping list
+    // and Copy Multibuy (what you still need to go acquire), handled separately from cost/profit.
+    node.calculatedCost = unitPrice * node.qtyNeeded;
     return node.calculatedCost;
   }
 

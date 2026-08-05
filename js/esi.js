@@ -1037,14 +1037,37 @@ window.resolveStationByName = resolveStationByName;
 
 // Searches for stations matching a partial name (for the search-as-you-type UI), using ESI's public
 // search endpoint.
+// CCP removed the standalone public /search/ endpoint around mid-2022 (confirmed via EVE Online
+// forum reports of it returning 404) - the only working search endpoint now is the authenticated,
+// character-scoped one. This means search now requires being logged in via EVE SSO; without a
+// character/token, there's no way to search ESI at all anymore (a real API constraint, not a choice
+// made here). Returns {} (empty categories) on any failure so callers can treat "not logged in" and
+// "no results" the same way.
+async function esiCharacterSearch(searchTerm, categories) {
+  const charId = localStorage.getItem('esi_char_id');
+  const accessToken = localStorage.getItem('esi_access_token');
+  if (!charId || !accessToken) {
+    console.warn('[ESISearch] No results possible - ESI search requires being logged in via EVE SSO (the old public /search/ endpoint was removed by CCP).');
+    return {};
+  }
+  try {
+    const url = `https://esi.evetech.net/latest/characters/${charId}/search/?categories=${encodeURIComponent(categories)}&search=${encodeURIComponent(searchTerm)}&datasource=tranquility&strict=false`;
+    const res = await fetchWithAuth(url, {}, accessToken, true);
+    if (!res || !res.ok) return {};
+    return await res.json();
+  } catch (e) {
+    console.warn('[ESISearch] Character search failed:', e);
+    return {};
+  }
+}
+window.esiCharacterSearch = esiCharacterSearch;
+
 async function searchStationsByName(query) {
   if (!query || query.length < 3) return [];
+  const data = await esiCharacterSearch(query, 'station');
+  const stationIds = (data.station || []).slice(0, 15);
+  if (stationIds.length === 0) return [];
   try {
-    const res = await fetch(`https://esi.evetech.net/latest/search/?categories=station&datasource=tranquility&language=en&search=${encodeURIComponent(query)}&strict=false`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    const stationIds = (data.station || []).slice(0, 15);
-    if (stationIds.length === 0) return [];
     const namesRes = await fetch('https://esi.evetech.net/latest/universe/names/?datasource=tranquility', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1054,7 +1077,7 @@ async function searchStationsByName(query) {
     const namesData = await namesRes.json();
     return namesData.map(s => ({ stationId: s.id, stationName: s.name }));
   } catch (e) {
-    console.warn('Station search failed:', e);
+    console.warn('Station name resolution failed:', e);
     return [];
   }
 }
