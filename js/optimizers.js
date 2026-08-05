@@ -292,7 +292,13 @@ function calculateTreeNodeCost(node) {
       const brokerFee = brokerFeeInput ? (parseFloat(brokerFeeInput.value) || 0) / 100 : 0.01;
       unitPrice = unitPrice * (1 + brokerFee);
     }
-    node.calculatedCost = unitPrice * netNeededQty;
+    const deficitCost = unitPrice * netNeededQty;
+    // Stock-covered materials aren't free - they have real market value, and using them here means
+    // forgoing the ability to sell them (or needing to buy more to replace them for your next build).
+    // Valued at market sell price (replacement cost), regardless of the deficit's buy/sell strategy.
+    const stockReplacementCost = (prices.sell || 0) * stockQty;
+    node.calculatedCost = deficitCost + stockReplacementCost;
+    node.stockReplacementCost = stockReplacementCost; // exposed for a cost breakdown if useful later
     return node.calculatedCost;
   }
 
