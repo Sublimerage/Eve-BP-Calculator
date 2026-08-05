@@ -294,10 +294,6 @@
         </summary>
         <div class="px-3.5 pb-3.5 space-y-2">
           <div class="flex items-center gap-2">
-            <select id="deduct-stock-mode" onchange="recalculate()" class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-cyan-300 font-bold text-[11px] outline-none">
-              <option value="true" selected>Deduct (ON)</option>
-              <option value="false">Off</option>
-            </select>
             <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
               <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
               <span>Pers</span>
@@ -360,6 +356,14 @@
         <button onclick="copyMultibuyText()" class="px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded mono transition shadow">
           Copy Multibuy
         </button>
+      </div>
+
+      <div class="px-4 py-2 border-b border-[#1e3348] bg-[#0d1922] flex items-center gap-2" title="Only affects this shopping list and Copy Multibuy - materials you already have in stock are excluded from what's shown/copied here. Does NOT affect Total Production Cost or Profit, which always reflect full market value regardless of stock.">
+        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Deduct Stock From List:</span>
+        <select id="deduct-stock-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1 text-cyan-300 font-bold text-[11px] outline-none">
+          <option value="true" selected>ON</option>
+          <option value="false">Off</option>
+        </select>
       </div>
 
       <!-- BOM Items List -->
