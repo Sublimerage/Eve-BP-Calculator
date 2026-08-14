@@ -35,6 +35,10 @@
         📋 <span class="hidden md:inline">Paste Hangar</span>
       </button>
 
+      <button onclick="openBlueprintBrowser()" class="px-3 py-2 bg-[#1e3348] hover:bg-slate-600 text-slate-100 font-bold rounded-md transition text-xs shadow flex items-center gap-1.5" title="Browse your owned blueprints (BPOs/BPCs) and load one straight into the calculator with its real ME/TE">
+        📘 <span class="hidden md:inline">My Blueprints</span>
+      </button>
+
       <a href="ledger.html" class="px-3.5 py-2 bg-purple-700 hover:bg-purple-600 text-purple-100 font-bold rounded-md transition text-xs shadow flex items-center gap-1.5" title="View your consolidated manufacturing jobs queue">
         📖 <span class="hidden sm:inline">View Ledger</span> <span id="header-journal-count" class="bg-purple-950 text-purple-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">0</span>
       </a>
@@ -384,6 +388,27 @@
       </div>
     </aside>
 
+  </div>
+
+  <!-- Blueprint Browser Modal -->
+  <div id="blueprint-browser-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[999] hidden p-4">
+    <div class="bg-[#0c1318] border border-cyan-500/80 rounded-lg p-6 w-full max-w-2xl h-[80vh] shadow-2xl flex flex-col text-xs mono">
+      <div class="flex justify-between items-center border-b border-[#1e3348] pb-3 mb-3">
+        <h3 class="text-base font-bold text-cyan-300 rajdhani tracking-wider">📘 MY BLUEPRINTS</h3>
+        <button onclick="closeBlueprintBrowser()" class="text-slate-400 hover:text-white font-bold text-base">✖</button>
+      </div>
+      <div class="flex items-center gap-2 mb-3">
+        <input type="text" id="blueprint-browser-search" placeholder="🔍 Search blueprint name..." autocomplete="off" oninput="filterBlueprintBrowser()"
+          class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded-md px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-cyan-500">
+        <select id="blueprint-browser-location" onchange="filterBlueprintBrowser()" class="bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-amber-300 font-bold text-[11px] outline-none max-w-[180px]">
+          <option value="all" selected>All Locations</option>
+        </select>
+        <button onclick="loadBlueprintBrowserData(true)" class="px-2.5 py-1.5 bg-cyan-800 hover:bg-cyan-700 text-cyan-100 font-semibold rounded text-[10px] transition flex-shrink-0">🔄 Refresh</button>
+      </div>
+      <div id="blueprint-browser-list" class="flex-1 overflow-y-auto space-y-1.5">
+        <div class="text-slate-500 italic p-4 text-center">Log in via EVE SSO to browse your blueprints.</div>
+      </div>
+    </div>
   </div>
 
   <!-- Clipboard Hangar Stock Import Modal -->
