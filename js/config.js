@@ -83,21 +83,29 @@ function extractJobMaterialsForNode(startNode) {
   const materials = [];
   const deductModeInput = document.getElementById('deduct-stock-mode');
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+  // Shared pool decremented as materials are claimed across the whole tree - checking each leaf
+  // independently against the full stock amount (the previous approach) let the same physical stock
+  // get counted as covering multiple different sub-components simultaneously.
+  const allocatedStockPool = { ...window.userStockMap };
 
   function walk(node) {
     if (!node) return;
     if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
       const productTypeId = node.productTypeId || node.typeId;
       const strategy = window.getNodePriceStrategy ? window.getNodePriceStrategy(node) : 'sell';
-      const stockQty = isStockDeductEnabled ? (window.userStockMap[productTypeId] || window.userStockMap[node.typeId] || 0) : 0;
-      const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
+      const availableStock = isStockDeductEnabled ? (allocatedStockPool[productTypeId] || allocatedStockPool[node.typeId] || 0) : 0;
+      const consumedFromStock = Math.min(node.qtyNeeded, availableStock);
+      if (isStockDeductEnabled && allocatedStockPool[productTypeId] !== undefined) {
+        allocatedStockPool[productTypeId] = Math.max(0, allocatedStockPool[productTypeId] - consumedFromStock);
+      }
+      const netQtyNeeded = Math.max(0, node.qtyNeeded - consumedFromStock);
       const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
       const unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
       materials.push({
         typeId: productTypeId,
         name: node.name.replace(' Blueprint', ''),
         qtyNeeded: node.qtyNeeded,
-        stockQty: stockQty,
+        stockQty: consumedFromStock,
         netQtyNeeded: netQtyNeeded,
         strategy: strategy,
         unitPrice: unitPrice,

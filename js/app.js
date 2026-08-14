@@ -180,6 +180,127 @@ window.selectRigForSlot = selectRigForSlot;
 
 // Restores each rig slot's search input to show the saved rig's real name (looked up by the stored
 // typeId), since the input just displays text - the typeId in localStorage is the actual saved state.
+// --- Blueprint Browser ---
+let _blueprintBrowserData = [];
+
+async function openBlueprintBrowser() {
+  const modal = document.getElementById('blueprint-browser-modal');
+  if (modal) modal.classList.remove('hidden');
+  if (_blueprintBrowserData.length === 0) {
+    await loadBlueprintBrowserData();
+  }
+}
+window.openBlueprintBrowser = openBlueprintBrowser;
+
+function closeBlueprintBrowser() {
+  const modal = document.getElementById('blueprint-browser-modal');
+  if (modal) modal.classList.add('hidden');
+}
+window.closeBlueprintBrowser = closeBlueprintBrowser;
+
+async function loadBlueprintBrowserData() {
+  const listEl = document.getElementById('blueprint-browser-list');
+  if (listEl) listEl.innerHTML = `<div class="text-slate-500 italic p-4 text-center">Loading your blueprints...</div>`;
+
+  const [charBps, corpBps] = await Promise.all([
+    typeof window.fetchCharacterBlueprints === 'function' ? window.fetchCharacterBlueprints() : [],
+    typeof window.fetchCorpBlueprints === 'function' ? window.fetchCorpBlueprints() : []
+  ]);
+
+  const allBps = [...(charBps || []).map(b => ({ ...b, source: 'Personal' })), ...(corpBps || []).map(b => ({ ...b, source: 'Corp' }))];
+
+  if (allBps.length === 0) {
+    if (listEl) listEl.innerHTML = `<div class="text-slate-500 italic p-4 text-center">No blueprints found - make sure you're logged in via EVE SSO, or you may not own any.</div>`;
+    return;
+  }
+
+  // Resolve location names in bulk (universe/names accepts up to 1000 IDs per call)
+  const locationIds = [...new Set(allBps.map(b => b.location_id))];
+  const locationNames = {};
+  try {
+    for (let i = 0; i < locationIds.length; i += 1000) {
+      const chunk = locationIds.slice(i, i + 1000);
+      const res = await fetch('https://esi.evetech.net/latest/universe/names/?datasource=tranquility', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(chunk)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        data.forEach(d => { locationNames[d.id] = d.name; });
+      }
+    }
+  } catch (e) { console.warn('Blueprint location resolution failed:', e); }
+
+  allBps.forEach(b => { b.locationName = locationNames[b.location_id] || `Location ${b.location_id}`; });
+  _blueprintBrowserData = allBps;
+
+  const locSelect = document.getElementById('blueprint-browser-location');
+  if (locSelect) {
+    const uniqueLocations = [...new Set(allBps.map(b => b.locationName))].sort();
+    locSelect.innerHTML = `<option value="all">All Locations</option>` + uniqueLocations.map(l => `<option value="${window.esc(l)}">${window.esc(l)}</option>`).join('');
+  }
+
+  renderBlueprintBrowserList(_blueprintBrowserData);
+}
+window.loadBlueprintBrowserData = loadBlueprintBrowserData;
+
+function filterBlueprintBrowser() {
+  const q = (document.getElementById('blueprint-browser-search')?.value || '').toLowerCase().trim();
+  const loc = document.getElementById('blueprint-browser-location')?.value || 'all';
+  const filtered = _blueprintBrowserData.filter(b => {
+    const name = (window.TYPE_ID_TO_NAME[b.type_id] || `Type ${b.type_id}`).toLowerCase();
+    if (q && !name.includes(q)) return false;
+    if (loc !== 'all' && b.locationName !== loc) return false;
+    return true;
+  });
+  renderBlueprintBrowserList(filtered);
+}
+window.filterBlueprintBrowser = filterBlueprintBrowser;
+
+function renderBlueprintBrowserList(list) {
+  const listEl = document.getElementById('blueprint-browser-list');
+  if (!listEl) return;
+  if (list.length === 0) {
+    listEl.innerHTML = `<div class="text-slate-500 italic p-4 text-center">No blueprints match your search/filter.</div>`;
+    return;
+  }
+  // ESI convention: quantity -1 = original (BPO), -2 = copy (BPC); positive quantity = a stack of BPCs.
+  listEl.innerHTML = list.map(bp => {
+    const name = window.TYPE_ID_TO_NAME[bp.type_id] || `Type ${bp.type_id}`;
+    const bpLabel = bp.quantity === -1 ? 'BPO' : (bp.quantity === -2 ? 'BPC' : `${bp.quantity}x BPC stack`);
+    return `
+      <div class="flex items-center justify-between bg-[#0d1922] border border-[#1e3348] hover:border-cyan-500 rounded p-2 transition">
+        <div class="flex items-center gap-2 min-w-0 flex-1">
+          <img src="https://images.evetech.net/types/${bp.type_id}/bp?size=32" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0">
+          <div class="min-w-0 flex-1">
+            <div class="font-bold text-slate-200 truncate">${window.esc(name)}</div>
+            <div class="text-[10px] text-slate-500 truncate">${window.esc(bp.locationName)} • ${bp.source} • ${bpLabel}${bp.quantity < -1 || bp.quantity > 0 ? ` • Runs: ${bp.runs}` : ''}</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <span class="text-cyan-400 font-bold text-[10px]">ME ${bp.material_efficiency}%</span>
+          <span class="text-purple-400 font-bold text-[10px]">TE ${bp.time_efficiency}%</span>
+          <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency})" class="px-2.5 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded text-[10px] transition">Load</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function loadBlueprintIntoCalculator(blueprintTypeId, me, te) {
+  const productTypeId = (window.BLUEPRINT_TO_PRODUCT_MAP && window.BLUEPRINT_TO_PRODUCT_MAP[blueprintTypeId]) || blueprintTypeId;
+  window.customMEOverrides = window.customMEOverrides || {};
+  window.customTEOverrides = window.customTEOverrides || {};
+  window.customMEOverrides[blueprintTypeId] = me;
+  window.customTEOverrides[blueprintTypeId] = te;
+
+  const productName = window.TYPE_ID_TO_NAME[productTypeId] || window.EVE_ITEMS[productTypeId] || `Item ${productTypeId}`;
+  closeBlueprintBrowser();
+  if (typeof window.selectItem === 'function') {
+    window.selectItem(productTypeId, productName, true);
+  }
+}
+window.loadBlueprintIntoCalculator = loadBlueprintIntoCalculator;
+
 function restoreRigSlotInputs() {
   for (let slot = 1; slot <= 3; slot++) {
     const rigTypeId = parseInt(localStorage.getItem(`eve_rig_slot_${slot}`));
@@ -1624,6 +1745,11 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
   const deductModeInput = document.getElementById('deduct-stock-mode');
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
   const bomMap = {};
+  // Shared pool that gets decremented as materials are claimed across the WHOLE tree - reading
+  // window.userStockMap directly per-leaf (the previous approach) let the same physical stock get
+  // counted as covering multiple different sub-components' needs simultaneously, whenever the same
+  // raw material (e.g. Tritanium) was needed in more than one place in the build.
+  const allocatedStockPool = { ...window.userStockMap };
 
   function generateBOM(node) {
     if (!node) return;
@@ -1632,8 +1758,12 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
       const strategy = window.getNodePriceStrategy(node);
       
       const productTypeId = node.productTypeId || node.typeId;
-      const stockQty = isStockDeductEnabled ? (window.userStockMap[productTypeId] || window.userStockMap[node.typeId] || 0) : 0;
-      const netQtyNeeded = Math.max(0, node.qtyNeeded - stockQty);
+      const availableStock = isStockDeductEnabled ? (allocatedStockPool[productTypeId] || allocatedStockPool[node.typeId] || 0) : 0;
+      const consumedFromStock = Math.min(node.qtyNeeded, availableStock);
+      if (isStockDeductEnabled && allocatedStockPool[productTypeId] !== undefined) {
+        allocatedStockPool[productTypeId] = Math.max(0, allocatedStockPool[productTypeId] - consumedFromStock);
+      }
+      const netQtyNeeded = Math.max(0, node.qtyNeeded - consumedFromStock);
 
       if (!bomMap[productTypeId]) {
         bomMap[productTypeId] = {
@@ -1664,7 +1794,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
     bomMap[rootTypeId] = { typeId: rootTypeId, name: rootNode.productName || rootNode.name.replace(' Blueprint', ''), qty: netQtyNeeded, strategy: strategy };
   }
 
-  const bomItems = Object.values(bomMap);
+  const bomItems = Object.values(bomMap).filter(item => item.qty > 0);
   let totalBOMCost = 0;
 
   bomItems.forEach(item => {

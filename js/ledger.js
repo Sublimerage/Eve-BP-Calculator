@@ -106,18 +106,31 @@ function getItemCategory(typeId, name) {
 }
 
 // --- Profit-with-stock toggle ---
+// Defaults to NOT crediting stock: owning a material doesn't make it free to consume - using it here
+// means you can't sell it or use it elsewhere, so it has real opportunity cost. Crediting it as zero
+// cost (the old default) understated build cost and inflated profit, sometimes drastically for jobs
+// where most materials happened to already be in stock.
 function getProfitStockMode() {
-  return localStorage.getItem('eve_ledger_profit_stock_mode') || 'with';
+  return localStorage.getItem('eve_ledger_profit_stock_mode') || 'without';
 }
 
-// The ISK value of materials that were already in stock when this job was added, and so weren't
-// charged for - this is exactly the amount that was subtracted from cost (and added to profit) at
-// add-time. Subtracting it back out shows what profit would be if you had to buy those materials too.
+// The ISK value of materials that were already in stock when this job was added (valued at the same
+// market price used for the rest of the job - sell price by default) - this is exactly the amount
+// that was subtracted from cost (and added to profit) at add-time under the old always-credit
+// behavior. Adding it back in shows the full, true cost as if every material had to be bought.
 function getJobStockCreditValue(job) {
   if (!Array.isArray(job.materials)) return 0;
   return job.materials.reduce((sum, m) => sum + ((m.stockQty || 0) * (m.unitPrice || 0)), 0);
 }
 window.getJobStockCreditValue = getJobStockCreditValue;
+
+// "with" = credit stock (cheaper cost, higher profit, treats owned materials as free - the old,
+// misleading default). "without" = full cost as if everything had to be bought (the new default).
+function getEffectiveJobCost(job) {
+  const cost = job.calculatedCost || 0;
+  return getProfitStockMode() === 'with' ? cost : cost + getJobStockCreditValue(job);
+}
+window.getEffectiveJobCost = getEffectiveJobCost;
 
 function getEffectiveJobProfit(job) {
   if (job.netProfit === undefined) return undefined;
@@ -136,13 +149,13 @@ function updateProfitStockToggleButton() {
   if (!btn) return;
   const mode = getProfitStockMode();
   if (mode === 'with') {
-    btn.textContent = 'With Stock';
-    btn.className = 'text-[8px] px-1.5 py-0.5 rounded font-bold mono uppercase tracking-wide bg-cyan-800 text-cyan-100 flex-shrink-0';
-    btn.title = 'Currently crediting materials you already have in stock - click to exclude them';
-  } else {
-    btn.textContent = 'No Stock';
+    btn.textContent = 'Crediting Stock';
     btn.className = 'text-[8px] px-1.5 py-0.5 rounded font-bold mono uppercase tracking-wide bg-amber-800 text-amber-100 flex-shrink-0';
-    btn.title = 'Currently excluding stock - click to credit materials you already have';
+    btn.title = 'Materials you already have in stock are being treated as free (0 ISK cost) - click to count them at full value instead';
+  } else {
+    btn.textContent = 'Full Cost';
+    btn.className = 'text-[8px] px-1.5 py-0.5 rounded font-bold mono uppercase tracking-wide bg-cyan-800 text-cyan-100 flex-shrink-0';
+    btn.title = 'Materials you already have in stock are valued at their market price (not free) - click to instead treat them as a free cost credit';
   }
 }
 
@@ -354,7 +367,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
   ` : '';
 
   return `
-    <div class="job-card ${job.isStarted ? 'bg-green-950/20' : 'bg-[#0c1318]'} border ${job.isSubBuild ? 'border-amber-600/40' : (job.isStarted ? 'border-green-700/50' : 'border-[#1e3348]')} rounded shadow-md transition"
+    <div class="job-card ${job.isStarted ? 'bg-[#0d2818]' : 'bg-[#0c1318]'} border-2 ${job.isSubBuild ? 'border-amber-500' : (job.isStarted ? 'border-green-500' : 'border-[#1e3348]')} rounded shadow-md transition"
          draggable="true" data-job-id="${job.id}"
          ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
          ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
@@ -545,7 +558,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
     ` : '';
 
     return `
-      <div class="job-card ${job.isStarted ? 'bg-green-950/20' : 'bg-[#0c1318]'} border ${job.isSubBuild ? 'border-amber-600/40 hover:border-amber-500/60' : (job.isStarted ? 'border-green-700/50 hover:border-green-500/70' : 'border-[#1e3348] hover:border-purple-500/40')} rounded p-3 flex flex-col justify-between shadow-md transition space-y-2"
+      <div class="job-card ${job.isStarted ? 'bg-[#0d2818]' : 'bg-[#0c1318]'} border-2 ${job.isSubBuild ? 'border-amber-500 hover:border-amber-400' : (job.isStarted ? 'border-green-500 hover:border-green-400' : 'border-[#1e3348] hover:border-purple-500/40')} rounded p-3 flex flex-col justify-between shadow-md transition space-y-2"
            draggable="true" data-job-id="${job.id}"
            ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
            ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
@@ -1333,12 +1346,25 @@ function renderBuildHistoryLedger() {
             <button onclick="requeueCompletedJob(${record.id})" class="px-2 py-0.5 bg-purple-950/60 hover:bg-purple-800 text-purple-300 font-semibold rounded text-[9px] mono border border-purple-800/40 transition">
               🔄 Re-queue
             </button>
+            <button onclick="deleteHistoryRecord(${record.id})" class="px-2 py-0.5 bg-red-950/60 hover:bg-red-800 text-red-300 font-semibold rounded text-[9px] mono border border-red-800/40 transition" title="Delete this entry">
+              ❌
+            </button>
           </div>
         </td>
       </tr>
     `;
   }).join('');
 }
+
+function deleteHistoryRecord(recordId) {
+  const index = buildHistory.findIndex(r => r && r.id === recordId);
+  if (index !== -1) {
+    buildHistory.splice(index, 1);
+    localStorage.setItem('eve_ledger_history', JSON.stringify(buildHistory));
+    renderJournalPage();
+  }
+}
+window.deleteHistoryRecord = deleteHistoryRecord;
 
 function clearJournalHistory() {
   localStorage.removeItem('eve_ledger_history');
