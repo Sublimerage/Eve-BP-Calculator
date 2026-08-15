@@ -56,9 +56,11 @@ function searchInventionItem(query) {
   }
   const t2Map = getInventionT2ToT1Map();
   const hits = [];
-  for (const [name, entry] of Object.entries(window.IDX || {})) {
-    if (name.includes(q) && t2Map[entry.id]) {
-      hits.push(entry);
+  for (const t2IdStr of Object.keys(t2Map)) {
+    const t2Id = parseInt(t2IdStr);
+    const name = (window.TYPE_ID_TO_NAME && window.TYPE_ID_TO_NAME[t2Id]) || (window.EVE_ITEMS && window.EVE_ITEMS[t2Id]);
+    if (name && name.toLowerCase().includes(q)) {
+      hits.push({ id: t2Id, name: name });
     }
     if (hits.length >= 15) break;
   }
