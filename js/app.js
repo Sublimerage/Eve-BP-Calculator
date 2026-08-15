@@ -187,6 +187,11 @@ async function loadBlueprintBrowserData() {
     } else {
       b.containerName = null;
     }
+    // Category filter needs the PRODUCT's category (Ship/Module/Drone/Ammo/etc), not the blueprint's
+    // own category (which is always "Blueprint") - resolve via the already-loaded recipe data.
+    const recipe = window.recipeMap && window.recipeMap[b.type_id];
+    const productTypeId = (recipe && recipe.productTypeID) || (window.BLUEPRINT_TO_PRODUCT_MAP && window.BLUEPRINT_TO_PRODUCT_MAP[b.type_id]);
+    b.categoryId = (productTypeId && window.EVE_CATEGORIES) ? window.EVE_CATEGORIES[productTypeId] : undefined;
   });
 
   _blueprintBrowserData = allBps;
@@ -305,6 +310,8 @@ function blueprintMatchesLocationFilter(bp, filterVal, activeSystemName) {
   return true;
 }
 
+const BLUEPRINT_BROWSER_KNOWN_CATEGORIES = [6, 7, 18, 8, 65, 32]; // Ships, Modules, Drones, Ammo/Charges, Structures, Subsystems
+
 function filterBlueprintBrowser() {
   const q = (document.getElementById('blueprint-browser-search')?.value || '').toLowerCase().trim();
   const loc = document.getElementById('blueprint-location-filter')?.value || 'all';
@@ -312,6 +319,8 @@ function filterBlueprintBrowser() {
   const useChar = document.getElementById('blueprint-use-char')?.checked ?? true;
   const useCorp = document.getElementById('blueprint-use-corp')?.checked ?? true;
   const stackEnabled = document.getElementById('blueprint-stack-toggle')?.checked ?? true;
+  const typeFilter = document.getElementById('blueprint-type-filter')?.value || 'all';
+  const categoryFilter = document.getElementById('blueprint-category-filter')?.value || 'all';
 
   const filtered = _blueprintBrowserData.filter(b => {
     if (b.source === 'Personal' && !useChar) return false;
@@ -319,6 +328,15 @@ function filterBlueprintBrowser() {
     const name = (window.TYPE_ID_TO_NAME[b.type_id] || `Type ${b.type_id}`).toLowerCase();
     if (q && !name.includes(q)) return false;
     if (!blueprintMatchesLocationFilter(b, loc, activeSystemName)) return false;
+    if (typeFilter === 'bpo' && b.quantity !== -1) return false;
+    if (typeFilter === 'bpc' && b.quantity === -1) return false;
+    if (categoryFilter !== 'all') {
+      if (categoryFilter === 'other') {
+        if (BLUEPRINT_BROWSER_KNOWN_CATEGORIES.includes(b.categoryId)) return false;
+      } else if (b.categoryId !== parseInt(categoryFilter)) {
+        return false;
+      }
+    }
     return true;
   });
   renderBlueprintBrowserList(filtered, stackEnabled);
