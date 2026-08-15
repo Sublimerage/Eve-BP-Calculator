@@ -129,6 +129,9 @@
           <button id="btn-sync-eve-jobs" onclick="syncWithEveIndustryJobs()" class="px-2 py-1 bg-cyan-800 hover:bg-cyan-700 text-cyan-100 font-semibold rounded text-[10px] mono transition" title="Check your active EVE industry jobs (your own and, if you have Factory Manager role, your corp's) and auto-start any pending ledger job that matches one, using EVE's real start time and duration.">
             🔄 Sync EVE Jobs
           </button>
+          <button onclick="collectAllReadyJobs()" class="px-2 py-1 bg-green-800 hover:bg-green-700 text-green-100 font-semibold rounded text-[10px] mono transition" title="Mark every job whose timer has finished as Built">
+            ✔ Collect All Ready
+          </button>
         </div>
       </div>
 
@@ -253,11 +256,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=4.8.0"></script>
-  <script src="js/config.js?v=4.8.0"></script>
-  <script src="js/esi.js?v=4.8.0"></script>
-  <script src="js/tree.js?v=4.8.0"></script>
-  <script src="js/optimizers.js?v=4.8.0"></script>
-  <script src="js/ledger.js?v=4.8.0"></script>
+  <script src="eve_db.js?v=4.9.0"></script>
+  <script src="js/config.js?v=4.9.0"></script>
+  <script src="js/esi.js?v=4.9.0"></script>
+  <script src="js/tree.js?v=4.9.0"></script>
+  <script src="js/optimizers.js?v=4.9.0"></script>
+  <script src="js/ledger.js?v=4.9.0"></script>
 </body>
 </html>
