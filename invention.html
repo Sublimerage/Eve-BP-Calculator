@@ -8,7 +8,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Invention Calculator</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=5.7.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=5.8.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -81,6 +81,32 @@
         </div>
 
         <div class="p-3.5 border-b border-[#1e3348] space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-400 font-bold uppercase tracking-wide">
+              <input type="checkbox" id="invention-deduct-stock" checked class="w-3.5 h-3.5 accent-cyan-500" onchange="recalculateInvention()">
+              Deduct Owned Stock
+            </label>
+            <button onclick="refreshLiveAssets()" class="text-[9px] px-2 py-1 bg-cyan-800 hover:bg-cyan-700 text-cyan-100 font-bold rounded transition">🔄 Refresh Assets</button>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+              <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
+              <span>Pers</span>
+            </label>
+            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+              <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
+              <span>Corp</span>
+            </label>
+          </div>
+          <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterLocationDropdownOptions()"
+            class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-cyan-500">
+          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-amber-300 font-bold text-[11px] outline-none truncate">
+            <option value="all" selected>All Locations (Combined Assets)</option>
+            <option value="industry_system">Current System Only (JITA)</option>
+          </select>
+        </div>
+
+        <div class="p-3.5 border-b border-[#1e3348] space-y-2">
           <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide" title="How input materials for manufacturing the resulting BPC are priced.">Material Pricing</div>
           <select id="input-price-mode" onchange="recalculateInvention()" class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-white font-bold text-xs outline-none">
             <option value="sell" selected>Jita Sell (Instant Buy)</option>
@@ -116,11 +142,11 @@
     </main>
   </div>
 
-  <script src="eve_db.js?v=5.7.0"></script>
-  <script src="js/config.js?v=5.7.0"></script>
-  <script src="js/esi.js?v=5.7.0"></script>
-  <script src="js/tree.js?v=5.7.0"></script>
-  <script src="js/optimizers.js?v=5.7.0"></script>
-  <script src="js/invention.js?v=5.7.0"></script>
+  <script src="eve_db.js?v=5.8.0"></script>
+  <script src="js/config.js?v=5.8.0"></script>
+  <script src="js/esi.js?v=5.8.0"></script>
+  <script src="js/tree.js?v=5.8.0"></script>
+  <script src="js/optimizers.js?v=5.8.0"></script>
+  <script src="js/invention.js?v=5.8.0"></script>
 </body>
 </html>
