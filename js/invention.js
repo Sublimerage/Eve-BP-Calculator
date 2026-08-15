@@ -323,7 +323,7 @@ async function recalculateInvention() {
   saveInventionState();
 
   const baseChance = parseFloat(document.getElementById('invention-base-chance').value) || 0;
-  const bpcRuns = Math.max(1, parseInt(document.getElementById('invention-bpc-runs').value) || 1);
+  const targetBPCs = Math.max(1, parseInt(document.getElementById('invention-target-bpcs').value) || 1);
 
   let encryptionLevel = 0;
   let scienceLevelSum = 0;
@@ -351,15 +351,9 @@ async function recalculateInvention() {
   const t2Recipe = window.recipeMap && window.recipeMap[t2ProductTypeId];
   const t2BlueprintTypeId = t2Recipe ? t2Recipe.blueprintTypeID : null;
   console.info(`[Invention] T2 product typeId=${t2ProductTypeId}, resolved blueprint typeId=${t2BlueprintTypeId || 'NOT FOUND'}`);
-  const warningEl = document.getElementById('invention-product-warning');
   if (!t2ProductTypeId) {
-    if (warningEl) warningEl.classList.remove('hidden');
-    console.warn('[Invention] No T2 product typeId set at all - profit calculation cannot run until you select one (see the warning banner).');
+    console.warn('[Invention] No T2 product typeId set at all - profit calculation cannot run.');
   } else if (!t2BlueprintTypeId) {
-    if (warningEl) {
-      warningEl.classList.remove('hidden');
-      warningEl.querySelector('div').textContent = `⚠️ Found T2 product "${_inventionCurrentProduct.name}" but no manufacturing recipe for it in your local database - regenerate generate_db.py, or this item may be missing from it.`;
-    }
     console.warn(`[Invention] recipeMap has no entry for product ${t2ProductTypeId}, or it's missing blueprintTypeID - manufacturing profit cannot be calculated.`);
   }
 
@@ -387,10 +381,9 @@ async function recalculateInvention() {
 
     const costPerAttempt = datacoreCost + decCost;
 
-    let bpcValue = 0;
-    let materialCostTotal = 0;
-    let unitsProduced = 0;
-    let totalBuildSeconds = 0;
+    let unitCost = 0;   // material cost to manufacture ONE BPC's full production
+    let unitSell = 0;   // gross revenue from selling ONE BPC's full production
+    let unitBuildSeconds = 0; // build time for ONE BPC's full production
     let profitDetail = 'No product data';
     if (t2BlueprintTypeId && t2ProductTypeId) {
       try {
@@ -412,20 +405,13 @@ async function recalculateInvention() {
           const allTypeIds = new Set();
           if (typeof window.collectAllTypeIds === 'function') window.collectAllTypeIds(root, allTypeIds);
           if (typeof window.fetchMarketPrices === 'function') await window.fetchMarketPrices(Array.from(allTypeIds));
-          const materialCost = typeof window.calculateTreeNodeCost === 'function' ? window.calculateTreeNodeCost(root) : 0;
+          unitCost = typeof window.calculateTreeNodeCost === 'function' ? window.calculateTreeNodeCost(root) : 0;
           const outputPrices = window.priceCache[t2ProductTypeId] || { sell: 0 };
-          const grossSell = outputPrices.sell * root.qtyNeeded;
-          bpcValue = grossSell - materialCost;
-          materialCostTotal = materialCost;
-          unitsProduced = root.qtyNeeded;
-
-          // Real manufacturing time for producing every run this BPC allows, using the same time
-          // calculation (skills, TE research, facility/rig bonuses) the calculator and ledger use.
-          totalBuildSeconds = typeof window.calculateTotalBuildSeconds === 'function' ? window.calculateTotalBuildSeconds(root) : 0;
-
-          profitDetail = `${root.qtyNeeded} units @ ${Math.round(outputPrices.sell).toLocaleString()} ISK sell, ${Math.round(materialCost).toLocaleString()} ISK mats, ${totalBuildSeconds > 0 ? window.formatDuration(totalBuildSeconds) : 'no time data'} to manufacture`;
+          unitSell = outputPrices.sell * root.qtyNeeded;
+          unitBuildSeconds = typeof window.calculateTotalBuildSeconds === 'function' ? window.calculateTotalBuildSeconds(root) : 0;
+          profitDetail = `${root.qtyNeeded} units @ ${Math.round(outputPrices.sell).toLocaleString()} ISK sell, ${Math.round(unitCost).toLocaleString()} ISK mats per BPC, ${unitBuildSeconds > 0 ? window.formatDuration(unitBuildSeconds) : 'no time data'} to manufacture per BPC`;
           if (dec.name === 'No Decryptor') {
-            console.info(`[Invention] "No Decryptor" breakdown: resultRuns=${resultRuns}, qtyProduced=${root.qtyNeeded}, sellPrice=${outputPrices.sell}, grossSell=${grossSell}, materialCost=${materialCost}, bpcValue=${bpcValue}, totalBuildSeconds=${totalBuildSeconds}`);
+            console.info(`[Invention] "No Decryptor" per-BPC breakdown: resultRuns=${resultRuns}, qtyProduced=${root.qtyNeeded}, sellPrice=${outputPrices.sell}, unitSell=${unitSell}, unitCost=${unitCost}, unitBuildSeconds=${unitBuildSeconds}`);
           }
         }
       } catch (e) {
@@ -433,16 +419,26 @@ async function recalculateInvention() {
       }
     }
 
-    const perAttemptProfit = (successChance / 100) * bpcValue - costPerAttempt;
-    // Each run on the T1 BPC is one invention attempt (consumed whether it succeeds or fails) - this
-    // is the total expected profit across every attempt your T1 BPC's runs allow.
-    const totalPotentialProfit = perAttemptProfit * bpcRuns;
-    // Normalizes profit to a single output unit, so decryptors producing different run counts (e.g.
-    // Augmentation's many runs vs Process's none) can be compared fairly on a per-run basis.
-    const perRunProfit = resultRuns > 0 ? perAttemptProfit / resultRuns : perAttemptProfit;
-    const iskPerHourWeighted = totalBuildSeconds > 0 ? perAttemptProfit / (totalBuildSeconds / 3600) : null;
+    // The core of the goal-based model: given this decryptor's success chance, how many invention
+    // ATTEMPTS (successes AND failures) does it take, on average, to reach your target number of
+    // successful BPCs? This is the standard expected-trials-for-k-successes result (targetBPCs / p) -
+    // and it's the number that actually makes the risk visible, rather than burying it inside a
+    // single "expected profit" figure.
+    const successProbability = successChance / 100;
+    const requiredAttempts = successProbability > 0 ? Math.ceil(targetBPCs / successProbability) : Infinity;
 
-    return { dec, successChance, resultRuns, resultME, resultTE, costPerAttempt, bpcValue, perAttemptProfit, totalPotentialProfit, perRunProfit, totalBuildSeconds, iskPerHour: iskPerHourWeighted, materialCostTotal, unitsProduced, profitDetail };
+    const totalInventionCost = isFinite(requiredAttempts) ? requiredAttempts * costPerAttempt : Infinity;
+    const totalManufacturingCost = targetBPCs * unitCost;
+    const totalRevenue = targetBPCs * unitSell;
+    const totalProfit = isFinite(totalInventionCost) ? (totalRevenue - totalManufacturingCost - totalInventionCost) : -Infinity;
+    const totalBuildSeconds = targetBPCs * unitBuildSeconds;
+    const iskPerHour = totalBuildSeconds > 0 && isFinite(totalProfit) ? totalProfit / (totalBuildSeconds / 3600) : null;
+    // Normalizes to a single manufacturing run (not a single attempt) so decryptors producing
+    // different run counts per BPC (e.g. Augmentation's many runs vs Process's none) compare fairly.
+    const totalRunsProduced = targetBPCs * resultRuns;
+    const profitPerRun = (isFinite(totalProfit) && totalRunsProduced > 0) ? totalProfit / totalRunsProduced : (isFinite(totalProfit) ? totalProfit : -Infinity);
+
+    return { dec, successChance, resultRuns, resultME, resultTE, costPerAttempt, requiredAttempts, totalInventionCost, totalManufacturingCost, totalRevenue, totalProfit, totalBuildSeconds, iskPerHour, profitPerRun, profitDetail };
   }));
 
   renderInventionComparisonTable(rows);
@@ -456,7 +452,8 @@ window.recalculateInvention = recalculateInvention;
 function renderInventionSummaryTiles(rows) {
   const container = document.getElementById('invention-summary-tiles');
   if (!container || rows.length === 0) return;
-  const best = rows.reduce((a, b) => (b.totalPotentialProfit > a.totalPotentialProfit ? b : a), rows[0]);
+  const best = rows.reduce((a, b) => (b.totalProfit > a.totalProfit ? b : a), rows[0]);
+  const targetBPCs = Math.max(1, parseInt(document.getElementById('invention-target-bpcs').value) || 1);
 
   container.innerHTML = `
     <div class="bg-[#0d1922] border border-[#1e3348] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
@@ -464,26 +461,31 @@ function renderInventionSummaryTiles(rows) {
       <div class="text-base font-bold text-green-300 mono leading-tight truncate">${window.esc(best.dec.name)}</div>
       <div class="text-[9px] text-slate-500 mt-0.5">${best.successChance.toFixed(1)}% success chance</div>
     </div>
+    <div class="bg-[#0d1922] border border-amber-600/40 px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Attempts Needed</div>
+      <div class="text-lg font-bold text-amber-300 mono leading-tight">${isFinite(best.requiredAttempts) ? best.requiredAttempts.toLocaleString() : '—'}</div>
+      <div class="text-[9px] text-slate-500 mt-0.5">to get ${targetBPCs} successful BPC${targetBPCs > 1 ? 's' : ''}</div>
+    </div>
     <div class="bg-[#0d1922] border border-[#1e3348] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
-      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Build Cost</div>
-      <div class="text-lg font-bold text-cyan-400 mono leading-tight">${Math.round(best.materialCostTotal).toLocaleString()} ISK</div>
-      <div class="text-[9px] text-slate-500 mt-0.5">${best.unitsProduced.toLocaleString()} units, materials only</div>
+      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Cost (Invention + Mfg)</div>
+      <div class="text-lg font-bold text-cyan-400 mono leading-tight">${isFinite(best.totalInventionCost) ? Math.round(best.totalInventionCost + best.totalManufacturingCost).toLocaleString() : '—'} ISK</div>
+      <div class="text-[9px] text-slate-500 mt-0.5">${isFinite(best.totalInventionCost) ? Math.round(best.totalInventionCost).toLocaleString() + ' invention + ' + Math.round(best.totalManufacturingCost).toLocaleString() + ' mfg' : ''}</div>
     </div>
     <div class="bg-[#0d1922] border border-green-600/40 px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
-      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Potential Profit</div>
-      <div class="text-lg font-bold ${best.totalPotentialProfit >= 0 ? 'text-green-400' : 'text-red-400'} mono leading-tight">${Math.round(best.totalPotentialProfit).toLocaleString()} ISK</div>
-      <div class="text-[9px] text-slate-500 mt-0.5">across all T1 BPC runs</div>
+      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Profit</div>
+      <div class="text-lg font-bold ${isFinite(best.totalProfit) && best.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'} mono leading-tight">${isFinite(best.totalProfit) ? Math.round(best.totalProfit).toLocaleString() + ' ISK' : '—'}</div>
+      <div class="text-[9px] text-slate-500 mt-0.5">for ${targetBPCs} successful BPC${targetBPCs > 1 ? 's' : ''}</div>
     </div>
     <div class="bg-[#0d1922] border border-[#1e3348] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
       <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">ISK/Hour</div>
       <div class="text-lg font-bold ${best.iskPerHour !== null ? (best.iskPerHour >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-500'} mono leading-tight">${best.iskPerHour !== null ? Math.round(best.iskPerHour).toLocaleString() + ' ISK' : 'No time data'}</div>
-      <div class="text-[9px] text-slate-500 mt-0.5">${best.totalBuildSeconds > 0 ? window.formatDuration(best.totalBuildSeconds) + ' to manufacture' : 'build time unavailable'}</div>
+      <div class="text-[9px] text-slate-500 mt-0.5">${best.totalBuildSeconds > 0 ? window.formatDuration(best.totalBuildSeconds) + ' total manufacturing' : 'build time unavailable'}</div>
     </div>
   `;
 }
 
 let _inventionLastComparisonRows = [];
-let _inventionSortColumn = 'totalPotentialProfit';
+let _inventionSortColumn = 'totalProfit';
 let _inventionSortDescending = true;
 
 function sortInventionComparisonBy(column) {
@@ -501,12 +503,12 @@ function renderInventionComparisonTable(rows) {
   const container = document.getElementById('invention-comparison-table');
   if (!container) return;
   _inventionLastComparisonRows = rows;
-  const bestProfit = rows.length > 0 ? Math.max(...rows.map(r => r.totalPotentialProfit)) : 0;
-  const bpcRuns = Math.max(1, parseInt(document.getElementById('invention-bpc-runs').value) || 1);
+  const bestProfit = rows.length > 0 ? Math.max(...rows.map(r => r.totalProfit)) : 0;
+  const targetBPCs = Math.max(1, parseInt(document.getElementById('invention-target-bpcs').value) || 1);
 
   const sortedRows = [...rows].sort((a, b) => {
-    const av = a[_inventionSortColumn] === null ? -Infinity : a[_inventionSortColumn];
-    const bv = b[_inventionSortColumn] === null ? -Infinity : b[_inventionSortColumn];
+    const av = a[_inventionSortColumn] === null || !isFinite(a[_inventionSortColumn]) ? -Infinity : a[_inventionSortColumn];
+    const bv = b[_inventionSortColumn] === null || !isFinite(b[_inventionSortColumn]) ? -Infinity : b[_inventionSortColumn];
     return _inventionSortDescending ? bv - av : av - bv;
   });
 
@@ -523,36 +525,39 @@ function renderInventionComparisonTable(rows) {
           <th class="p-2">Decryptor</th>
           ${sortHeader('successChance', 'Success %', 'right')}
           <th class="p-2 text-right">Result BPC</th>
-          ${sortHeader('costPerAttempt', 'Invention Cost', 'right')}
-          ${sortHeader('totalBuildSeconds', 'Build Time', 'right')}
-          ${sortHeader('totalPotentialProfit', `Total Potential Profit (${bpcRuns} run${bpcRuns > 1 ? 's' : ''} on T1 BPC)`, 'right')}
+          ${sortHeader('requiredAttempts', `Attempts Needed (for ${targetBPCs})`, 'right')}
+          ${sortHeader('totalInventionCost', 'Total Invention Cost', 'right')}
+          ${sortHeader('totalManufacturingCost', 'Total Mfg Cost', 'right')}
+          ${sortHeader('totalProfit', 'Total Profit', 'right')}
           ${sortHeader('iskPerHour', 'ISK/Hour', 'right')}
-          ${sortHeader('perRunProfit', 'Profit / 1 Run', 'right')}
+          ${sortHeader('profitPerRun', 'Profit / 1 Run', 'right')}
         </tr>
       </thead>
       <tbody>
         ${sortedRows.map(r => {
-          const isBest = r.totalPotentialProfit === bestProfit && bestProfit > -Infinity;
+          const isBest = r.totalProfit === bestProfit && bestProfit > -Infinity;
           return `
           <tr class="border-b border-[#1e3348]/40 ${isBest ? 'bg-green-950/30' : ''} hover:bg-[#0d1922] transition" title="${window.esc(r.profitDetail)}">
             <td class="p-2 font-bold ${isBest ? 'text-green-300' : 'text-slate-200'}">${isBest ? '🏆 ' : ''}${window.esc(r.dec.name)}</td>
             <td class="p-2 text-right text-cyan-300 font-bold">${r.successChance.toFixed(1)}%</td>
             <td class="p-2 text-right text-slate-400">${r.resultRuns} run${r.resultRuns > 1 ? 's' : ''}, ME${r.resultME >= 0 ? '+' : ''}${r.resultME}, TE${r.resultTE >= 0 ? '+' : ''}${r.resultTE}</td>
-            <td class="p-2 text-right text-amber-300">${Math.round(r.costPerAttempt).toLocaleString()} ISK</td>
-            <td class="p-2 text-right text-slate-400">${r.totalBuildSeconds > 0 ? window.formatDuration(r.totalBuildSeconds) : '—'}</td>
-            <td class="p-2 text-right font-bold ${r.totalPotentialProfit >= 0 ? 'text-green-300' : 'text-red-300'}">${Math.round(r.totalPotentialProfit).toLocaleString()} ISK</td>
+            <td class="p-2 text-right text-amber-300 font-bold">${isFinite(r.requiredAttempts) ? r.requiredAttempts.toLocaleString() : '—'}</td>
+            <td class="p-2 text-right text-amber-300">${isFinite(r.totalInventionCost) ? Math.round(r.totalInventionCost).toLocaleString() + ' ISK' : '—'}</td>
+            <td class="p-2 text-right text-cyan-400">${Math.round(r.totalManufacturingCost).toLocaleString()} ISK</td>
+            <td class="p-2 text-right font-bold ${isFinite(r.totalProfit) && r.totalProfit >= 0 ? 'text-green-300' : 'text-red-300'}">${isFinite(r.totalProfit) ? Math.round(r.totalProfit).toLocaleString() + ' ISK' : '—'}</td>
             <td class="p-2 text-right ${r.iskPerHour !== null ? (r.iskPerHour >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-500'} font-bold">${r.iskPerHour !== null ? Math.round(r.iskPerHour).toLocaleString() + ' ISK' : '—'}</td>
-            <td class="p-2 text-right font-bold ${r.perRunProfit >= 0 ? 'text-green-400' : 'text-red-400'}">${Math.round(r.perRunProfit).toLocaleString()} ISK</td>
+            <td class="p-2 text-right font-bold ${isFinite(r.profitPerRun) && r.profitPerRun >= 0 ? 'text-green-400' : 'text-red-400'}">${isFinite(r.profitPerRun) ? Math.round(r.profitPerRun).toLocaleString() + ' ISK' : '—'}</td>
           </tr>
         `; }).join('')}
       </tbody>
     </table>
     <p class="text-[10px] text-slate-500 mt-2 leading-relaxed">
-      Click any column header to sort by it (click again to reverse). All figures are probability-weighted (success chance × manufacturing profit, minus the invention attempt's cost).
-      <b>Total Potential Profit</b> = per-attempt profit × your T1 BPC's available runs (each run is one invention attempt, consumed win or lose).
-      <b>ISK/Hour</b> = per-attempt profit ÷ manufacturing time for one resulting BPC's full production.
-      <b>Profit / 1 Run</b> normalizes per-attempt profit to a single output unit, so decryptors with different run counts can be compared fairly.
-      "Manufacturing profit" = revenue from selling everything produced minus material cost at your chosen Jita buy/sell pricing, at the resulting ME/TE. Not included: the T1 BPC's own cost (fixed regardless of decryptor), the invention job's own installation fee, or manufacturing job fees (facility tax/SCC/broker).
+      Click any column header to sort by it (click again to reverse).
+      <b>Attempts Needed</b> = the average number of invention tries (successes AND failures) to reach your target of ${targetBPCs} successful BPC${targetBPCs > 1 ? 's' : ''}, given this decryptor's success chance - this is where the success rate actually shows up: a worse chance means more attempts, more failed datacores/decryptors spent, and a higher Total Invention Cost for the same goal.
+      <b>Total Invention Cost</b> = Attempts Needed × (datacores + decryptor cost per attempt) - you pay this on every attempt, win or lose.
+      <b>Total Mfg Cost / Total Profit</b> = manufacturing your ${targetBPCs} target BPC${targetBPCs > 1 ? 's' : ''} worth of production, at your chosen Jita buy/sell pricing, minus Total Invention Cost.
+      <b>Profit / 1 Run</b> normalizes Total Profit to a single manufacturing run, so decryptors with different run counts per BPC compare fairly.
+      Not included: the T1 BPC's own acquisition cost, the invention job's own installation fee, or manufacturing job fees (facility tax/SCC/broker).
     </p>
   `;
 }
@@ -564,7 +569,7 @@ function saveInventionState() {
     typeId: _inventionSelectedTypeId,
     name: _inventionSelectedName,
     baseChance: document.getElementById('invention-base-chance')?.value,
-    bpcRuns: document.getElementById('invention-bpc-runs')?.value,
+    targetBPCs: document.getElementById('invention-target-bpcs')?.value,
     priceMode: document.getElementById('input-price-mode')?.value,
     skillLevels: Array.from(document.querySelectorAll('.invention-skill-input')).map(el => ({ skillId: el.dataset.skillId, value: el.value }))
   };
@@ -579,7 +584,11 @@ async function restoreInventionState() {
   await selectInventionItem(state.typeId, state.name, true); // skipSave - don't overwrite what we're restoring
 
   if (state.baseChance !== undefined) document.getElementById('invention-base-chance').value = state.baseChance;
-  if (state.bpcRuns !== undefined) document.getElementById('invention-bpc-runs').value = state.bpcRuns;
+  const targetBPCsToRestore = state.targetBPCs !== undefined ? state.targetBPCs : state.bpcRuns; // bpcRuns: back-compat with state saved before this rename
+  if (targetBPCsToRestore !== undefined) {
+    const targetEl = document.getElementById('invention-target-bpcs');
+    if (targetEl) targetEl.value = targetBPCsToRestore;
+  }
   if (state.priceMode !== undefined) {
     const priceEl = document.getElementById('input-price-mode');
     if (priceEl) priceEl.value = state.priceMode;
