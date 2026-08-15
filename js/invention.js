@@ -20,6 +20,13 @@ let _inventionCurrentProduct = null;   // the T2 product/blueprint chosen from i
 
 // --- Search ---
 let _inventionSearchToken = 0;
+function isFullyInventable(recipe) {
+  return !!(recipe && recipe.inventionMaterials && recipe.inventionMaterials.length > 0
+    && recipe.inventionProducts && recipe.inventionProducts.length > 0 && recipe.inventionProducts[0].typeId);
+}
+
+let _inventionLastSearchHits = [];
+
 function searchInventionItem(query) {
   const resultsEl = document.getElementById('invention-search-results');
   if (!resultsEl) return;
@@ -33,27 +40,149 @@ function searchInventionItem(query) {
   for (const [name, entry] of Object.entries(window.IDX || {})) {
     if (name.includes(q)) {
       const recipe = window.recipeMap && window.recipeMap[entry.id];
-      if (recipe && recipe.inventionMaterials && recipe.inventionMaterials.length > 0) {
+      if (isFullyInventable(recipe)) {
         hits.push(entry);
       }
     }
     if (hits.length >= 15) break;
   }
   if (token !== _inventionSearchToken) return;
+  _inventionLastSearchHits = hits;
   if (hits.length === 0) {
-    resultsEl.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">No inventable items found matching "${window.esc(q)}". Search the item itself (e.g. "Caracal"), not its blueprint.</div>`;
+    resultsEl.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">No inventable items found matching "${window.esc(q)}". Search the T1 item itself (e.g. "Caracal"), not its blueprint. If you know this item should be inventable and it's not showing up, your local database may be missing its T2 product data - try regenerating it.</div>`;
     resultsEl.classList.remove('hidden');
     return;
   }
-  resultsEl.innerHTML = hits.map(h => `
-    <div class="px-3 py-2 hover:bg-[#1e3348] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#1e3348]/40" onmousedown="selectInventionItem(${h.id}, '${window.esc(h.name)}')">
-      <img src="https://images.evetech.net/types/${h.id}/icon?size=32" class="w-6 h-6 rounded" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${h.id}/render?size=32';">
-      <span class="font-semibold text-slate-200">${window.esc(h.name)}</span>
-    </div>
-  `).join('');
-  resultsEl.classList.remove('hidden');
+  renderInventionSearchResults(hits);
 }
 window.searchInventionItem = searchInventionItem;
+
+function renderInventionSearchResults(hits, profitById) {
+  const resultsEl = document.getElementById('invention-search-results');
+  if (!resultsEl) return;
+  const sortBtn = hits.length > 1 ? `
+    <div class="px-3 py-1.5 bg-[#0a0f14] border-b border-[#1e3348] flex items-center justify-between">
+      <span class="text-[9px] text-slate-500">${hits.length} match${hits.length > 1 ? 'es' : ''}</span>
+      <button onmousedown="sortInventionSearchResultsByProfit()" class="text-[9px] px-2 py-0.5 bg-purple-800 hover:bg-purple-700 text-purple-100 font-bold rounded transition">📊 Sort by Profit</button>
+    </div>
+  ` : '';
+  resultsEl.innerHTML = sortBtn + hits.map(h => {
+    const profit = profitById && profitById[h.id] !== undefined ? profitById[h.id] : null;
+    const profitBadge = profit !== null
+      ? `<span class="ml-auto text-[10px] font-bold ${profit >= 0 ? 'text-green-400' : 'text-red-400'} flex-shrink-0">${Math.round(profit).toLocaleString()} ISK</span>`
+      : '';
+    return `
+    <div class="px-3 py-2 hover:bg-[#1e3348] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#1e3348]/40" onmousedown="selectInventionItem(${h.id}, '${window.esc(h.name)}')">
+      <img src="https://images.evetech.net/types/${h.id}/icon?size=32" class="w-6 h-6 rounded flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${h.id}/render?size=32';">
+      <span class="font-semibold text-slate-200 truncate">${window.esc(h.name)}</span>
+      ${profitBadge}
+    </div>
+  `; }).join('');
+  resultsEl.classList.remove('hidden');
+}
+
+// Computes each current search result's best-decryptor Total Potential Profit on demand (bounded to
+// whatever's currently shown, not a scan of the whole database - see the earlier "margin finder"
+// discussion for why scanning everything isn't practical) and re-sorts the list by it.
+async function sortInventionSearchResultsByProfit() {
+  const resultsEl = document.getElementById('invention-search-results');
+  if (!resultsEl || _inventionLastSearchHits.length === 0) return;
+  resultsEl.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">Computing profit for ${_inventionLastSearchHits.length} item(s)...</div>`;
+
+  const profitById = {};
+  for (const hit of _inventionLastSearchHits) {
+    try {
+      const profit = await computeQuickBestInventionProfit(hit.id);
+      profitById[hit.id] = profit;
+    } catch (e) {
+      console.warn(`[Invention] Quick profit calc failed for ${hit.name}:`, e);
+      profitById[hit.id] = null;
+    }
+  }
+
+  const sortedHits = [..._inventionLastSearchHits].sort((a, b) => {
+    const pa = profitById[a.id] === null || profitById[a.id] === undefined ? -Infinity : profitById[a.id];
+    const pb = profitById[b.id] === null || profitById[b.id] === undefined ? -Infinity : profitById[b.id];
+    return pb - pa;
+  });
+  renderInventionSearchResults(sortedHits, profitById);
+}
+window.sortInventionSearchResultsByProfit = sortInventionSearchResultsByProfit;
+
+// A lighter-weight version of the full comparison: just finds the best decryptor's Total Potential
+// Profit for one item, using default skill levels (0, or your real ones if logged in via ESI) and 1
+// BPC run, for ranking search results. Does NOT touch the currently-selected item's own state.
+async function computeQuickBestInventionProfit(typeId) {
+  const recipe = window.recipeMap && window.recipeMap[typeId];
+  if (!isFullyInventable(recipe)) return null;
+
+  const t2ProductTypeId = recipe.inventionProducts[0].typeId;
+  const t2Recipe = window.recipeMap && window.recipeMap[t2ProductTypeId];
+  const t2BlueprintTypeId = t2Recipe ? t2Recipe.blueprintTypeID : null;
+  if (!t2BlueprintTypeId) return null;
+
+  const baseChance = getInventionBaseChance(t2ProductTypeId);
+  const charSkills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { allSkills: {} });
+  let encryptionLevel = 0;
+  let scienceLevelSum = 0;
+  (recipe.inventionSkills || []).forEach(sk => {
+    const level = (charSkills.allSkills && charSkills.allSkills[sk.skillId] !== undefined) ? charSkills.allSkills[sk.skillId] : 0;
+    if ((sk.name || '').toLowerCase().includes('encryption')) encryptionLevel = level;
+    else scienceLevelSum += level;
+  });
+
+  const datacores = recipe.inventionMaterials || [];
+  if (typeof window.fetchMarketPrices === 'function') {
+    await window.fetchMarketPrices(datacores.map(m => m.typeId));
+  }
+  const datacoreCost = datacores.reduce((sum, m) => sum + (getInventionInputPrice(m.typeId) * m.qty), 0);
+
+  const productGroupName = ((window.EVE_GROUP_NAMES && window.EVE_GROUP_NAMES[t2ProductTypeId]) || '').toLowerCase();
+  const categoryId = window.EVE_CATEGORIES && window.EVE_CATEGORIES[t2ProductTypeId];
+  const isShipOrRig = categoryId === 6 || productGroupName.includes('rig');
+  const baseRuns = isShipOrRig ? 1 : 10;
+
+  const decryptorTypeIds = DECRYPTORS.map(d => window.IDX && window.IDX[d.name.toLowerCase()] && window.IDX[d.name.toLowerCase()].id).filter(id => id);
+  if (typeof window.fetchMarketPrices === 'function') await window.fetchMarketPrices(decryptorTypeIds);
+
+  let bestProfit = -Infinity;
+  for (const dec of DECRYPTORS) {
+    const successChance = Math.min(100, baseChance * (1 + (scienceLevelSum / 30) + (encryptionLevel / 40)) * (1 + dec.probMod / 100));
+    const resultRuns = Math.max(1, baseRuns + dec.runsMod);
+    const resultME = 2 + dec.meMod;
+    const resultTE = 4 + dec.teMod;
+    const decEntry = window.IDX && window.IDX[dec.name.toLowerCase()];
+    const decCost = (dec.name !== 'No Decryptor' && decEntry) ? getInventionInputPrice(decEntry.id) : 0;
+    const costPerAttempt = datacoreCost + decCost;
+
+    let bpcValue = 0;
+    try {
+      window.customMEOverrides = window.customMEOverrides || {};
+      window.customTEOverrides = window.customTEOverrides || {};
+      window.customMEOverrides[t2BlueprintTypeId] = resultME;
+      window.customTEOverrides[t2BlueprintTypeId] = resultTE;
+      window.recipeTreeRootProductTypeId = t2ProductTypeId;
+      const root = await window.buildRecursiveRecipeTree(parseInt(t2BlueprintTypeId), t2Recipe.productName + ' Blueprint', resultRuns, 0, 6, new Set(), null);
+      window.recipeTreeRootProductTypeId = null;
+      if (root) {
+        root.runsNeeded = resultRuns;
+        root.qtyNeeded = resultRuns * (root.batchYield || 1);
+        const facility = (window.getActiveStructureType ? window.getActiveStructureType().meBonus : 1.0) / 100;
+        if (typeof window.scaleTreeQuantities === 'function') window.scaleTreeQuantities(root, facility);
+        const allTypeIds = new Set();
+        if (typeof window.collectAllTypeIds === 'function') window.collectAllTypeIds(root, allTypeIds);
+        if (typeof window.fetchMarketPrices === 'function') await window.fetchMarketPrices(Array.from(allTypeIds));
+        const materialCost = typeof window.calculateTreeNodeCost === 'function' ? window.calculateTreeNodeCost(root) : 0;
+        const outputPrices = window.priceCache[t2ProductTypeId] || { sell: 0 };
+        bpcValue = (outputPrices.sell * root.qtyNeeded) - materialCost;
+      }
+    } catch (e) { /* skip this decryptor for this item */ }
+
+    const perAttemptProfit = (successChance / 100) * bpcValue - costPerAttempt;
+    if (perAttemptProfit > bestProfit) bestProfit = perAttemptProfit;
+  }
+  return bestProfit === -Infinity ? null : bestProfit;
+}
 
 // --- Base chance classification ---
 // Confirmed categories: modules/rigs/ammo/drones=34%, frigates/destroyers=30%,
