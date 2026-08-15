@@ -117,8 +117,10 @@ window.selectRigForSlot = selectRigForSlot;
 let _blueprintBrowserData = [];
 
 async function openBlueprintBrowser() {
-  const modal = document.getElementById('blueprint-browser-modal');
-  if (modal) modal.classList.remove('hidden');
+  const backdrop = document.getElementById('blueprint-browser-backdrop');
+  const drawer = document.getElementById('blueprint-browser-drawer');
+  if (backdrop) backdrop.classList.remove('hidden');
+  if (drawer) requestAnimationFrame(() => drawer.classList.remove('translate-x-full'));
   if (_blueprintBrowserData.length === 0) {
     await loadBlueprintBrowserData();
   }
@@ -126,8 +128,10 @@ async function openBlueprintBrowser() {
 window.openBlueprintBrowser = openBlueprintBrowser;
 
 function closeBlueprintBrowser() {
-  const modal = document.getElementById('blueprint-browser-modal');
-  if (modal) modal.classList.add('hidden');
+  const backdrop = document.getElementById('blueprint-browser-backdrop');
+  const drawer = document.getElementById('blueprint-browser-drawer');
+  if (drawer) drawer.classList.add('translate-x-full');
+  if (backdrop) setTimeout(() => backdrop.classList.add('hidden'), 300);
 }
 window.closeBlueprintBrowser = closeBlueprintBrowser;
 
@@ -186,31 +190,163 @@ async function loadBlueprintBrowserData() {
   });
 
   _blueprintBrowserData = allBps;
-
-  const locSelect = document.getElementById('blueprint-browser-location');
-  if (locSelect) {
-    const uniqueStations = [...new Set(allBps.map(b => b.stationName))].sort();
-    locSelect.innerHTML = `<option value="all">All Stations</option>` + uniqueStations.map(l => `<option value="${window.esc(l)}">${window.esc(l)}</option>`).join('');
-  }
-
-  renderBlueprintBrowserList(_blueprintBrowserData);
+  populateBlueprintLocationDropdown();
+  filterBlueprintBrowser();
 }
 window.loadBlueprintBrowserData = loadBlueprintBrowserData;
 
+// Mirrors the calculator's populateLocationDropdown() structure (all/system/station/corp-division/
+// container hierarchy with counts) but sourced from blueprint data and targeting its own dropdown -
+// a separate element ID since index.html already has #stock-location-filter for general stock, and
+// duplicate IDs on the same page would break document.getElementById lookups.
+function populateBlueprintLocationDropdown() {
+  const filterSelect = document.getElementById('blueprint-location-filter');
+  if (!filterSelect) return;
+  const currentSystemName = (document.getElementById('system-search')?.value || 'JITA').toUpperCase();
+  const currentValue = filterSelect.value || 'all';
+  filterSelect.innerHTML = `
+    <option value="all" style="color: #38bdf8; background-color: #0c1318; font-weight: bold;">All Locations</option>
+    <option value="industry_system" style="color: #38bdf8; background-color: #0c1318; font-weight: bold;">Current System Only (${currentSystemName})</option>
+  `;
+  const sagNameMap = {
+    'CorpSAG1': window.corpDivisionNames[1] || 'DIVISION 1',
+    'CorpSAG2': window.corpDivisionNames[2] || 'DIVISION 2',
+    'CorpSAG3': window.corpDivisionNames[3] || 'DIVISION 3',
+    'CorpSAG4': window.corpDivisionNames[4] || 'DIVISION 4',
+    'CorpSAG5': window.corpDivisionNames[5] || 'DIVISION 5',
+    'CorpSAG6': window.corpDivisionNames[6] || 'DIVISION 6',
+    'CorpSAG7': window.corpDivisionNames[7] || 'DIVISION 7',
+    'CorpDeliveries': 'CORP DELIVERIES'
+  };
+  const locCounts = {};
+  _blueprintBrowserData.forEach(bp => {
+    const locId = bp.rootLocationId;
+    const locName = bp.stationName || `Location #${locId}`;
+    if (!locCounts[locId]) {
+      locCounts[locId] = { name: locName, count: 0, corpDivisions: {}, containers: {} };
+    }
+    locCounts[locId].count += 1;
+    if (bp.source === 'Corp' && bp.location_flag && bp.location_flag.startsWith('Corp')) {
+      const sagFlag = bp.location_flag;
+      if (!locCounts[locId].corpDivisions[sagFlag]) {
+        locCounts[locId].corpDivisions[sagFlag] = { name: sagNameMap[sagFlag] || sagFlag, count: 0 };
+      }
+      locCounts[locId].corpDivisions[sagFlag].count += 1;
+    }
+    if (bp.containerId) {
+      const cId = bp.containerId;
+      const cName = bp.containerName || `Container #${cId}`;
+      if (!locCounts[locId].containers[cId]) {
+        locCounts[locId].containers[cId] = { name: cName, count: 0 };
+      }
+      locCounts[locId].containers[cId].count += 1;
+    }
+  });
+  for (const [locId, data] of Object.entries(locCounts)) {
+    const mainOpt = document.createElement('option');
+    mainOpt.value = `loc_${locId}`;
+    const numericLocId = parseInt(locId);
+    const isUpwellStructure = numericLocId > 1000000000000;
+    mainOpt.style.color = isUpwellStructure ? '#f97316' : '#4caf6f';
+    mainOpt.style.backgroundColor = '#0c1318';
+    mainOpt.style.fontWeight = 'bold';
+    mainOpt.textContent = `${isUpwellStructure ? '🟧' : '🟩'} ${data.name} (${data.count})`;
+    filterSelect.appendChild(mainOpt);
+    for (const [sagFlag, sagData] of Object.entries(data.corpDivisions)) {
+      const sagOpt = document.createElement('option');
+      sagOpt.value = `corpsag_${locId}_${sagFlag}`;
+      sagOpt.style.color = '#c084fc';
+      sagOpt.style.backgroundColor = '#070b0f';
+      sagOpt.style.fontWeight = 'bold';
+      sagOpt.textContent = `  └─ 🟪 Corp: ${sagData.name} (${sagData.count})`;
+      filterSelect.appendChild(sagOpt);
+    }
+    for (const [cId, cData] of Object.entries(data.containers)) {
+      const containerOpt = document.createElement('option');
+      containerOpt.value = `container_${cId}`;
+      containerOpt.style.color = '#f8fafc';
+      containerOpt.style.backgroundColor = '#070b0f';
+      containerOpt.textContent = `  └─ 📦 ${cData.name} (${cData.count})`;
+      filterSelect.appendChild(containerOpt);
+    }
+  }
+  filterSelect.value = filterSelect.querySelector(`option[value="${currentValue}"]`) ? currentValue : 'all';
+}
+window.populateBlueprintLocationDropdown = populateBlueprintLocationDropdown;
+
+// Mirrors esi.js's filterLocationDropdownOptions() - text-filters the option list itself, since with
+// many locations the dropdown is its own thing to search through.
+function filterBlueprintLocationDropdownOptions() {
+  const query = (document.getElementById('blueprint-location-search')?.value || '').trim().toUpperCase();
+  const filterSelect = document.getElementById('blueprint-location-filter');
+  if (!filterSelect) return;
+  filterSelect.querySelectorAll('option').forEach(opt => {
+    if (opt.value === 'all' || opt.value === 'industry_system') { opt.hidden = false; return; }
+    opt.hidden = query.length > 0 && !opt.textContent.toUpperCase().includes(query);
+  });
+}
+window.filterBlueprintLocationDropdownOptions = filterBlueprintLocationDropdownOptions;
+
+// Mirrors esi.js's applyStockLocationFilter() value parsing (all/industry_system/loc_/corpsag_/
+// container_) but filters the blueprint list itself rather than building a stock quantity map.
+function blueprintMatchesLocationFilter(bp, filterVal, activeSystemName) {
+  if (filterVal === 'all') return true;
+  if (filterVal === 'industry_system') return (bp.stationName || '').toUpperCase().includes(activeSystemName);
+  if (filterVal.startsWith('loc_')) {
+    return bp.rootLocationId === parseInt(filterVal.replace('loc_', ''));
+  }
+  if (filterVal.startsWith('corpsag_')) {
+    const parts = filterVal.split('_');
+    return bp.rootLocationId === parseInt(parts[1]) && bp.location_flag === parts[2];
+  }
+  if (filterVal.startsWith('container_')) {
+    return bp.containerId === parseInt(filterVal.replace('container_', ''));
+  }
+  return true;
+}
+
 function filterBlueprintBrowser() {
   const q = (document.getElementById('blueprint-browser-search')?.value || '').toLowerCase().trim();
-  const loc = document.getElementById('blueprint-browser-location')?.value || 'all';
+  const loc = document.getElementById('blueprint-location-filter')?.value || 'all';
+  const activeSystemName = (document.getElementById('system-search')?.value || 'JITA').toUpperCase();
+  const useChar = document.getElementById('blueprint-use-char')?.checked ?? true;
+  const useCorp = document.getElementById('blueprint-use-corp')?.checked ?? true;
+  const stackEnabled = document.getElementById('blueprint-stack-toggle')?.checked ?? true;
+
   const filtered = _blueprintBrowserData.filter(b => {
+    if (b.source === 'Personal' && !useChar) return false;
+    if (b.source === 'Corp' && !useCorp) return false;
     const name = (window.TYPE_ID_TO_NAME[b.type_id] || `Type ${b.type_id}`).toLowerCase();
     if (q && !name.includes(q)) return false;
-    if (loc !== 'all' && b.stationName !== loc) return false;
+    if (!blueprintMatchesLocationFilter(b, loc, activeSystemName)) return false;
     return true;
   });
-  renderBlueprintBrowserList(filtered);
+  renderBlueprintBrowserList(filtered, stackEnabled);
 }
 window.filterBlueprintBrowser = filterBlueprintBrowser;
 
-function renderBlueprintBrowserList(list) {
+// Groups identical BPOs/BPCs into one displayed entry with a stack count - same type, ME, and TE for
+// BPOs; same type, ME, TE, AND runs for BPCs (runs isn't meaningful for a BPO, which never depletes).
+// Also correctly folds in blueprints ESI already reports as a pre-stacked group (quantity > 0).
+function stackBlueprints(list) {
+  const groups = {};
+  const order = [];
+  list.forEach(bp => {
+    const isBPO = bp.quantity === -1;
+    const key = isBPO
+      ? `bpo|${bp.type_id}|${bp.material_efficiency}|${bp.time_efficiency}|${bp.rootLocationId}|${bp.containerId || ''}`
+      : `bpc|${bp.type_id}|${bp.material_efficiency}|${bp.time_efficiency}|${bp.runs}|${bp.rootLocationId}|${bp.containerId || ''}`;
+    const countForThisEntry = (!isBPO && bp.quantity > 0) ? bp.quantity : 1;
+    if (!groups[key]) {
+      groups[key] = { ...bp, stackCount: 0 };
+      order.push(key);
+    }
+    groups[key].stackCount += countForThisEntry;
+  });
+  return order.map(key => groups[key]);
+}
+
+function renderBlueprintBrowserList(list, stackEnabled) {
   const listEl = document.getElementById('blueprint-browser-list');
   if (!listEl) return;
   if (list.length === 0) {
@@ -218,12 +354,15 @@ function renderBlueprintBrowserList(list) {
     return;
   }
 
+  const processedList = stackEnabled ? stackBlueprints(list) : list;
+
   // Group by station so blueprints are clearly parented to the station they're actually in, not
   // shown as a flat list.
   const byStation = {};
-  list.forEach(bp => {
-    if (!byStation[bp.stationName]) byStation[bp.stationName] = [];
-    byStation[bp.stationName].push(bp);
+  processedList.forEach(bp => {
+    const key = bp.stationName;
+    if (!byStation[key]) byStation[key] = [];
+    byStation[key].push(bp);
   });
 
   // ESI convention: quantity -1 = original (BPO), -2 = copy (BPC); positive quantity = a stack of BPCs.
@@ -231,8 +370,11 @@ function renderBlueprintBrowserList(list) {
     const rows = byStation[stationName].map(bp => {
       const name = window.TYPE_ID_TO_NAME[bp.type_id] || `Type ${bp.type_id}`;
       const isOriginal = bp.quantity === -1;
-      const bpLabel = isOriginal ? 'BPO' : (bp.quantity === -2 ? 'BPC' : `${bp.quantity}x BPC stack`);
+      const bpLabel = isOriginal ? 'BPO' : 'BPC';
       const bpImageVariant = isOriginal ? 'bp' : 'bpc';
+      const stackBadge = (bp.stackCount && bp.stackCount > 1)
+        ? `<span class="text-[9px] font-bold text-cyan-300 bg-cyan-950/40 border border-cyan-700/40 rounded px-1.5 py-0.5 flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
+        : '';
       const containerBadge = bp.containerName
         ? `<span class="text-[9px] font-bold text-amber-400 bg-amber-950/40 border border-amber-700/40 rounded px-1.5 py-0.5 flex-shrink-0" title="Inside container: ${window.esc(bp.containerName)}">📦 ${window.esc(bp.containerName)}</span>`
         : '';
@@ -241,9 +383,9 @@ function renderBlueprintBrowserList(list) {
           <div class="flex items-center gap-2 min-w-0 flex-1">
             <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0">
             <div class="min-w-0 flex-1">
-              <div class="font-bold text-slate-200 truncate">${window.esc(name)}</div>
+              <div class="font-bold text-slate-200 truncate flex items-center gap-1.5">${window.esc(name)} ${stackBadge}</div>
               <div class="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
-                <span>${bp.source} • ${bpLabel}${bp.quantity < -1 || bp.quantity > 0 ? ` • Runs: ${bp.runs}` : ''}</span>
+                <span>${bp.source} • ${bpLabel}${!isOriginal ? ` • Runs: ${bp.runs}` : ''}</span>
                 ${containerBadge}
               </div>
             </div>
