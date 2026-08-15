@@ -394,22 +394,50 @@
 
   </div>
 
-  <!-- Blueprint Browser Modal -->
-  <div id="blueprint-browser-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[999] hidden p-4">
-    <div class="bg-[#0c1318] border border-cyan-500/80 rounded-lg p-6 w-full max-w-2xl h-[80vh] shadow-2xl flex flex-col text-xs mono">
-      <div class="flex justify-between items-center border-b border-[#1e3348] pb-3 mb-3">
-        <h3 class="text-base font-bold text-cyan-300 rajdhani tracking-wider">📘 MY BLUEPRINTS</h3>
-        <button onclick="closeBlueprintBrowser()" class="text-slate-400 hover:text-white font-bold text-base">✖</button>
-      </div>
-      <div class="flex items-center gap-2 mb-3">
-        <input type="text" id="blueprint-browser-search" placeholder="🔍 Search blueprint name..." autocomplete="off" oninput="filterBlueprintBrowser()"
-          class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded-md px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-cyan-500">
-        <select id="blueprint-browser-location" onchange="filterBlueprintBrowser()" class="bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-amber-300 font-bold text-[11px] outline-none max-w-[180px]">
-          <option value="all" selected>All Locations</option>
-        </select>
-        <button onclick="loadBlueprintBrowserData(true)" class="px-2.5 py-1.5 bg-cyan-800 hover:bg-cyan-700 text-cyan-100 font-semibold rounded text-[10px] transition flex-shrink-0">🔄 Refresh</button>
-      </div>
-      <div id="blueprint-browser-list" class="flex-1 overflow-y-auto space-y-1.5">
+  <!-- Blueprint Browser Drawer -->
+  <div id="blueprint-browser-backdrop" class="fixed inset-0 bg-black/70 z-[998] hidden transition-opacity duration-300" onclick="closeBlueprintBrowser()"></div>
+  <div id="blueprint-browser-drawer" class="fixed top-0 right-0 h-full w-full sm:w-[720px] max-w-full bg-[#0c1318] border-l border-cyan-500/60 shadow-2xl z-[999] flex flex-col text-xs mono transform translate-x-full transition-transform duration-300 ease-out">
+    <div class="flex justify-between items-center border-b border-[#1e3348] px-5 py-3.5 flex-shrink-0">
+      <h3 class="text-base font-bold text-cyan-300 rajdhani tracking-wider">📘 MY BLUEPRINTS</h3>
+      <button onclick="closeBlueprintBrowser()" class="text-slate-400 hover:text-white font-bold text-lg leading-none">✖</button>
+    </div>
+
+    <div class="flex flex-1 overflow-hidden">
+      <!-- Filter sidebar -->
+      <aside class="w-[240px] flex-shrink-0 border-r border-[#1e3348] overflow-y-auto p-3.5 space-y-3">
+        <div>
+          <input type="text" id="blueprint-browser-search" placeholder="🔍 Search blueprint name..." autocomplete="off" oninput="filterBlueprintBrowser()"
+            class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-cyan-500">
+        </div>
+        <div class="flex items-center justify-between">
+          <button onclick="loadBlueprintBrowserData(true)" class="px-2.5 py-1.5 bg-cyan-800 hover:bg-cyan-700 text-cyan-100 font-semibold rounded text-[10px] transition">🔄 Refresh</button>
+          <label class="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-400 font-bold">
+            <input type="checkbox" id="blueprint-stack-toggle" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
+            Stack identical
+          </label>
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+            <input type="checkbox" id="blueprint-use-char" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
+            <span>Pers</span>
+          </label>
+          <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+            <input type="checkbox" id="blueprint-use-corp" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
+            <span>Corp</span>
+          </label>
+        </div>
+        <div>
+          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Location</div>
+          <input type="text" id="blueprint-location-search" autocomplete="off" placeholder="Filter locations..." oninput="filterBlueprintLocationDropdownOptions()"
+            class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-cyan-500 mb-1.5">
+          <select id="blueprint-location-filter" onchange="filterBlueprintBrowser()" size="10" class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-amber-300 font-bold text-[10px] outline-none">
+            <option value="all" selected>All Locations</option>
+          </select>
+        </div>
+      </aside>
+
+      <!-- Blueprint list -->
+      <div id="blueprint-browser-list" class="flex-1 overflow-y-auto p-3.5 space-y-1.5">
         <div class="text-slate-500 italic p-4 text-center">Log in via EVE SSO to browse your blueprints.</div>
       </div>
     </div>
