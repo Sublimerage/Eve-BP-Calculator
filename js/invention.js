@@ -333,6 +333,10 @@ async function recalculateInvention() {
       scienceLevelSum += level;
     }
   });
+  console.info(`[Invention] Success chance inputs: baseChance=${baseChance}, encryptionLevel=${encryptionLevel}, scienceLevelSum=${scienceLevelSum}, skill inputs found: ${document.querySelectorAll('.invention-skill-input').length}`);
+  document.querySelectorAll('.invention-skill-input').forEach(input => {
+    console.info(`[Invention]   skill-id=${input.dataset.skillId}, isEncryption=${input.dataset.isEncryption}, value=${input.value}`);
+  });
 
   const datacores = _inventionCurrentBlueprint.inventionMaterials || [];
   const datacoreCost = datacores.reduce((sum, m) => sum + (getInventionInputPrice(m.typeId) * m.qty), 0);
@@ -476,28 +480,56 @@ function renderInventionSummaryTiles(rows) {
   `;
 }
 
+let _inventionLastComparisonRows = [];
+let _inventionSortColumn = 'totalPotentialProfit';
+let _inventionSortDescending = true;
+
+function sortInventionComparisonBy(column) {
+  if (_inventionSortColumn === column) {
+    _inventionSortDescending = !_inventionSortDescending;
+  } else {
+    _inventionSortColumn = column;
+    _inventionSortDescending = true;
+  }
+  renderInventionComparisonTable(_inventionLastComparisonRows);
+}
+window.sortInventionComparisonBy = sortInventionComparisonBy;
+
 function renderInventionComparisonTable(rows) {
   const container = document.getElementById('invention-comparison-table');
   if (!container) return;
+  _inventionLastComparisonRows = rows;
   const bestProfit = rows.length > 0 ? Math.max(...rows.map(r => r.totalPotentialProfit)) : 0;
   const bpcRuns = Math.max(1, parseInt(document.getElementById('invention-bpc-runs').value) || 1);
+
+  const sortedRows = [...rows].sort((a, b) => {
+    const av = a[_inventionSortColumn] === null ? -Infinity : a[_inventionSortColumn];
+    const bv = b[_inventionSortColumn] === null ? -Infinity : b[_inventionSortColumn];
+    return _inventionSortDescending ? bv - av : av - bv;
+  });
+
+  const sortHeader = (column, label, align) => {
+    const isActive = _inventionSortColumn === column;
+    const arrow = isActive ? (_inventionSortDescending ? ' ▼' : ' ▲') : '';
+    return `<th class="p-2 ${align === 'right' ? 'text-right' : ''} cursor-pointer hover:text-purple-300 select-none" onclick="sortInventionComparisonBy('${column}')">${label}${arrow}</th>`;
+  };
 
   container.innerHTML = `
     <table class="w-full text-left border-collapse text-xs mono">
       <thead>
         <tr class="text-slate-400 border-b border-[#1e3348] uppercase text-[10px] font-bold">
           <th class="p-2">Decryptor</th>
-          <th class="p-2 text-right">Success %</th>
+          ${sortHeader('successChance', 'Success %', 'right')}
           <th class="p-2 text-right">Result BPC</th>
-          <th class="p-2 text-right">Invention Cost</th>
-          <th class="p-2 text-right">Build Time</th>
-          <th class="p-2 text-right">Total Potential Profit (${bpcRuns} run${bpcRuns > 1 ? 's' : ''} on T1 BPC)</th>
-          <th class="p-2 text-right">ISK/Hour</th>
-          <th class="p-2 text-right">Profit / 1 Run</th>
+          ${sortHeader('costPerAttempt', 'Invention Cost', 'right')}
+          ${sortHeader('totalBuildSeconds', 'Build Time', 'right')}
+          ${sortHeader('totalPotentialProfit', `Total Potential Profit (${bpcRuns} run${bpcRuns > 1 ? 's' : ''} on T1 BPC)`, 'right')}
+          ${sortHeader('iskPerHour', 'ISK/Hour', 'right')}
+          ${sortHeader('perRunProfit', 'Profit / 1 Run', 'right')}
         </tr>
       </thead>
       <tbody>
-        ${rows.map(r => {
+        ${sortedRows.map(r => {
           const isBest = r.totalPotentialProfit === bestProfit && bestProfit > -Infinity;
           return `
           <tr class="border-b border-[#1e3348]/40 ${isBest ? 'bg-green-950/30' : ''} hover:bg-[#0d1922] transition" title="${window.esc(r.profitDetail)}">
@@ -514,7 +546,7 @@ function renderInventionComparisonTable(rows) {
       </tbody>
     </table>
     <p class="text-[10px] text-slate-500 mt-2 leading-relaxed">
-      All figures are probability-weighted (success chance × manufacturing profit, minus the invention attempt's cost).
+      Click any column header to sort by it (click again to reverse). All figures are probability-weighted (success chance × manufacturing profit, minus the invention attempt's cost).
       <b>Total Potential Profit</b> = per-attempt profit × your T1 BPC's available runs (each run is one invention attempt, consumed win or lose).
       <b>ISK/Hour</b> = per-attempt profit ÷ manufacturing time for one resulting BPC's full production.
       <b>Profit / 1 Run</b> normalizes per-attempt profit to a single output unit, so decryptors with different run counts can be compared fairly.
