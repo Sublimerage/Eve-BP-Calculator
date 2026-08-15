@@ -5,6 +5,10 @@ let buildHistory = [];
 
 let activeOrderFilter = 'all'; 
 let activeCategoryFilter = 'all'; 
+let activeJobSearchQuery = '';
+let activeJobStatusFilter = 'all'; // 'all' | 'started' | 'pending'
+let collapsedJobCardIds = new Set(); // job IDs with the BOM/details section minimized
+let activeQueueViewMode = localStorage.getItem('eve_queue_view_mode') || 'grid'; // 'grid' | 'list'
 
 function loadJournalState() {
   try {
@@ -102,18 +106,31 @@ function getItemCategory(typeId, name) {
 }
 
 // --- Profit-with-stock toggle ---
+// Defaults to NOT crediting stock: owning a material doesn't make it free to consume - using it here
+// means you can't sell it or use it elsewhere, so it has real opportunity cost. Crediting it as zero
+// cost (the old default) understated build cost and inflated profit, sometimes drastically for jobs
+// where most materials happened to already be in stock.
 function getProfitStockMode() {
-  return localStorage.getItem('eve_ledger_profit_stock_mode') || 'with';
+  return localStorage.getItem('eve_ledger_profit_stock_mode') || 'without';
 }
 
-// The ISK value of materials that were already in stock when this job was added, and so weren't
-// charged for - this is exactly the amount that was subtracted from cost (and added to profit) at
-// add-time. Subtracting it back out shows what profit would be if you had to buy those materials too.
+// The ISK value of materials that were already in stock when this job was added (valued at the same
+// market price used for the rest of the job - sell price by default) - this is exactly the amount
+// that was subtracted from cost (and added to profit) at add-time under the old always-credit
+// behavior. Adding it back in shows the full, true cost as if every material had to be bought.
 function getJobStockCreditValue(job) {
   if (!Array.isArray(job.materials)) return 0;
   return job.materials.reduce((sum, m) => sum + ((m.stockQty || 0) * (m.unitPrice || 0)), 0);
 }
 window.getJobStockCreditValue = getJobStockCreditValue;
+
+// "with" = credit stock (cheaper cost, higher profit, treats owned materials as free - the old,
+// misleading default). "without" = full cost as if everything had to be bought (the new default).
+function getEffectiveJobCost(job) {
+  const cost = job.calculatedCost || 0;
+  return getProfitStockMode() === 'with' ? cost : cost + getJobStockCreditValue(job);
+}
+window.getEffectiveJobCost = getEffectiveJobCost;
 
 function getEffectiveJobProfit(job) {
   if (job.netProfit === undefined) return undefined;
@@ -132,13 +149,13 @@ function updateProfitStockToggleButton() {
   if (!btn) return;
   const mode = getProfitStockMode();
   if (mode === 'with') {
-    btn.textContent = 'With Stock';
-    btn.className = 'text-[8px] px-1.5 py-0.5 rounded font-bold mono uppercase tracking-wide bg-cyan-800 text-cyan-100 flex-shrink-0';
-    btn.title = 'Currently crediting materials you already have in stock - click to exclude them';
-  } else {
-    btn.textContent = 'No Stock';
+    btn.textContent = 'Crediting Stock';
     btn.className = 'text-[8px] px-1.5 py-0.5 rounded font-bold mono uppercase tracking-wide bg-amber-800 text-amber-100 flex-shrink-0';
-    btn.title = 'Currently excluding stock - click to credit materials you already have';
+    btn.title = 'Materials you already have in stock are being treated as free (0 ISK cost) - click to count them at full value instead';
+  } else {
+    btn.textContent = 'Full Cost';
+    btn.className = 'text-[8px] px-1.5 py-0.5 rounded font-bold mono uppercase tracking-wide bg-cyan-800 text-cyan-100 flex-shrink-0';
+    btn.title = 'Materials you already have in stock are valued at their market price (not free) - click to instead treat them as a free cost credit';
   }
 }
 
@@ -235,7 +252,7 @@ function renderActiveJobsList(allocatedStock) {
 
   if (activeJobs.length === 0) {
     container.innerHTML = `
-      <div class="col-span-full bg-[#0c1318] border border-[#1e3348] p-8 rounded text-center text-slate-400 mono">
+      <div class="bg-[#0c1318] border border-[#1e3348] p-8 rounded text-center text-slate-400 mono">
         No active manufacturing jobs queued in ledger. Go back to the calculator and click "Add to Job Queue" on any root item card to add jobs here.
       </div>
     `;
@@ -244,20 +261,142 @@ function renderActiveJobsList(allocatedStock) {
 
   const deductModeInput = document.getElementById('deduct-stock-mode');
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+  const q = (activeJobSearchQuery || '').toLowerCase().trim();
 
-  container.innerHTML = activeJobs.map(job => {
-    if (!job) return '';
-    const iconTypeId = job.productTypeId || job.typeId;
-    const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
+  const visibleJobs = activeJobs.filter(job => {
+    if (!job) return false;
+    if (q && !(job.name || '').toLowerCase().includes(q)) return false;
+    if (activeJobStatusFilter === 'started' && !job.isStarted) return false;
+    if (activeJobStatusFilter === 'pending' && job.isStarted) return false;
+    return true;
+  });
 
-    const dragHandleHTML = `
-      <div class="flex items-center flex-shrink-0" onclick="event.stopPropagation()">
-        <span class="drag-handle cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-300 px-1.5 py-0.5 text-sm select-none" title="Drag to reorder (changes stock allocation priority)">
-          ⠿
-        </span>
+  if (visibleJobs.length === 0) {
+    container.innerHTML = `
+      <div class="bg-[#0c1318] border border-[#1e3348] p-8 rounded text-center text-slate-400 mono">
+        No jobs match your current search/filter.
       </div>
     `;
+    return;
+  }
 
+  const startedJobs = visibleJobs.filter(j => j.isStarted);
+  const pendingJobs = visibleJobs.filter(j => !j.isStarted);
+
+  const isListMode = activeQueueViewMode === 'list';
+  const groupWrapClass = isListMode ? 'space-y-2' : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3';
+  const renderGroup = (jobs) => jobs.map(job => isListMode
+    ? renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled)
+    : renderJobCardHTML(job, allocatedStock, isStockDeductEnabled)
+  ).join('');
+
+  let html = '';
+  if (activeJobStatusFilter !== 'pending' && startedJobs.length > 0) {
+    html += `
+      <div class="mb-2">
+        <div class="flex items-center gap-2 mb-2.5 px-3 py-2 rounded-md bg-green-950/40 border-2 border-green-600/50">
+          <span class="text-green-400 font-extrabold text-base rajdhani uppercase tracking-wider">🟢 In Progress</span>
+          <span class="text-green-400 font-bold text-sm mono">(${startedJobs.length})</span>
+        </div>
+        <div class="${groupWrapClass}">${renderGroup(startedJobs)}</div>
+      </div>
+    `;
+  }
+  if (activeJobStatusFilter !== 'started' && pendingJobs.length > 0) {
+    html += `
+      <div>
+        <div class="flex items-center gap-2 mb-2.5 px-3 py-2 rounded-md bg-[#0d1922] border-2 border-[#1e3348]">
+          <span class="text-slate-200 font-extrabold text-base rajdhani uppercase tracking-wider">⏳ Pending</span>
+          <span class="text-slate-400 font-bold text-sm mono">(${pendingJobs.length})</span>
+        </div>
+        <div class="${groupWrapClass}">${renderGroup(pendingJobs)}</div>
+      </div>
+    `;
+  }
+  container.innerHTML = html;
+}
+
+function toggleQueueViewMode() {
+  activeQueueViewMode = activeQueueViewMode === 'list' ? 'grid' : 'list';
+  localStorage.setItem('eve_queue_view_mode', activeQueueViewMode);
+  const btn = document.getElementById('btn-view-mode');
+  if (btn) btn.textContent = activeQueueViewMode === 'list' ? '▦ Grid View' : '☰ List View';
+  renderJournalPage();
+}
+window.toggleQueueViewMode = toggleQueueViewMode;
+
+// Compact single-line-per-job view. Shows the essentials (icon/name, runs, status, cost, profit,
+// actions) with a chevron to expand the same BOM/details block used in grid view, reusing the same
+// collapse state so switching views doesn't lose whether you had a job's details open.
+function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
+  const iconTypeId = job.productTypeId || job.typeId;
+  const isJobReady = job.isStarted && job.startedAt && ((Date.now() - job.startedAt) / 1000 >= (job.totalBuildSeconds || 0));
+  const jobNameLower = (window.TYPE_ID_TO_NAME[iconTypeId] || job.name || '').toLowerCase();
+  const isJobBp = jobNameLower.includes('blueprint') || jobNameLower.includes('formula') || jobNameLower.includes('reaction');
+  const jobIconUrl = isJobBp
+    ? `https://images.evetech.net/types/${iconTypeId}/bp?size=64`
+    : `https://images.evetech.net/types/${iconTypeId}/icon?size=64`;
+  const jobDisplayName = window.TYPE_ID_TO_NAME[iconTypeId] || (job.name || '')
+    .replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
+
+  let statusText = '⏳ PENDING';
+  let statusClass = 'text-slate-400';
+  if (job.isStarted && job.startedAt) {
+    const elapsedSeconds = (Date.now() - job.startedAt) / 1000;
+    const remaining = (job.totalBuildSeconds || 0) - elapsedSeconds;
+    const ready = remaining <= 0;
+    statusText = ready ? '✓ READY' : `⏱ ${window.formatDuration(Math.ceil(remaining))}`;
+    statusClass = ready ? 'text-green-400' : 'text-cyan-300';
+  }
+
+  const p = getEffectiveJobProfit(job);
+  const isExpanded = !collapsedJobCardIds.has(job.id);
+
+  const expandedDetailHTML = isExpanded ? `
+    <div class="px-3 pb-3 pt-1 border-t border-[#1e3348]/40" onclick="event.stopPropagation()">
+      ${renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled)}
+      ${!job.isStarted ? `
+        <div class="flex items-center gap-1.5 px-2 py-1.5 mt-2 bg-[#070b0f] rounded border border-[#1e3348]">
+          <span class="text-[10px] text-slate-400 font-bold flex-shrink-0">Runs to start:</span>
+          <input type="number" id="start-runs-${job.id}" value="${job.runsNeeded}" min="1" max="${job.runsNeeded}"
+            onmousedown="event.stopPropagation()" onfocus="this.select()"
+            class="w-16 bg-[#0d1922] border border-[#1e3348] text-center text-amber-300 font-bold rounded p-1 outline-none text-[11px]">
+          <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-1 px-2.5 rounded text-[10px] mono transition flex-shrink-0">▶ Start Job</button>
+        </div>
+      ` : ''}
+    </div>
+  ` : '';
+
+  return `
+    <div class="job-card ${isJobReady ? 'bg-[#0d2818]' : (job.isStarted ? 'bg-green-950/20' : 'bg-[#0c1318]')} border${isJobReady ? '-2' : ''} ${job.isSubBuild ? 'border-amber-500' : (isJobReady ? 'border-green-500' : (job.isStarted ? 'border-green-700/50' : 'border-[#1e3348]'))} rounded shadow-md transition"
+         draggable="true" data-job-id="${job.id}"
+         ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
+         ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
+      <div class="flex items-center gap-2 p-2 cursor-pointer" onclick="toggleJobCardCollapse(${job.id})">
+        <span class="drag-handle cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-300 px-1 text-sm select-none flex-shrink-0" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>
+        <span class="text-slate-500 text-xs flex-shrink-0">${isExpanded ? '▾' : '▸'}</span>
+        <img src="${jobIconUrl}" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-sm text-white truncate">${window.esc(jobDisplayName)}</div>
+          ${job.isSubBuild ? `<div class="text-[9px] mono text-amber-400 font-bold uppercase truncate">⚙ Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
+          ${job.autoImported ? `<div class="text-[9px] mono text-cyan-400 font-bold uppercase truncate" title="No matching plan existed - imported from your active EVE job.">📥 Auto-imported ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
+        </div>
+        <span class="text-lg font-extrabold text-purple-300 mono flex-shrink-0 cursor-pointer hover:text-purple-200" onclick="event.stopPropagation(); copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">${job.runsNeeded.toLocaleString()}</span>
+        <span class="text-[10px] text-slate-500 mono flex-shrink-0 w-14">runs</span>
+        <span class="text-xs font-extrabold ${statusClass} mono flex-shrink-0 w-28 text-center">${statusText}</span>
+        <span class="text-xs font-bold text-cyan-400 mono flex-shrink-0 w-24 text-right">${Math.round(job.calculatedCost || 0).toLocaleString()} ISK</span>
+        <span class="text-xs font-bold ${p !== undefined ? (p >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-600'} mono flex-shrink-0 w-24 text-right">${p !== undefined ? Math.round(p).toLocaleString() + ' ISK' : '—'}</span>
+        <div class="flex items-center gap-1.5 flex-shrink-0" onclick="event.stopPropagation()">
+          <button onclick="markJobAsBuilt(${job.id})" class="py-1 px-2 bg-green-800/80 hover:bg-green-700 text-white font-bold rounded text-[10px] mono transition">✔</button>
+          <button onclick="deleteJobFromQueue(${job.id})" class="py-1 px-2 bg-red-950/60 hover:bg-red-800 text-red-300 font-bold rounded text-[10px] mono transition">❌</button>
+        </div>
+      </div>
+      ${expandedDetailHTML}
+    </div>
+  `;
+}
+
+function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) {
     const individualBOMHTML = Array.isArray(job.materials) ? job.materials.map(mat => {
       if (!mat) return '';
       const availableInStock = isStockDeductEnabled ? (allocatedStock[mat.typeId] || 0) : 0;
@@ -331,6 +470,51 @@ function renderActiveJobsList(allocatedStock) {
       `;
     }
 
+    return `
+      <div class="p-2 bg-[#070b0f] rounded border border-[#1e3348]/40">
+        <div class="flex justify-between items-center mb-1.5 pb-1 border-b border-[#1e3348]/40">
+          <span class="text-[10px] text-cyan-400 font-bold uppercase tracking-wider rajdhani">Job Materials (BOM)</span>
+          <button onclick="copyIndividualJobMultibuy(event, ${job.id})" class="text-[9px] bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-1.5 py-0.5 rounded mono transition">
+            📋 Copy BOM
+          </button>
+        </div>
+        <div class="max-h-28 overflow-y-auto scrollbar-thin">
+          ${individualBOMHTML}
+        </div>
+        <div class="flex flex-col text-[10px] mono font-bold pt-1.5 border-t border-[#1e3348]/40 mt-1 space-y-1">
+          ${buildTimeUI}
+          <div class="flex justify-between items-center mt-0.5">
+            <span class="text-slate-300">Total Build Cost:</span>
+            <span class="text-cyan-400">${Math.round(job.calculatedCost).toLocaleString()} ISK</span>
+          </div>
+          ${(() => { const p = getEffectiveJobProfit(job); return p !== undefined ? `
+            <div class="flex justify-between items-center">
+              <span class="text-slate-300">Total Profit:</span>
+              <span class="${p >= 0 ? 'text-green-400' : 'text-red-400'}">${Math.round(p).toLocaleString()} ISK</span>
+            </div>
+          ` : ''; })()}
+        </div>
+      </div>
+    `;
+}
+
+function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
+    const iconTypeId = job.productTypeId || job.typeId;
+    const isJobReady = job.isStarted && job.startedAt && ((Date.now() - job.startedAt) / 1000 >= (job.totalBuildSeconds || 0));
+    const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
+    const isCollapsed = collapsedJobCardIds.has(job.id);
+
+    const dragHandleHTML = `
+      <div class="flex items-center flex-shrink-0" onclick="event.stopPropagation()">
+        <button onclick="toggleJobCardCollapse(${job.id})" class="text-slate-500 hover:text-slate-300 px-1 text-xs select-none" title="${isCollapsed ? 'Show full details' : 'Hide Bill of Materials'}">
+          ${isCollapsed ? '▸' : '▾'}
+        </button>
+        <span class="drag-handle cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-300 px-1.5 py-0.5 text-sm select-none" title="Drag to reorder (changes stock allocation priority)">
+          ⠿
+        </span>
+      </div>
+    `;
+
     // CORRECTION: Direct blueprint path safety check inside active jobs loop prevents any imageservers 400 errors [1.1.1, 1.1.4]
     const jobNameLower = (window.TYPE_ID_TO_NAME[iconTypeId] || job.name || '').toLowerCase();
     const isJobBp = jobNameLower.includes('blueprint') || jobNameLower.includes('formula') || jobNameLower.includes('reaction');
@@ -342,8 +526,41 @@ function renderActiveJobsList(allocatedStock) {
     const jobDisplayName = window.TYPE_ID_TO_NAME[iconTypeId] || (job.name || '')
       .replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
 
+    // Status banner - kept prominent, right under the header, instead of buried below the BOM, since
+    // job status is one of the most important things to see at a glance.
+    let statusBannerHTML = '';
+    if (job.isStarted && job.startedAt) {
+      const elapsedSeconds = (Date.now() - job.startedAt) / 1000;
+      const remaining = (job.totalBuildSeconds || 0) - elapsedSeconds;
+      const ready = remaining <= 0;
+      const text = ready ? '✓ READY TO COLLECT!' : `⏱ ${window.formatDuration(Math.ceil(remaining))} remaining`;
+      statusBannerHTML = `
+        <div class="job-timer flex items-center justify-between px-2.5 py-2 rounded border-2 ${ready ? 'bg-green-950/40 border-green-500/70' : 'bg-cyan-950/30 border-cyan-500/50'}" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}">
+          <span class="text-[10px] text-slate-300 font-bold uppercase tracking-wide flex-shrink-0">Status:</span>
+          <span class="timer-display text-sm font-extrabold ${ready ? 'text-green-400' : 'text-cyan-300'} mono">${text}</span>
+        </div>
+      `;
+    } else {
+      statusBannerHTML = `
+        <div class="flex items-center justify-between px-2.5 py-2 rounded border-2 bg-[#0d1922] border-slate-600/50">
+          <span class="text-[10px] text-slate-300 font-bold uppercase tracking-wide flex-shrink-0">Status:</span>
+          <span class="text-sm font-extrabold text-slate-400 mono">⏳ PENDING</span>
+        </div>
+      `;
+    }
+
+    const startJobRowHTML = (!job.isStarted) ? `
+      <div class="flex items-center gap-1.5 px-2 py-1.5 bg-[#070b0f] rounded border border-[#1e3348]" onclick="event.stopPropagation()">
+        <span class="text-[10px] text-slate-400 font-bold flex-shrink-0" title="Starting fewer than all runs splits this into a started job plus a still-queued job for the rest, matching how EVE actually queues manufacturing jobs.">Runs to start:</span>
+        <input type="number" id="start-runs-${job.id}" value="${job.runsNeeded}" min="1" max="${job.runsNeeded}"
+          onmousedown="event.stopPropagation()" onfocus="this.select()"
+          class="w-16 bg-[#0d1922] border border-[#1e3348] text-center text-amber-300 font-bold rounded p-1 outline-none text-[11px]">
+        <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-1 px-2.5 rounded text-[10px] mono transition flex-shrink-0">▶ Start Job</button>
+      </div>
+    ` : '';
+
     return `
-      <div class="job-card bg-[#0c1318] border ${job.isSubBuild ? 'border-amber-600/40 hover:border-amber-500/60' : 'border-[#1e3348] hover:border-purple-500/40'} rounded p-3 flex flex-col justify-between shadow-md transition space-y-2"
+      <div class="job-card ${isJobReady ? 'bg-[#0d2818]' : (job.isStarted ? 'bg-green-950/20' : 'bg-[#0c1318]')} border${isJobReady ? '-2' : ''} ${job.isSubBuild ? 'border-amber-500 hover:border-amber-400' : (isJobReady ? 'border-green-500 hover:border-green-400' : (job.isStarted ? 'border-green-700/50 hover:border-green-500/70' : 'border-[#1e3348] hover:border-purple-500/40'))} rounded p-3 flex flex-col justify-between shadow-md transition space-y-2"
            draggable="true" data-job-id="${job.id}"
            ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
            ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
@@ -351,65 +568,34 @@ function renderActiveJobsList(allocatedStock) {
           <div class="flex items-start space-x-3 min-w-0 flex-1">
             <img src="${jobIconUrl}" class="w-12 h-12 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
-              <h3 class="font-bold text-sm text-white truncate">${window.esc(jobDisplayName)}</h3>
+              <h3 class="font-bold text-base text-white truncate">${window.esc(jobDisplayName)}</h3>
               ${job.isSubBuild ? `<div class="text-[9px] mono text-amber-400 font-bold uppercase tracking-wide mt-0.5" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
-              <div class="text-[10px] mono text-slate-400 mt-0.5">Added on: ${formattedDate}</div>
+              ${job.autoImported ? `<div class="text-[9px] mono text-cyan-400 font-bold uppercase tracking-wide mt-0.5" title="No matching plan existed for this job - imported directly from your active EVE industry job using its real ME/TE and market sell pricing.">📥 Auto-imported from EVE ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
+              <div class="text-[10px] mono text-slate-500 mt-0.5">Added on: ${formattedDate}</div>
             </div>
           </div>
           ${dragHandleHTML}
         </div>
 
-        <div class="text-[11px] text-purple-300 font-bold mono mt-1">
-          ${job.runsNeeded.toLocaleString()} Run${job.runsNeeded > 1 ? 's' : ''} @ ${job.qtyNeeded.toLocaleString()} total units
+        ${statusBannerHTML}
+
+        <div class="flex items-center justify-between px-1">
+          <span
+            class="text-xl font-extrabold text-purple-300 mono cursor-pointer hover:text-purple-200 transition"
+            onclick="event.stopPropagation(); copyRunsToClipboard(event, ${job.runsNeeded})"
+            title="Click to copy the run count to clipboard">
+            ${job.runsNeeded.toLocaleString()} Run${job.runsNeeded > 1 ? 's' : ''}
+          </span>
+          <span class="text-[11px] text-slate-400 mono">${job.qtyNeeded.toLocaleString()} units total</span>
         </div>
 
-        <div class="p-2 bg-[#070b0f] rounded border border-[#1e3348]/40">
-          <div class="flex justify-between items-center mb-1.5 pb-1 border-b border-[#1e3348]/40">
-            <span class="text-[10px] text-cyan-400 font-bold uppercase tracking-wider rajdhani">Job Materials (BOM)</span>
-            <button onclick="copyIndividualJobMultibuy(event, ${job.id})" class="text-[9px] bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-1.5 py-0.5 rounded mono transition">
-              📋 Copy BOM
-            </button>
+        ${!isCollapsed ? renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) : `
+          <div class="px-2 py-1 text-[10px] text-slate-500 italic text-center border border-[#1e3348]/40 rounded">
+            Details minimized - click ▸ above to expand
           </div>
-          <div class="max-h-28 overflow-y-auto scrollbar-thin">
-            ${individualBOMHTML}
-          </div>
-          <div class="flex flex-col text-[10px] mono font-bold pt-1.5 border-t border-[#1e3348]/40 mt-1 space-y-1">
-            ${buildTimeUI}
-            <div class="flex justify-between items-center mt-0.5">
-              <span class="text-slate-300">Total Build Cost:</span>
-              <span class="text-cyan-400">${Math.round(job.calculatedCost).toLocaleString()} ISK</span>
-            </div>
-            ${(() => { const p = getEffectiveJobProfit(job); return p !== undefined ? `
-              <div class="flex justify-between items-center">
-                <span class="text-slate-300">Total Profit:</span>
-                <span class="${p >= 0 ? 'text-green-400' : 'text-red-400'}">${Math.round(p).toLocaleString()} ISK</span>
-              </div>
-            ` : ''; })()}
-          </div>
-        </div>
+        `}
 
-        ${(() => {
-          if (job.isStarted && job.startedAt) {
-            const elapsedSeconds = (Date.now() - job.startedAt) / 1000;
-            const remaining = (job.totalBuildSeconds || 0) - elapsedSeconds;
-            const ready = remaining <= 0;
-            const text = ready ? '✓ Ready to Collect!' : `⏱ ${window.formatDuration(Math.ceil(remaining))} remaining`;
-            const colorClass = ready ? 'text-green-400' : 'text-cyan-300';
-            return `
-              <div class="job-timer flex items-center justify-between px-2 py-1.5 bg-[#070b0f] rounded border ${ready ? 'border-green-600/50' : 'border-cyan-600/40'}" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}">
-                <span class="text-[10px] text-slate-400 font-bold flex-shrink-0">Job Status:</span>
-                <span class="timer-display text-[11px] font-bold ${colorClass} mono">${text}</span>
-              </div>
-            `;
-          }
-          return `
-            <div class="flex items-center gap-1.5 px-2 py-1.5 bg-[#070b0f] rounded border border-[#1e3348]" onclick="event.stopPropagation()">
-              <span class="text-[10px] text-slate-400 font-bold flex-shrink-0" title="Starting fewer than all runs splits this into a started job plus a still-queued job for the rest, matching how EVE actually queues manufacturing jobs.">Runs to start:</span>
-              <input type="number" id="start-runs-${job.id}" value="${job.runsNeeded}" min="1" max="${job.runsNeeded}" class="w-16 bg-[#0d1922] border border-[#1e3348] text-center text-amber-300 font-bold rounded p-1 outline-none text-[11px]">
-              <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-1 px-2.5 rounded text-[10px] mono transition flex-shrink-0">▶ Start Job</button>
-            </div>
-          `;
-        })()}
+        ${startJobRowHTML}
 
         <div class="flex items-center space-x-2 pt-1">
           <button onclick="markJobAsBuilt(${job.id})" class="flex-1 py-1.5 bg-green-800/80 hover:bg-green-700 text-white font-bold rounded text-[11px] mono transition border border-green-600/30 flex items-center justify-center gap-1">
@@ -421,8 +607,140 @@ function renderActiveJobsList(allocatedStock) {
         </div>
       </div>
     `;
-  }).join('');
 }
+
+// --- Search / status filter controls ---
+function filterJobsBySearch(query) {
+  activeJobSearchQuery = query;
+  renderJournalPage();
+}
+window.filterJobsBySearch = filterJobsBySearch;
+
+function setJobStatusFilter(status) {
+  activeJobStatusFilter = status;
+  ['all', 'started', 'pending'].forEach(s => {
+    const btn = document.getElementById(`btn-status-${s}`);
+    if (btn) btn.className = `px-2.5 py-1.5 rounded-md font-bold transition text-[10px] mono ${s === status ? 'bg-purple-800 text-white border border-purple-600/30' : 'bg-[#1e3348] text-slate-400 hover:text-white'}`;
+  });
+  renderJournalPage();
+}
+window.setJobStatusFilter = setJobStatusFilter;
+
+// --- Minimize/maximize card details ---
+function toggleJobCardCollapse(jobId) {
+  if (collapsedJobCardIds.has(jobId)) collapsedJobCardIds.delete(jobId);
+  else collapsedJobCardIds.add(jobId);
+  renderJournalPage();
+}
+window.toggleJobCardCollapse = toggleJobCardCollapse;
+
+function collapseAllJobCards() {
+  activeJobs.forEach(j => { if (j) collapsedJobCardIds.add(j.id); });
+  renderJournalPage();
+}
+window.collapseAllJobCards = collapseAllJobCards;
+
+function expandAllJobCards() {
+  collapsedJobCardIds.clear();
+  renderJournalPage();
+}
+window.expandAllJobCards = expandAllJobCards;
+
+// --- Click-to-copy runs count ---
+function copyRunsToClipboard(e, runs) {
+  if (e) e.stopPropagation();
+  const text = String(runs);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+  const target = e && e.target;
+  if (target) {
+    const original = target.textContent;
+    target.textContent = '✔ Copied!';
+    setTimeout(() => { target.textContent = original; }, 900);
+  }
+}
+window.copyRunsToClipboard = copyRunsToClipboard;
+
+// --- Combine duplicate jobs ---
+// Only merges jobs that are safely equivalent: same product, same build/buy config context
+// (sub-build vs final, and which job it's a prerequisite for), same sell strategy, and neither one
+// already started. Jobs that differ in any of these (e.g. one set to build, one to buy; one selling
+// via buy order vs sell order) are deliberately left alone, since merging those would silently lose
+// information about which configuration applies to which materials.
+function combineDuplicateJobs() {
+  loadJournalState();
+  const groups = {};
+  const order = [];
+  activeJobs.forEach(job => {
+    if (!job) return;
+    if (job.isStarted) { order.push({ key: null, job }); return; } // never combine started jobs
+    const key = [
+      job.productTypeId || job.typeId,
+      job.isSubBuild ? 'sub' : 'final',
+      job.parentJobName || '',
+      job.sellStrategy || ''
+    ].join('|');
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(job);
+    order.push({ key, job });
+  });
+
+  const mergedByKey = {};
+  let combinedCount = 0;
+  Object.keys(groups).forEach(key => {
+    const jobs = groups[key];
+    if (jobs.length < 2) return;
+    combinedCount += jobs.length - 1;
+
+    const materialsMap = {};
+    jobs.forEach(j => {
+      (j.materials || []).forEach(m => {
+        if (!m) return;
+        if (!materialsMap[m.typeId]) {
+          materialsMap[m.typeId] = { ...m, qtyNeeded: 0, stockQty: 0, netQtyNeeded: 0, lineCost: 0 };
+        }
+        materialsMap[m.typeId].qtyNeeded += m.qtyNeeded || 0;
+        materialsMap[m.typeId].stockQty += m.stockQty || 0;
+        materialsMap[m.typeId].netQtyNeeded += m.netQtyNeeded || 0;
+        materialsMap[m.typeId].lineCost += m.lineCost || 0;
+      });
+    });
+
+    const first = jobs[0];
+    const merged = {
+      ...first,
+      runsNeeded: jobs.reduce((s, j) => s + (j.runsNeeded || 0), 0),
+      qtyNeeded: jobs.reduce((s, j) => s + (j.qtyNeeded || 0), 0),
+      calculatedCost: jobs.reduce((s, j) => s + (j.calculatedCost || 0), 0),
+      netProfit: jobs.every(j => j.netProfit !== undefined) ? jobs.reduce((s, j) => s + j.netProfit, 0) : undefined,
+      totalBuildSeconds: jobs.reduce((s, j) => s + (j.totalBuildSeconds || 0), 0),
+      materials: Object.values(materialsMap),
+      addedAt: jobs.reduce((earliest, j) => (j.addedAt && j.addedAt < earliest) ? j.addedAt : earliest, first.addedAt)
+    };
+    mergedByKey[key] = merged;
+  });
+
+  const newQueue = [];
+  const emittedKeys = new Set();
+  order.forEach(({ key, job }) => {
+    if (key === null) { newQueue.push(job); return; }
+    if (mergedByKey[key]) {
+      if (!emittedKeys.has(key)) { newQueue.push(mergedByKey[key]); emittedKeys.add(key); }
+    } else {
+      newQueue.push(job);
+    }
+  });
+
+  activeJobs = newQueue;
+  localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
+  renderJournalPage();
+
+  if (combinedCount === 0) {
+    alert('No combinable duplicate jobs found. Jobs only combine when they match on item, build/buy context, and sell strategy, and neither is already started.');
+  }
+}
+window.combineDuplicateJobs = combineDuplicateJobs;
 
 function copyIndividualJobMultibuy(e, jobId) {
   if (e) e.stopPropagation();
@@ -649,6 +967,13 @@ function updateJobTimers() {
       display.className = 'timer-display text-[11px] font-bold text-green-400 mono';
       el.classList.remove('border-cyan-600/40');
       el.classList.add('border-green-600/50');
+      // The parent card only shows the bold "ready" color once actually ready - update it live here
+      // so it doesn't sit in the wrong color until the next full re-render.
+      const card = el.closest('.job-card');
+      if (card && !card.classList.contains('border-amber-500')) {
+        card.classList.remove('bg-green-950/20', 'border', 'border-green-700/50', 'hover:border-green-500/70');
+        card.classList.add('bg-[#0d2818]', 'border-2', 'border-green-500', 'hover:border-green-400');
+      }
     } else {
       display.textContent = `⏱ ${window.formatDuration(Math.ceil(remaining))} remaining`;
       display.className = 'timer-display text-[11px] font-bold text-cyan-300 mono';
@@ -659,6 +984,270 @@ if (!window._jobTimerIntervalStarted) {
   window._jobTimerIntervalStarted = true;
   setInterval(updateJobTimers, 1000);
 }
+
+// Matches real active EVE industry jobs (from ESI) against PENDING ledger jobs, by product + run
+// count, and marks matches as started using the REAL start time and duration EVE calculated - this
+// replaces this app's own time estimate with the actual in-game number once a job is confirmed
+// running, and means you don't have to manually click Start for jobs you already started in-game.
+async function syncWithEveIndustryJobs(silent) {
+  const btn = document.getElementById('btn-sync-eve-jobs');
+  if (btn && !silent) { btn.disabled = true; btn.textContent = '🔄 Syncing...'; }
+
+  const [charJobs, corpJobs, charBps, corpBps] = await Promise.all([
+    typeof window.fetchActiveIndustryJobs === 'function' ? window.fetchActiveIndustryJobs() : null,
+    typeof window.fetchActiveCorpIndustryJobs === 'function' ? window.fetchActiveCorpIndustryJobs() : [],
+    typeof window.fetchCharacterBlueprints === 'function' ? window.fetchCharacterBlueprints() : [],
+    typeof window.fetchCorpBlueprints === 'function' ? window.fetchCorpBlueprints() : []
+  ]);
+
+  if (btn) { btn.disabled = false; btn.textContent = '🔄 Sync EVE Jobs'; }
+
+  console.info(`[JobSync] Fetched ${charJobs ? charJobs.length : 'null (fetch failed)'} character job(s), ${corpJobs ? corpJobs.length : 0} corp job(s), ${(charBps||[]).length} char blueprint(s), ${(corpBps||[]).length} corp blueprint(s).`);
+
+  if (!charJobs && (!corpJobs || corpJobs.length === 0)) {
+    if (!silent) alert('Could not fetch active industry jobs. Make sure you are logged in via EVE SSO - if you logged in before this feature existed, log out and back in once to grant the new Industry Jobs permissions.');
+    return;
+  }
+
+  // Merge character jobs (this character's own) with corp jobs (any corp member's, if this character
+  // has the Factory Manager role) - dedupe by job_id in case the same job appears in both.
+  const seenJobIds = new Set();
+  const allRealJobs = [...(charJobs || []), ...(corpJobs || [])].filter(j => {
+    if (!j || seenJobIds.has(j.job_id)) return false;
+    seenJobIds.add(j.job_id);
+    return true;
+  });
+
+  // Only manufacturing (1) and reaction (11) jobs represent "building an item" the way the ledger
+  // models it - research/copying/invention jobs are skipped.
+  const activeRealJobs = allRealJobs.filter(j => j && j.status === 'active' && (j.activity_id === 1 || j.activity_id === 11));
+  console.info(`[JobSync] ${activeRealJobs.length} active manufacturing/reaction job(s) out of ${allRealJobs.length} total fetched.`);
+  activeRealJobs.forEach(rj => {
+    console.info(`[JobSync]   Active real job: job_id=${rj.job_id}, product_type_id=${rj.product_type_id}, blueprint_id=${rj.blueprint_id}, blueprint_type_id=${rj.blueprint_type_id}, activity_id=${rj.activity_id}, runs=${rj.runs}`);
+  });
+
+  // Real ME/TE for the specific blueprint instance used, keyed by blueprint_id (item_id) - this is a
+  // separate endpoint from industry jobs, since a job's blueprint_id only references the item, not
+  // its research level.
+  const blueprintMeTeMap = {};
+  [...(charBps || []), ...(corpBps || [])].forEach(bp => {
+    if (bp && bp.item_id !== undefined) {
+      blueprintMeTeMap[bp.item_id] = { me: bp.material_efficiency || 0, te: bp.time_efficiency || 0 };
+    }
+  });
+
+  loadJournalState();
+
+  // Anything already tracked by an existing STARTED ledger job (from a previous sync) must be
+  // skipped entirely here - otherwise every sync re-imports the same still-active real job as a
+  // brand new duplicate, since it's no longer sitting in the pending pool to be "matched" against.
+  const alreadyTrackedEveJobIds = new Set(
+    activeJobs.filter(j => j && j.isStarted && j.eveJobId !== undefined).map(j => j.eveJobId)
+  );
+  const untrackedRealJobs = activeRealJobs.filter(rj => !alreadyTrackedEveJobIds.has(rj.job_id));
+  console.info(`[JobSync] ${activeRealJobs.length - untrackedRealJobs.length} real job(s) already tracked by an existing started ledger job - skipping those, ${untrackedRealJobs.length} remain to match/import.`);
+
+  const usedRealJobIds = new Set();
+  let matchedCount = 0;
+  let importedCount = 0;
+
+  // Pass 1: match against existing PENDING ledger jobs. A real job's run count fitting inside a
+  // larger pending job's run count splits it (started fragment + still-queued remainder) - the same
+  // thing a manual partial "Start Job" already does - rather than ever creating a redundant duplicate.
+  untrackedRealJobs.forEach(rj => {
+    if (usedRealJobIds.has(rj.job_id)) return;
+    const targetProductId = rj.product_type_id;
+    const candidates = activeJobs
+      .filter(j => j && !j.isStarted && (j.productTypeId || j.typeId) === targetProductId && j.runsNeeded >= rj.runs)
+      .sort((a, b) => a.runsNeeded - b.runsNeeded); // smallest sufficient fit first, to avoid attributing a small job to a much larger unrelated one
+    const candidate = candidates[0];
+    if (!candidate) return; // no fit among pending jobs - falls through to auto-import in pass 2
+
+    usedRealJobIds.add(rj.job_id);
+    matchedCount++;
+    const jobIndex = activeJobs.findIndex(j => j.id === candidate.id);
+    if (jobIndex === -1) return;
+
+    const startedAt = new Date(rj.start_date).getTime();
+    const totalBuildSeconds = Math.max(0, (new Date(rj.end_date).getTime() - startedAt) / 1000);
+
+    if (rj.runs >= candidate.runsNeeded) {
+      console.info(`[JobSync]   ✔ MATCHED "${candidate.name}" (full ${candidate.runsNeeded} runs) to real job_id=${rj.job_id}`);
+      activeJobs[jobIndex].isStarted = true;
+      activeJobs[jobIndex].startedAt = startedAt;
+      activeJobs[jobIndex].totalBuildSeconds = totalBuildSeconds;
+      activeJobs[jobIndex].eveJobId = rj.job_id;
+    } else {
+      console.info(`[JobSync]   ✔ MATCHED "${candidate.name}" - splitting: ${rj.runs} of ${candidate.runsNeeded} runs started (job_id=${rj.job_id}), ${candidate.runsNeeded - rj.runs} remain pending`);
+      const totalRuns = candidate.runsNeeded;
+      const startRuns = rj.runs;
+      const ratio = startRuns / totalRuns;
+      const remainingRuns = totalRuns - startRuns;
+      const remainingRatio = remainingRuns / totalRuns;
+      const scaleMaterials = (r) => Array.isArray(candidate.materials) ? candidate.materials.map(m => {
+        const scaledQty = Math.ceil(m.qtyNeeded * r);
+        const scaledStock = Math.min(m.stockQty || 0, scaledQty);
+        return { ...m, qtyNeeded: scaledQty, stockQty: scaledStock, netQtyNeeded: Math.max(0, scaledQty - scaledStock), lineCost: (m.unitPrice || 0) * Math.max(0, scaledQty - scaledStock) };
+      }) : [];
+
+      const activeFragment = {
+        ...candidate,
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        runsNeeded: startRuns,
+        qtyNeeded: Math.round((candidate.qtyNeeded || 0) * ratio),
+        calculatedCost: (candidate.calculatedCost || 0) * ratio,
+        netProfit: candidate.netProfit !== undefined ? candidate.netProfit * ratio : undefined,
+        totalBuildSeconds: totalBuildSeconds,
+        materials: scaleMaterials(ratio),
+        startedAt: startedAt,
+        isStarted: true,
+        eveJobId: rj.job_id,
+        splitFromId: candidate.id
+      };
+      const remainingFragment = {
+        ...candidate,
+        id: Date.now() + Math.floor(Math.random() * 1000) + 1,
+        runsNeeded: remainingRuns,
+        qtyNeeded: Math.round((candidate.qtyNeeded || 0) * remainingRatio),
+        calculatedCost: (candidate.calculatedCost || 0) * remainingRatio,
+        netProfit: candidate.netProfit !== undefined ? candidate.netProfit * remainingRatio : undefined,
+        totalBuildSeconds: (candidate.totalBuildSeconds || 0) * remainingRatio,
+        materials: scaleMaterials(remainingRatio),
+        startedAt: undefined,
+        isStarted: false,
+        splitFromId: candidate.id
+      };
+      activeJobs.splice(jobIndex, 1, activeFragment, remainingFragment);
+    }
+  });
+
+  // Pass 2: any remaining active real job with no ledger counterpart gets auto-imported - built as a
+  // real recipe tree using the blueprint's ACTUAL researched ME/TE, priced at market sell only.
+  for (const rj of untrackedRealJobs) {
+    if (usedRealJobIds.has(rj.job_id)) continue;
+    console.info(`[JobSync]   ⬇ No pending job fits real job_id=${rj.job_id} (product ${rj.product_type_id}, ${rj.runs} runs) - auto-importing.`);
+    const imported = await buildAutoImportedJob(rj, blueprintMeTeMap);
+    if (imported) {
+      activeJobs.push(imported);
+      importedCount++;
+    } else {
+      console.warn(`[JobSync]   ✘ Auto-import failed for real job_id=${rj.job_id} - see warnings above for why.`);
+    }
+  }
+
+  localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
+  renderJournalPage();
+
+  if (!silent) {
+    if (matchedCount === 0 && importedCount === 0) {
+      alert('No active EVE industry jobs found to sync (or none matched/imported). Check the browser console for [JobSync] diagnostic details.');
+    } else {
+      alert(`Synced ${matchedCount} job(s) against existing plans, auto-imported ${importedCount} job(s) with no prior plan - using EVE's real start time, duration, and researched ME/TE.`);
+    }
+  }
+}
+window.syncWithEveIndustryJobs = syncWithEveIndustryJobs;
+
+// Builds a full ledger job entry for a real EVE industry job that has no matching pending plan,
+// using the tool's own recipe database and the blueprint's ACTUAL researched ME/TE (fetched
+// separately, since the industry jobs endpoint doesn't carry that). Prices materials and output at
+// market sell only, per instruction - no buy/sell strategy modeling for auto-imports.
+async function buildAutoImportedJob(realJob, blueprintMeTeMap) {
+  try {
+    const blueprintTypeId = realJob.blueprint_type_id;
+    const productTypeId = realJob.product_type_id;
+    const runs = realJob.runs;
+    const bpInfo = blueprintMeTeMap[realJob.blueprint_id] || { me: 0, te: 0 };
+    console.info(`[JobSync]   Blueprint ME/TE for blueprint_id=${realJob.blueprint_id}: ME=${bpInfo.me}%, TE=${bpInfo.te}% ${blueprintMeTeMap[realJob.blueprint_id] === undefined ? '(not found in your blueprints list - defaulting to 0/0, verify this against the job in-game)' : ''}`);
+
+    if (typeof window.buildRecursiveRecipeTree !== 'function') {
+      console.warn('[JobSync] Recipe tree builder not available - cannot auto-import.');
+      return null;
+    }
+
+    window.customMEOverrides = window.customMEOverrides || {};
+    window.customTEOverrides = window.customTEOverrides || {};
+    window.customMEOverrides[blueprintTypeId] = bpInfo.me;
+    window.customTEOverrides[blueprintTypeId] = bpInfo.te;
+    window.recipeTreeRootProductTypeId = productTypeId; // we already know this for certain from ESI
+
+    const productName = (window.TYPE_ID_TO_NAME && window.TYPE_ID_TO_NAME[productTypeId]) || (window.EVE_ITEMS && window.EVE_ITEMS[productTypeId]) || `Item ${productTypeId}`;
+
+    let root;
+    try {
+      // qty is a rough guess (batch yield unknown until the recipe resolves) - corrected below.
+      root = await window.buildRecursiveRecipeTree(blueprintTypeId, productName + ' Blueprint', runs, 0, 6, new Set(), null);
+    } finally {
+      window.recipeTreeRootProductTypeId = null; // don't leak into unrelated calls
+    }
+
+    if (!root) {
+      console.warn(`[JobSync] Could not resolve a recipe for blueprint_type_id=${blueprintTypeId} (product ${productTypeId}) - this item may not be in your local database. Try regenerating it.`);
+      return null;
+    }
+
+    // Force the EXACT real run count (the tree derives runs from a qty/batchYield guess, which we
+    // don't know in advance) and re-cascade quantities through the tree with the corrected count.
+    root.runsNeeded = runs;
+    root.qtyNeeded = runs * (root.batchYield || 1);
+    const facility = (window.getActiveStructureType ? window.getActiveStructureType().meBonus : 1.0) / 100;
+    if (typeof window.scaleTreeQuantities === 'function') window.scaleTreeQuantities(root, facility);
+
+    const allTypeIds = new Set();
+    if (typeof window.collectAllTypeIds === 'function') window.collectAllTypeIds(root, allTypeIds);
+    if (typeof window.fetchMarketPrices === 'function') await window.fetchMarketPrices(Array.from(allTypeIds));
+    if (typeof window.calculateNodeEIV === 'function') window.calculateNodeEIV(root);
+
+    const materialCost = typeof window.calculateTreeNodeCost === 'function' ? window.calculateTreeNodeCost(root) : 0;
+    // ESI's own reported job installation fee is more accurate here than re-estimating our own -
+    // it's the real ISK EVE actually charged for this specific job.
+    const totalCost = materialCost + (realJob.cost || 0);
+
+    const outputPrices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
+    const grossSell = outputPrices.sell * root.qtyNeeded;
+    const netProfit = grossSell - totalCost;
+
+    const totalBuildSeconds = Math.max(0, (new Date(realJob.end_date).getTime() - new Date(realJob.start_date).getTime()) / 1000);
+    const materials = typeof window.extractJobMaterialsForNode === 'function' ? window.extractJobMaterialsForNode(root) : [];
+
+    return {
+      id: Date.now() + Math.floor(Math.random() * 1000) + realJob.job_id,
+      typeId: blueprintTypeId,
+      productTypeId: productTypeId,
+      name: productName,
+      runsNeeded: runs,
+      qtyNeeded: root.qtyNeeded,
+      calculatedCost: totalCost,
+      totalBuildSeconds: totalBuildSeconds,
+      netProfit: netProfit,
+      sellStrategy: 'market-sell',
+      unitSellPrice: outputPrices.sell,
+      materials: materials,
+      isStarted: true,
+      startedAt: new Date(realJob.start_date).getTime(),
+      eveJobId: realJob.job_id,
+      autoImported: true,
+      meLevel: bpInfo.me,
+      teLevel: bpInfo.te,
+      addedAt: new Date().toISOString()
+    };
+  } catch (e) {
+    console.warn(`[JobSync] Auto-import threw an error for job_id=${realJob.job_id}:`, e);
+    return null;
+  }
+}
+
+
+function collectAllReadyJobs() {
+  loadJournalState();
+  const readyJobs = activeJobs.filter(j => j && j.isStarted && j.startedAt && ((Date.now() - j.startedAt) / 1000 >= (j.totalBuildSeconds || 0)));
+  if (readyJobs.length === 0) {
+    alert('No jobs are ready to collect yet.');
+    return;
+  }
+  readyJobs.forEach(j => markJobAsBuilt(j.id));
+}
+window.collectAllReadyJobs = collectAllReadyJobs;
 
 function markJobAsBuilt(jobId) {
   loadJournalState();
@@ -677,6 +1266,7 @@ function markJobAsBuilt(jobId) {
     netProfit: job.netProfit,
     isSubBuild: job.isSubBuild,
     parentJobName: job.parentJobName,
+    autoImported: job.autoImported,
     materials: job.materials, 
     completedAt: new Date().toISOString()
   };
@@ -776,12 +1366,25 @@ function renderBuildHistoryLedger() {
             <button onclick="requeueCompletedJob(${record.id})" class="px-2 py-0.5 bg-purple-950/60 hover:bg-purple-800 text-purple-300 font-semibold rounded text-[9px] mono border border-purple-800/40 transition">
               🔄 Re-queue
             </button>
+            <button onclick="deleteHistoryRecord(${record.id})" class="px-2 py-0.5 bg-red-950/60 hover:bg-red-800 text-red-300 font-semibold rounded text-[9px] mono border border-red-800/40 transition" title="Delete this entry">
+              ❌
+            </button>
           </div>
         </td>
       </tr>
     `;
   }).join('');
 }
+
+function deleteHistoryRecord(recordId) {
+  const index = buildHistory.findIndex(r => r && r.id === recordId);
+  if (index !== -1) {
+    buildHistory.splice(index, 1);
+    localStorage.setItem('eve_ledger_history', JSON.stringify(buildHistory));
+    renderJournalPage();
+  }
+}
+window.deleteHistoryRecord = deleteHistoryRecord;
 
 function clearJournalHistory() {
   localStorage.removeItem('eve_ledger_history');
@@ -1101,7 +1704,9 @@ window.onload = async () => {
   }
 
   if (typeof window.handleEsiSSOCallback === 'function') {
-    window.handleEsiSSOCallback().catch(err => console.error("SSO Callback error:", err));
+    window.handleEsiSSOCallback()
+      .then(() => { if (typeof window.syncWithEveIndustryJobs === 'function') return window.syncWithEveIndustryJobs(true); })
+      .catch(err => console.error("SSO Callback error:", err));
   }
 
   if (typeof window.fetchAdjustedPrices === 'function') {
