@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>EVE Invention Calculator</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=5.3.0">
+</head>
+<body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
+
+  <!-- Header -->
+  <header class="bg-[#0c1318] border-b border-[#1e3348] px-5 py-2.5 flex flex-wrap justify-between items-center gap-2 shadow-xl z-30">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 bg-purple-500 rounded flex items-center justify-center font-bold text-black text-2xl rajdhani shadow-lg shadow-purple-500/20">I</div>
+      <h1 class="text-lg font-bold tracking-widest text-white rajdhani leading-none">INVENTION CALCULATOR</h1>
+    </div>
+    <div class="flex items-center gap-2 text-xs mono flex-wrap">
+      <div id="esi-login-container">
+        <button onclick="startEsiSSOLogin()" class="px-3.5 py-2 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-md transition flex items-center gap-1.5 shadow text-xs" title="Login with EVE Online to auto-fill your real skill levels">
+          🔐 <span class="hidden sm:inline">EVE SSO Login</span>
+        </button>
+      </div>
+      <a href="index.html" class="px-3.5 py-2 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-md transition text-xs shadow flex items-center gap-1.5">
+        ⬅ <span class="hidden sm:inline">Calculator</span>
+      </a>
+      <a href="ledger.html" class="px-3.5 py-2 bg-purple-700 hover:bg-purple-600 text-purple-100 font-bold rounded-md transition text-xs shadow flex items-center gap-1.5">
+        📖 <span class="hidden sm:inline">Ledger</span>
+      </a>
+    </div>
+  </header>
+
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- Left: Search + Config -->
+    <aside class="w-full md:w-[380px] bg-[#0c1318] border-r border-[#1e3348] flex flex-col overflow-y-auto flex-shrink-0">
+      <div class="p-3.5 border-b border-[#1e3348]">
+        <h2 class="text-purple-400 font-bold uppercase text-xs rajdhani tracking-wider mb-2">🔍 Search T1 Item to Invent</h2>
+        <div class="relative">
+          <input type="text" id="invention-item-search" placeholder="Search item name (e.g. Caracal)..." autocomplete="off"
+            oninput="searchInventionItem(this.value)" onfocus="searchInventionItem(this.value)"
+            onblur="setTimeout(() => { const el = document.getElementById('invention-search-results'); if (el) el.classList.add('hidden'); }, 200)"
+            class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-2 text-white font-bold mono text-sm outline-none focus:border-purple-500">
+          <div id="invention-search-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-purple-500 rounded-b-md max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
+        </div>
+        <p class="text-[10px] text-slate-500 mt-1.5">Search for the <b>Tech 1</b> item whose blueprint you'll invent from (e.g. "Caracal", not "Moa Navy Issue").</p>
+      </div>
+
+      <div id="invention-config-panel" class="hidden">
+        <div class="p-3.5 border-b border-[#1e3348] flex items-center gap-3">
+          <img id="invention-item-icon" src="" class="w-12 h-12 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0">
+          <div class="min-w-0 flex-1">
+            <div id="invention-item-name" class="font-bold text-white truncate"></div>
+            <div id="invention-product-name" class="text-[11px] text-purple-300 truncate"></div>
+          </div>
+        </div>
+
+        <div id="invention-product-warning" class="hidden p-3.5 border-b border-amber-700/40 bg-amber-950/20">
+          <div class="text-[11px] text-amber-300 font-bold mb-1.5">⚠️ No T2 product data found for this blueprint - manufacturing profit can't be calculated until you pick it manually.</div>
+          <div class="relative">
+            <input type="text" id="invention-product-override-search" placeholder="Search for the T2 item this invents..." autocomplete="off"
+              oninput="searchInventionProductOverride(this.value)" onfocus="searchInventionProductOverride(this.value)"
+              onblur="setTimeout(() => { const el = document.getElementById('invention-product-override-results'); if (el) el.classList.add('hidden'); }, 200)"
+              class="w-full bg-[#070b0f] border border-amber-700/50 rounded-md px-2.5 py-2 text-white font-bold mono text-xs outline-none focus:border-amber-500">
+            <div id="invention-product-override-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-amber-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl"></div>
+          </div>
+        </div>
+
+        <div class="p-3.5 border-b border-[#1e3348] space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Base Success Chance</span>
+            <span class="text-[9px] text-slate-500" title="Auto-classified from item type. Override if you know the exact value from the in-game invention window.">auto-detected</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="number" id="invention-base-chance" min="0" max="100" step="0.1" class="w-20 bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-cyan-300 font-bold text-sm outline-none focus:border-cyan-500" oninput="recalculateInvention()">
+            <span class="text-slate-400 text-sm">%</span>
+          </div>
+        </div>
+
+        <div class="p-3.5 border-b border-[#1e3348] space-y-2">
+          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Skill Levels</div>
+          <div id="invention-skill-inputs" class="space-y-1.5"></div>
+          <p class="text-[9px] text-slate-500">Auto-filled from your ESI skill sheet if logged in. Edit manually otherwise.</p>
+        </div>
+
+        <div class="p-3.5 border-b border-[#1e3348] space-y-2">
+          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Datacores Required</div>
+          <div id="invention-datacore-list" class="space-y-1 text-[11px] mono"></div>
+        </div>
+
+        <div class="p-3.5 border-b border-[#1e3348] space-y-2">
+          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide" title="How input materials for manufacturing the resulting BPC are priced.">Material Pricing</div>
+          <select id="input-price-mode" onchange="recalculateInvention()" class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-white font-bold text-xs outline-none">
+            <option value="sell" selected>Jita Sell (Instant Buy)</option>
+            <option value="buy">Jita Buy Order</option>
+          </select>
+        </div>
+
+        <div class="p-3.5 border-b border-[#1e3348] space-y-2">
+          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1" title="How many runs are on the T1 BPC you're using. Each attempt (success or fail) consumes one run; the BPC itself is only consumed when its last run is used.">T1 BPC Runs Available</div>
+          <div class="flex items-center gap-2">
+            <input type="number" id="invention-bpc-runs" min="1" value="1" class="w-20 bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-amber-300 font-bold text-sm outline-none focus:border-amber-500" oninput="recalculateInvention()">
+            <span class="text-slate-500 text-[10px]">runs on this copy</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main: Profit Comparer -->
+    <main class="flex-1 overflow-y-auto p-4" id="invention-main-area">
+      <div id="invention-empty-state" class="flex items-center justify-center h-full text-slate-500 italic">
+        Search for a Tech 1 item on the left to begin.
+      </div>
+      <div id="invention-results-area" class="hidden space-y-4">
+        <div id="invention-summary-tiles" class="grid grid-cols-2 md:grid-cols-4 gap-2.5"></div>
+        <div>
+          <h2 class="text-sm font-bold uppercase tracking-wider text-purple-300 rajdhani mb-2">💰 Decryptor Profit Comparison</h2>
+          <p class="text-[11px] text-slate-400 mb-3">
+            Ranked by <b>total potential profit</b> - the expected profit from manufacturing everything a successful invention lets you build, weighted by success chance, across all the runs your T1 BPC has available.
+          </p>
+          <div id="invention-comparison-table" class="overflow-x-auto"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="eve_db.js?v=5.3.0"></script>
+  <script src="js/config.js?v=5.3.0"></script>
+  <script src="js/esi.js?v=5.3.0"></script>
+  <script src="js/tree.js?v=5.3.0"></script>
+  <script src="js/optimizers.js?v=5.3.0"></script>
+  <script src="js/invention.js?v=5.3.0"></script>
+</body>
+</html>
