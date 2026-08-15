@@ -61,6 +61,36 @@ function isContainerAsset(typeId) {
   return isContainer && !isShip;
 }
 
+// Walks an item's location chain up through any nested containers to find its real root station/
+// structure, and the first container (if any) it's sitting in - same logic already used to build
+// the asset hierarchy, but reusable for anything with a location_id (e.g. a blueprint), not just
+// during the asset refresh flow itself.
+function resolveItemLocationHierarchy(locationId, itemIdToAssetMap) {
+  let currentLoc = locationId;
+  let depth = 0;
+  let containerId = null;
+  while (itemIdToAssetMap[currentLoc] && depth < 10) {
+    const parentAsset = itemIdToAssetMap[currentLoc];
+    if (isContainerAsset(parentAsset.type_id) && !containerId) {
+      containerId = currentLoc;
+    }
+    currentLoc = parentAsset.location_id;
+    depth++;
+  }
+  return { rootLocationId: currentLoc, containerId: containerId };
+}
+window.resolveItemLocationHierarchy = resolveItemLocationHierarchy;
+
+function buildItemIdToAssetMap() {
+  const map = {};
+  (window.rawAssetItems || []).forEach(ast => {
+    if (ast.item_id) map[ast.item_id] = ast;
+  });
+  return map;
+}
+window.buildItemIdToAssetMap = buildItemIdToAssetMap;
+
+
 // Checks for Rookie Ships and all EVE ship hulls
 function isShipType(typeId) {
   const rookieShipIds = new Set([
@@ -600,65 +630,75 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
   }
 }
 
+// Resolves a list of location IDs (NPC stations/systems via bulk /universe/names/, player-owned
+// Upwell structures via the authenticated per-structure endpoint) into window.resolvedLocationNames.
+// Reusable by anything needing real location names - not just the asset/stock flow.
+async function resolveLocationIds(locationIds, accessToken = null) {
+  const uniqueIds = Array.from(new Set((locationIds || []).filter(id => id && id !== 99999999)));
+  if (uniqueIds.length === 0) return;
+
+  const missingIds = uniqueIds.filter(id => !window.resolvedLocationNames[id]);
+  const standardUniverseIds = missingIds.filter(id => id < 1000000000);
+  if (standardUniverseIds.length > 0) {
+    const chunks = [];
+    for (let i = 0; i < standardUniverseIds.length; i += 500) {
+      chunks.push(standardUniverseIds.slice(i, i + 500));
+    }
+    for (const chunk of chunks) {
+      try {
+        const res = await fetch('https://esi.evetech.net/latest/universe/names/?datasource=tranquility', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(chunk)
+        });
+        if (res.ok) {
+          const nameData = await res.json();
+          if (Array.isArray(nameData)) {
+            nameData.forEach(item => {
+              window.resolvedLocationNames[item.id] = item.name.toUpperCase();
+            });
+          }
+        }
+      } catch (e) {}
+    }
+  }
+
+  const token = accessToken || localStorage.getItem('esi_access_token');
+  const unresolvedStructureIds = uniqueIds.filter(id => id > 1000000000000 && !window.resolvedLocationNames[id]);
+  if (unresolvedStructureIds.length > 0 && token) {
+    await Promise.all(unresolvedStructureIds.map(async (structId) => {
+      try {
+        const res = await fetchWithAuth(`https://esi.evetech.net/latest/universe/structures/${structId}/?datasource=tranquility`, {}, token, true);
+        if (res && res.ok) {
+          const structData = await res.json();
+          if (structData && structData.name) {
+            let sysName = window.systemNameCache[structData.solar_system_id] || '';
+            if (!sysName && structData.solar_system_id) {
+              try {
+                const sysRes = await fetch(`https://esi.evetech.net/latest/universe/systems/${structData.solar_system_id}/?datasource=tranquility`);
+                if (sysRes.ok) {
+                  const sysData = await sysRes.json();
+                  sysName = sysData.name.toUpperCase();
+                  window.systemNameCache[structData.solar_system_id] = sysName;
+                }
+              } catch (e) {}
+            }
+            const fullName = structData.name.toUpperCase();
+            window.resolvedLocationNames[structId] = sysName ? `${fullName} (${sysName})` : fullName;
+          }
+        } else if (res && res.status === 403) {
+          window.resolvedLocationNames[structId] = `UPWELL STRUCTURE (${structId.toString().slice(-6)}) [PRIVATE]`;
+        }
+      } catch (e) {}
+    }));
+  }
+}
+window.resolveLocationIds = resolveLocationIds;
+
 async function resolveAndPopulateLocationFilter(accessToken = null) {
   const uniqueRootLocIds = Array.from(new Set(window.rawAssetItems.map(a => a.root_location_id || a.location_id).filter(id => id && id !== 99999999)));
   const uniqueContainerIds = Array.from(new Set(window.rawAssetItems.map(a => a.container_id).filter(id => id)));
-  if (uniqueRootLocIds.length > 0) {
-    const missingRootIds = uniqueRootLocIds.filter(id => !window.resolvedLocationNames[id]);
-    const standardUniverseIds = missingRootIds.filter(id => id < 1000000000);
-    if (standardUniverseIds.length > 0) {
-      const chunks = [];
-      for (let i = 0; i < standardUniverseIds.length; i += 500) {
-        chunks.push(standardUniverseIds.slice(i, i + 500));
-      }
-      for (const chunk of chunks) {
-        try {
-          const res = await fetch('https://esi.evetech.net/latest/universe/names/?datasource=tranquility', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(chunk)
-          });
-          if (res.ok) {
-            const nameData = await res.json();
-            if (Array.isArray(nameData)) {
-              nameData.forEach(item => {
-                window.resolvedLocationNames[item.id] = item.name.toUpperCase();
-              });
-            }
-          }
-        } catch (e) {}
-      }
-    }
-    const token = accessToken || localStorage.getItem('esi_access_token');
-    const unresolvedStructureIds = uniqueRootLocIds.filter(id => id > 1000000000000 && !window.resolvedLocationNames[id]);
-    if (unresolvedStructureIds.length > 0 && token) {
-      await Promise.all(unresolvedStructureIds.map(async (structId) => {
-        try {
-          const res = await fetchWithAuth(`https://esi.evetech.net/latest/universe/structures/${structId}/?datasource=tranquility`, {}, token, true);
-          if (res && res.ok) {
-            const structData = await res.json();
-            if (structData && structData.name) {
-              let sysName = window.systemNameCache[structData.solar_system_id] || '';
-              if (!sysName && structData.solar_system_id) {
-                try {
-                  const sysRes = await fetch(`https://esi.evetech.net/latest/universe/systems/${structData.solar_system_id}/?datasource=tranquility`);
-                  if (sysRes.ok) {
-                    const sysData = await sysRes.json();
-                    sysName = sysData.name.toUpperCase();
-                    window.systemNameCache[structData.solar_system_id] = sysName;
-                  }
-                } catch (e) {}
-              }
-              const fullName = structData.name.toUpperCase();
-              window.resolvedLocationNames[structId] = sysName ? `${fullName} (${sysName})` : fullName;
-            }
-          } else if (res && res.status === 403) {
-            window.resolvedLocationNames[structId] = `UPWELL STRUCTURE (${structId.toString().slice(-6)}) [PRIVATE]`;
-          }
-        } catch (e) {}
-      }));
-    }
-  }
+  await resolveLocationIds(uniqueRootLocIds, accessToken);
   window.rawAssetItems.forEach(item => {
     const id = item.root_location_id || item.location_id;
     if (!window.resolvedLocationNames[id]) {

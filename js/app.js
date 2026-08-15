@@ -214,20 +214,50 @@ async function loadBlueprintBrowserData() {
     return;
   }
 
-  // Resolve location names using the same reliable resolver the stock/asset viewer uses - this
-  // correctly handles player-owned Upwell structures (IDs above 10^12), which the plain bulk
-  // /universe/names/ endpoint cannot resolve at all and was returning as raw numbers for.
-  const locationIds = [...new Set(allBps.map(b => b.location_id))];
-  if (typeof window.resolveLocationIds === 'function') {
-    await window.resolveLocationIds(locationIds);
+  // Resolving which STATION a blueprint is really in (when it's sitting inside a container/can)
+  // requires the character's full asset list, since a blueprint's own location_id points at the
+  // container itself, not the station - the same hierarchy walk the asset/stock viewer already does.
+  if (!window.rawAssetItems || window.rawAssetItems.length === 0) {
+    if (listEl) listEl.innerHTML = `<div class="text-slate-500 italic p-4 text-center">Fetching your assets to resolve station/container locations...</div>`;
+    if (typeof window.refreshLiveAssets === 'function') {
+      try { await window.refreshLiveAssets(); } catch (e) { console.warn('Asset refresh for blueprint browser failed:', e); }
+    }
   }
-  allBps.forEach(b => { b.locationName = (window.resolvedLocationNames && window.resolvedLocationNames[b.location_id]) || `Location ${b.location_id}`; });
+
+  const itemIdToAssetMap = window.buildItemIdToAssetMap ? window.buildItemIdToAssetMap() : {};
+  allBps.forEach(b => {
+    const hierarchy = window.resolveItemLocationHierarchy
+      ? window.resolveItemLocationHierarchy(b.location_id, itemIdToAssetMap)
+      : { rootLocationId: b.location_id, containerId: null };
+    b.rootLocationId = hierarchy.rootLocationId;
+    b.containerId = hierarchy.containerId;
+  });
+
+  // Resolve station/structure names for the root locations, and container names (custom in-game
+  // names, if any were set) for anything sitting inside a container - both feed the same reliable
+  // resolver/cache the stock viewer uses.
+  const rootLocationIds = [...new Set(allBps.map(b => b.rootLocationId))];
+  if (typeof window.resolveLocationIds === 'function') {
+    await window.resolveLocationIds(rootLocationIds);
+  }
+  allBps.forEach(b => {
+    b.stationName = (window.resolvedLocationNames && window.resolvedLocationNames[b.rootLocationId]) || `Location ${b.rootLocationId}`;
+    if (b.containerId) {
+      const containerAsset = itemIdToAssetMap[b.containerId];
+      const containerTypeName = containerAsset ? (window.TYPE_ID_TO_NAME[containerAsset.type_id] || 'Container') : 'Container';
+      const customName = window.resolvedLocationNames && window.resolvedLocationNames[b.containerId];
+      b.containerName = customName || `${containerTypeName} (#${String(b.containerId).slice(-5)})`;
+    } else {
+      b.containerName = null;
+    }
+  });
+
   _blueprintBrowserData = allBps;
 
   const locSelect = document.getElementById('blueprint-browser-location');
   if (locSelect) {
-    const uniqueLocations = [...new Set(allBps.map(b => b.locationName))].sort();
-    locSelect.innerHTML = `<option value="all">All Locations</option>` + uniqueLocations.map(l => `<option value="${window.esc(l)}">${window.esc(l)}</option>`).join('');
+    const uniqueStations = [...new Set(allBps.map(b => b.stationName))].sort();
+    locSelect.innerHTML = `<option value="all">All Stations</option>` + uniqueStations.map(l => `<option value="${window.esc(l)}">${window.esc(l)}</option>`).join('');
   }
 
   renderBlueprintBrowserList(_blueprintBrowserData);
@@ -240,7 +270,7 @@ function filterBlueprintBrowser() {
   const filtered = _blueprintBrowserData.filter(b => {
     const name = (window.TYPE_ID_TO_NAME[b.type_id] || `Type ${b.type_id}`).toLowerCase();
     if (q && !name.includes(q)) return false;
-    if (loc !== 'all' && b.locationName !== loc) return false;
+    if (loc !== 'all' && b.stationName !== loc) return false;
     return true;
   });
   renderBlueprintBrowserList(filtered);
@@ -254,42 +284,71 @@ function renderBlueprintBrowserList(list) {
     listEl.innerHTML = `<div class="text-slate-500 italic p-4 text-center">No blueprints match your search/filter.</div>`;
     return;
   }
+
+  // Group by station so blueprints are clearly parented to the station they're actually in, not
+  // shown as a flat list.
+  const byStation = {};
+  list.forEach(bp => {
+    if (!byStation[bp.stationName]) byStation[bp.stationName] = [];
+    byStation[bp.stationName].push(bp);
+  });
+
   // ESI convention: quantity -1 = original (BPO), -2 = copy (BPC); positive quantity = a stack of BPCs.
-  listEl.innerHTML = list.map(bp => {
-    const name = window.TYPE_ID_TO_NAME[bp.type_id] || `Type ${bp.type_id}`;
-    const isOriginal = bp.quantity === -1;
-    const bpLabel = isOriginal ? 'BPO' : (bp.quantity === -2 ? 'BPC' : `${bp.quantity}x BPC stack`);
-    const bpImageVariant = isOriginal ? 'bp' : 'bpc';
-    return `
-      <div class="flex items-center justify-between bg-[#0d1922] border border-[#1e3348] hover:border-cyan-500 rounded p-2 transition">
-        <div class="flex items-center gap-2 min-w-0 flex-1">
-          <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0">
-          <div class="min-w-0 flex-1">
-            <div class="font-bold text-slate-200 truncate">${window.esc(name)}</div>
-            <div class="text-[10px] text-slate-500 truncate">${window.esc(bp.locationName)} • ${bp.source} • ${bpLabel}${bp.quantity < -1 || bp.quantity > 0 ? ` • Runs: ${bp.runs}` : ''}</div>
+  listEl.innerHTML = Object.keys(byStation).sort().map(stationName => {
+    const rows = byStation[stationName].map(bp => {
+      const name = window.TYPE_ID_TO_NAME[bp.type_id] || `Type ${bp.type_id}`;
+      const isOriginal = bp.quantity === -1;
+      const bpLabel = isOriginal ? 'BPO' : (bp.quantity === -2 ? 'BPC' : `${bp.quantity}x BPC stack`);
+      const bpImageVariant = isOriginal ? 'bp' : 'bpc';
+      const containerBadge = bp.containerName
+        ? `<span class="text-[9px] font-bold text-amber-400 bg-amber-950/40 border border-amber-700/40 rounded px-1.5 py-0.5 flex-shrink-0" title="Inside container: ${window.esc(bp.containerName)}">📦 ${window.esc(bp.containerName)}</span>`
+        : '';
+      return `
+        <div class="flex items-center justify-between bg-[#0d1922] border border-[#1e3348] hover:border-cyan-500 rounded p-2 transition">
+          <div class="flex items-center gap-2 min-w-0 flex-1">
+            <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0">
+            <div class="min-w-0 flex-1">
+              <div class="font-bold text-slate-200 truncate">${window.esc(name)}</div>
+              <div class="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
+                <span>${bp.source} • ${bpLabel}${bp.quantity < -1 || bp.quantity > 0 ? ` • Runs: ${bp.runs}` : ''}</span>
+                ${containerBadge}
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-cyan-400 font-bold text-[10px]">ME ${bp.material_efficiency}%</span>
+            <span class="text-purple-400 font-bold text-[10px]">TE ${bp.time_efficiency}%</span>
+            <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency})" class="px-2.5 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded text-[10px] transition">Load</button>
           </div>
         </div>
-        <div class="flex items-center gap-2 flex-shrink-0">
-          <span class="text-cyan-400 font-bold text-[10px]">ME ${bp.material_efficiency}%</span>
-          <span class="text-purple-400 font-bold text-[10px]">TE ${bp.time_efficiency}%</span>
-          <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency})" class="px-2.5 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded text-[10px] transition">Load</button>
-        </div>
+      `;
+    }).join('');
+    return `
+      <div class="mb-3">
+        <div class="text-[10px] font-bold text-cyan-300 uppercase tracking-wide mb-1.5 px-1">📍 ${window.esc(stationName)}</div>
+        <div class="space-y-1.5">${rows}</div>
       </div>
     `;
   }).join('');
 }
 
 function loadBlueprintIntoCalculator(blueprintTypeId, me, te) {
-  const productTypeId = (window.BLUEPRINT_TO_PRODUCT_MAP && window.BLUEPRINT_TO_PRODUCT_MAP[blueprintTypeId]) || blueprintTypeId;
   window.customMEOverrides = window.customMEOverrides || {};
   window.customTEOverrides = window.customTEOverrides || {};
   window.customMEOverrides[blueprintTypeId] = me;
   window.customTEOverrides[blueprintTypeId] = te;
 
+  // The root node's identity (.typeId) ends up being whatever gets passed to selectItem/
+  // buildRecursiveRecipeTree - it must be the BLUEPRINT's own type ID here, matching the key the
+  // ME/TE overrides above were just set under. Passing the product ID instead (what this used to do)
+  // meant the root node's typeId never matched the override key, so it silently fell back to 0/0.
+  const productTypeId = (window.BLUEPRINT_TO_PRODUCT_MAP && window.BLUEPRINT_TO_PRODUCT_MAP[blueprintTypeId]) || blueprintTypeId;
   const productName = window.TYPE_ID_TO_NAME[productTypeId] || window.EVE_ITEMS[productTypeId] || `Item ${productTypeId}`;
+  const blueprintName = window.EVE_ITEMS[blueprintTypeId] || `${productName} Blueprint`;
+
   closeBlueprintBrowser();
   if (typeof window.selectItem === 'function') {
-    window.selectItem(productTypeId, productName, true);
+    window.selectItem(blueprintTypeId, blueprintName, true);
   }
 }
 window.loadBlueprintIntoCalculator = loadBlueprintIntoCalculator;
