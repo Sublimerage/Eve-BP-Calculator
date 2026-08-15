@@ -8,7 +8,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Invention Calculator</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=5.0.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=5.1.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -81,6 +81,14 @@
         </div>
 
         <div class="p-3.5 border-b border-[#1e3348] space-y-2">
+          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide" title="How input materials for manufacturing the resulting BPC are priced.">Material Pricing</div>
+          <select id="input-price-mode" onchange="recalculateInvention()" class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-white font-bold text-xs outline-none">
+            <option value="sell" selected>Jita Sell (Instant Buy)</option>
+            <option value="buy">Jita Buy Order</option>
+          </select>
+        </div>
+
+        <div class="p-3.5 border-b border-[#1e3348] space-y-2">
           <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1" title="How many runs are on the T1 BPC you're using. Each attempt (success or fail) consumes one run; the BPC itself is only consumed when its last run is used.">T1 BPC Runs Available</div>
           <div class="flex items-center gap-2">
             <input type="number" id="invention-bpc-runs" min="1" value="1" class="w-20 bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-amber-300 font-bold text-sm outline-none focus:border-amber-500" oninput="recalculateInvention()">
@@ -107,11 +115,11 @@
     </main>
   </div>
 
-  <script src="eve_db.js?v=5.0.0"></script>
-  <script src="js/config.js?v=5.0.0"></script>
-  <script src="js/esi.js?v=5.0.0"></script>
-  <script src="js/tree.js?v=5.0.0"></script>
-  <script src="js/optimizers.js?v=5.0.0"></script>
-  <script src="js/invention.js?v=5.0.0"></script>
+  <script src="eve_db.js?v=5.1.0"></script>
+  <script src="js/config.js?v=5.1.0"></script>
+  <script src="js/esi.js?v=5.1.0"></script>
+  <script src="js/tree.js?v=5.1.0"></script>
+  <script src="js/optimizers.js?v=5.1.0"></script>
+  <script src="js/invention.js?v=5.1.0"></script>
 </body>
 </html>
