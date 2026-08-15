@@ -404,33 +404,57 @@
 
     <div class="flex flex-1 overflow-hidden">
       <!-- Filter sidebar -->
-      <aside class="w-[240px] flex-shrink-0 border-r border-[#1e3348] overflow-y-auto p-3.5 space-y-3">
-        <div>
-          <input type="text" id="blueprint-browser-search" placeholder="🔍 Search blueprint name..." autocomplete="off" oninput="filterBlueprintBrowser()"
-            class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-cyan-500">
+      <aside class="w-[260px] flex-shrink-0 border-r border-[#1e3348] flex flex-col overflow-hidden">
+        <div class="p-3.5 space-y-3 flex-shrink-0 border-b border-[#1e3348] overflow-y-auto">
+          <div>
+            <input type="text" id="blueprint-browser-search" placeholder="🔍 Search blueprint name..." autocomplete="off" oninput="filterBlueprintBrowser()"
+              class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-cyan-500">
+          </div>
+          <div class="flex items-center justify-between">
+            <button onclick="loadBlueprintBrowserData(true)" class="px-2.5 py-1.5 bg-cyan-800 hover:bg-cyan-700 text-cyan-100 font-semibold rounded text-[10px] transition">🔄 Refresh</button>
+            <label class="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-400 font-bold">
+              <input type="checkbox" id="blueprint-stack-toggle" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
+              Stack identical
+            </label>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+              <input type="checkbox" id="blueprint-use-char" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
+              <span>Pers</span>
+            </label>
+            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+              <input type="checkbox" id="blueprint-use-corp" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
+              <span>Corp</span>
+            </label>
+          </div>
+          <div>
+            <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Type</div>
+            <select id="blueprint-type-filter" onchange="filterBlueprintBrowser()" class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
+              <option value="all" selected>All (BPO + BPC)</option>
+              <option value="bpo">BPO Only</option>
+              <option value="bpc">BPC Only</option>
+            </select>
+          </div>
+          <div>
+            <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Category</div>
+            <select id="blueprint-category-filter" onchange="filterBlueprintBrowser()" class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
+              <option value="all" selected>All Categories</option>
+              <option value="6">Ships</option>
+              <option value="7">Modules</option>
+              <option value="18">Drones</option>
+              <option value="8">Ammo &amp; Charges</option>
+              <option value="65">Structures</option>
+              <option value="32">Subsystems</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
         </div>
-        <div class="flex items-center justify-between">
-          <button onclick="loadBlueprintBrowserData(true)" class="px-2.5 py-1.5 bg-cyan-800 hover:bg-cyan-700 text-cyan-100 font-semibold rounded text-[10px] transition">🔄 Refresh</button>
-          <label class="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-400 font-bold">
-            <input type="checkbox" id="blueprint-stack-toggle" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
-            Stack identical
-          </label>
-        </div>
-        <div class="flex items-center gap-2">
-          <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
-            <input type="checkbox" id="blueprint-use-char" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
-            <span>Pers</span>
-          </label>
-          <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
-            <input type="checkbox" id="blueprint-use-corp" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
-            <span>Corp</span>
-          </label>
-        </div>
-        <div>
-          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Location</div>
+
+        <div class="flex-1 flex flex-col min-h-0 p-3.5">
+          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1 flex-shrink-0">Location</div>
           <input type="text" id="blueprint-location-search" autocomplete="off" placeholder="Filter locations..." oninput="filterBlueprintLocationDropdownOptions()"
-            class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-cyan-500 mb-1.5">
-          <select id="blueprint-location-filter" onchange="filterBlueprintBrowser()" size="10" class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-amber-300 font-bold text-[10px] outline-none">
+            class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-cyan-500 mb-1.5 flex-shrink-0">
+          <select id="blueprint-location-filter" onchange="filterBlueprintBrowser()" size="20" class="flex-1 w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-amber-300 font-bold text-[10px] outline-none">
             <option value="all" selected>All Locations</option>
           </select>
         </div>
