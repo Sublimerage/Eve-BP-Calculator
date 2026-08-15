@@ -8,7 +8,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Invention Calculator</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=5.4.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=5.5.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -38,15 +38,15 @@
     <!-- Left: Search + Config -->
     <aside class="w-full md:w-[380px] bg-[#0c1318] border-r border-[#1e3348] flex flex-col overflow-y-auto flex-shrink-0">
       <div class="p-3.5 border-b border-[#1e3348]">
-        <h2 class="text-purple-400 font-bold uppercase text-xs rajdhani tracking-wider mb-2">🔍 Search T1 Item to Invent</h2>
+        <h2 class="text-purple-400 font-bold uppercase text-xs rajdhani tracking-wider mb-2">🔍 Search T2 Item to Produce</h2>
         <div class="relative">
-          <input type="text" id="invention-item-search" placeholder="Search item name (e.g. Caracal)..." autocomplete="off"
+          <input type="text" id="invention-item-search" placeholder="Search item name (e.g. Wolf)..." autocomplete="off"
             oninput="searchInventionItem(this.value)" onfocus="searchInventionItem(this.value)"
             onblur="setTimeout(() => { const el = document.getElementById('invention-search-results'); if (el) el.classList.add('hidden'); }, 200)"
             class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-2 text-white font-bold mono text-sm outline-none focus:border-purple-500">
           <div id="invention-search-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-purple-500 rounded-b-md max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
         </div>
-        <p class="text-[10px] text-slate-500 mt-1.5">Search for the <b>Tech 1</b> item whose blueprint you'll invent from (e.g. "Caracal", not "Moa Navy Issue").</p>
+        <p class="text-[10px] text-slate-500 mt-1.5">Search for the <b>Tech 2</b> item you want to produce (e.g. "Wolf"), not the T1 item it's invented from - the T1 source and its ME/TE requirements are resolved automatically.</p>
       </div>
 
       <div id="invention-config-panel" class="hidden">
@@ -55,17 +55,6 @@
           <div class="min-w-0 flex-1">
             <div id="invention-item-name" class="font-bold text-white truncate"></div>
             <div id="invention-product-name" class="text-[11px] text-purple-300 truncate"></div>
-          </div>
-        </div>
-
-        <div id="invention-product-warning" class="hidden p-3.5 border-b border-amber-700/40 bg-amber-950/20">
-          <div class="text-[11px] text-amber-300 font-bold mb-1.5">⚠️ No T2 product data found for this blueprint - manufacturing profit can't be calculated until you pick it manually.</div>
-          <div class="relative">
-            <input type="text" id="invention-product-override-search" placeholder="Search for the T2 item this invents..." autocomplete="off"
-              oninput="searchInventionProductOverride(this.value)" onfocus="searchInventionProductOverride(this.value)"
-              onblur="setTimeout(() => { const el = document.getElementById('invention-product-override-results'); if (el) el.classList.add('hidden'); }, 200)"
-              class="w-full bg-[#070b0f] border border-amber-700/50 rounded-md px-2.5 py-2 text-white font-bold mono text-xs outline-none focus:border-amber-500">
-            <div id="invention-product-override-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-amber-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl"></div>
           </div>
         </div>
 
@@ -127,11 +116,11 @@
     </main>
   </div>
 
-  <script src="eve_db.js?v=5.4.0"></script>
-  <script src="js/config.js?v=5.4.0"></script>
-  <script src="js/esi.js?v=5.4.0"></script>
-  <script src="js/tree.js?v=5.4.0"></script>
-  <script src="js/optimizers.js?v=5.4.0"></script>
-  <script src="js/invention.js?v=5.4.0"></script>
+  <script src="eve_db.js?v=5.5.0"></script>
+  <script src="js/config.js?v=5.5.0"></script>
+  <script src="js/esi.js?v=5.5.0"></script>
+  <script src="js/tree.js?v=5.5.0"></script>
+  <script src="js/optimizers.js?v=5.5.0"></script>
+  <script src="js/invention.js?v=5.5.0"></script>
 </body>
 </html>
