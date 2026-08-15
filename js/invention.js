@@ -72,7 +72,10 @@ function getInventionBaseChance(productTypeId) {
   return 34; // modules, rigs, ammo, drones, and everything else
 }
 
-async function selectInventionItem(typeId, name) {
+let _inventionSelectedTypeId = null;
+let _inventionSelectedName = null;
+
+async function selectInventionItem(typeId, name, skipSave) {
   document.getElementById('invention-item-search').value = name;
   document.getElementById('invention-search-results').classList.add('hidden');
 
@@ -82,16 +85,23 @@ async function selectInventionItem(typeId, name) {
     return;
   }
   _inventionCurrentBlueprint = recipe;
+  _inventionSelectedTypeId = typeId;
+  _inventionSelectedName = name;
 
   const products = recipe.inventionProducts && recipe.inventionProducts.length > 0
     ? recipe.inventionProducts
     : [{ typeId: null, name: 'Unknown T2 product', probability: 1 }];
   _inventionCurrentProduct = products[0]; // TODO: if multiple, let user pick - most T1 items only invent one T2 variant
 
+  console.info(`[Invention] Selected "${name}" (typeId=${typeId}). inventionMaterials: ${recipe.inventionMaterials.length}, inventionSkills: ${(recipe.inventionSkills || []).length}, inventionProducts: ${JSON.stringify(recipe.inventionProducts)}`);
+
   document.getElementById('invention-config-panel').classList.remove('hidden');
   document.getElementById('invention-item-icon').src = `https://images.evetech.net/types/${typeId}/icon?size=64`;
   document.getElementById('invention-item-name').textContent = name;
   document.getElementById('invention-product-name').textContent = `Invents: ${_inventionCurrentProduct.name || 'Unknown'}`;
+
+  const warningEl = document.getElementById('invention-product-warning');
+  if (warningEl) warningEl.classList.toggle('hidden', !!_inventionCurrentProduct.typeId);
 
   const baseChance = getInventionBaseChance(_inventionCurrentProduct.typeId || typeId);
   document.getElementById('invention-base-chance').value = baseChance;
@@ -99,9 +109,51 @@ async function selectInventionItem(typeId, name) {
   renderInventionSkillInputs(recipe.inventionSkills || []);
   await renderInventionDatacoreList(recipe.inventionMaterials || []);
 
+  if (!skipSave) saveInventionState();
   recalculateInvention();
 }
 window.selectInventionItem = selectInventionItem;
+
+// --- Manual T2 product override (when inventionProducts data is missing for this blueprint) ---
+let _inventionOverrideSearchToken = 0;
+function searchInventionProductOverride(query) {
+  const resultsEl = document.getElementById('invention-product-override-results');
+  if (!resultsEl) return;
+  const token = ++_inventionOverrideSearchToken;
+  const q = (query || '').toLowerCase().trim();
+  if (q.length < 2) {
+    resultsEl.classList.add('hidden');
+    return;
+  }
+  const hits = [];
+  for (const [name, entry] of Object.entries(window.IDX || {})) {
+    if (name.includes(q)) hits.push(entry);
+    if (hits.length >= 15) break;
+  }
+  if (token !== _inventionOverrideSearchToken) return;
+  resultsEl.innerHTML = hits.length === 0
+    ? `<div class="p-3 text-slate-400 text-xs italic">No items found.</div>`
+    : hits.map(h => `
+      <div class="px-3 py-2 hover:bg-[#1e3348] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#1e3348]/40" onmousedown="selectInventionProductOverride(${h.id}, '${window.esc(h.name)}')">
+        <img src="https://images.evetech.net/types/${h.id}/icon?size=32" class="w-6 h-6 rounded" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${h.id}/render?size=32';">
+        <span class="font-semibold text-slate-200">${window.esc(h.name)}</span>
+      </div>
+    `).join('');
+  resultsEl.classList.remove('hidden');
+}
+window.searchInventionProductOverride = searchInventionProductOverride;
+
+function selectInventionProductOverride(typeId, name) {
+  _inventionCurrentProduct = { typeId: typeId, name: name, probability: 1 };
+  document.getElementById('invention-product-override-search').value = '';
+  document.getElementById('invention-product-override-results').classList.add('hidden');
+  document.getElementById('invention-product-warning').classList.add('hidden');
+  document.getElementById('invention-product-name').textContent = `Invents: ${name} (manually selected)`;
+  console.info(`[Invention] T2 product manually overridden to "${name}" (typeId=${typeId})`);
+  saveInventionState();
+  recalculateInvention();
+}
+window.selectInventionProductOverride = selectInventionProductOverride;
 
 function renderInventionSkillInputs(skills) {
   const container = document.getElementById('invention-skill-inputs');
@@ -166,6 +218,7 @@ async function renderInventionDatacoreList(materials) {
 // --- Core calculation + Profit Comparer ---
 async function recalculateInvention() {
   if (!_inventionCurrentBlueprint || !_inventionCurrentProduct) return;
+  saveInventionState();
 
   const baseChance = parseFloat(document.getElementById('invention-base-chance').value) || 0;
   const bpcRuns = Math.max(1, parseInt(document.getElementById('invention-bpc-runs').value) || 1);
@@ -191,8 +244,17 @@ async function recalculateInvention() {
   // as long as the T2 item's recipe was captured during database generation).
   const t2Recipe = window.recipeMap && window.recipeMap[t2ProductTypeId];
   const t2BlueprintTypeId = t2Recipe ? t2Recipe.blueprintTypeID : null;
-  if (!t2BlueprintTypeId) {
-    console.warn(`[Invention] No recipe found for T2 product ${t2ProductTypeId} - regenerate your database, or this item's manufacturing data is missing.`);
+  console.info(`[Invention] T2 product typeId=${t2ProductTypeId}, resolved blueprint typeId=${t2BlueprintTypeId || 'NOT FOUND'}`);
+  const warningEl = document.getElementById('invention-product-warning');
+  if (!t2ProductTypeId) {
+    if (warningEl) warningEl.classList.remove('hidden');
+    console.warn('[Invention] No T2 product typeId set at all - profit calculation cannot run until you select one (see the warning banner).');
+  } else if (!t2BlueprintTypeId) {
+    if (warningEl) {
+      warningEl.classList.remove('hidden');
+      warningEl.querySelector('div').textContent = `⚠️ Found T2 product "${_inventionCurrentProduct.name}" but no manufacturing recipe for it in your local database - regenerate generate_db.py, or this item may be missing from it.`;
+    }
+    console.warn(`[Invention] recipeMap has no entry for product ${t2ProductTypeId}, or it's missing blueprintTypeID - manufacturing profit cannot be calculated.`);
   }
 
   const productGroupName = ((window.EVE_GROUP_NAMES && window.EVE_GROUP_NAMES[t2ProductTypeId]) || '').toLowerCase();
@@ -220,6 +282,8 @@ async function recalculateInvention() {
     const costPerAttempt = datacoreCost + decCost;
 
     let bpcValue = 0;
+    let materialCostTotal = 0;
+    let unitsProduced = 0;
     let totalBuildSeconds = 0;
     let profitDetail = 'No product data';
     if (t2BlueprintTypeId && t2ProductTypeId) {
@@ -231,6 +295,9 @@ async function recalculateInvention() {
         window.recipeTreeRootProductTypeId = t2ProductTypeId;
         const root = await window.buildRecursiveRecipeTree(parseInt(t2BlueprintTypeId), _inventionCurrentProduct.name + ' Blueprint', resultRuns, 0, 6, new Set(), null);
         window.recipeTreeRootProductTypeId = null;
+        if (!root) {
+          console.warn(`[Invention] buildRecursiveRecipeTree returned nothing for blueprint ${t2BlueprintTypeId} (decryptor: ${dec.name}) - this item's manufacturing recipe may be missing or malformed.`);
+        }
         if (root) {
           root.runsNeeded = resultRuns;
           root.qtyNeeded = resultRuns * (root.batchYield || 1);
@@ -243,15 +310,20 @@ async function recalculateInvention() {
           const outputPrices = window.priceCache[t2ProductTypeId] || { sell: 0 };
           const grossSell = outputPrices.sell * root.qtyNeeded;
           bpcValue = grossSell - materialCost;
+          materialCostTotal = materialCost;
+          unitsProduced = root.qtyNeeded;
 
           // Real manufacturing time for producing every run this BPC allows, using the same time
           // calculation (skills, TE research, facility/rig bonuses) the calculator and ledger use.
           totalBuildSeconds = typeof window.calculateTotalBuildSeconds === 'function' ? window.calculateTotalBuildSeconds(root) : 0;
 
           profitDetail = `${root.qtyNeeded} units @ ${Math.round(outputPrices.sell).toLocaleString()} ISK sell, ${Math.round(materialCost).toLocaleString()} ISK mats, ${totalBuildSeconds > 0 ? window.formatDuration(totalBuildSeconds) : 'no time data'} to manufacture`;
+          if (dec.name === 'No Decryptor') {
+            console.info(`[Invention] "No Decryptor" breakdown: resultRuns=${resultRuns}, qtyProduced=${root.qtyNeeded}, sellPrice=${outputPrices.sell}, grossSell=${grossSell}, materialCost=${materialCost}, bpcValue=${bpcValue}, totalBuildSeconds=${totalBuildSeconds}`);
+          }
         }
       } catch (e) {
-        console.warn('Invention profit calc failed for', dec.name, e);
+        console.warn('[Invention] Profit calc threw an error for', dec.name, e);
       }
     }
 
@@ -264,15 +336,45 @@ async function recalculateInvention() {
     const perRunProfit = resultRuns > 0 ? perAttemptProfit / resultRuns : perAttemptProfit;
     const iskPerHourWeighted = totalBuildSeconds > 0 ? perAttemptProfit / (totalBuildSeconds / 3600) : null;
 
-    return { dec, successChance, resultRuns, resultME, resultTE, costPerAttempt, bpcValue, perAttemptProfit, totalPotentialProfit, perRunProfit, totalBuildSeconds, iskPerHour: iskPerHourWeighted, profitDetail };
+    return { dec, successChance, resultRuns, resultME, resultTE, costPerAttempt, bpcValue, perAttemptProfit, totalPotentialProfit, perRunProfit, totalBuildSeconds, iskPerHour: iskPerHourWeighted, materialCostTotal, unitsProduced, profitDetail };
   }));
 
   renderInventionComparisonTable(rows);
+  renderInventionSummaryTiles(rows);
 
   document.getElementById('invention-empty-state').classList.add('hidden');
   document.getElementById('invention-results-area').classList.remove('hidden');
 }
 window.recalculateInvention = recalculateInvention;
+
+function renderInventionSummaryTiles(rows) {
+  const container = document.getElementById('invention-summary-tiles');
+  if (!container || rows.length === 0) return;
+  const best = rows.reduce((a, b) => (b.totalPotentialProfit > a.totalPotentialProfit ? b : a), rows[0]);
+
+  container.innerHTML = `
+    <div class="bg-[#0d1922] border border-[#1e3348] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Best Option</div>
+      <div class="text-base font-bold text-green-300 mono leading-tight truncate">${window.esc(best.dec.name)}</div>
+      <div class="text-[9px] text-slate-500 mt-0.5">${best.successChance.toFixed(1)}% success chance</div>
+    </div>
+    <div class="bg-[#0d1922] border border-[#1e3348] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Build Cost</div>
+      <div class="text-lg font-bold text-cyan-400 mono leading-tight">${Math.round(best.materialCostTotal).toLocaleString()} ISK</div>
+      <div class="text-[9px] text-slate-500 mt-0.5">${best.unitsProduced.toLocaleString()} units, materials only</div>
+    </div>
+    <div class="bg-[#0d1922] border border-green-600/40 px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Potential Profit</div>
+      <div class="text-lg font-bold ${best.totalPotentialProfit >= 0 ? 'text-green-400' : 'text-red-400'} mono leading-tight">${Math.round(best.totalPotentialProfit).toLocaleString()} ISK</div>
+      <div class="text-[9px] text-slate-500 mt-0.5">across all T1 BPC runs</div>
+    </div>
+    <div class="bg-[#0d1922] border border-[#1e3348] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">ISK/Hour</div>
+      <div class="text-lg font-bold ${best.iskPerHour !== null ? (best.iskPerHour >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-500'} mono leading-tight">${best.iskPerHour !== null ? Math.round(best.iskPerHour).toLocaleString() + ' ISK' : 'No time data'}</div>
+      <div class="text-[9px] text-slate-500 mt-0.5">${best.totalBuildSeconds > 0 ? window.formatDuration(best.totalBuildSeconds) + ' to manufacture' : 'build time unavailable'}</div>
+    </div>
+  `;
+}
 
 function renderInventionComparisonTable(rows) {
   const container = document.getElementById('invention-comparison-table');
@@ -321,11 +423,60 @@ function renderInventionComparisonTable(rows) {
   `;
 }
 
+// --- State persistence (survives reload and navigating away/back) ---
+function saveInventionState() {
+  if (!_inventionSelectedTypeId) return;
+  const state = {
+    typeId: _inventionSelectedTypeId,
+    name: _inventionSelectedName,
+    baseChance: document.getElementById('invention-base-chance')?.value,
+    bpcRuns: document.getElementById('invention-bpc-runs')?.value,
+    priceMode: document.getElementById('input-price-mode')?.value,
+    skillLevels: Array.from(document.querySelectorAll('.invention-skill-input')).map(el => ({ skillId: el.dataset.skillId, value: el.value })),
+    productOverride: (_inventionCurrentProduct && _inventionCurrentProduct.typeId) ? { typeId: _inventionCurrentProduct.typeId, name: _inventionCurrentProduct.name } : null
+  };
+  localStorage.setItem('eve_invention_state', JSON.stringify(state));
+}
+window.saveInventionState = saveInventionState;
+
+async function restoreInventionState() {
+  const state = window.safeParseJSON(localStorage.getItem('eve_invention_state'), null);
+  if (!state || !state.typeId) return;
+
+  await selectInventionItem(state.typeId, state.name, true); // skipSave - don't overwrite what we're restoring
+
+  if (state.baseChance !== undefined) document.getElementById('invention-base-chance').value = state.baseChance;
+  if (state.bpcRuns !== undefined) document.getElementById('invention-bpc-runs').value = state.bpcRuns;
+  if (state.priceMode !== undefined) {
+    const priceEl = document.getElementById('input-price-mode');
+    if (priceEl) priceEl.value = state.priceMode;
+  }
+  if (Array.isArray(state.skillLevels)) {
+    state.skillLevels.forEach(sl => {
+      const input = document.querySelector(`.invention-skill-input[data-skill-id="${sl.skillId}"]`);
+      if (input) input.value = sl.value;
+    });
+  }
+  if (state.productOverride && state.productOverride.typeId) {
+    _inventionCurrentProduct = { typeId: state.productOverride.typeId, name: state.productOverride.name, probability: 1 };
+    document.getElementById('invention-product-name').textContent = `Invents: ${state.productOverride.name} (manually selected)`;
+    document.getElementById('invention-product-warning').classList.add('hidden');
+  }
+
+  recalculateInvention();
+}
+window.restoreInventionState = restoreInventionState;
+
 window.onload = async () => {
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
   if (typeof window.handleEsiSSOCallback === 'function') {
     try { await window.handleEsiSSOCallback(); } catch (e) { console.error('SSO callback error:', e); }
+  }
+  try {
+    await restoreInventionState();
+  } catch (e) {
+    console.warn('[Invention] Failed to restore previous session state:', e);
   }
 };
