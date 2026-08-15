@@ -221,7 +221,6 @@ async function recalculateInvention() {
 
     let bpcValue = 0;
     let totalBuildSeconds = 0;
-    let iskPerHour = null;
     let profitDetail = 'No product data';
     if (t2BlueprintTypeId && t2ProductTypeId) {
       try {
@@ -248,7 +247,6 @@ async function recalculateInvention() {
           // Real manufacturing time for producing every run this BPC allows, using the same time
           // calculation (skills, TE research, facility/rig bonuses) the calculator and ledger use.
           totalBuildSeconds = typeof window.calculateTotalBuildSeconds === 'function' ? window.calculateTotalBuildSeconds(root) : 0;
-          iskPerHour = totalBuildSeconds > 0 ? bpcValue / (totalBuildSeconds / 3600) : null;
 
           profitDetail = `${root.qtyNeeded} units @ ${Math.round(outputPrices.sell).toLocaleString()} ISK sell, ${Math.round(materialCost).toLocaleString()} ISK mats, ${totalBuildSeconds > 0 ? window.formatDuration(totalBuildSeconds) : 'no time data'} to manufacture`;
         }
@@ -257,16 +255,18 @@ async function recalculateInvention() {
       }
     }
 
-    const expectedProfitPerAttempt = (successChance / 100) * bpcValue - costPerAttempt;
-    const expectedCostPerSuccess = successChance > 0 ? costPerAttempt / (successChance / 100) : Infinity;
-    // Each run on the T1 BPC is one invention attempt (success or fail, it's consumed) - this is the
-    // expected total profit if you use every available run attempting this decryptor choice.
-    const totalExpectedProfitAllRuns = expectedProfitPerAttempt * bpcRuns;
+    const perAttemptProfit = (successChance / 100) * bpcValue - costPerAttempt;
+    // Each run on the T1 BPC is one invention attempt (consumed whether it succeeds or fails) - this
+    // is the total expected profit across every attempt your T1 BPC's runs allow.
+    const totalPotentialProfit = perAttemptProfit * bpcRuns;
+    // Normalizes profit to a single output unit, so decryptors producing different run counts (e.g.
+    // Augmentation's many runs vs Process's none) can be compared fairly on a per-run basis.
+    const perRunProfit = resultRuns > 0 ? perAttemptProfit / resultRuns : perAttemptProfit;
+    const iskPerHourWeighted = totalBuildSeconds > 0 ? perAttemptProfit / (totalBuildSeconds / 3600) : null;
 
-    return { dec, successChance, resultRuns, resultME, resultTE, costPerAttempt, bpcValue, expectedProfitPerAttempt, expectedCostPerSuccess, totalBuildSeconds, iskPerHour, totalExpectedProfitAllRuns, profitDetail };
+    return { dec, successChance, resultRuns, resultME, resultTE, costPerAttempt, bpcValue, perAttemptProfit, totalPotentialProfit, perRunProfit, totalBuildSeconds, iskPerHour: iskPerHourWeighted, profitDetail };
   }));
 
-  rows.sort((a, b) => b.expectedProfitPerAttempt - a.expectedProfitPerAttempt);
   renderInventionComparisonTable(rows);
 
   document.getElementById('invention-empty-state').classList.add('hidden');
@@ -277,7 +277,7 @@ window.recalculateInvention = recalculateInvention;
 function renderInventionComparisonTable(rows) {
   const container = document.getElementById('invention-comparison-table');
   if (!container) return;
-  const bestProfit = rows.length > 0 ? rows[0].expectedProfitPerAttempt : 0;
+  const bestProfit = rows.length > 0 ? Math.max(...rows.map(r => r.totalPotentialProfit)) : 0;
   const bpcRuns = Math.max(1, parseInt(document.getElementById('invention-bpc-runs').value) || 1);
 
   container.innerHTML = `
@@ -287,16 +287,16 @@ function renderInventionComparisonTable(rows) {
           <th class="p-2">Decryptor</th>
           <th class="p-2 text-right">Success %</th>
           <th class="p-2 text-right">Result BPC</th>
-          <th class="p-2 text-right">Cost/Attempt</th>
+          <th class="p-2 text-right">Invention Cost</th>
           <th class="p-2 text-right">Build Time</th>
+          <th class="p-2 text-right">Total Potential Profit (${bpcRuns} run${bpcRuns > 1 ? 's' : ''} on T1 BPC)</th>
           <th class="p-2 text-right">ISK/Hour</th>
-          <th class="p-2 text-right">Profit/Attempt</th>
-          <th class="p-2 text-right">Total (${bpcRuns} run${bpcRuns > 1 ? 's' : ''})</th>
+          <th class="p-2 text-right">Profit / 1 Run</th>
         </tr>
       </thead>
       <tbody>
         ${rows.map(r => {
-          const isBest = r.expectedProfitPerAttempt === bestProfit && bestProfit > -Infinity;
+          const isBest = r.totalPotentialProfit === bestProfit && bestProfit > -Infinity;
           return `
           <tr class="border-b border-[#1e3348]/40 ${isBest ? 'bg-green-950/30' : ''} hover:bg-[#0d1922] transition" title="${window.esc(r.profitDetail)}">
             <td class="p-2 font-bold ${isBest ? 'text-green-300' : 'text-slate-200'}">${isBest ? '🏆 ' : ''}${window.esc(r.dec.name)}</td>
@@ -304,18 +304,19 @@ function renderInventionComparisonTable(rows) {
             <td class="p-2 text-right text-slate-400">${r.resultRuns} run${r.resultRuns > 1 ? 's' : ''}, ME${r.resultME >= 0 ? '+' : ''}${r.resultME}, TE${r.resultTE >= 0 ? '+' : ''}${r.resultTE}</td>
             <td class="p-2 text-right text-amber-300">${Math.round(r.costPerAttempt).toLocaleString()} ISK</td>
             <td class="p-2 text-right text-slate-400">${r.totalBuildSeconds > 0 ? window.formatDuration(r.totalBuildSeconds) : '—'}</td>
+            <td class="p-2 text-right font-bold ${r.totalPotentialProfit >= 0 ? 'text-green-300' : 'text-red-300'}">${Math.round(r.totalPotentialProfit).toLocaleString()} ISK</td>
             <td class="p-2 text-right ${r.iskPerHour !== null ? (r.iskPerHour >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-500'} font-bold">${r.iskPerHour !== null ? Math.round(r.iskPerHour).toLocaleString() + ' ISK' : '—'}</td>
-            <td class="p-2 text-right font-bold ${r.expectedProfitPerAttempt >= 0 ? 'text-green-400' : 'text-red-400'}">${Math.round(r.expectedProfitPerAttempt).toLocaleString()} ISK</td>
-            <td class="p-2 text-right font-bold ${r.totalExpectedProfitAllRuns >= 0 ? 'text-green-300' : 'text-red-300'}">${Math.round(r.totalExpectedProfitAllRuns).toLocaleString()} ISK</td>
+            <td class="p-2 text-right font-bold ${r.perRunProfit >= 0 ? 'text-green-400' : 'text-red-400'}">${Math.round(r.perRunProfit).toLocaleString()} ISK</td>
           </tr>
         `; }).join('')}
       </tbody>
     </table>
     <p class="text-[10px] text-slate-500 mt-2 leading-relaxed">
-      <b>Profit/Attempt</b> = success chance × (value of manufacturing everything the resulting BPC allows) − cost of this one attempt.
-      <b>ISK/Hour</b> uses the same manufacturing time calculation (skills, TE research, facility/rig bonuses) as the calculator and ledger.
-      <b>Total (N runs)</b> = Profit/Attempt × your T1 BPC's available runs, assuming you use all of them on this decryptor choice.
-      None of these include the T1 BPC's own cost (fixed regardless of decryptor), the invention job's own installation fee, or manufacturing job fees (facility tax/SCC/broker) - materials only.
+      All figures are probability-weighted (success chance × manufacturing profit, minus the invention attempt's cost).
+      <b>Total Potential Profit</b> = per-attempt profit × your T1 BPC's available runs (each run is one invention attempt, consumed win or lose).
+      <b>ISK/Hour</b> = per-attempt profit ÷ manufacturing time for one resulting BPC's full production.
+      <b>Profit / 1 Run</b> normalizes per-attempt profit to a single output unit, so decryptors with different run counts can be compared fairly.
+      "Manufacturing profit" = revenue from selling everything produced minus material cost at your chosen Jita buy/sell pricing, at the resulting ME/TE. Not included: the T1 BPC's own cost (fixed regardless of decryptor), the invention job's own installation fee, or manufacturing job fees (facility tax/SCC/broker).
     </p>
   `;
 }
