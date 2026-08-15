@@ -214,23 +214,14 @@ async function loadBlueprintBrowserData() {
     return;
   }
 
-  // Resolve location names in bulk (universe/names accepts up to 1000 IDs per call)
+  // Resolve location names using the same reliable resolver the stock/asset viewer uses - this
+  // correctly handles player-owned Upwell structures (IDs above 10^12), which the plain bulk
+  // /universe/names/ endpoint cannot resolve at all and was returning as raw numbers for.
   const locationIds = [...new Set(allBps.map(b => b.location_id))];
-  const locationNames = {};
-  try {
-    for (let i = 0; i < locationIds.length; i += 1000) {
-      const chunk = locationIds.slice(i, i + 1000);
-      const res = await fetch('https://esi.evetech.net/latest/universe/names/?datasource=tranquility', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(chunk)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        data.forEach(d => { locationNames[d.id] = d.name; });
-      }
-    }
-  } catch (e) { console.warn('Blueprint location resolution failed:', e); }
-
-  allBps.forEach(b => { b.locationName = locationNames[b.location_id] || `Location ${b.location_id}`; });
+  if (typeof window.resolveLocationIds === 'function') {
+    await window.resolveLocationIds(locationIds);
+  }
+  allBps.forEach(b => { b.locationName = (window.resolvedLocationNames && window.resolvedLocationNames[b.location_id]) || `Location ${b.location_id}`; });
   _blueprintBrowserData = allBps;
 
   const locSelect = document.getElementById('blueprint-browser-location');
@@ -266,11 +257,13 @@ function renderBlueprintBrowserList(list) {
   // ESI convention: quantity -1 = original (BPO), -2 = copy (BPC); positive quantity = a stack of BPCs.
   listEl.innerHTML = list.map(bp => {
     const name = window.TYPE_ID_TO_NAME[bp.type_id] || `Type ${bp.type_id}`;
-    const bpLabel = bp.quantity === -1 ? 'BPO' : (bp.quantity === -2 ? 'BPC' : `${bp.quantity}x BPC stack`);
+    const isOriginal = bp.quantity === -1;
+    const bpLabel = isOriginal ? 'BPO' : (bp.quantity === -2 ? 'BPC' : `${bp.quantity}x BPC stack`);
+    const bpImageVariant = isOriginal ? 'bp' : 'bpc';
     return `
       <div class="flex items-center justify-between bg-[#0d1922] border border-[#1e3348] hover:border-cyan-500 rounded p-2 transition">
         <div class="flex items-center gap-2 min-w-0 flex-1">
-          <img src="https://images.evetech.net/types/${bp.type_id}/bp?size=32" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0">
+          <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0">
           <div class="min-w-0 flex-1">
             <div class="font-bold text-slate-200 truncate">${window.esc(name)}</div>
             <div class="text-[10px] text-slate-500 truncate">${window.esc(bp.locationName)} • ${bp.source} • ${bpLabel}${bp.quantity < -1 || bp.quantity > 0 ? ` • Runs: ${bp.runs}` : ''}</div>

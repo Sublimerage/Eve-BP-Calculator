@@ -330,6 +330,7 @@ window.toggleQueueViewMode = toggleQueueViewMode;
 // collapse state so switching views doesn't lose whether you had a job's details open.
 function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
   const iconTypeId = job.productTypeId || job.typeId;
+  const isJobReady = job.isStarted && job.startedAt && ((Date.now() - job.startedAt) / 1000 >= (job.totalBuildSeconds || 0));
   const jobNameLower = (window.TYPE_ID_TO_NAME[iconTypeId] || job.name || '').toLowerCase();
   const isJobBp = jobNameLower.includes('blueprint') || jobNameLower.includes('formula') || jobNameLower.includes('reaction');
   const jobIconUrl = isJobBp
@@ -367,7 +368,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
   ` : '';
 
   return `
-    <div class="job-card ${job.isStarted ? 'bg-[#0d2818]' : 'bg-[#0c1318]'} border-2 ${job.isSubBuild ? 'border-amber-500' : (job.isStarted ? 'border-green-500' : 'border-[#1e3348]')} rounded shadow-md transition"
+    <div class="job-card ${isJobReady ? 'bg-[#0d2818]' : (job.isStarted ? 'bg-green-950/20' : 'bg-[#0c1318]')} border${isJobReady ? '-2' : ''} ${job.isSubBuild ? 'border-amber-500' : (isJobReady ? 'border-green-500' : (job.isStarted ? 'border-green-700/50' : 'border-[#1e3348]'))} rounded shadow-md transition"
          draggable="true" data-job-id="${job.id}"
          ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
          ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
@@ -499,6 +500,7 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) {
 
 function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
     const iconTypeId = job.productTypeId || job.typeId;
+    const isJobReady = job.isStarted && job.startedAt && ((Date.now() - job.startedAt) / 1000 >= (job.totalBuildSeconds || 0));
     const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
     const isCollapsed = collapsedJobCardIds.has(job.id);
 
@@ -558,7 +560,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
     ` : '';
 
     return `
-      <div class="job-card ${job.isStarted ? 'bg-[#0d2818]' : 'bg-[#0c1318]'} border-2 ${job.isSubBuild ? 'border-amber-500 hover:border-amber-400' : (job.isStarted ? 'border-green-500 hover:border-green-400' : 'border-[#1e3348] hover:border-purple-500/40')} rounded p-3 flex flex-col justify-between shadow-md transition space-y-2"
+      <div class="job-card ${isJobReady ? 'bg-[#0d2818]' : (job.isStarted ? 'bg-green-950/20' : 'bg-[#0c1318]')} border${isJobReady ? '-2' : ''} ${job.isSubBuild ? 'border-amber-500 hover:border-amber-400' : (isJobReady ? 'border-green-500 hover:border-green-400' : (job.isStarted ? 'border-green-700/50 hover:border-green-500/70' : 'border-[#1e3348] hover:border-purple-500/40'))} rounded p-3 flex flex-col justify-between shadow-md transition space-y-2"
            draggable="true" data-job-id="${job.id}"
            ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
            ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
@@ -965,6 +967,13 @@ function updateJobTimers() {
       display.className = 'timer-display text-[11px] font-bold text-green-400 mono';
       el.classList.remove('border-cyan-600/40');
       el.classList.add('border-green-600/50');
+      // The parent card only shows the bold "ready" color once actually ready - update it live here
+      // so it doesn't sit in the wrong color until the next full re-render.
+      const card = el.closest('.job-card');
+      if (card && !card.classList.contains('border-amber-500')) {
+        card.classList.remove('bg-green-950/20', 'border', 'border-green-700/50', 'hover:border-green-500/70');
+        card.classList.add('bg-[#0d2818]', 'border-2', 'border-green-500', 'hover:border-green-400');
+      }
     } else {
       display.textContent = `⏱ ${window.formatDuration(Math.ceil(remaining))} remaining`;
       display.className = 'timer-display text-[11px] font-bold text-cyan-300 mono';
@@ -1228,6 +1237,17 @@ async function buildAutoImportedJob(realJob, blueprintMeTeMap) {
   }
 }
 
+
+function collectAllReadyJobs() {
+  loadJournalState();
+  const readyJobs = activeJobs.filter(j => j && j.isStarted && j.startedAt && ((Date.now() - j.startedAt) / 1000 >= (j.totalBuildSeconds || 0)));
+  if (readyJobs.length === 0) {
+    alert('No jobs are ready to collect yet.');
+    return;
+  }
+  readyJobs.forEach(j => markJobAsBuilt(j.id));
+}
+window.collectAllReadyJobs = collectAllReadyJobs;
 
 function markJobAsBuilt(jobId) {
   loadJournalState();
