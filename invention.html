@@ -8,7 +8,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Invention Calculator</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=5.2.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=5.3.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -58,6 +58,17 @@
           </div>
         </div>
 
+        <div id="invention-product-warning" class="hidden p-3.5 border-b border-amber-700/40 bg-amber-950/20">
+          <div class="text-[11px] text-amber-300 font-bold mb-1.5">⚠️ No T2 product data found for this blueprint - manufacturing profit can't be calculated until you pick it manually.</div>
+          <div class="relative">
+            <input type="text" id="invention-product-override-search" placeholder="Search for the T2 item this invents..." autocomplete="off"
+              oninput="searchInventionProductOverride(this.value)" onfocus="searchInventionProductOverride(this.value)"
+              onblur="setTimeout(() => { const el = document.getElementById('invention-product-override-results'); if (el) el.classList.add('hidden'); }, 200)"
+              class="w-full bg-[#070b0f] border border-amber-700/50 rounded-md px-2.5 py-2 text-white font-bold mono text-xs outline-none focus:border-amber-500">
+            <div id="invention-product-override-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-amber-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl"></div>
+          </div>
+        </div>
+
         <div class="p-3.5 border-b border-[#1e3348] space-y-2">
           <div class="flex items-center justify-between">
             <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Base Success Chance</span>
@@ -104,6 +115,7 @@
         Search for a Tech 1 item on the left to begin.
       </div>
       <div id="invention-results-area" class="hidden space-y-4">
+        <div id="invention-summary-tiles" class="grid grid-cols-2 md:grid-cols-4 gap-2.5"></div>
         <div>
           <h2 class="text-sm font-bold uppercase tracking-wider text-purple-300 rajdhani mb-2">💰 Decryptor Profit Comparison</h2>
           <p class="text-[11px] text-slate-400 mb-3">
@@ -115,11 +127,11 @@
     </main>
   </div>
 
-  <script src="eve_db.js?v=5.2.0"></script>
-  <script src="js/config.js?v=5.2.0"></script>
-  <script src="js/esi.js?v=5.2.0"></script>
-  <script src="js/tree.js?v=5.2.0"></script>
-  <script src="js/optimizers.js?v=5.2.0"></script>
-  <script src="js/invention.js?v=5.2.0"></script>
+  <script src="eve_db.js?v=5.3.0"></script>
+  <script src="js/config.js?v=5.3.0"></script>
+  <script src="js/esi.js?v=5.3.0"></script>
+  <script src="js/tree.js?v=5.3.0"></script>
+  <script src="js/optimizers.js?v=5.3.0"></script>
+  <script src="js/invention.js?v=5.3.0"></script>
 </body>
 </html>
