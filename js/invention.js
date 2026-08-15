@@ -16,15 +16,33 @@ const DECRYPTORS = [
 ];
 
 let _inventionCurrentBlueprint = null; // the T1 blueprint recipe object
-let _inventionCurrentProduct = null;   // the T2 product/blueprint chosen from inventionProducts
+let _inventionCurrentProduct = null;   // the T2 product being searched/selected
 
-// --- Search ---
-let _inventionSearchToken = 0;
-function isFullyInventable(recipe) {
-  return !!(recipe && recipe.inventionMaterials && recipe.inventionMaterials.length > 0
-    && recipe.inventionProducts && recipe.inventionProducts.length > 0 && recipe.inventionProducts[0].typeId);
+// --- Reverse index: T2 product -> T1 source recipe ---
+// Built once, lazily, from the same recipeMap data already loaded. Only items with BOTH invention
+// materials and a confirmed T2 product get indexed, so anything found via this map is guaranteed to
+// have complete data - no more "found it, but missing product data" dead ends.
+let _inventionT2ToT1Map = null;
+function getInventionT2ToT1Map() {
+  if (_inventionT2ToT1Map) return _inventionT2ToT1Map;
+  const map = {};
+  const seenBlueprintIds = new Set();
+  for (const recipe of Object.values(window.recipeMap || {})) {
+    if (!recipe || seenBlueprintIds.has(recipe.blueprintTypeID)) continue;
+    seenBlueprintIds.add(recipe.blueprintTypeID);
+    if (recipe.inventionMaterials && recipe.inventionMaterials.length > 0 && recipe.inventionProducts && recipe.inventionProducts.length > 0) {
+      recipe.inventionProducts.forEach(p => {
+        if (p && p.typeId) map[p.typeId] = recipe;
+      });
+    }
+  }
+  _inventionT2ToT1Map = map;
+  console.info(`[Invention] Built T2->T1 reverse index: ${Object.keys(map).length} inventable T2 products found.`);
+  return map;
 }
 
+// --- Search (searches the T2 product you want, not the T1 BPC you'd use) ---
+let _inventionSearchToken = 0;
 let _inventionLastSearchHits = [];
 
 function searchInventionItem(query) {
@@ -36,20 +54,18 @@ function searchInventionItem(query) {
     resultsEl.classList.add('hidden');
     return;
   }
+  const t2Map = getInventionT2ToT1Map();
   const hits = [];
   for (const [name, entry] of Object.entries(window.IDX || {})) {
-    if (name.includes(q)) {
-      const recipe = window.recipeMap && window.recipeMap[entry.id];
-      if (isFullyInventable(recipe)) {
-        hits.push(entry);
-      }
+    if (name.includes(q) && t2Map[entry.id]) {
+      hits.push(entry);
     }
     if (hits.length >= 15) break;
   }
   if (token !== _inventionSearchToken) return;
   _inventionLastSearchHits = hits;
   if (hits.length === 0) {
-    resultsEl.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">No inventable items found matching "${window.esc(q)}". Search the T1 item itself (e.g. "Caracal"), not its blueprint. If you know this item should be inventable and it's not showing up, your local database may be missing its T2 product data - try regenerating it.</div>`;
+    resultsEl.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">No inventable Tech II items found matching "${window.esc(q)}". Search the T2 item you want to produce (e.g. "Wolf"), not the T1 item it's invented from.</div>`;
     resultsEl.classList.remove('hidden');
     return;
   }
@@ -112,11 +128,11 @@ window.sortInventionSearchResultsByProfit = sortInventionSearchResultsByProfit;
 // A lighter-weight version of the full comparison: just finds the best decryptor's Total Potential
 // Profit for one item, using default skill levels (0, or your real ones if logged in via ESI) and 1
 // BPC run, for ranking search results. Does NOT touch the currently-selected item's own state.
-async function computeQuickBestInventionProfit(typeId) {
-  const recipe = window.recipeMap && window.recipeMap[typeId];
-  if (!isFullyInventable(recipe)) return null;
+async function computeQuickBestInventionProfit(t2ProductTypeId) {
+  const t2Map = getInventionT2ToT1Map();
+  const recipe = t2Map[t2ProductTypeId]; // the T1 source recipe for this T2 product
+  if (!recipe) return null;
 
-  const t2ProductTypeId = recipe.inventionProducts[0].typeId;
   const t2Recipe = window.recipeMap && window.recipeMap[t2ProductTypeId];
   const t2BlueprintTypeId = t2Recipe ? t2Recipe.blueprintTypeID : null;
   if (!t2BlueprintTypeId) return null;
@@ -208,81 +224,36 @@ async function selectInventionItem(typeId, name, skipSave) {
   document.getElementById('invention-item-search').value = name;
   document.getElementById('invention-search-results').classList.add('hidden');
 
-  const recipe = window.recipeMap && window.recipeMap[typeId];
-  if (!recipe || !recipe.inventionMaterials) {
+  const t2Map = getInventionT2ToT1Map();
+  const t1Recipe = t2Map[typeId];
+  if (!t1Recipe) {
     alert('No invention data found for this item.');
     return;
   }
-  _inventionCurrentBlueprint = recipe;
+  _inventionCurrentBlueprint = t1Recipe;
   _inventionSelectedTypeId = typeId;
   _inventionSelectedName = name;
+  // typeId/name here are exactly what was searched (the T2 product) - no guessing or override needed,
+  // since anything found via the reverse index is guaranteed to have this relationship confirmed.
+  _inventionCurrentProduct = { typeId: typeId, name: name, probability: 1 };
 
-  const products = recipe.inventionProducts && recipe.inventionProducts.length > 0
-    ? recipe.inventionProducts
-    : [{ typeId: null, name: 'Unknown T2 product', probability: 1 }];
-  _inventionCurrentProduct = products[0]; // TODO: if multiple, let user pick - most T1 items only invent one T2 variant
-
-  console.info(`[Invention] Selected "${name}" (typeId=${typeId}). inventionMaterials: ${recipe.inventionMaterials.length}, inventionSkills: ${(recipe.inventionSkills || []).length}, inventionProducts: ${JSON.stringify(recipe.inventionProducts)}`);
+  console.info(`[Invention] Selected T2 product "${name}" (typeId=${typeId}), invented from T1 "${t1Recipe.productName}" (blueprint typeId=${t1Recipe.blueprintTypeID}).`);
 
   document.getElementById('invention-config-panel').classList.remove('hidden');
   document.getElementById('invention-item-icon').src = `https://images.evetech.net/types/${typeId}/icon?size=64`;
   document.getElementById('invention-item-name').textContent = name;
-  document.getElementById('invention-product-name').textContent = `Invents: ${_inventionCurrentProduct.name || 'Unknown'}`;
+  document.getElementById('invention-product-name').textContent = `Invented from: ${t1Recipe.productName || 'T1 item'}`;
 
-  const warningEl = document.getElementById('invention-product-warning');
-  if (warningEl) warningEl.classList.toggle('hidden', !!_inventionCurrentProduct.typeId);
-
-  const baseChance = getInventionBaseChance(_inventionCurrentProduct.typeId || typeId);
+  const baseChance = getInventionBaseChance(typeId);
   document.getElementById('invention-base-chance').value = baseChance;
 
-  renderInventionSkillInputs(recipe.inventionSkills || []);
-  await renderInventionDatacoreList(recipe.inventionMaterials || []);
+  renderInventionSkillInputs(t1Recipe.inventionSkills || []);
+  await renderInventionDatacoreList(t1Recipe.inventionMaterials || []);
 
   if (!skipSave) saveInventionState();
   recalculateInvention();
 }
 window.selectInventionItem = selectInventionItem;
-
-// --- Manual T2 product override (when inventionProducts data is missing for this blueprint) ---
-let _inventionOverrideSearchToken = 0;
-function searchInventionProductOverride(query) {
-  const resultsEl = document.getElementById('invention-product-override-results');
-  if (!resultsEl) return;
-  const token = ++_inventionOverrideSearchToken;
-  const q = (query || '').toLowerCase().trim();
-  if (q.length < 2) {
-    resultsEl.classList.add('hidden');
-    return;
-  }
-  const hits = [];
-  for (const [name, entry] of Object.entries(window.IDX || {})) {
-    if (name.includes(q)) hits.push(entry);
-    if (hits.length >= 15) break;
-  }
-  if (token !== _inventionOverrideSearchToken) return;
-  resultsEl.innerHTML = hits.length === 0
-    ? `<div class="p-3 text-slate-400 text-xs italic">No items found.</div>`
-    : hits.map(h => `
-      <div class="px-3 py-2 hover:bg-[#1e3348] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#1e3348]/40" onmousedown="selectInventionProductOverride(${h.id}, '${window.esc(h.name)}')">
-        <img src="https://images.evetech.net/types/${h.id}/icon?size=32" class="w-6 h-6 rounded" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${h.id}/render?size=32';">
-        <span class="font-semibold text-slate-200">${window.esc(h.name)}</span>
-      </div>
-    `).join('');
-  resultsEl.classList.remove('hidden');
-}
-window.searchInventionProductOverride = searchInventionProductOverride;
-
-function selectInventionProductOverride(typeId, name) {
-  _inventionCurrentProduct = { typeId: typeId, name: name, probability: 1 };
-  document.getElementById('invention-product-override-search').value = '';
-  document.getElementById('invention-product-override-results').classList.add('hidden');
-  document.getElementById('invention-product-warning').classList.add('hidden');
-  document.getElementById('invention-product-name').textContent = `Invents: ${name} (manually selected)`;
-  console.info(`[Invention] T2 product manually overridden to "${name}" (typeId=${typeId})`);
-  saveInventionState();
-  recalculateInvention();
-}
-window.selectInventionProductOverride = selectInventionProductOverride;
 
 function renderInventionSkillInputs(skills) {
   const container = document.getElementById('invention-skill-inputs');
@@ -561,8 +532,7 @@ function saveInventionState() {
     baseChance: document.getElementById('invention-base-chance')?.value,
     bpcRuns: document.getElementById('invention-bpc-runs')?.value,
     priceMode: document.getElementById('input-price-mode')?.value,
-    skillLevels: Array.from(document.querySelectorAll('.invention-skill-input')).map(el => ({ skillId: el.dataset.skillId, value: el.value })),
-    productOverride: (_inventionCurrentProduct && _inventionCurrentProduct.typeId) ? { typeId: _inventionCurrentProduct.typeId, name: _inventionCurrentProduct.name } : null
+    skillLevels: Array.from(document.querySelectorAll('.invention-skill-input')).map(el => ({ skillId: el.dataset.skillId, value: el.value }))
   };
   localStorage.setItem('eve_invention_state', JSON.stringify(state));
 }
@@ -585,11 +555,6 @@ async function restoreInventionState() {
       const input = document.querySelector(`.invention-skill-input[data-skill-id="${sl.skillId}"]`);
       if (input) input.value = sl.value;
     });
-  }
-  if (state.productOverride && state.productOverride.typeId) {
-    _inventionCurrentProduct = { typeId: state.productOverride.typeId, name: state.productOverride.name, probability: 1 };
-    document.getElementById('invention-product-name').textContent = `Invents: ${state.productOverride.name} (manually selected)`;
-    document.getElementById('invention-product-warning').classList.add('hidden');
   }
 
   recalculateInvention();
