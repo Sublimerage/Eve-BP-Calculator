@@ -125,6 +125,71 @@ function extractJobMaterialsForNode(startNode) {
 }
 window.extractJobMaterialsForNode = extractJobMaterialsForNode;
 
+// Strictly queries exact unreduced SDE manufacturing durations directly from SDE database
+function extractBuildTime(recipe) {
+  if (!recipe) return 0;
+  return parseInt(recipe.time || recipe.t || recipe.timeSeconds || recipe.duration || recipe.mfgTime || recipe.productionTime || 0);
+}
+window.extractBuildTime = extractBuildTime;
+
+// Applies TE research, character skills (Industry/Advanced Industry), and the selected facility's
+// time bonus to a single job's raw SDE duration. Reactions can't be TE-researched, so TE is ignored
+// for them. Shared by the per-card time display, the total-tree time summary, the ledger, and the
+// invention calculator.
+const _loggedSkillDiagnosticIds = new Set();
+function logSkillDiagnosticOnce(typeId, message) {
+  const key = `${typeId}`;
+  if (_loggedSkillDiagnosticIds.has(key)) return;
+  _loggedSkillDiagnosticIds.add(key);
+  console.info(message);
+}
+
+function calculateAdjustedJobSeconds(baseTimeSeconds, customTE, runsNeeded, isReaction, productTypeId, requiredSkills) {
+  if (!baseTimeSeconds || baseTimeSeconds <= 0) return 0;
+  const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
+  const indFactor = 1 - (0.04 * (skills.industry || 0));
+  const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
+
+  let requiredSkillFactor = 1.0;
+  if (Array.isArray(requiredSkills) && requiredSkills.length > 0) {
+    if (!skills.allSkills) {
+      logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId} requires skills but no full skill sheet is loaded (skills.allSkills missing) - log in via ESI SSO to fetch your trained skill levels, otherwise these bonuses stay at 0.`);
+    } else {
+      requiredSkills.forEach(reqSkill => {
+        const playerLevel = skills.allSkills[reqSkill.skillId] || 0;
+        requiredSkillFactor *= (1 - (0.01 * playerLevel));
+      });
+      logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId}: required skills ${JSON.stringify(requiredSkills)}, your trained levels: ${requiredSkills.map(s => `${s.skillId}=${skills.allSkills[s.skillId] || 0}`).join(', ')}, combined factor: ${requiredSkillFactor.toFixed(4)}`);
+    }
+  } else if (requiredSkills !== undefined) {
+    logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId}: recipe has no requiredSkills data (empty array) - either this item genuinely needs none, or your local database predates this feature and needs regenerating (generate_db.py).`);
+  }
+
+  const skillTimeFactor = indFactor * advIndFactor * requiredSkillFactor;
+  const te = isReaction ? 0 : (customTE || 0);
+  const teFactor = 1 - (te / 100);
+  const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { teBonus: 30.0 };
+  const facilityFactor = 1 - (structureType.teBonus / 100);
+  const rigTEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(productTypeId, 'TE') : 0;
+  const rigFactor = 1 - (rigTEBonus / 100);
+  return baseTimeSeconds * teFactor * skillTimeFactor * facilityFactor * rigFactor * (runsNeeded || 1);
+}
+window.calculateAdjustedJobSeconds = calculateAdjustedJobSeconds;
+
+// Recursively sums the adjusted build time across every job actually being manufactured in the tree.
+function calculateTotalBuildSeconds(node) {
+  if (!node || !node.isBuildingSelf) return 0;
+  let total = 0;
+  if (node.recipe) {
+    total += calculateAdjustedJobSeconds(extractBuildTime(node.recipe), node.customTE, node.runsNeeded, node.isReaction, node.productTypeId, node.recipe.requiredSkills);
+  }
+  if (node.children) {
+    node.children.forEach(child => { if (child) total += calculateTotalBuildSeconds(child); });
+  }
+  return total;
+}
+window.calculateTotalBuildSeconds = calculateTotalBuildSeconds;
+
 window.systemNameCache = systemNameCache;
 window.resolvedLocationNames = resolvedLocationNames;
 window.corpDivisionNames = corpDivisionNames;

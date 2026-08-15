@@ -126,6 +126,21 @@ function renderInventionSkillInputs(skills) {
   }).join('');
 }
 
+// Prices something you need to ACQUIRE (datacores, decryptor) using the same buy/sell strategy
+// toggle the manufacturing cost engine reads - "sell" means buying instantly off sell orders, "buy"
+// means placing your own buy order (cheaper, but not instant, and a broker fee applies).
+function getInventionInputPrice(typeId) {
+  const strategy = document.getElementById('input-price-mode')?.value || 'sell';
+  const prices = (window.priceCache && window.priceCache[typeId]) || { sell: 0, buy: 0 };
+  let price = strategy === 'sell' ? prices.sell : prices.buy;
+  if (strategy === 'buy') {
+    const brokerFeeInput = document.getElementById('broker-fee');
+    const brokerFee = brokerFeeInput ? (parseFloat(brokerFeeInput.value) || 0) / 100 : 0.01;
+    price = price * (1 + brokerFee);
+  }
+  return price || 0;
+}
+
 async function renderInventionDatacoreList(materials) {
   const container = document.getElementById('invention-datacore-list');
   if (!container) return;
@@ -138,7 +153,7 @@ async function renderInventionDatacoreList(materials) {
     await window.fetchMarketPrices(typeIds);
   }
   container.innerHTML = materials.map(m => {
-    const price = (window.priceCache && window.priceCache[m.typeId]) ? window.priceCache[m.typeId].sell : 0;
+    const price = getInventionInputPrice(m.typeId);
     return `
       <div class="flex justify-between items-center py-0.5 border-b border-[#1e3348]/30">
         <span class="text-slate-300">${window.esc(m.name)} x${m.qty}</span>
@@ -167,15 +182,18 @@ async function recalculateInvention() {
   });
 
   const datacores = _inventionCurrentBlueprint.inventionMaterials || [];
-  const datacoreCost = datacores.reduce((sum, m) => {
-    const price = (window.priceCache && window.priceCache[m.typeId]) ? window.priceCache[m.typeId].sell : 0;
-    return sum + (price * m.qty);
-  }, 0);
+  const datacoreCost = datacores.reduce((sum, m) => sum + (getInventionInputPrice(m.typeId) * m.qty), 0);
 
   const t2ProductTypeId = _inventionCurrentProduct.typeId;
-  const t2BlueprintTypeId = window.BLUEPRINT_TO_PRODUCT_MAP
-    ? Object.keys(window.BLUEPRINT_TO_PRODUCT_MAP).find(bpId => window.BLUEPRINT_TO_PRODUCT_MAP[bpId] === t2ProductTypeId)
-    : null;
+  // recipeMap stores the blueprint's own ID directly on the recipe object - far more reliable than
+  // reverse-searching BLUEPRINT_TO_PRODUCT_MAP for a matching entry, which was silently failing and
+  // leaving bpcValue at 0 for every row (recipeMap is indexed by product ID too, so this always works
+  // as long as the T2 item's recipe was captured during database generation).
+  const t2Recipe = window.recipeMap && window.recipeMap[t2ProductTypeId];
+  const t2BlueprintTypeId = t2Recipe ? t2Recipe.blueprintTypeID : null;
+  if (!t2BlueprintTypeId) {
+    console.warn(`[Invention] No recipe found for T2 product ${t2ProductTypeId} - regenerate your database, or this item's manufacturing data is missing.`);
+  }
 
   const productGroupName = ((window.EVE_GROUP_NAMES && window.EVE_GROUP_NAMES[t2ProductTypeId]) || '').toLowerCase();
   const categoryId = window.EVE_CATEGORIES && window.EVE_CATEGORIES[t2ProductTypeId];
@@ -197,11 +215,13 @@ async function recalculateInvention() {
     const resultTE = 4 + dec.teMod;
 
     const decEntry = window.IDX && window.IDX[dec.name.toLowerCase()];
-    const decCost = (dec.name !== 'No Decryptor' && decEntry && window.priceCache[decEntry.id]) ? window.priceCache[decEntry.id].sell : 0;
+    const decCost = (dec.name !== 'No Decryptor' && decEntry) ? getInventionInputPrice(decEntry.id) : 0;
 
     const costPerAttempt = datacoreCost + decCost;
 
     let bpcValue = 0;
+    let totalBuildSeconds = 0;
+    let iskPerHour = null;
     let profitDetail = 'No product data';
     if (t2BlueprintTypeId && t2ProductTypeId) {
       try {
@@ -224,7 +244,13 @@ async function recalculateInvention() {
           const outputPrices = window.priceCache[t2ProductTypeId] || { sell: 0 };
           const grossSell = outputPrices.sell * root.qtyNeeded;
           bpcValue = grossSell - materialCost;
-          profitDetail = `${root.qtyNeeded} units @ ${Math.round(outputPrices.sell).toLocaleString()} ISK sell, ${Math.round(materialCost).toLocaleString()} ISK mats`;
+
+          // Real manufacturing time for producing every run this BPC allows, using the same time
+          // calculation (skills, TE research, facility/rig bonuses) the calculator and ledger use.
+          totalBuildSeconds = typeof window.calculateTotalBuildSeconds === 'function' ? window.calculateTotalBuildSeconds(root) : 0;
+          iskPerHour = totalBuildSeconds > 0 ? bpcValue / (totalBuildSeconds / 3600) : null;
+
+          profitDetail = `${root.qtyNeeded} units @ ${Math.round(outputPrices.sell).toLocaleString()} ISK sell, ${Math.round(materialCost).toLocaleString()} ISK mats, ${totalBuildSeconds > 0 ? window.formatDuration(totalBuildSeconds) : 'no time data'} to manufacture`;
         }
       } catch (e) {
         console.warn('Invention profit calc failed for', dec.name, e);
@@ -233,8 +259,11 @@ async function recalculateInvention() {
 
     const expectedProfitPerAttempt = (successChance / 100) * bpcValue - costPerAttempt;
     const expectedCostPerSuccess = successChance > 0 ? costPerAttempt / (successChance / 100) : Infinity;
+    // Each run on the T1 BPC is one invention attempt (success or fail, it's consumed) - this is the
+    // expected total profit if you use every available run attempting this decryptor choice.
+    const totalExpectedProfitAllRuns = expectedProfitPerAttempt * bpcRuns;
 
-    return { dec, successChance, resultRuns, resultME, resultTE, costPerAttempt, bpcValue, expectedProfitPerAttempt, expectedCostPerSuccess, profitDetail };
+    return { dec, successChance, resultRuns, resultME, resultTE, costPerAttempt, bpcValue, expectedProfitPerAttempt, expectedCostPerSuccess, totalBuildSeconds, iskPerHour, totalExpectedProfitAllRuns, profitDetail };
   }));
 
   rows.sort((a, b) => b.expectedProfitPerAttempt - a.expectedProfitPerAttempt);
@@ -249,6 +278,7 @@ function renderInventionComparisonTable(rows) {
   const container = document.getElementById('invention-comparison-table');
   if (!container) return;
   const bestProfit = rows.length > 0 ? rows[0].expectedProfitPerAttempt : 0;
+  const bpcRuns = Math.max(1, parseInt(document.getElementById('invention-bpc-runs').value) || 1);
 
   container.innerHTML = `
     <table class="w-full text-left border-collapse text-xs mono">
@@ -258,9 +288,10 @@ function renderInventionComparisonTable(rows) {
           <th class="p-2 text-right">Success %</th>
           <th class="p-2 text-right">Result BPC</th>
           <th class="p-2 text-right">Cost/Attempt</th>
-          <th class="p-2 text-right">Cost/Success</th>
-          <th class="p-2 text-right">BPC Value</th>
-          <th class="p-2 text-right">Expected Profit</th>
+          <th class="p-2 text-right">Build Time</th>
+          <th class="p-2 text-right">ISK/Hour</th>
+          <th class="p-2 text-right">Profit/Attempt</th>
+          <th class="p-2 text-right">Total (${bpcRuns} run${bpcRuns > 1 ? 's' : ''})</th>
         </tr>
       </thead>
       <tbody>
@@ -272,16 +303,19 @@ function renderInventionComparisonTable(rows) {
             <td class="p-2 text-right text-cyan-300 font-bold">${r.successChance.toFixed(1)}%</td>
             <td class="p-2 text-right text-slate-400">${r.resultRuns} run${r.resultRuns > 1 ? 's' : ''}, ME${r.resultME >= 0 ? '+' : ''}${r.resultME}, TE${r.resultTE >= 0 ? '+' : ''}${r.resultTE}</td>
             <td class="p-2 text-right text-amber-300">${Math.round(r.costPerAttempt).toLocaleString()} ISK</td>
-            <td class="p-2 text-right text-amber-400">${isFinite(r.expectedCostPerSuccess) ? Math.round(r.expectedCostPerSuccess).toLocaleString() + ' ISK' : '—'}</td>
-            <td class="p-2 text-right text-slate-300">${Math.round(r.bpcValue).toLocaleString()} ISK</td>
+            <td class="p-2 text-right text-slate-400">${r.totalBuildSeconds > 0 ? window.formatDuration(r.totalBuildSeconds) : '—'}</td>
+            <td class="p-2 text-right ${r.iskPerHour !== null ? (r.iskPerHour >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-500'} font-bold">${r.iskPerHour !== null ? Math.round(r.iskPerHour).toLocaleString() + ' ISK' : '—'}</td>
             <td class="p-2 text-right font-bold ${r.expectedProfitPerAttempt >= 0 ? 'text-green-400' : 'text-red-400'}">${Math.round(r.expectedProfitPerAttempt).toLocaleString()} ISK</td>
+            <td class="p-2 text-right font-bold ${r.totalExpectedProfitAllRuns >= 0 ? 'text-green-300' : 'text-red-300'}">${Math.round(r.totalExpectedProfitAllRuns).toLocaleString()} ISK</td>
           </tr>
         `; }).join('')}
       </tbody>
     </table>
-    <p class="text-[10px] text-slate-500 mt-2">
-      "Expected Profit" = success chance × (value of the resulting BPC's production) − cost of this one attempt. It does NOT include the T1 BPC's own cost (that's a fixed cost independent of which decryptor you pick) or facility/broker fees on the datacores/decryptor themselves.
-      "BPC Value" reuses this app's own manufacturing cost/profit engine at your current home market and structure settings, at the resulting ME/TE and run count.
+    <p class="text-[10px] text-slate-500 mt-2 leading-relaxed">
+      <b>Profit/Attempt</b> = success chance × (value of manufacturing everything the resulting BPC allows) − cost of this one attempt.
+      <b>ISK/Hour</b> uses the same manufacturing time calculation (skills, TE research, facility/rig bonuses) as the calculator and ledger.
+      <b>Total (N runs)</b> = Profit/Attempt × your T1 BPC's available runs, assuming you use all of them on this decryptor choice.
+      None of these include the T1 BPC's own cost (fixed regardless of decryptor), the invention job's own installation fee, or manufacturing job fees (facility tax/SCC/broker) - materials only.
     </p>
   `;
 }

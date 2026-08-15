@@ -4,76 +4,9 @@ if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sel
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
 if (window.globalRuns === undefined) window.globalRuns = 1;
 
-// Strictly queries exact unreduced SDE manufacturing durations directly from SDE database
-function extractBuildTime(recipe) {
-  if (!recipe) return 0;
-  return parseInt(recipe.time || recipe.t || recipe.timeSeconds || recipe.duration || recipe.mfgTime || recipe.productionTime || 0);
-}
+// (extractBuildTime, calculateAdjustedJobSeconds, calculateTotalBuildSeconds moved to config.js so
+// the calculator, ledger, and invention pages can all share the same real time calculation)
 
-// Applies TE research, character skills (Industry/Advanced Industry), and the selected facility's
-// time bonus to a single job's raw SDE duration. Reactions can't be TE-researched, so TE is ignored
-// for them. Shared by the per-card time display, the total-tree time summary, and the ledger.
-const _loggedSkillDiagnosticIds = new Set();
-function logSkillDiagnosticOnce(typeId, message) {
-  const key = `${typeId}`;
-  if (_loggedSkillDiagnosticIds.has(key)) return;
-  _loggedSkillDiagnosticIds.add(key);
-  console.info(message);
-}
-
-function calculateAdjustedJobSeconds(baseTimeSeconds, customTE, runsNeeded, isReaction, productTypeId, requiredSkills) {
-  if (!baseTimeSeconds || baseTimeSeconds <= 0) return 0;
-  const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
-  const indFactor = 1 - (0.04 * (skills.industry || 0));
-  const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
-
-  // Many T2/T3/faction/Triglavian blueprints require specific science/engineering skills (e.g.
-  // Caldari Starship Engineering, Triglavian Quantum Engineering) that EACH grant their own
-  // 1%-per-level manufacturing time reduction for items requiring them - confirmed via EVE
-  // University's skill list - on top of the generic Industry/Advanced Industry bonuses above.
-  // This was previously not accounted for at all, which is why T2/T3/Triglavian build times could
-  // run noticeably longer here than in-game.
-  let requiredSkillFactor = 1.0;
-  if (Array.isArray(requiredSkills) && requiredSkills.length > 0) {
-    if (!skills.allSkills) {
-      logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId} requires skills but no full skill sheet is loaded (skills.allSkills missing) - log in via ESI SSO to fetch your trained skill levels, otherwise these bonuses stay at 0.`);
-    } else {
-      requiredSkills.forEach(reqSkill => {
-        const playerLevel = skills.allSkills[reqSkill.skillId] || 0;
-        requiredSkillFactor *= (1 - (0.01 * playerLevel));
-      });
-      logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId}: required skills ${JSON.stringify(requiredSkills)}, your trained levels: ${requiredSkills.map(s => `${s.skillId}=${skills.allSkills[s.skillId] || 0}`).join(', ')}, combined factor: ${requiredSkillFactor.toFixed(4)}`);
-    }
-  } else if (requiredSkills !== undefined) {
-    logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId}: recipe has no requiredSkills data (empty array) - either this item genuinely needs none, or your local database predates this feature and needs regenerating (generate_db.py).`);
-  }
-
-  const skillTimeFactor = indFactor * advIndFactor * requiredSkillFactor;
-  const te = isReaction ? 0 : (customTE || 0);
-  const teFactor = 1 - (te / 100);
-  const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { teBonus: 30.0 };
-  const facilityFactor = 1 - (structureType.teBonus / 100);
-  const rigTEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(productTypeId, 'TE') : 0;
-  const rigFactor = 1 - (rigTEBonus / 100);
-  return baseTimeSeconds * teFactor * skillTimeFactor * facilityFactor * rigFactor * (runsNeeded || 1);
-}
-
-// Recursively sums the adjusted build time across every job actually being manufactured in the tree.
-// Sub-components toggled to "Buy" contribute no build time of their own - only what you're building.
-function calculateTotalBuildSeconds(node) {
-  if (!node || !node.isBuildingSelf) return 0;
-  let total = 0;
-  if (node.recipe) {
-    total += calculateAdjustedJobSeconds(extractBuildTime(node.recipe), node.customTE, node.runsNeeded, node.isReaction, node.productTypeId, node.recipe.requiredSkills);
-  }
-  if (node.children) {
-    node.children.forEach(child => { if (child) total += calculateTotalBuildSeconds(child); });
-  }
-  return total;
-}
-window.calculateAdjustedJobSeconds = calculateAdjustedJobSeconds;
-window.extractBuildTime = extractBuildTime;
-window.calculateTotalBuildSeconds = calculateTotalBuildSeconds;
 
 // Binds custom card overrides directly to tree node structures before calculations
 function syncTreeOverrides(node) {
@@ -318,7 +251,7 @@ function renderBlueprintBrowserList(list) {
           <div class="flex items-center gap-2 flex-shrink-0">
             <span class="text-cyan-400 font-bold text-[10px]">ME ${bp.material_efficiency}%</span>
             <span class="text-purple-400 font-bold text-[10px]">TE ${bp.time_efficiency}%</span>
-            <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency})" class="px-2.5 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded text-[10px] transition">Load</button>
+            <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs})" class="px-2.5 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded text-[10px] transition">Load</button>
           </div>
         </div>
       `;
@@ -332,11 +265,20 @@ function renderBlueprintBrowserList(list) {
   }).join('');
 }
 
-function loadBlueprintIntoCalculator(blueprintTypeId, me, te) {
+function loadBlueprintIntoCalculator(blueprintTypeId, me, te, runs) {
   window.customMEOverrides = window.customMEOverrides || {};
   window.customTEOverrides = window.customTEOverrides || {};
   window.customMEOverrides[blueprintTypeId] = me;
   window.customTEOverrides[blueprintTypeId] = te;
+
+  // BPOs report runs as -1 (unlimited) - only a real BPC has a meaningful fixed run count to carry
+  // over. Set before calling selectItem (with preserveView=true, which skips selectItem's own reset
+  // of globalRuns) so the tree gets built at the BPC's actual max runs, not the default of 1.
+  if (typeof runs === 'number' && runs > 0) {
+    window.globalRuns = runs;
+    const runsInput = document.getElementById('bp-runs');
+    if (runsInput) runsInput.value = runs;
+  }
 
   // The root node's identity (.typeId) ends up being whatever gets passed to selectItem/
   // buildRecursiveRecipeTree - it must be the BLUEPRINT's own type ID here, matching the key the
