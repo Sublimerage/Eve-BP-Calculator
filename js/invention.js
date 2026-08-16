@@ -405,6 +405,18 @@ async function recalculateInvention() {
         totalInventionCost += netToBuy * unitPrice;
         if (netToBuy > 0) multibuyItems.push({ name: dec.name, qty: netToBuy });
       }
+
+      // The invention job's own installation fee - same EIV-based formula as manufacturing jobs
+      // (facility tax + SCC surcharge + system cost index), but using invention's own SCI and EIV
+      // based on the datacores actually consumed per attempt (invention has no ME to reduce this).
+      const facilityTaxForInv = (parseFloat(document.getElementById('facility-tax')?.value) || 1.0) / 100;
+      const sccSurchargeForInv = (parseFloat(document.getElementById('scc-surcharge')?.value) || 4.0) / 100;
+      const structureTypeForInv = window.getActiveStructureType ? window.getActiveStructureType() : { costBonus: 5.0 };
+      const structureRoleBonusForInv = structureTypeForInv.costBonus / 100;
+      const inventionSCI = window.activeInventionSCI !== undefined ? window.activeInventionSCI : 0.02;
+      const attemptEIV = datacores.reduce((sum, m) => sum + (window.eivCache && window.eivCache[m.typeId] ? window.eivCache[m.typeId] * m.qty : 0), 0);
+      const inventionJobFeePerAttempt = attemptEIV * (inventionSCI * (1 - structureRoleBonusForInv) + facilityTaxForInv + sccSurchargeForInv);
+      totalInventionCost += inventionJobFeePerAttempt * requiredAttempts;
     } else {
       totalInventionCost = Infinity;
     }
@@ -433,13 +445,32 @@ async function recalculateInvention() {
           const allTypeIds = new Set();
           if (typeof window.collectAllTypeIds === 'function') window.collectAllTypeIds(root, allTypeIds);
           if (typeof window.fetchMarketPrices === 'function') await window.fetchMarketPrices(Array.from(allTypeIds));
-          unitCost = typeof window.calculateTreeNodeCost === 'function' ? window.calculateTreeNodeCost(root) : 0;
+          const materialCost = typeof window.calculateTreeNodeCost === 'function' ? window.calculateTreeNodeCost(root) : 0;
+
+          // Manufacturing job installation fee (facility tax + SCC surcharge + system cost index on
+          // the job's EIV) - reuses the exact same calculation the main calculator uses, not a
+          // separate approximation, so this stays consistent if that formula is ever revisited.
+          const facilityTax = (parseFloat(document.getElementById('facility-tax')?.value) || 1.0) / 100;
+          const sccSurcharge = (parseFloat(document.getElementById('scc-surcharge')?.value) || 4.0) / 100;
+          const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { costBonus: 5.0 };
+          const structureRoleBonus = structureType.costBonus / 100;
+          let mfgJobFee = 0;
+          if (typeof window.calculateNodeEIV === 'function' && typeof window.calculateNodeJobFee === 'function') {
+            window.calculateNodeEIV(root);
+            mfgJobFee = window.calculateNodeJobFee(root, facilityTax, sccSurcharge, structureRoleBonus);
+          }
+          unitCost = materialCost + mfgJobFee;
+
           const outputPrices = window.priceCache[t2ProductTypeId] || { sell: 0 };
-          unitSell = outputPrices.sell * root.qtyNeeded;
+          const grossSell = outputPrices.sell * root.qtyNeeded;
+          const salesTax = (parseFloat(document.getElementById('sales-tax')?.value) || 3.6) / 100;
+          const sellBrokerFee = (parseFloat(document.getElementById('broker-fee')?.value) || 1.0) / 100;
+          unitSell = grossSell * (1 - salesTax - sellBrokerFee);
+
           unitBuildSeconds = typeof window.calculateTotalBuildSeconds === 'function' ? window.calculateTotalBuildSeconds(root) : 0;
-          profitDetail = `${root.qtyNeeded} units @ ${Math.round(outputPrices.sell).toLocaleString()} ISK sell, ${Math.round(unitCost).toLocaleString()} ISK mats per BPC, ${unitBuildSeconds > 0 ? window.formatDuration(unitBuildSeconds) : 'no time data'} to manufacture per BPC`;
+          profitDetail = `${root.qtyNeeded} units @ ${Math.round(outputPrices.sell).toLocaleString()} ISK sell (net of tax/broker: ${Math.round(unitSell).toLocaleString()}), ${Math.round(materialCost).toLocaleString()} ISK mats + ${Math.round(mfgJobFee).toLocaleString()} ISK job fee per BPC, ${unitBuildSeconds > 0 ? window.formatDuration(unitBuildSeconds) : 'no time data'} to manufacture per BPC`;
           if (dec.name === 'No Decryptor') {
-            console.info(`[Invention] "No Decryptor" per-BPC breakdown: resultRuns=${resultRuns}, qtyProduced=${root.qtyNeeded}, sellPrice=${outputPrices.sell}, unitSell=${unitSell}, unitCost=${unitCost}, unitBuildSeconds=${unitBuildSeconds}`);
+            console.info(`[Invention] "No Decryptor" per-BPC breakdown: resultRuns=${resultRuns}, qtyProduced=${root.qtyNeeded}, sellPrice=${outputPrices.sell}, grossSell=${grossSell}, unitSell(net)=${unitSell}, materialCost=${materialCost}, mfgJobFee=${mfgJobFee}, unitCost=${unitCost}, unitBuildSeconds=${unitBuildSeconds}`);
           }
         }
       } catch (e) {
@@ -648,12 +679,61 @@ async function restoreInventionState() {
 }
 window.restoreInventionState = restoreInventionState;
 
+// Shared with the main calculator via the same localStorage key - reads/writes only the tax/fee
+// fields relevant here, merging with (not overwriting) calculator-specific fields like facility
+// select or rig slots, so editing from either page keeps both in sync without clobbering settings
+// this page doesn't touch.
+function loadSharedTaxSettings() {
+  try {
+    const saved = localStorage.getItem('eve_tax_settings');
+    if (!saved) return;
+    const settings = window.safeParseJSON(saved, {});
+    if (settings.facilityTax !== undefined && document.getElementById('facility-tax')) document.getElementById('facility-tax').value = settings.facilityTax;
+    if (settings.sccSurcharge !== undefined && document.getElementById('scc-surcharge')) document.getElementById('scc-surcharge').value = settings.sccSurcharge;
+    if (settings.salesTax !== undefined && document.getElementById('sales-tax')) document.getElementById('sales-tax').value = settings.salesTax;
+    if (settings.brokerFee !== undefined && document.getElementById('broker-fee')) document.getElementById('broker-fee').value = settings.brokerFee;
+  } catch (e) {}
+}
+window.loadSharedTaxSettings = loadSharedTaxSettings;
+
+function saveSharedTaxSettings() {
+  try {
+    const existingRaw = localStorage.getItem('eve_tax_settings');
+    const existing = existingRaw ? window.safeParseJSON(existingRaw, {}) : {};
+    existing.facilityTax = document.getElementById('facility-tax')?.value;
+    existing.sccSurcharge = document.getElementById('scc-surcharge')?.value;
+    existing.salesTax = document.getElementById('sales-tax')?.value;
+    existing.brokerFee = document.getElementById('broker-fee')?.value;
+    localStorage.setItem('eve_tax_settings', JSON.stringify(existing));
+  } catch (e) {}
+}
+window.saveSharedTaxSettings = saveSharedTaxSettings;
+
 window.onload = async () => {
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
   if (typeof window.handleEsiSSOCallback === 'function') {
     try { await window.handleEsiSSOCallback(); } catch (e) { console.error('SSO callback error:', e); }
+  }
+  loadSharedTaxSettings();
+  // System cost index (needed for job fees) and adjusted prices (needed for EIV) - the calculator
+  // and ledger both fetch these on load already; this page needs them too now that job fees are
+  // calculated here. Both are AWAITED before restoreInventionState() runs the first calculation -
+  // firing fetchAdjustedPrices() in the background here previously meant the first calculation (and
+  // often every calculation after it) ran against an empty EIV cache, making job fees silently
+  // compute to zero regardless of any tax/fee input, since nothing multiplied by zero stays zero.
+  if (typeof window.loadSavedSystem === 'function') {
+    try { await window.loadSavedSystem(); } catch (e) { console.warn('[Invention] SCI load failed:', e); }
+  }
+  if (typeof window.fetchAdjustedPrices === 'function') {
+    try { await window.fetchAdjustedPrices(); } catch (e) { console.warn('[Invention] Adjusted prices fetch error:', e); }
+  }
+  // Page rendering and input aren't blocked while the awaits above are in flight, so it's possible
+  // the user already selected an item before EIV/SCI data was ready - force one more recalculation
+  // now that it actually is, rather than leaving a stale zero-fee calculation on screen.
+  if (_inventionCurrentBlueprint) {
+    recalculateInvention();
   }
   try {
     await restoreInventionState();

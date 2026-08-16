@@ -136,7 +136,6 @@ function closeBlueprintBrowser() {
 window.closeBlueprintBrowser = closeBlueprintBrowser;
 
 async function loadBlueprintBrowserData() {
-  _blueprintProfitCache = {};
   const listEl = document.getElementById('blueprint-browser-list');
   if (listEl) listEl.innerHTML = `<div class="text-slate-500 italic p-4 text-center">Loading your blueprints...</div>`;
 
@@ -354,7 +353,36 @@ window.filterBlueprintBrowser = filterBlueprintBrowser;
 // BPOs; same type, ME, TE, AND runs for BPCs (runs isn't meaningful for a BPO, which never depletes).
 // Also correctly folds in blueprints ESI already reports as a pre-stacked group (quantity > 0).
 // --- Profit Scanner ---
-let _blueprintProfitCache = {}; // key -> {profit, iskPerHour, runsUsed, qtyProduced} | null (scan failed)
+let _blueprintProfitCache = null; // key -> {profit, iskPerHour, runsUsed, qtyProduced, scannedAt} | null (scan failed) - loaded lazily from localStorage
+const BLUEPRINT_PROFIT_CACHE_KEY = 'eve_blueprint_profit_cache';
+
+function getBlueprintProfitCache() {
+  if (_blueprintProfitCache === null) {
+    _blueprintProfitCache = window.safeParseJSON(localStorage.getItem(BLUEPRINT_PROFIT_CACHE_KEY), {});
+  }
+  return _blueprintProfitCache;
+}
+
+function saveBlueprintProfitCache() {
+  try {
+    localStorage.setItem(BLUEPRINT_PROFIT_CACHE_KEY, JSON.stringify(_blueprintProfitCache || {}));
+  } catch (e) {
+    console.warn('[BlueprintScan] Failed to persist profit cache (localStorage may be full):', e);
+  }
+}
+
+// Renders a compact "Xd Yh ago" style relative time string for the scan-age tooltip.
+function formatScanAge(scannedAt) {
+  if (!scannedAt) return 'unknown';
+  const seconds = Math.max(0, (Date.now() - scannedAt) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ${minutes % 60}m ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ${hours % 24}h ago`;
+}
 
 function getBlueprintProfitCacheKey(bp) {
   const isBPO = bp.quantity === -1;
@@ -402,12 +430,32 @@ async function computeBlueprintManufacturingProfit(bp) {
   const buildSeconds = typeof window.calculateTotalBuildSeconds === 'function' ? window.calculateTotalBuildSeconds(root) : 0;
   const iskPerHour = buildSeconds > 0 ? profit / (buildSeconds / 3600) : null;
 
-  return { profit, iskPerHour, runsUsed: runsToUse, qtyProduced: root.qtyNeeded };
+  return { profit, iskPerHour, runsUsed: runsToUse, qtyProduced: root.qtyNeeded, scannedAt: Date.now() };
 }
+
+async function scanSingleBlueprintProfit(typeId, me, te, runs, quantity, productTypeId, btnEl) {
+  const bp = { type_id: typeId, material_efficiency: me, time_efficiency: te, runs: runs, quantity: quantity, productTypeId: productTypeId };
+  const key = getBlueprintProfitCacheKey(bp);
+  const cache = getBlueprintProfitCache();
+
+  const origContent = btnEl ? btnEl.textContent : null;
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳'; }
+  try {
+    cache[key] = await computeBlueprintManufacturingProfit(bp);
+  } catch (e) {
+    console.warn('[BlueprintScan] Failed for', typeId, e);
+    cache[key] = null;
+  }
+  saveBlueprintProfitCache();
+  if (btnEl) { btnEl.disabled = false; btnEl.textContent = origContent; }
+  filterBlueprintBrowser();
+}
+window.scanSingleBlueprintProfit = scanSingleBlueprintProfit;
 
 async function scanBlueprintProfits() {
   const btn = document.getElementById('blueprint-scan-btn');
   if (btn) btn.disabled = true;
+  const cache = getBlueprintProfitCache();
 
   // Scan whatever's currently visible under the active filters, stacked first so identical
   // BPOs/BPCs aren't recomputed redundantly.
@@ -418,16 +466,17 @@ async function scanBlueprintProfits() {
   let done = 0;
   for (const bp of toScan) {
     const key = getBlueprintProfitCacheKey(bp);
-    if (_blueprintProfitCache[key] !== undefined) { done++; continue; }
+    if (cache[key] !== undefined) { done++; continue; }
     try {
-      _blueprintProfitCache[key] = await computeBlueprintManufacturingProfit(bp);
+      cache[key] = await computeBlueprintManufacturingProfit(bp);
     } catch (e) {
       console.warn('[BlueprintScan] Failed for', bp.type_id, e);
-      _blueprintProfitCache[key] = null;
+      cache[key] = null;
     }
     done++;
     if (btn) btn.textContent = `⏳ Scanning ${done}/${toScan.length}...`;
   }
+  saveBlueprintProfitCache();
 
   if (btn) { btn.disabled = false; btn.textContent = '📊 Scan Profit'; }
   filterBlueprintBrowser();
@@ -463,13 +512,17 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
   let processedList = stackEnabled ? stackBlueprints(list) : list;
 
   // Attach scanned profit data (if any) from the cache, keyed by (type, ME, TE, runs-if-BPC).
-  processedList = processedList.map(bp => ({ ...bp, _profitResult: _blueprintProfitCache[getBlueprintProfitCacheKey(bp)] }));
+  const profitCache = getBlueprintProfitCache();
+  processedList = processedList.map(bp => ({ ...bp, _profitResult: profitCache[getBlueprintProfitCacheKey(bp)] }));
 
   const renderRow = (bp, showStationLabel) => {
     const name = window.TYPE_ID_TO_NAME[bp.type_id] || `Type ${bp.type_id}`;
     const isOriginal = bp.quantity === -1;
-    const bpLabel = isOriginal ? 'BPO' : 'BPC';
     const bpImageVariant = isOriginal ? 'bp' : 'bpc';
+    // Distinct colors so BPO vs BPC is recognizable at a glance, not just from the text label.
+    const bpTypeBadge = isOriginal
+      ? `<span class="text-[10px] font-bold text-amber-300 bg-amber-950/50 border border-amber-600/50 rounded px-1.5 py-0.5 flex-shrink-0">BPO</span>`
+      : `<span class="text-[10px] font-bold text-emerald-300 bg-emerald-950/50 border border-emerald-600/50 rounded px-1.5 py-0.5 flex-shrink-0">BPC</span>`;
     const stackBadge = (bp.stackCount && bp.stackCount > 1)
       ? `<span class="text-[9px] font-bold text-cyan-300 bg-cyan-950/40 border border-cyan-700/40 rounded px-1.5 py-0.5 flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
       : '';
@@ -485,24 +538,25 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     } else if (bp._profitResult) {
       const p = bp._profitResult;
       const profitColor = p.profit >= 0 ? 'text-green-400' : 'text-red-400';
-      profitBadge = `<span class="text-[10px] font-bold ${profitColor} flex-shrink-0" title="Manufacturing profit for ${p.runsUsed} run${p.runsUsed > 1 ? 's' : ''} (${p.qtyProduced} units)${p.iskPerHour !== null ? `, ${Math.round(p.iskPerHour).toLocaleString()} ISK/hour` : ''}">${Math.round(p.profit).toLocaleString()} ISK</span>`;
+      profitBadge = `<span class="text-[10px] font-bold ${profitColor} flex-shrink-0" title="Manufacturing profit for ${p.runsUsed} run${p.runsUsed > 1 ? 's' : ''} (${p.qtyProduced} units)${p.iskPerHour !== null ? `, ${Math.round(p.iskPerHour).toLocaleString()} ISK/hour` : ''} - scanned ${formatScanAge(p.scannedAt)}">${Math.round(p.profit).toLocaleString()} ISK</span>`;
     }
     return `
       <div class="flex items-center justify-between bg-[#0d1922] border border-[#1e3348] hover:border-cyan-500 rounded p-2 transition">
         <div class="flex items-center gap-2 min-w-0 flex-1">
           <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0">
           <div class="min-w-0 flex-1">
-            <div class="font-bold text-slate-200 truncate flex items-center gap-1.5">${window.esc(name)} ${stackBadge}</div>
+            <div class="font-bold text-slate-200 truncate flex items-center gap-1.5">${window.esc(name)} ${bpTypeBadge} ${stackBadge}</div>
             <div class="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
-              <span>${bp.source} • ${bpLabel}${!isOriginal ? ` • Runs: ${bp.runs}` : ''}</span>
+              <span>${bp.source}${!isOriginal ? ` • Runs: ${bp.runs}` : ''}</span>
               ${containerBadge}${stationBadge}
             </div>
           </div>
         </div>
         <div class="flex items-center gap-2 flex-shrink-0">
           ${profitBadge}
-          <span class="text-cyan-400 font-bold text-[10px]">ME ${bp.material_efficiency}%</span>
-          <span class="text-purple-400 font-bold text-[10px]">TE ${bp.time_efficiency}%</span>
+          <span class="text-sm font-extrabold text-cyan-300 bg-cyan-950/50 border border-cyan-700/40 rounded px-2 py-1">ME ${bp.material_efficiency}%</span>
+          <span class="text-sm font-extrabold text-purple-300 bg-purple-950/50 border border-purple-700/40 rounded px-2 py-1">TE ${bp.time_efficiency}%</span>
+          <button onclick="scanSingleBlueprintProfit(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs}, ${bp.quantity}, ${bp.productTypeId || 'null'}, this)" class="px-2 py-1 bg-purple-700 hover:bg-purple-600 text-white font-bold rounded text-[10px] transition" title="Scan just this blueprint's profit">📊</button>
           <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs})" class="px-2.5 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded text-[10px] transition">Load</button>
         </div>
       </div>
