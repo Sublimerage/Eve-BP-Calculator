@@ -8,7 +8,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Invention Calculator</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=5.8.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=6.1.1">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -115,6 +115,28 @@
         </div>
 
         <div class="p-3.5 border-b border-[#1e3348] space-y-2">
+          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1.5" title="Shared with the main calculator - editing here updates it there too.">Taxes &amp; Fees</div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-[9px] text-slate-500 font-bold uppercase block mb-0.5" title="Facility/structure tax applied to every manufacturing AND invention job's installation cost.">Facility Tax %</label>
+              <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveSharedTaxSettings(); recalculateInvention();" class="w-full bg-[#0d1922] border border-[#1e3348] rounded text-center text-cyan-400 font-bold p-1 outline-none text-[11px]">
+            </div>
+            <div>
+              <label class="text-[9px] text-slate-500 font-bold uppercase block mb-0.5" title="SCC surcharge applied to every manufacturing AND invention job's installation cost.">SCC Surcharge %</label>
+              <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="w-full bg-[#0d1922] border border-[#1e3348] rounded text-center text-amber-400 font-bold p-1 outline-none text-[11px]">
+            </div>
+            <div>
+              <label class="text-[9px] text-slate-500 font-bold uppercase block mb-0.5" title="Sales tax deducted when selling the manufactured output.">Sales Tax %</label>
+              <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="w-full bg-[#0d1922] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-1 outline-none text-[11px]">
+            </div>
+            <div>
+              <label class="text-[9px] text-slate-500 font-bold uppercase block mb-0.5" title="Broker fee, applied when selling AND when buying materials via buy orders.">Broker Fee %</label>
+              <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="w-full bg-[#0d1922] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-1 outline-none text-[11px]">
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3.5 border-b border-[#1e3348] space-y-2">
           <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1" title="How many successful T2 BPCs you want to end up with. For each decryptor, the tool works out how many invention attempts that requires on average given its success chance, then totals the cost of all those attempts (successes AND failures) plus the manufacturing cost for your target BPCs.">Target: T2 BPCs Wanted</div>
           <div class="flex items-center gap-2">
             <input type="number" id="invention-target-bpcs" min="1" value="1" class="w-20 bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-amber-300 font-bold text-sm outline-none focus:border-amber-500" oninput="recalculateInvention()">
@@ -142,11 +164,11 @@
     </main>
   </div>
 
-  <script src="eve_db.js?v=5.8.0"></script>
-  <script src="js/config.js?v=5.8.0"></script>
-  <script src="js/esi.js?v=5.8.0"></script>
-  <script src="js/tree.js?v=5.8.0"></script>
-  <script src="js/optimizers.js?v=5.8.0"></script>
-  <script src="js/invention.js?v=5.8.0"></script>
+  <script src="eve_db.js?v=6.1.1"></script>
+  <script src="js/config.js?v=6.1.1"></script>
+  <script src="js/esi.js?v=6.1.1"></script>
+  <script src="js/tree.js?v=6.1.1"></script>
+  <script src="js/optimizers.js?v=6.1.1"></script>
+  <script src="js/invention.js?v=6.1.1"></script>
 </body>
 </html>

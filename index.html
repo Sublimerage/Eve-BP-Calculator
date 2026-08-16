@@ -427,6 +427,14 @@
               <span>Corp</span>
             </label>
           </div>
+          <div class="flex items-center gap-2">
+            <button id="blueprint-scan-btn" onclick="scanBlueprintProfits()" class="flex-1 px-2.5 py-1.5 bg-purple-700 hover:bg-purple-600 text-white font-bold rounded text-[10px] transition" title="Computes manufacturing profit for every visible blueprint using its real owned ME/TE/runs - can take a while for large collections">📊 Scan Profit</button>
+            <label class="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-400 font-bold flex-shrink-0">
+              <input type="checkbox" id="blueprint-sort-by-profit" onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-purple-500">
+              Sort
+            </label>
+          </div>
+
           <div>
             <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Type</div>
             <select id="blueprint-type-filter" onchange="filterBlueprintBrowser()" class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
