@@ -294,32 +294,6 @@
         </div>
       </details>
 
-      <!-- Stock & Location Filters -->
-      <details open class="group">
-        <summary class="p-3.5 cursor-pointer text-cyan-400 font-bold uppercase text-xs rajdhani tracking-wider select-none hover:bg-[#0d1922] flex items-center justify-between list-none">
-          <span class="flex items-center gap-1.5">📦 Stock &amp; Location <span id="location-search-feedback" class="text-[9px] text-amber-300 font-mono font-bold normal-case hidden"></span></span>
-          <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
-        </summary>
-        <div class="px-3.5 pb-3.5 space-y-2">
-          <div class="flex items-center gap-2">
-            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
-              <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
-              <span>Pers</span>
-            </label>
-            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
-              <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
-              <span>Corp</span>
-            </label>
-          </div>
-          <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterLocationDropdownOptions()"
-            class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-cyan-500">
-          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-amber-300 font-bold text-[11px] outline-none truncate">
-            <option value="all" selected>All Locations (Combined Assets)</option>
-            <option value="industry_system">Current System Only (JITA)</option>
-          </select>
-        </div>
-      </details>
-
     </aside>
 
     <!-- Interactive Diagram Viewport -->
@@ -366,13 +340,37 @@
         </button>
       </div>
 
-      <div class="px-4 py-2 border-b border-[#1e3348] bg-[#0d1922] flex items-center gap-2" title="Only affects this shopping list and Copy Multibuy - materials you already have in stock are excluded from what's shown/copied here. Does NOT affect Total Production Cost or Profit, which always reflect full market value regardless of stock.">
-        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Deduct Stock From List:</span>
-        <select id="deduct-stock-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1 text-cyan-300 font-bold text-[11px] outline-none">
-          <option value="true" selected>ON</option>
-          <option value="false">Off</option>
-        </select>
-      </div>
+      <details open class="border-b border-[#1e3348] group">
+        <summary class="px-4 py-2.5 cursor-pointer bg-[#0d1922] flex items-center justify-between list-none hover:bg-[#101c26]" title="Only affects this shopping list and Copy Multibuy - materials you already have in stock are excluded from what's shown/copied here. Does NOT affect Total Production Cost or Profit, which always reflect full market value regardless of stock.">
+          <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide flex items-center gap-1.5">📦 Stock &amp; Location <span id="location-search-feedback" class="text-[9px] text-amber-300 font-mono font-bold normal-case hidden"></span></span>
+          <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
+        </summary>
+        <div class="px-4 pb-3 pt-1 bg-[#0d1922] space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Deduct Stock From List:</span>
+            <select id="deduct-stock-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1 text-cyan-300 font-bold text-[11px] outline-none">
+              <option value="true" selected>ON</option>
+              <option value="false">Off</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+              <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
+              <span>Pers</span>
+            </label>
+            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+              <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
+              <span>Corp</span>
+            </label>
+          </div>
+          <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterLocationDropdownOptions()"
+            class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-cyan-500">
+          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-amber-300 font-bold text-[11px] outline-none truncate">
+            <option value="all" selected>All Locations (Combined Assets)</option>
+            <option value="industry_system">Current System Only (JITA)</option>
+          </select>
+        </div>
+      </details>
 
       <!-- BOM Items List -->
       <div id="bom-items-list" class="flex-1 overflow-y-auto p-4 space-y-2 text-xs">
@@ -396,7 +394,7 @@
 
   <!-- Blueprint Browser Drawer -->
   <div id="blueprint-browser-backdrop" class="fixed inset-0 bg-black/70 z-[998] hidden transition-opacity duration-300" onclick="closeBlueprintBrowser()"></div>
-  <div id="blueprint-browser-drawer" class="fixed top-0 right-0 h-full w-full sm:w-[920px] max-w-full bg-[#0c1318] border-l border-cyan-500/60 shadow-2xl z-[999] flex flex-col text-xs mono transform translate-x-full transition-transform duration-300 ease-out">
+  <div id="blueprint-browser-drawer" class="fixed top-0 right-0 h-full w-full sm:w-[clamp(920px,62vw,1300px)] max-w-full bg-[#0c1318] border-l border-cyan-500/60 shadow-2xl z-[999] flex flex-col text-xs mono transform translate-x-full transition-transform duration-300 ease-out">
     <div class="flex justify-between items-center border-b border-[#1e3348] px-5 py-3.5 flex-shrink-0">
       <h3 class="text-base font-bold text-cyan-300 rajdhani tracking-wider">📘 MY BLUEPRINTS</h3>
       <button onclick="closeBlueprintBrowser()" class="text-slate-400 hover:text-white font-bold text-lg leading-none">✖</button>
