@@ -136,6 +136,7 @@ function closeBlueprintBrowser() {
 window.closeBlueprintBrowser = closeBlueprintBrowser;
 
 async function loadBlueprintBrowserData() {
+  _blueprintProfitCache = {};
   const listEl = document.getElementById('blueprint-browser-list');
   if (listEl) listEl.innerHTML = `<div class="text-slate-500 italic p-4 text-center">Loading your blueprints...</div>`;
 
@@ -191,6 +192,7 @@ async function loadBlueprintBrowserData() {
     // own category (which is always "Blueprint") - resolve via the already-loaded recipe data.
     const recipe = window.recipeMap && window.recipeMap[b.type_id];
     const productTypeId = (recipe && recipe.productTypeID) || (window.BLUEPRINT_TO_PRODUCT_MAP && window.BLUEPRINT_TO_PRODUCT_MAP[b.type_id]);
+    b.productTypeId = productTypeId;
     b.categoryId = (productTypeId && window.EVE_CATEGORIES) ? window.EVE_CATEGORIES[productTypeId] : undefined;
   });
 
@@ -312,17 +314,16 @@ function blueprintMatchesLocationFilter(bp, filterVal, activeSystemName) {
 
 const BLUEPRINT_BROWSER_KNOWN_CATEGORIES = [6, 7, 18, 8, 65, 32]; // Ships, Modules, Drones, Ammo/Charges, Structures, Subsystems
 
-function filterBlueprintBrowser() {
+function getCurrentlyFilteredBlueprints() {
   const q = (document.getElementById('blueprint-browser-search')?.value || '').toLowerCase().trim();
   const loc = document.getElementById('blueprint-location-filter')?.value || 'all';
   const activeSystemName = (document.getElementById('system-search')?.value || 'JITA').toUpperCase();
   const useChar = document.getElementById('blueprint-use-char')?.checked ?? true;
   const useCorp = document.getElementById('blueprint-use-corp')?.checked ?? true;
-  const stackEnabled = document.getElementById('blueprint-stack-toggle')?.checked ?? true;
   const typeFilter = document.getElementById('blueprint-type-filter')?.value || 'all';
   const categoryFilter = document.getElementById('blueprint-category-filter')?.value || 'all';
 
-  const filtered = _blueprintBrowserData.filter(b => {
+  return _blueprintBrowserData.filter(b => {
     if (b.source === 'Personal' && !useChar) return false;
     if (b.source === 'Corp' && !useCorp) return false;
     const name = (window.TYPE_ID_TO_NAME[b.type_id] || `Type ${b.type_id}`).toLowerCase();
@@ -339,13 +340,100 @@ function filterBlueprintBrowser() {
     }
     return true;
   });
-  renderBlueprintBrowserList(filtered, stackEnabled);
+}
+
+function filterBlueprintBrowser() {
+  const stackEnabled = document.getElementById('blueprint-stack-toggle')?.checked ?? true;
+  const sortByProfit = document.getElementById('blueprint-sort-by-profit')?.checked ?? false;
+  const filtered = getCurrentlyFilteredBlueprints();
+  renderBlueprintBrowserList(filtered, stackEnabled, sortByProfit);
 }
 window.filterBlueprintBrowser = filterBlueprintBrowser;
 
 // Groups identical BPOs/BPCs into one displayed entry with a stack count - same type, ME, and TE for
 // BPOs; same type, ME, TE, AND runs for BPCs (runs isn't meaningful for a BPO, which never depletes).
 // Also correctly folds in blueprints ESI already reports as a pre-stacked group (quantity > 0).
+// --- Profit Scanner ---
+let _blueprintProfitCache = {}; // key -> {profit, iskPerHour, runsUsed, qtyProduced} | null (scan failed)
+
+function getBlueprintProfitCacheKey(bp) {
+  const isBPO = bp.quantity === -1;
+  return isBPO
+    ? `bpo|${bp.type_id}|${bp.material_efficiency}|${bp.time_efficiency}`
+    : `bpc|${bp.type_id}|${bp.material_efficiency}|${bp.time_efficiency}|${bp.runs}`;
+}
+
+// Manufacturing profit for one blueprint at its REAL owned ME/TE - for a BPC, using its actual
+// remaining runs; for a BPO (infinite runs), using 1 run as the representative unit, since ISK/hour
+// and per-run profit are what's actually comparable across BPOs and BPCs alike.
+async function computeBlueprintManufacturingProfit(bp) {
+  if (!bp.productTypeId) return null;
+  const runsToUse = (bp.quantity === -1) ? 1 : Math.max(1, bp.runs);
+
+  window.customMEOverrides = window.customMEOverrides || {};
+  window.customTEOverrides = window.customTEOverrides || {};
+  window.customMEOverrides[bp.type_id] = bp.material_efficiency;
+  window.customTEOverrides[bp.type_id] = bp.time_efficiency;
+  window.recipeTreeRootProductTypeId = bp.productTypeId;
+
+  const productName = window.TYPE_ID_TO_NAME[bp.productTypeId] || 'Item';
+  let root;
+  try {
+    root = await window.buildRecursiveRecipeTree(bp.type_id, productName + ' Blueprint', runsToUse, 0, 6, new Set(), null);
+  } finally {
+    window.recipeTreeRootProductTypeId = null;
+  }
+  if (!root) return null;
+
+  root.runsNeeded = runsToUse;
+  root.qtyNeeded = runsToUse * (root.batchYield || 1);
+  const facility = (window.getActiveStructureType ? window.getActiveStructureType().meBonus : 1.0) / 100;
+  if (typeof window.scaleTreeQuantities === 'function') window.scaleTreeQuantities(root, facility);
+
+  const allTypeIds = new Set();
+  if (typeof window.collectAllTypeIds === 'function') window.collectAllTypeIds(root, allTypeIds);
+  allTypeIds.add(bp.productTypeId);
+  if (typeof window.fetchMarketPrices === 'function') await window.fetchMarketPrices(Array.from(allTypeIds));
+
+  const materialCost = typeof window.calculateTreeNodeCost === 'function' ? window.calculateTreeNodeCost(root) : 0;
+  const outputPrices = window.priceCache[bp.productTypeId] || { sell: 0 };
+  const grossSell = outputPrices.sell * root.qtyNeeded;
+  const profit = grossSell - materialCost;
+  const buildSeconds = typeof window.calculateTotalBuildSeconds === 'function' ? window.calculateTotalBuildSeconds(root) : 0;
+  const iskPerHour = buildSeconds > 0 ? profit / (buildSeconds / 3600) : null;
+
+  return { profit, iskPerHour, runsUsed: runsToUse, qtyProduced: root.qtyNeeded };
+}
+
+async function scanBlueprintProfits() {
+  const btn = document.getElementById('blueprint-scan-btn');
+  if (btn) btn.disabled = true;
+
+  // Scan whatever's currently visible under the active filters, stacked first so identical
+  // BPOs/BPCs aren't recomputed redundantly.
+  const currentFiltered = getCurrentlyFilteredBlueprints();
+  const stackEnabled = document.getElementById('blueprint-stack-toggle')?.checked ?? true;
+  const toScan = stackEnabled ? stackBlueprints(currentFiltered) : currentFiltered;
+
+  let done = 0;
+  for (const bp of toScan) {
+    const key = getBlueprintProfitCacheKey(bp);
+    if (_blueprintProfitCache[key] !== undefined) { done++; continue; }
+    try {
+      _blueprintProfitCache[key] = await computeBlueprintManufacturingProfit(bp);
+    } catch (e) {
+      console.warn('[BlueprintScan] Failed for', bp.type_id, e);
+      _blueprintProfitCache[key] = null;
+    }
+    done++;
+    if (btn) btn.textContent = `⏳ Scanning ${done}/${toScan.length}...`;
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = '📊 Scan Profit'; }
+  filterBlueprintBrowser();
+}
+window.scanBlueprintProfits = scanBlueprintProfits;
+
 function stackBlueprints(list) {
   const groups = {};
   const order = [];
@@ -364,7 +452,7 @@ function stackBlueprints(list) {
   return order.map(key => groups[key]);
 }
 
-function renderBlueprintBrowserList(list, stackEnabled) {
+function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
   const listEl = document.getElementById('blueprint-browser-list');
   if (!listEl) return;
   if (list.length === 0) {
@@ -372,7 +460,70 @@ function renderBlueprintBrowserList(list, stackEnabled) {
     return;
   }
 
-  const processedList = stackEnabled ? stackBlueprints(list) : list;
+  let processedList = stackEnabled ? stackBlueprints(list) : list;
+
+  // Attach scanned profit data (if any) from the cache, keyed by (type, ME, TE, runs-if-BPC).
+  processedList = processedList.map(bp => ({ ...bp, _profitResult: _blueprintProfitCache[getBlueprintProfitCacheKey(bp)] }));
+
+  const renderRow = (bp, showStationLabel) => {
+    const name = window.TYPE_ID_TO_NAME[bp.type_id] || `Type ${bp.type_id}`;
+    const isOriginal = bp.quantity === -1;
+    const bpLabel = isOriginal ? 'BPO' : 'BPC';
+    const bpImageVariant = isOriginal ? 'bp' : 'bpc';
+    const stackBadge = (bp.stackCount && bp.stackCount > 1)
+      ? `<span class="text-[9px] font-bold text-cyan-300 bg-cyan-950/40 border border-cyan-700/40 rounded px-1.5 py-0.5 flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
+      : '';
+    const containerBadge = bp.containerName
+      ? `<span class="text-[9px] font-bold text-amber-400 bg-amber-950/40 border border-amber-700/40 rounded px-1.5 py-0.5 flex-shrink-0" title="Inside container: ${window.esc(bp.containerName)}">📦 ${window.esc(bp.containerName)}</span>`
+      : '';
+    const stationBadge = showStationLabel
+      ? `<span class="text-[9px] text-slate-500 flex-shrink-0" title="${window.esc(bp.stationName)}">📍 ${window.esc(bp.stationName)}</span>`
+      : '';
+    let profitBadge = '';
+    if (bp._profitResult === null) {
+      profitBadge = `<span class="text-[9px] text-red-400 font-bold flex-shrink-0" title="Profit scan failed for this item - see console">⚠ scan failed</span>`;
+    } else if (bp._profitResult) {
+      const p = bp._profitResult;
+      const profitColor = p.profit >= 0 ? 'text-green-400' : 'text-red-400';
+      profitBadge = `<span class="text-[10px] font-bold ${profitColor} flex-shrink-0" title="Manufacturing profit for ${p.runsUsed} run${p.runsUsed > 1 ? 's' : ''} (${p.qtyProduced} units)${p.iskPerHour !== null ? `, ${Math.round(p.iskPerHour).toLocaleString()} ISK/hour` : ''}">${Math.round(p.profit).toLocaleString()} ISK</span>`;
+    }
+    return `
+      <div class="flex items-center justify-between bg-[#0d1922] border border-[#1e3348] hover:border-cyan-500 rounded p-2 transition">
+        <div class="flex items-center gap-2 min-w-0 flex-1">
+          <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0">
+          <div class="min-w-0 flex-1">
+            <div class="font-bold text-slate-200 truncate flex items-center gap-1.5">${window.esc(name)} ${stackBadge}</div>
+            <div class="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
+              <span>${bp.source} • ${bpLabel}${!isOriginal ? ` • Runs: ${bp.runs}` : ''}</span>
+              ${containerBadge}${stationBadge}
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          ${profitBadge}
+          <span class="text-cyan-400 font-bold text-[10px]">ME ${bp.material_efficiency}%</span>
+          <span class="text-purple-400 font-bold text-[10px]">TE ${bp.time_efficiency}%</span>
+          <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs})" class="px-2.5 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded text-[10px] transition">Load</button>
+        </div>
+      </div>
+    `;
+  };
+
+  if (sortByProfit) {
+    // Flat list, ranked by profit regardless of station - grouping by location doesn't make sense
+    // when the whole point is "which of my blueprints is most worth building right now."
+    const sorted = [...processedList].sort((a, b) => {
+      const av = a._profitResult ? a._profitResult.profit : -Infinity;
+      const bv = b._profitResult ? b._profitResult.profit : -Infinity;
+      return bv - av;
+    });
+    const unscannedCount = sorted.filter(bp => bp._profitResult === undefined).length;
+    const hint = unscannedCount > 0
+      ? `<div class="text-[10px] text-amber-400 italic mb-2 px-1">${unscannedCount} item${unscannedCount > 1 ? 's' : ''} not yet scanned - click "📊 Scan Profit" to include them in the ranking.</div>`
+      : '';
+    listEl.innerHTML = hint + `<div class="space-y-1.5">${sorted.map(bp => renderRow(bp, true)).join('')}</div>`;
+    return;
+  }
 
   // Group by station so blueprints are clearly parented to the station they're actually in, not
   // shown as a flat list.
@@ -385,37 +536,7 @@ function renderBlueprintBrowserList(list, stackEnabled) {
 
   // ESI convention: quantity -1 = original (BPO), -2 = copy (BPC); positive quantity = a stack of BPCs.
   listEl.innerHTML = Object.keys(byStation).sort().map(stationName => {
-    const rows = byStation[stationName].map(bp => {
-      const name = window.TYPE_ID_TO_NAME[bp.type_id] || `Type ${bp.type_id}`;
-      const isOriginal = bp.quantity === -1;
-      const bpLabel = isOriginal ? 'BPO' : 'BPC';
-      const bpImageVariant = isOriginal ? 'bp' : 'bpc';
-      const stackBadge = (bp.stackCount && bp.stackCount > 1)
-        ? `<span class="text-[9px] font-bold text-cyan-300 bg-cyan-950/40 border border-cyan-700/40 rounded px-1.5 py-0.5 flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
-        : '';
-      const containerBadge = bp.containerName
-        ? `<span class="text-[9px] font-bold text-amber-400 bg-amber-950/40 border border-amber-700/40 rounded px-1.5 py-0.5 flex-shrink-0" title="Inside container: ${window.esc(bp.containerName)}">📦 ${window.esc(bp.containerName)}</span>`
-        : '';
-      return `
-        <div class="flex items-center justify-between bg-[#0d1922] border border-[#1e3348] hover:border-cyan-500 rounded p-2 transition">
-          <div class="flex items-center gap-2 min-w-0 flex-1">
-            <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0">
-            <div class="min-w-0 flex-1">
-              <div class="font-bold text-slate-200 truncate flex items-center gap-1.5">${window.esc(name)} ${stackBadge}</div>
-              <div class="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
-                <span>${bp.source} • ${bpLabel}${!isOriginal ? ` • Runs: ${bp.runs}` : ''}</span>
-                ${containerBadge}
-              </div>
-            </div>
-          </div>
-          <div class="flex items-center gap-2 flex-shrink-0">
-            <span class="text-cyan-400 font-bold text-[10px]">ME ${bp.material_efficiency}%</span>
-            <span class="text-purple-400 font-bold text-[10px]">TE ${bp.time_efficiency}%</span>
-            <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs})" class="px-2.5 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded text-[10px] transition">Load</button>
-          </div>
-        </div>
-      `;
-    }).join('');
+    const rows = byStation[stationName].map(bp => renderRow(bp, false)).join('');
     return `
       <div class="mb-3">
         <div class="text-[10px] font-bold text-cyan-300 uppercase tracking-wide mb-1.5 px-1">📍 ${window.esc(stationName)}</div>
