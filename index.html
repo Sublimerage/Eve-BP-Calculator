@@ -7,45 +7,56 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>EVE Online Industry Ledger</title>
+<title>EVE Deep-Industry Engine</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link class="cache-bust" rel="stylesheet" href="css/styles.css?v=4.3.1">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
   <!-- Header: branding + primary account/nav actions only -->
-  <header class="bg-[#0c1318] border-b border-[#1e3348] px-5 py-2.5 flex flex-wrap justify-between items-center gap-2 shadow-xl z-30">
+  <header class="bg-[#0c1318] border-b border-[#1e3348] px-5 py-2.5 flex flex-wrap justify-between items-center gap-3 shadow-xl z-30">
     <div class="flex items-center space-x-3">
       <div class="w-10 h-10 bg-cyan-500 rounded flex items-center justify-center font-bold text-black text-2xl rajdhani shadow-lg shadow-cyan-500/20">E</div>
       <h1 class="text-lg font-bold tracking-widest text-white rajdhani leading-none">EVE DEEP-INDUSTRY ENGINE</h1>
     </div>
 
-    <div class="flex items-center gap-2 text-xs mono flex-wrap">
-      <div id="esi-login-container">
-        <button onclick="startEsiSSOLogin()" class="px-3.5 py-2 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-md transition flex items-center gap-1.5 shadow text-xs" title="Login with EVE Online to import your character assets">
-          🔐 <span class="hidden sm:inline">EVE SSO Login</span>
+    <div class="flex items-center gap-3 mono flex-wrap">
+
+      <!-- Primary destinations: the app's three main workspaces, given real visual weight so they
+           read as "go here", not just another button in a row of equals. -->
+      <nav class="flex items-center gap-2">
+        <button onclick="openBlueprintBrowser()" class="px-4 py-2.5 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-lg transition-all text-sm shadow-lg shadow-cyan-900/40 border border-cyan-500/40 flex items-center gap-2 hover:-translate-y-0.5" title="Browse your owned blueprints (BPOs/BPCs) and load one straight into the calculator with its real ME/TE">
+          <span class="text-base">📘</span> <span class="hidden sm:inline">My Blueprints</span>
+        </button>
+
+        <a href="ledger.html" class="px-4 py-2.5 bg-purple-700 hover:bg-purple-600 text-white font-bold rounded-lg transition-all text-sm shadow-lg shadow-purple-900/40 border border-purple-500/40 flex items-center gap-2 hover:-translate-y-0.5" title="View your consolidated manufacturing jobs queue">
+          <span class="text-base">📖</span> <span class="hidden sm:inline">Ledger</span> <span id="header-journal-count" class="bg-purple-950 text-purple-200 text-[10px] px-1.5 py-0.5 rounded-full font-bold">0</span>
+        </a>
+
+        <a href="invention.html" class="px-4 py-2.5 bg-amber-700 hover:bg-amber-600 text-white font-bold rounded-lg transition-all text-sm shadow-lg shadow-amber-900/40 border border-amber-500/40 flex items-center gap-2 hover:-translate-y-0.5" title="Compare invention decryptor options and see which gives the best expected profit">
+          <span class="text-base">🧪</span> <span class="hidden sm:inline">Invention</span>
+        </a>
+      </nav>
+
+      <div class="w-px h-7 bg-[#1e3348] hidden md:block"></div>
+
+      <!-- Secondary utilities: used rarely, so deliberately quieter and smaller than the destinations above. -->
+      <div class="flex items-center gap-1.5">
+        <button onclick="refreshLiveAssets()" class="px-2 py-1.5 bg-transparent hover:bg-[#1e3348] text-slate-500 hover:text-slate-200 rounded-md transition text-[10px] flex items-center gap-1" title="Fetch latest live character and corp assets from EVE Online">
+          🔄 <span class="hidden xl:inline">Refresh Assets</span>
+        </button>
+        <button onclick="openPasteModal()" class="px-2 py-1.5 bg-transparent hover:bg-[#1e3348] text-slate-500 hover:text-slate-200 rounded-md transition text-[10px] flex items-center gap-1" title="Paste in-game inventory text to import stock">
+          📋 <span class="hidden xl:inline">Paste Hangar</span>
         </button>
       </div>
 
-      <button onclick="refreshLiveAssets()" class="px-3 py-2 bg-cyan-900/80 hover:bg-cyan-700 text-cyan-200 font-bold rounded-md transition text-xs shadow border border-cyan-500/40 flex items-center gap-1.5" title="Fetch latest live character and corp assets from EVE Online">
-        🔄 <span class="hidden md:inline">Refresh Assets</span>
-      </button>
+      <div class="w-px h-7 bg-[#1e3348] hidden md:block"></div>
 
-      <button onclick="openPasteModal()" class="px-3 py-2 bg-[#1e3348] hover:bg-slate-600 text-slate-100 font-bold rounded-md transition text-xs shadow flex items-center gap-1.5" title="Paste in-game inventory text to import stock">
-        📋 <span class="hidden md:inline">Paste Hangar</span>
-      </button>
-
-      <button onclick="openBlueprintBrowser()" class="px-3 py-2 bg-[#1e3348] hover:bg-slate-600 text-slate-100 font-bold rounded-md transition text-xs shadow flex items-center gap-1.5" title="Browse your owned blueprints (BPOs/BPCs) and load one straight into the calculator with its real ME/TE">
-        📘 <span class="hidden md:inline">My Blueprints</span>
-      </button>
-
-      <a href="ledger.html" class="px-3.5 py-2 bg-purple-700 hover:bg-purple-600 text-purple-100 font-bold rounded-md transition text-xs shadow flex items-center gap-1.5" title="View your consolidated manufacturing jobs queue">
-        📖 <span class="hidden sm:inline">View Ledger</span> <span id="header-journal-count" class="bg-purple-950 text-purple-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">0</span>
-      </a>
-
-      <a href="invention.html" class="px-3.5 py-2 bg-[#1e3348] hover:bg-slate-600 text-slate-100 font-bold rounded-md transition text-xs shadow flex items-center gap-1.5" title="Compare invention decryptor options and see which gives the best expected profit">
-        🧪 <span class="hidden sm:inline">Invention</span>
-      </a>
+      <div id="esi-login-container">
+        <button onclick="startEsiSSOLogin()" class="px-3.5 py-2 bg-cyan-900/60 hover:bg-cyan-700 text-cyan-200 hover:text-white font-bold rounded-md transition flex items-center gap-1.5 border border-cyan-600/30 text-xs" title="Login with EVE Online to import your character assets">
+          🔐 <span class="hidden sm:inline">EVE SSO Login</span>
+        </button>
+      </div>
 
       <div id="status-badge" class="px-3 py-2 bg-[#0d1922] border border-[#1e3348] rounded-md flex items-center gap-2 text-xs shadow">
         <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0"></span>

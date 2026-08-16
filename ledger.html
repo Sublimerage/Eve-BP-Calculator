@@ -20,20 +20,24 @@
       <h1 class="text-lg font-bold tracking-widest text-white rajdhani leading-none">EVE INDUSTRY LEDGER</h1>
     </div>
 
-    <div class="flex items-center gap-2 text-xs mono flex-wrap">
+    <div class="flex items-center gap-3 mono flex-wrap">
+      <nav class="flex items-center gap-2">
+        <a href="index.html" class="px-4 py-2.5 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-lg transition-all text-sm shadow-lg shadow-cyan-900/40 border border-cyan-500/40 flex items-center gap-2 hover:-translate-y-0.5" title="Go back to the interactive recipe tree calculator">
+          <span class="text-base">⬅</span> <span class="hidden sm:inline">Calculator</span>
+        </a>
+
+        <a href="invention.html" class="px-4 py-2.5 bg-amber-700 hover:bg-amber-600 text-white font-bold rounded-lg transition-all text-sm shadow-lg shadow-amber-900/40 border border-amber-500/40 flex items-center gap-2 hover:-translate-y-0.5" title="Compare invention decryptor options and see which gives the best expected profit">
+          <span class="text-base">🧪</span> <span class="hidden sm:inline">Invention</span>
+        </a>
+      </nav>
+
+      <div class="w-px h-7 bg-[#1e3348] hidden md:block"></div>
+
       <div id="esi-login-container">
-        <button onclick="startEsiSSOLogin()" class="px-3.5 py-2 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-md transition flex items-center gap-1.5 shadow text-xs" title="Login with EVE Online to import your character assets">
+        <button onclick="startEsiSSOLogin()" class="px-3.5 py-2 bg-cyan-900/60 hover:bg-cyan-700 text-cyan-200 hover:text-white font-bold rounded-md transition flex items-center gap-1.5 border border-cyan-600/30 text-xs" title="Login with EVE Online to import your character assets">
           🔐 <span class="hidden sm:inline">EVE SSO Login</span>
         </button>
       </div>
-
-      <a href="index.html" class="px-3.5 py-2 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-md transition text-xs shadow flex items-center gap-1.5" title="Go back to the interactive recipe tree calculator">
-        ⬅ <span class="hidden sm:inline">Back to Calculator</span>
-      </a>
-
-      <a href="invention.html" class="px-3.5 py-2 bg-[#1e3348] hover:bg-slate-600 text-slate-100 font-bold rounded-md transition text-xs shadow flex items-center gap-1.5" title="Compare invention decryptor options and see which gives the best expected profit">
-        🧪 <span class="hidden sm:inline">Invention</span>
-      </a>
     </div>
   </header>
 
@@ -260,11 +264,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=6.2.0"></script>
-  <script src="js/config.js?v=6.2.0"></script>
-  <script src="js/esi.js?v=6.2.0"></script>
-  <script src="js/tree.js?v=6.2.0"></script>
-  <script src="js/optimizers.js?v=6.2.0"></script>
-  <script src="js/ledger.js?v=6.2.0"></script>
+  <script src="eve_db.js?v=6.4.0"></script>
+  <script src="js/config.js?v=6.4.0"></script>
+  <script src="js/esi.js?v=6.4.0"></script>
+  <script src="js/tree.js?v=6.4.0"></script>
+  <script src="js/optimizers.js?v=6.4.0"></script>
+  <script src="js/ledger.js?v=6.4.0"></script>
 </body>
 </html>
