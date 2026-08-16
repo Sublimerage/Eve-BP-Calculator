@@ -519,10 +519,6 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     const name = window.TYPE_ID_TO_NAME[bp.type_id] || `Type ${bp.type_id}`;
     const isOriginal = bp.quantity === -1;
     const bpImageVariant = isOriginal ? 'bp' : 'bpc';
-    // Distinct colors so BPO vs BPC is recognizable at a glance, not just from the text label.
-    const bpTypeBadge = isOriginal
-      ? `<span class="text-[10px] font-bold text-amber-300 bg-amber-950/50 border border-amber-600/50 rounded px-1.5 py-0.5 flex-shrink-0">BPO</span>`
-      : `<span class="text-[10px] font-bold text-emerald-300 bg-emerald-950/50 border border-emerald-600/50 rounded px-1.5 py-0.5 flex-shrink-0">BPC</span>`;
     const stackBadge = (bp.stackCount && bp.stackCount > 1)
       ? `<span class="text-[9px] font-bold text-cyan-300 bg-cyan-950/40 border border-cyan-700/40 rounded px-1.5 py-0.5 flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
       : '';
@@ -534,30 +530,31 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
       : '';
     let profitBadge = '';
     if (bp._profitResult === null) {
-      profitBadge = `<span class="text-[9px] text-red-400 font-bold flex-shrink-0" title="Profit scan failed for this item - see console">⚠ scan failed</span>`;
+      profitBadge = `<span class="text-xs text-red-400 font-bold flex-shrink-0 whitespace-nowrap" title="Profit scan failed for this item - see console">⚠ scan failed</span>`;
     } else if (bp._profitResult) {
       const p = bp._profitResult;
       const profitColor = p.profit >= 0 ? 'text-green-400' : 'text-red-400';
-      profitBadge = `<span class="text-[10px] font-bold ${profitColor} flex-shrink-0" title="Manufacturing profit for ${p.runsUsed} run${p.runsUsed > 1 ? 's' : ''} (${p.qtyProduced} units)${p.iskPerHour !== null ? `, ${Math.round(p.iskPerHour).toLocaleString()} ISK/hour` : ''} - scanned ${formatScanAge(p.scannedAt)}">${Math.round(p.profit).toLocaleString()} ISK</span>`;
+      profitBadge = `<span class="text-sm font-extrabold ${profitColor} flex-shrink-0 whitespace-nowrap" title="Manufacturing profit for ${p.runsUsed} run${p.runsUsed > 1 ? 's' : ''} (${p.qtyProduced} units)${p.iskPerHour !== null ? `, ${Math.round(p.iskPerHour).toLocaleString()} ISK/hour` : ''} - scanned ${formatScanAge(p.scannedAt)}">${Math.round(p.profit).toLocaleString()} ISK</span>`;
     }
     return `
-      <div class="flex items-center justify-between bg-[#0d1922] border border-[#1e3348] hover:border-cyan-500 rounded p-2 transition">
-        <div class="flex items-center gap-2 min-w-0 flex-1">
-          <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0">
-          <div class="min-w-0 flex-1">
-            <div class="font-bold text-slate-200 truncate flex items-center gap-1.5">${window.esc(name)} ${bpTypeBadge} ${stackBadge}</div>
-            <div class="text-[10px] text-slate-500 truncate flex items-center gap-1.5">
-              <span>${bp.source}${!isOriginal ? ` • Runs: ${bp.runs}` : ''}</span>
-              ${containerBadge}${stationBadge}
-            </div>
-          </div>
+      <div class="bg-[#0d1922] border border-[#1e3348] hover:border-cyan-500 rounded p-2.5 transition space-y-2">
+        <div class="flex items-center gap-2 min-w-0">
+          <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" title="${isOriginal ? 'Blueprint Original (BPO)' : 'Blueprint Copy (BPC)'}">
+          <span class="font-bold text-slate-200 min-w-0">${window.esc(name)}</span>
+          ${stackBadge}
         </div>
-        <div class="flex items-center gap-2 flex-shrink-0">
-          ${profitBadge}
-          <span class="text-sm font-extrabold text-cyan-300 bg-cyan-950/50 border border-cyan-700/40 rounded px-2 py-1">ME ${bp.material_efficiency}%</span>
-          <span class="text-sm font-extrabold text-purple-300 bg-purple-950/50 border border-purple-700/40 rounded px-2 py-1">TE ${bp.time_efficiency}%</span>
-          <button onclick="scanSingleBlueprintProfit(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs}, ${bp.quantity}, ${bp.productTypeId || 'null'}, this)" class="px-2 py-1 bg-purple-700 hover:bg-purple-600 text-white font-bold rounded text-[10px] transition" title="Scan just this blueprint's profit">📊</button>
-          <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs})" class="px-2.5 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded text-[10px] transition">Load</button>
+        <div class="flex items-center justify-between gap-3">
+          <div class="text-[10px] text-slate-500 truncate flex items-center gap-1.5 min-w-0">
+            <span class="flex-shrink-0">${bp.source}${!isOriginal ? ` • Runs: ${bp.runs}` : ''}</span>
+            ${containerBadge}${stationBadge}
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            ${profitBadge}
+            <span class="text-[11px] font-bold text-cyan-300 bg-cyan-950/50 border border-cyan-700/40 rounded px-1.5 py-0.5 whitespace-nowrap">ME ${bp.material_efficiency}%</span>
+            <span class="text-[11px] font-bold text-purple-300 bg-purple-950/50 border border-purple-700/40 rounded px-1.5 py-0.5 whitespace-nowrap">TE ${bp.time_efficiency}%</span>
+            <button onclick="scanSingleBlueprintProfit(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs}, ${bp.quantity}, ${bp.productTypeId || 'null'}, this)" class="px-2 py-1 bg-purple-700 hover:bg-purple-600 text-white font-bold rounded text-[10px] transition" title="Scan just this blueprint's profit">📊</button>
+            <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs})" class="px-2.5 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded text-[10px] transition">Load</button>
+          </div>
         </div>
       </div>
     `;
