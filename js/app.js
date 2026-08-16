@@ -822,8 +822,15 @@ function searchItems(query) {
   if (!q) return [];
   const exact = [], starts = [], contains = [];
   for (const [k, v] of Object.entries(window.IDX || {})) {
+    // Both checks matter here: the name pattern keeps results to "X Blueprint"/"X Reaction Formula"
+    // style entries specifically (recipeMap is dual-indexed by product AND blueprint ID, so without
+    // this a plain product name like "Rifter" would show up as a separate duplicate result alongside
+    // "Rifter Blueprint" for the exact same recipe). The recipe-existence check catches phantom
+    // entries that pass the name pattern but have no real data behind them (e.g. "Synth Drop Booster
+    // Reaction" - a different item than the real "...Reaction Formula" that shares part of its name).
     const isBlueprint = k.includes('blueprint') || k.includes('formula') || k.includes('reaction');
     if (!isBlueprint) continue;
+    if (!window.recipeMap || !window.recipeMap[v.id]) continue;
 
     if (k === q) exact.push(v);
     else if (k.startsWith(q)) starts.push(v);
