@@ -366,13 +366,8 @@
           <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
         </summary>
         <div class="px-4 pb-3 pt-1 bg-[#0d1922] space-y-2">
-          <div class="flex items-center justify-between">
-            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Deduct Stock From List:</span>
-            <select id="deduct-stock-mode" onchange="recalculate()" class="bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1 text-cyan-300 font-bold text-[11px] outline-none">
-              <option value="true" selected>ON</option>
-              <option value="false">Off</option>
-            </select>
-          </div>
+          <button id="deduct-stock-mode" value="true" onclick="toggleDeductStockButton(this, 'recalculate')" class="w-full px-3 py-1.5 rounded-md font-bold text-xs transition flex items-center justify-center gap-1.5 bg-cyan-700 hover:bg-cyan-600 text-white border border-cyan-400 shadow shadow-cyan-900/40" title="Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead">✔ Deducting Stock</button>
+
           <div class="flex items-center gap-2">
             <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
               <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">

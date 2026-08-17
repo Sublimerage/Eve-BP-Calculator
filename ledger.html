@@ -50,10 +50,6 @@
       </div>
 
       <div class="flex items-center gap-2 flex-wrap">
-        <select id="deduct-stock-mode" onchange="recalculateJournalStock()" class="bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-cyan-300 font-bold text-[11px] outline-none">
-          <option value="true" selected>Deduct (ON)</option>
-          <option value="false">Off</option>
-        </select>
 
         <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
           <input type="checkbox" id="use-char-assets" checked onchange="applyJournalStockFilter()" class="w-3.5 h-3.5 accent-cyan-500">
@@ -103,13 +99,8 @@
       <div id="journal-materials-cost" class="text-lg font-bold text-green-400 mono leading-tight">0 ISK</div>
     </div>
 
-    <div class="bg-[#0d1922] border border-green-600/40 px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center" title="Total net sell profit across every job currently in the queue. * means one or more queued jobs predate profit tracking and are excluded.">
-      <div class="flex items-center justify-between gap-1">
-        <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Potential Profit</div>
-        <button id="profit-stock-toggle" onclick="toggleProfitStockMode()" class="text-[8px] px-1.5 py-0.5 rounded font-bold mono uppercase tracking-wide bg-cyan-800 text-cyan-100 flex-shrink-0" title="Toggle whether profit calculations credit materials you already have in stock">
-            With Stock
-        </button>
-      </div>
+    <div class="bg-[#0d1922] border border-green-600/40 px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center" title="Total net sell profit across every job currently in the queue, at full market cost. * means one or more queued jobs predate profit tracking and are excluded.">
+      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Potential Profit</div>
       <div id="journal-total-profit" class="text-lg font-bold text-green-400 mono leading-tight">0 ISK</div>
     </div>
   </section>
@@ -173,6 +164,7 @@
 
       <!-- Sidebar BOM Filter controls -->
       <div class="px-4 py-3 border-b border-[#1e3348] bg-[#0d1922] space-y-2 flex flex-col">
+        <button id="deduct-stock-mode" value="true" onclick="toggleDeductStockButton(this, 'recalculateJournalStock')" class="w-full px-3 py-1.5 rounded-md font-bold text-xs transition flex items-center justify-center gap-1.5 bg-cyan-700 hover:bg-cyan-600 text-white border border-cyan-400 shadow shadow-cyan-900/40" title="Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead">✔ Deducting Stock</button>
         <!-- Order Type Strategy Filter -->
         <div class="flex items-center justify-between text-[11px] mono">
           <span class="text-slate-400 font-bold">Order Type:</span>
@@ -264,11 +256,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=6.4.0"></script>
-  <script src="js/config.js?v=6.4.0"></script>
-  <script src="js/esi.js?v=6.4.0"></script>
-  <script src="js/tree.js?v=6.4.0"></script>
-  <script src="js/optimizers.js?v=6.4.0"></script>
-  <script src="js/ledger.js?v=6.4.0"></script>
+  <script src="eve_db.js?v=6.9.0"></script>
+  <script src="js/config.js?v=6.9.0"></script>
+  <script src="js/esi.js?v=6.9.0"></script>
+  <script src="js/tree.js?v=6.9.0"></script>
+  <script src="js/optimizers.js?v=6.9.0"></script>
+  <script src="js/ledger.js?v=6.9.0"></script>
 </body>
 </html>
