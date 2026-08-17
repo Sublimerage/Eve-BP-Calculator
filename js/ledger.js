@@ -105,59 +105,29 @@ function getItemCategory(typeId, name) {
   return 'others';
 }
 
-// --- Profit-with-stock toggle ---
-// Defaults to NOT crediting stock: owning a material doesn't make it free to consume - using it here
-// means you can't sell it or use it elsewhere, so it has real opportunity cost. Crediting it as zero
-// cost (the old default) understated build cost and inflated profit, sometimes drastically for jobs
-// where most materials happened to already be in stock.
-function getProfitStockMode() {
-  return localStorage.getItem('eve_ledger_profit_stock_mode') || 'without';
-}
-
-// The ISK value of materials that were already in stock when this job was added (valued at the same
-// market price used for the rest of the job - sell price by default) - this is exactly the amount
-// that was subtracted from cost (and added to profit) at add-time under the old always-credit
-// behavior. Adding it back in shows the full, true cost as if every material had to be bought.
+// --- Profit display (always full cost - stock never affects profit, only the BOM shopping list) ---
+// job.netProfit/job.calculatedCost are ALREADY full market cost from the moment they're calculated
+// (calculateTreeNodeCost never credits stock - this has been the architecture since early on). A
+// previous version of this file had a toggle that subtracted a stock-credit value from netProfit in
+// "Full Cost" mode - but since netProfit was never stock-discounted to begin with, that subtraction
+// was double-counting the stock value, which is what caused profit to swing wildly, sometimes
+// severely negative. Stock only ever affects the consolidated BOM (shopping list) now - these
+// functions keep their names so existing call sites don't need individual changes, but always return
+// the real, unmodified value.
 function getJobStockCreditValue(job) {
-  if (!Array.isArray(job.materials)) return 0;
-  return job.materials.reduce((sum, m) => sum + ((m.stockQty || 0) * (m.unitPrice || 0)), 0);
+  return 0;
 }
 window.getJobStockCreditValue = getJobStockCreditValue;
 
-// "with" = credit stock (cheaper cost, higher profit, treats owned materials as free - the old,
-// misleading default). "without" = full cost as if everything had to be bought (the new default).
 function getEffectiveJobCost(job) {
-  const cost = job.calculatedCost || 0;
-  return getProfitStockMode() === 'with' ? cost : cost + getJobStockCreditValue(job);
+  return job.calculatedCost || 0;
 }
 window.getEffectiveJobCost = getEffectiveJobCost;
 
 function getEffectiveJobProfit(job) {
-  if (job.netProfit === undefined) return undefined;
-  return getProfitStockMode() === 'with' ? job.netProfit : job.netProfit - getJobStockCreditValue(job);
+  return job.netProfit;
 }
 window.getEffectiveJobProfit = getEffectiveJobProfit;
-
-function toggleProfitStockMode() {
-  localStorage.setItem('eve_ledger_profit_stock_mode', getProfitStockMode() === 'with' ? 'without' : 'with');
-  renderJournalPage();
-}
-window.toggleProfitStockMode = toggleProfitStockMode;
-
-function updateProfitStockToggleButton() {
-  const btn = document.getElementById('profit-stock-toggle');
-  if (!btn) return;
-  const mode = getProfitStockMode();
-  if (mode === 'with') {
-    btn.textContent = 'Crediting Stock';
-    btn.className = 'text-xs px-1.5 py-0.5 rounded font-bold mono uppercase tracking-wide bg-amber-800 text-amber-100 flex-shrink-0';
-    btn.title = 'Materials you already have in stock are being treated as free (0 ISK cost) - click to count them at full value instead';
-  } else {
-    btn.textContent = 'Full Cost';
-    btn.className = 'text-xs px-1.5 py-0.5 rounded font-bold mono uppercase tracking-wide bg-cyan-800 text-cyan-100 flex-shrink-0';
-    btn.title = 'Materials you already have in stock are valued at their market price (not free) - click to instead treat them as a free cost credit';
-  }
-}
 
 function renderJournalPage() {
   loadJournalState();
@@ -184,7 +154,6 @@ function renderJournalPage() {
       }
     }
   });
-  updateProfitStockToggleButton();
 
   if (activeJobsCountEl) activeJobsCountEl.textContent = activeJobs.length.toLocaleString();
   if (totalCostEl) totalCostEl.textContent = Math.round(totalActiveCost).toLocaleString() + ' ISK';
@@ -196,7 +165,10 @@ function renderJournalPage() {
 
   const consolidatedBOM = {};
   activeJobs.forEach(job => {
-    if (job && Array.isArray(job.materials)) {
+    // Already-started jobs have already committed their materials - a "what do I still need to
+    // buy" list has nothing useful to say about them, so they're excluded entirely rather than
+    // showing up as clutter (often at 0 qty needed, which conveys nothing).
+    if (job && !job.isStarted && Array.isArray(job.materials)) {
       job.materials.forEach(mat => {
         if (!mat || !mat.typeId) return;
         if (activeOrderFilter !== 'all' && mat.strategy !== activeOrderFilter) return;
@@ -1329,9 +1301,12 @@ function renderBuildHistoryLedger() {
     let historyProfitMissing = false;
     buildHistory.forEach(record => {
       if (record) {
-        const effProfit = getEffectiveJobProfit(record);
-        if (effProfit !== undefined) {
-          totalHistoryProfit += effProfit;
+        // History records use their own stored netProfit directly - NOT getEffectiveJobProfit(), which
+        // applies the stock-credit toggle. A completed job's profit is a fixed historical fact from
+        // when it finished; it shouldn't fluctuate based on a live "with/without stock credit" display
+        // preference the way a still-pending job's projected profit reasonably can.
+        if (record.netProfit !== undefined) {
+          totalHistoryProfit += record.netProfit;
         } else if (!record.isSubBuild) {
           historyProfitMissing = true;
         }

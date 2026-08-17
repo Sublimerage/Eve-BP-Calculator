@@ -5,6 +5,32 @@ function esc(s) {
 }
 window.esc = esc;
 
+// Shared toggle-button handler for "Deduct Stock" controls across all pages - a clear on/off button
+// instead of a dropdown, but keeps the exact same id="deduct-stock-mode" + .value === 'true' pattern
+// every read site already uses, since <button value="..."> supports .value identically to <select>.
+function toggleDeductStockButton(btn, recalcFnName) {
+  if (!btn) return;
+  const newValue = btn.value === 'true' ? 'false' : 'true';
+  btn.value = newValue;
+  updateDeductStockButtonVisual(btn);
+  if (recalcFnName && typeof window[recalcFnName] === 'function') window[recalcFnName]();
+}
+window.toggleDeductStockButton = toggleDeductStockButton;
+
+function updateDeductStockButtonVisual(btn) {
+  if (!btn) return;
+  if (btn.value === 'true') {
+    btn.textContent = '✔ Deducting Stock';
+    btn.className = 'px-3 py-1.5 rounded-md font-bold text-xs transition flex items-center gap-1.5 bg-cyan-700 hover:bg-cyan-600 text-white border border-cyan-400 shadow shadow-cyan-900/40';
+    btn.title = 'Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead';
+  } else {
+    btn.textContent = '✖ Not Deducting Stock';
+    btn.className = 'px-3 py-1.5 rounded-md font-bold text-xs transition flex items-center gap-1.5 bg-[#1e3348] hover:bg-slate-600 text-slate-300 border border-slate-600';
+    btn.title = 'Shopping list/multibuy below shows the FULL amount needed, even for materials you already own - click to deduct owned stock instead';
+  }
+}
+window.updateDeductStockButtonVisual = updateDeductStockButtonVisual;
+
 function safeParseJSON(str, fallback) {
   if (!str || str === 'undefined' || str === 'null') return fallback;
   try {
@@ -57,6 +83,7 @@ var isolatedInstanceId = null;
 var collapsedInstanceIds = new Set(); // instanceIds of nodes whose children are hidden from the diagram
 var activeMfgSCI = 0.0425;
 var activeReactSCI = 0.0110;
+var activeInventionSCI = 0.0200;
 var zoomScale = 1.0;
 var panX = 0;
 var panY = 0;
@@ -203,6 +230,7 @@ window.isolatedInstanceId = isolatedInstanceId;
 window.collapsedInstanceIds = collapsedInstanceIds;
 window.activeMfgSCI = activeMfgSCI;
 window.activeReactSCI = activeReactSCI;
+window.activeInventionSCI = activeInventionSCI;
 window.zoomScale = zoomScale;
 window.panX = panX;
 window.panY = panY;
