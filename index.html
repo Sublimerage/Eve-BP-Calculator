@@ -182,6 +182,15 @@
           <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
         </summary>
         <div class="px-3.5 pb-3.5 space-y-2">
+          <div class="p-2 bg-[#070b0f] rounded-md border border-[#1e3348] space-y-1.5">
+            <div class="flex items-center gap-1.5">
+              <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="flex-1 min-w-0 bg-[#0d1922] border border-[#1e3348] rounded px-2 py-1.5 text-emerald-300 font-bold text-xs outline-none">
+                <option value="">— Load a saved production station —</option>
+              </select>
+              <button onclick="deleteProductionPreset()" class="px-2 py-1.5 bg-[#1e3348] hover:bg-red-800 text-slate-400 hover:text-red-200 rounded transition text-xs flex-shrink-0" title="Delete the currently-selected preset">🗑</button>
+            </div>
+            <button onclick="saveProductionPreset()" class="w-full px-2 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-emerald-100 font-bold rounded text-xs transition" title="Saves your current system, structure type, and rig fitting as a named preset you can switch back to instantly">💾 Save Current as Preset</button>
+          </div>
           <div class="relative">
             <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="System..."
               class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-2 text-cyan-300 font-bold mono uppercase focus:border-cyan-500 outline-none text-sm">
@@ -442,6 +451,9 @@
               <input type="checkbox" id="blueprint-sort-by-profit" onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-purple-500">
               Sort
             </label>
+          </div>
+          <div>
+            <button id="blueprint-readiness-btn" onclick="scanBlueprintReadiness()" class="w-full px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded text-[10px] transition" title="Checks each visible blueprint's direct materials against your current stock - shows which ones you could build right now with zero shopping">🧰 What Can I Build Right Now?</button>
           </div>
 
           <div>
