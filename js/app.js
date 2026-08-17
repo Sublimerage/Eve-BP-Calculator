@@ -1614,7 +1614,7 @@ function createNodeCard(node) {
 
   card.className = `diagram-node rounded p-3 shadow-2xl transition-all ${cardStyle}`;
   card.innerHTML = `
-    <div class="flex items-center space-x-3 border-b border-[#1e3348] pb-2 mb-2">
+    <div class="flex items-center space-x-3 border-b border-[#1e3348] pb-2.5 mb-2.5">
       <img src="${iconUrl}" class="w-10 h-10 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
       <div class="min-w-0 flex-1">
         <div class="font-bold text-sm text-white truncate flex items-center justify-between">
@@ -1643,7 +1643,7 @@ function createNodeCard(node) {
             `}
           </div>
         </div>
-        <div class="text-sm text-cyan-400 mono flex items-center justify-between">
+        <div class="text-sm text-cyan-400 mono flex items-center justify-between mt-0.5">
           <span>${isRoot ? 'Output Qty:' : 'Req Qty:'} ${node.qtyNeeded.toLocaleString()} ${node.productName}</span>
           ${stockQty > 0 ? `<span class="bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-xs px-1 rounded font-bold" title="In Stock in Hangar">Stock: ${stockQty.toLocaleString()}</span>` : ''}
         </div>
@@ -1651,92 +1651,96 @@ function createNodeCard(node) {
       </div>
     </div>
 
-    ${isRoot ? `
-      <div class="mb-2 p-1.5 bg-[#070b0f] rounded border border-cyan-500/40 flex items-center justify-between text-sm mono" onclick="event.stopPropagation()">
-        <span class="text-slate-300 font-bold">Runs:</span>
-        <div class="flex items-center space-x-1">
-          <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" onchange="syncCardRunsToGlobal(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-16 bg-[#0c1318] border border-cyan-500/60 text-center text-amber-300 font-bold rounded p-0.5 outline-none">
-          <span class="text-slate-400 text-xs">Runs</span>
-        </div>
-      </div>
-    ` : ''}
-    ${sellStrategyUI}
-
-    ${!isRoot && node.isManufacturable ? `
-      <div class="mb-2 flex items-center justify-between bg-[#070b0f] p-1 rounded border border-[#1e3348]/60 text-xs mono">
-        <span class="text-slate-400 font-semibold ml-1">Mode:</span>
-        <div class="flex space-x-1" onclick="event.stopPropagation()">
-          <button onclick="toggleBuildSelf(event, ${node.typeId})" class="px-2 py-0.5 rounded font-bold transition ${node.isBuildingSelf ? 'bg-green-600 text-white' : 'bg-[#1e3348] text-slate-400 hover:text-white'}">🔨 Build</button>
-          <button onclick="toggleBuildSelf(event, ${node.typeId})" class="px-2 py-0.5 rounded font-bold transition ${!node.isBuildingSelf ? 'bg-amber-600 text-black' : 'bg-[#1e3348] text-slate-400 hover:text-white'}">🛒 Buy</button>
-        </div>
-      </div>
-    ` : ''}
-
-    ${!isRoot && (!node.isBuildingSelf || !node.children || node.children.length === 0) ? `
-      <div class="mb-2 flex items-center justify-between bg-[#070b0f] p-1 rounded border border-[#1e3348]/60 text-xs mono">
-        <span class="text-slate-400 font-semibold ml-1">Buy via:</span>
-        <div class="flex space-x-1" onclick="event.stopPropagation()">
-          <button onclick="setComponentBuyMode(event, ${node.typeId}, 'sell')" class="px-1.5 py-0.5 rounded font-bold transition ${currentBuyStrategy === 'sell' ? 'bg-amber-600 text-black' : 'bg-[#1e3348] text-slate-400 hover:text-white'}" title="Instant Buy off Sell Orders">⚡ Sell</button>
-          <button onclick="setComponentBuyMode(event, ${node.typeId}, 'buy')" class="px-1.5 py-0.5 rounded font-bold transition ${currentBuyStrategy === 'buy' ? 'bg-cyan-600 text-white' : 'bg-[#1e3348] text-slate-400 hover:text-white'}" title="Order Placing via Buy Orders">📜 Buy</button>
-        </div>
-      </div>
-    ` : ''}
-
-    ${node.isBuildingSelf && node.isManufacturable && !node.isReaction ? `
-      <div class="flex items-center justify-between mb-2 px-1 text-xs mono border-b border-[#1e3348]/40 pb-1">
-        <span class="text-slate-400 font-semibold">Job ME/TE:</span>
-        <div class="flex items-center space-x-1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">
-          <input type="number" id="card-me-${node.instanceId}" min="0" max="10" value="${node.customME}" onchange="onCardMEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-400 font-bold rounded p-0.5 outline-none focus:border-cyan-500">
-          <span class="text-slate-500">%</span>
-          <input type="number" id="card-te-${node.instanceId}" min="0" max="20" value="${node.customTE}" onchange="onCardTEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-400 font-bold rounded p-0.5 outline-none focus:border-cyan-500">
-          <span class="text-slate-500">%</span>
-        </div>
-      </div>
-    ` : ''}
-
-    <div class="text-sm mono space-y-1">
-      <div class="flex justify-between items-center font-semibold">
-        <span class="text-slate-400">Lowest Sell:</span>
-        <div class="flex items-center gap-1.5">
-          <span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK</span>
-          <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="text-xs bg-[#1e3348] hover:bg-cyan-600 text-cyan-200 px-1.5 py-0.5 rounded transition flex items-center gap-1" title="Compare price and trade volume across your tracked markets">⇄ Compare</button>
-        </div>
-      </div>
-      <div class="flex justify-between text-slate-400"><span>Highest Buy:</span><span class="text-slate-300">${prices.buy.toLocaleString()} ISK</span></div>
-      ${!isRoot && savingsPct !== null ? `<div class="flex justify-between text-green-400 font-semibold text-xs"><span>Order Savings:</span><span>${savingsPct}%</span></div>` : ''}
-      ${node.jobFee > 0 && node.isBuildingSelf ? `<div class="flex justify-between text-[#e85555] font-semibold border-t border-[#1e3348]/40 pt-1"><span>Job Inst. Fee:</span><span>+${Math.round(node.jobFee).toLocaleString()} ISK</span></div>` : ''}
-      <div class="flex justify-between font-bold border-t border-[#1e3348]/60 pt-1 mt-1"><span class="text-slate-300">${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span><span class="text-amber-400 font-bold">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span></div>
+    <div class="space-y-2.5">
       ${isRoot ? `
-        <div class="flex justify-between font-bold border-t border-green-500/40 pt-1 mt-1 bg-green-950/30 p-1 rounded">
-          <span class="text-slate-300">${window.rootSellStrategy === 'custom-contract' ? 'Net Profit (Contract Output):' : 'Net Profit (Sell Output):'}</span>
-          <span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${Math.round(node.netProfitSell || 0).toLocaleString()} ISK</span>
+        <div class="p-1.5 bg-[#070b0f] rounded border border-cyan-500/40 flex items-center justify-between text-sm mono" onclick="event.stopPropagation()">
+          <span class="text-slate-300 font-bold">Runs:</span>
+          <div class="flex items-center space-x-1">
+            <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" onchange="syncCardRunsToGlobal(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-16 bg-[#0c1318] border border-cyan-500/60 text-center text-amber-300 font-bold rounded p-0.5 outline-none">
+            <span class="text-slate-400 text-xs">Runs</span>
+          </div>
+        </div>
+      ` : ''}
+      ${sellStrategyUI}
+
+      ${(!isRoot && node.isManufacturable) || (!isRoot && (!node.isBuildingSelf || !node.children || node.children.length === 0)) || (node.isBuildingSelf && node.isManufacturable && !node.isReaction) ? `
+        <div class="bg-[#070b0f] rounded border border-[#1e3348]/60 divide-y divide-[#1e3348]/40" onclick="event.stopPropagation()">
+          ${!isRoot && node.isManufacturable ? `
+            <div class="flex items-center justify-between px-2 py-1.5 text-xs mono">
+              <span class="text-slate-400 font-semibold">Mode:</span>
+              <div class="flex space-x-1">
+                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="px-2 py-0.5 rounded font-bold transition ${node.isBuildingSelf ? 'bg-green-600 text-white' : 'bg-[#1e3348] text-slate-400 hover:text-white'}">🔨 Build</button>
+                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="px-2 py-0.5 rounded font-bold transition ${!node.isBuildingSelf ? 'bg-amber-600 text-black' : 'bg-[#1e3348] text-slate-400 hover:text-white'}">🛒 Buy</button>
+              </div>
+            </div>
+          ` : ''}
+          ${!isRoot && (!node.isBuildingSelf || !node.children || node.children.length === 0) ? `
+            <div class="flex items-center justify-between px-2 py-1.5 text-xs mono">
+              <span class="text-slate-400 font-semibold">Buy via:</span>
+              <div class="flex space-x-1">
+                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'sell')" class="px-1.5 py-0.5 rounded font-bold transition ${currentBuyStrategy === 'sell' ? 'bg-amber-600 text-black' : 'bg-[#1e3348] text-slate-400 hover:text-white'}" title="Instant Buy off Sell Orders">⚡ Sell</button>
+                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'buy')" class="px-1.5 py-0.5 rounded font-bold transition ${currentBuyStrategy === 'buy' ? 'bg-cyan-600 text-white' : 'bg-[#1e3348] text-slate-400 hover:text-white'}" title="Order Placing via Buy Orders">📜 Buy</button>
+              </div>
+            </div>
+          ` : ''}
+          ${node.isBuildingSelf && node.isManufacturable && !node.isReaction ? `
+            <div class="flex items-center justify-between px-2 py-1.5 text-xs mono" onmousedown="event.stopPropagation()">
+              <span class="text-slate-400 font-semibold">Job ME/TE:</span>
+              <div class="flex items-center space-x-1">
+                <input type="number" id="card-me-${node.instanceId}" min="0" max="10" value="${node.customME}" onchange="onCardMEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-[#0c1318] border border-[#1e3348] text-center text-cyan-400 font-bold rounded p-0.5 outline-none focus:border-cyan-500">
+                <span class="text-slate-500">%</span>
+                <input type="number" id="card-te-${node.instanceId}" min="0" max="20" value="${node.customTE}" onchange="onCardTEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-[#0c1318] border border-[#1e3348] text-center text-cyan-400 font-bold rounded p-0.5 outline-none focus:border-cyan-500">
+                <span class="text-slate-500">%</span>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+
+      <div class="text-sm mono space-y-1 border-t border-[#1e3348]/60 pt-2">
+        <div class="flex justify-between items-center font-semibold">
+          <span class="text-slate-400">Lowest Sell:</span>
+          <div class="flex items-center gap-1.5">
+            <span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK</span>
+            <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="text-xs bg-[#1e3348] hover:bg-cyan-600 text-cyan-200 px-1.5 py-0.5 rounded transition flex items-center gap-1" title="Compare price and trade volume across your tracked markets">⇄ Compare</button>
+          </div>
+        </div>
+        <div class="flex justify-between text-slate-400"><span>Highest Buy:</span><span class="text-slate-300">${prices.buy.toLocaleString()} ISK</span></div>
+        ${!isRoot && savingsPct !== null ? `<div class="flex justify-between text-green-400 font-semibold text-xs"><span>Order Savings:</span><span>${savingsPct}%</span></div>` : ''}
+        ${node.jobFee > 0 && node.isBuildingSelf ? `<div class="flex justify-between text-[#e85555] font-semibold border-t border-[#1e3348]/40 pt-1"><span>Job Inst. Fee:</span><span>+${Math.round(node.jobFee).toLocaleString()} ISK</span></div>` : ''}
+        <div class="flex justify-between font-bold border-t border-[#1e3348]/60 pt-1 mt-1"><span class="text-slate-300">${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span><span class="text-amber-400 font-bold">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span></div>
+        ${isRoot ? `
+          <div class="flex justify-between font-bold border-t border-green-500/40 pt-1 mt-1 bg-green-950/30 p-1.5 rounded">
+            <span class="text-slate-300">${window.rootSellStrategy === 'custom-contract' ? 'Net Profit (Contract Output):' : 'Net Profit (Sell Output):'}</span>
+            <span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${Math.round(node.netProfitSell || 0).toLocaleString()} ISK</span>
+          </div>
+        ` : ''}
+      </div>
+      ${(buildTimeUI || isRoot) ? `
+        <div class="pt-2 border-t-2 border-dashed border-purple-500/30">
+          <div class="text-xs text-purple-300 uppercase font-bold tracking-wider mb-1">Time &amp; Efficiency</div>
+          <div class="text-sm mono space-y-1">
+            ${buildTimeUI}
+            ${isRoot ? `
+              <div class="flex justify-between font-bold" title="This job's own time PLUS every sub-component you're manufacturing yourself (not buying) - this is the number the Ledger's countdown timer actually uses, since building sub-components takes real time before you can even start the final job.">
+                <span class="text-slate-300">Total Project Time:</span>
+                ${node.totalBuildSeconds > 0
+                  ? `<span class="text-amber-300 font-bold">${window.formatDuration(node.totalBuildSeconds)}</span>`
+                  : `<span class="text-slate-500 italic">No Time Data</span>`}
+              </div>
+            ` : ''}
+            ${isRoot ? `
+              <div class="flex justify-between font-bold" title="Total net sell profit divided by the total time to build this item and every sub-component you're manufacturing yourself.">
+                <span class="text-slate-300">Est. ISK/Hour:</span>
+                ${node.totalBuildSeconds > 0
+                  ? `<span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${Math.round((node.netProfitSell || 0) / (node.totalBuildSeconds / 3600)).toLocaleString()} ISK</span>`
+                  : `<span class="text-slate-500 italic">No Time Data</span>`}
+              </div>
+            ` : ''}
+          </div>
         </div>
       ` : ''}
     </div>
-    ${(buildTimeUI || isRoot) ? `
-      <div class="mt-2 pt-1.5 border-t-2 border-dashed border-purple-500/30">
-        <div class="text-xs text-purple-300 uppercase font-bold tracking-wider mb-1">Time &amp; Efficiency</div>
-        <div class="text-sm mono space-y-1">
-          ${buildTimeUI}
-          ${isRoot ? `
-            <div class="flex justify-between font-bold" title="This job's own time PLUS every sub-component you're manufacturing yourself (not buying) - this is the number the Ledger's countdown timer actually uses, since building sub-components takes real time before you can even start the final job.">
-              <span class="text-slate-300">Total Project Time:</span>
-              ${node.totalBuildSeconds > 0
-                ? `<span class="text-amber-300 font-bold">${window.formatDuration(node.totalBuildSeconds)}</span>`
-                : `<span class="text-slate-500 italic">No Time Data</span>`}
-            </div>
-          ` : ''}
-          ${isRoot ? `
-            <div class="flex justify-between font-bold" title="Total net sell profit divided by the total time to build this item and every sub-component you're manufacturing yourself.">
-              <span class="text-slate-300">Est. ISK/Hour:</span>
-              ${node.totalBuildSeconds > 0
-                ? `<span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${Math.round((node.netProfitSell || 0) / (node.totalBuildSeconds / 3600)).toLocaleString()} ISK</span>`
-                : `<span class="text-slate-500 italic">No Time Data</span>`}
-            </div>
-          ` : ''}
-        </div>
-      </div>
-    ` : ''}
   `;
   return card;
 }

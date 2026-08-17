@@ -164,11 +164,13 @@ function renderJournalPage() {
   }
 
   const consolidatedBOM = {};
+  console.info(`[BOM Debug] Full active job list (${activeJobs.length} jobs):`, activeJobs.map(j => j && ({ id: j.id, name: j.name, isStarted: j.isStarted, isSubBuild: j.isSubBuild, parentJobName: j.parentJobName })));
   activeJobs.forEach(job => {
     // Already-started jobs have already committed their materials - a "what do I still need to
     // buy" list has nothing useful to say about them, so they're excluded entirely rather than
     // showing up as clutter (often at 0 qty needed, which conveys nothing).
     if (job && !job.isStarted && Array.isArray(job.materials)) {
+      console.info(`[BOM Debug] Including job "${job.name}" (id=${job.id}, isStarted=${job.isStarted}, isSubBuild=${job.isSubBuild}, parentJobName=${job.parentJobName || 'n/a'}) in consolidated BOM.`);
       job.materials.forEach(mat => {
         if (!mat || !mat.typeId) return;
         if (activeOrderFilter !== 'all' && mat.strategy !== activeOrderFilter) return;
