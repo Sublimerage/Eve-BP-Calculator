@@ -80,14 +80,14 @@ function renderInventionSearchResults(hits, profitById) {
   if (!resultsEl) return;
   const sortBtn = hits.length > 1 ? `
     <div class="px-3 py-1.5 bg-[#0a0f14] border-b border-[#1e3348] flex items-center justify-between">
-      <span class="text-[9px] text-slate-500">${hits.length} match${hits.length > 1 ? 'es' : ''}</span>
-      <button onmousedown="sortInventionSearchResultsByProfit()" class="text-[9px] px-2 py-0.5 bg-purple-800 hover:bg-purple-700 text-purple-100 font-bold rounded transition">📊 Sort by Profit</button>
+      <span class="text-xs text-slate-500">${hits.length} match${hits.length > 1 ? 'es' : ''}</span>
+      <button onmousedown="sortInventionSearchResultsByProfit()" class="text-xs px-2 py-0.5 bg-purple-800 hover:bg-purple-700 text-purple-100 font-bold rounded transition">📊 Sort by Profit</button>
     </div>
   ` : '';
   resultsEl.innerHTML = sortBtn + hits.map(h => {
     const profit = profitById && profitById[h.id] !== undefined ? profitById[h.id] : null;
     const profitBadge = profit !== null
-      ? `<span class="ml-auto text-[10px] font-bold ${profit >= 0 ? 'text-green-400' : 'text-red-400'} flex-shrink-0">${Math.round(profit).toLocaleString()} ISK</span>`
+      ? `<span class="ml-auto text-xs font-bold ${profit >= 0 ? 'text-green-400' : 'text-red-400'} flex-shrink-0">${Math.round(profit).toLocaleString()} ISK</span>`
       : '';
     return `
     <div class="px-3 py-2 hover:bg-[#1e3348] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#1e3348]/40" onmousedown="selectInventionItem(${h.id}, '${window.esc(h.name)}')">
@@ -263,7 +263,7 @@ function renderInventionSkillInputs(skills) {
   const charSkills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { allSkills: {} });
 
   if (skills.length === 0) {
-    container.innerHTML = `<div class="text-slate-500 italic text-[11px]">No skill data found for this blueprint's invention activity - try regenerating the database.</div>`;
+    container.innerHTML = `<div class="text-slate-500 italic text-sm">No skill data found for this blueprint's invention activity - try regenerating the database.</div>`;
     return;
   }
 
@@ -272,9 +272,9 @@ function renderInventionSkillInputs(skills) {
     const trainedLevel = (charSkills.allSkills && charSkills.allSkills[sk.skillId] !== undefined) ? charSkills.allSkills[sk.skillId] : 0;
     return `
       <div class="flex items-center justify-between bg-[#070b0f] border border-[#1e3348] rounded px-2 py-1.5">
-        <span class="text-[11px] ${isEncryption ? 'text-amber-300' : 'text-cyan-300'} font-semibold truncate pr-2" title="${isEncryption ? 'Encryption skill (affects chance /40)' : 'Science skill (affects chance /30, combined with the other science skill)'}">${window.esc(sk.name || `Skill ${sk.skillId}`)}</span>
+        <span class="text-sm ${isEncryption ? 'text-amber-300' : 'text-cyan-300'} font-semibold truncate pr-2" title="${isEncryption ? 'Encryption skill (affects chance /40)' : 'Science skill (affects chance /30, combined with the other science skill)'}">${window.esc(sk.name || `Skill ${sk.skillId}`)}</span>
         <input type="number" min="0" max="5" value="${trainedLevel}" data-skill-id="${sk.skillId}" data-is-encryption="${isEncryption}"
-          oninput="recalculateInvention()" class="invention-skill-input w-12 bg-[#0d1922] border border-[#1e3348] rounded text-center text-white font-bold text-[11px] outline-none p-1">
+          oninput="recalculateInvention()" class="invention-skill-input w-12 bg-[#0d1922] border border-[#1e3348] rounded text-center text-white font-bold text-sm outline-none p-1">
       </div>
     `;
   }).join('');
@@ -507,29 +507,29 @@ function renderInventionSummaryTiles(rows) {
 
   container.innerHTML = `
     <div class="bg-[#0d1922] border border-[#1e3348] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
-      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Best Option</div>
+      <div class="text-xs text-slate-400 uppercase font-bold mono tracking-wide truncate">Best Option</div>
       <div class="text-base font-bold text-green-300 mono leading-tight truncate">${window.esc(best.dec.name)}</div>
-      <div class="text-[9px] text-slate-500 mt-0.5">${best.successChance.toFixed(1)}% success chance</div>
+      <div class="text-xs text-slate-500 mt-0.5">${best.successChance.toFixed(1)}% success chance</div>
     </div>
     <div class="bg-[#0d1922] border border-amber-600/40 px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
-      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Attempts Needed</div>
+      <div class="text-xs text-slate-400 uppercase font-bold mono tracking-wide truncate">Attempts Needed</div>
       <div class="text-lg font-bold text-amber-300 mono leading-tight">${isFinite(best.requiredAttempts) ? best.requiredAttempts.toLocaleString() : '—'}</div>
-      <div class="text-[9px] text-slate-500 mt-0.5">to get ${targetBPCs} successful BPC${targetBPCs > 1 ? 's' : ''}</div>
+      <div class="text-xs text-slate-500 mt-0.5">to get ${targetBPCs} successful BPC${targetBPCs > 1 ? 's' : ''}</div>
     </div>
     <div class="bg-[#0d1922] border border-[#1e3348] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
-      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Cost (Invention + Mfg)</div>
+      <div class="text-xs text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Cost (Invention + Mfg)</div>
       <div class="text-lg font-bold text-cyan-400 mono leading-tight">${isFinite(best.totalInventionCost) ? Math.round(best.totalInventionCost + best.totalManufacturingCost).toLocaleString() : '—'} ISK</div>
-      <div class="text-[9px] text-slate-500 mt-0.5">${isFinite(best.totalInventionCost) ? Math.round(best.totalInventionCost).toLocaleString() + ' invention + ' + Math.round(best.totalManufacturingCost).toLocaleString() + ' mfg' : ''}</div>
+      <div class="text-xs text-slate-500 mt-0.5">${isFinite(best.totalInventionCost) ? Math.round(best.totalInventionCost).toLocaleString() + ' invention + ' + Math.round(best.totalManufacturingCost).toLocaleString() + ' mfg' : ''}</div>
     </div>
     <div class="bg-[#0d1922] border border-green-600/40 px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
-      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Profit</div>
+      <div class="text-xs text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Profit</div>
       <div class="text-lg font-bold ${isFinite(best.totalProfit) && best.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'} mono leading-tight">${isFinite(best.totalProfit) ? Math.round(best.totalProfit).toLocaleString() + ' ISK' : '—'}</div>
-      <div class="text-[9px] text-slate-500 mt-0.5">for ${targetBPCs} successful BPC${targetBPCs > 1 ? 's' : ''}</div>
+      <div class="text-xs text-slate-500 mt-0.5">for ${targetBPCs} successful BPC${targetBPCs > 1 ? 's' : ''}</div>
     </div>
     <div class="bg-[#0d1922] border border-[#1e3348] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
-      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">ISK/Hour</div>
+      <div class="text-xs text-slate-400 uppercase font-bold mono tracking-wide truncate">ISK/Hour</div>
       <div class="text-lg font-bold ${best.iskPerHour !== null ? (best.iskPerHour >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-500'} mono leading-tight">${best.iskPerHour !== null ? Math.round(best.iskPerHour).toLocaleString() + ' ISK' : 'No time data'}</div>
-      <div class="text-[9px] text-slate-500 mt-0.5">${best.totalBuildSeconds > 0 ? window.formatDuration(best.totalBuildSeconds) + ' total manufacturing' : 'build time unavailable'}</div>
+      <div class="text-xs text-slate-500 mt-0.5">${best.totalBuildSeconds > 0 ? window.formatDuration(best.totalBuildSeconds) + ' total manufacturing' : 'build time unavailable'}</div>
     </div>
   `;
 }
@@ -590,7 +590,7 @@ function renderInventionComparisonTable(rows) {
   container.innerHTML = `
     <table class="w-full text-left border-collapse text-xs mono">
       <thead>
-        <tr class="text-slate-400 border-b border-[#1e3348] uppercase text-[10px] font-bold">
+        <tr class="text-slate-400 border-b border-[#1e3348] uppercase text-xs font-bold">
           <th class="p-2">Decryptor</th>
           ${sortHeader('successChance', 'Success %', 'right')}
           <th class="p-2 text-right">Result BPC</th>
@@ -619,13 +619,13 @@ function renderInventionComparisonTable(rows) {
             <td class="p-2 text-right ${r.iskPerHour !== null ? (r.iskPerHour >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-500'} font-bold">${r.iskPerHour !== null ? Math.round(r.iskPerHour).toLocaleString() + ' ISK' : '—'}</td>
             <td class="p-2 text-right font-bold ${isFinite(r.profitPerRun) && r.profitPerRun >= 0 ? 'text-green-400' : 'text-red-400'}">${isFinite(r.profitPerRun) ? Math.round(r.profitPerRun).toLocaleString() + ' ISK' : '—'}</td>
             <td class="p-2 text-right">
-              <button id="invention-multibuy-btn-${rowIndex}" onclick="copyInventionMultibuy(${rowIndex})" class="px-2 py-1 bg-purple-700 hover:bg-purple-600 text-white font-bold rounded text-[10px] transition" title="Copy datacores + decryptor needed for this decryptor's Attempts Needed, minus whatever stock you already own">📋 Copy</button>
+              <button id="invention-multibuy-btn-${rowIndex}" onclick="copyInventionMultibuy(${rowIndex})" class="px-2 py-1 bg-purple-700 hover:bg-purple-600 text-white font-bold rounded text-xs transition" title="Copy datacores + decryptor needed for this decryptor's Attempts Needed, minus whatever stock you already own">📋 Copy</button>
             </td>
           </tr>
         `; }).join('')}
       </tbody>
     </table>
-    <p class="text-[10px] text-slate-500 mt-2 leading-relaxed">
+    <p class="text-xs text-slate-500 mt-2 leading-relaxed">
       Click any column header to sort by it (click again to reverse).
       <b>Attempts Needed</b> = the average number of invention tries (successes AND failures) to reach your target of ${targetBPCs} successful BPC${targetBPCs > 1 ? 's' : ''}, given this decryptor's success chance - this is where the success rate actually shows up: a worse chance means more attempts, more failed datacores/decryptors spent, and a higher Total Invention Cost for the same goal.
       <b>Buy List</b> copies the datacores + decryptors needed for that many attempts in EVE multibuy format, with your owned stock (from the location filter on the left) already deducted.

@@ -1401,27 +1401,27 @@ function createNodeCard(node) {
 
     sellStrategyUI = `
       <div class="mb-2 p-1.5 bg-[#070b0f] rounded border border-purple-500/40 space-y-1.5" onclick="event.stopPropagation()">
-        <div class="flex justify-between items-center text-[10px] mono">
+        <div class="flex justify-between items-center text-xs mono">
           <span class="text-purple-300 font-bold">Sell Channel:</span>
-          <select id="card-sell-strategy" onchange="syncSellStrategy(event)" class="bg-[#0c1318] text-white rounded p-0.5 border border-[#1e3348] text-[10px] outline-none">
+          <select id="card-sell-strategy" onchange="syncSellStrategy(event)" class="bg-[#0c1318] text-white rounded p-0.5 border border-[#1e3348] text-xs outline-none">
             <option value="market-sell" ${curStrategy === 'market-sell' ? 'selected' : ''}>Auto</option>
             <option value="custom-market-sell" ${curStrategy === 'custom-market-sell' ? 'selected' : ''}>Custom Market Sell</option>
             <option value="custom-contract" ${curStrategy === 'custom-contract' ? 'selected' : ''}>Custom Contract</option>
           </select>
         </div>
         ${isCustomPriceNeeded ? `
-          <div class="flex flex-col text-[10px] mono">
+          <div class="flex flex-col text-xs mono">
             <div class="flex justify-between items-center">
               <span class="text-purple-300 font-bold">Custom Sell Price:</span>
               <div class="flex items-center space-x-1">
-                <input type="number" id="card-custom-price" value="${curCustomPrice}" placeholder="Unit Price" onchange="syncCustomPrice(event)" class="w-24 bg-[#0c1318] border border-[#1e3348] text-center text-green-400 font-bold rounded p-0.5 outline-none text-[10px]">
-                <span class="text-slate-500 text-[9px]">ISK</span>
+                <input type="number" id="card-custom-price" value="${curCustomPrice}" placeholder="Unit Price" onchange="syncCustomPrice(event)" class="w-24 bg-[#0c1318] border border-[#1e3348] text-center text-green-400 font-bold rounded p-0.5 outline-none text-xs">
+                <span class="text-slate-500 text-xs">ISK</span>
               </div>
             </div>
-            <div class="text-[9px] text-green-400 text-right font-bold mt-1">${Math.round(window.rootCustomPrice || 0).toLocaleString()} ISK</div>
+            <div class="text-xs text-green-400 text-right font-bold mt-1">${Math.round(window.rootCustomPrice || 0).toLocaleString()} ISK</div>
           </div>
         ` : ''}
-        <button onclick="addCurrentJobToLedger(event)" class="w-full mt-2 py-1.5 bg-purple-800 hover:bg-purple-700 text-purple-100 font-bold rounded transition text-[11px] mono flex items-center justify-center gap-1 border border-purple-500/30 shadow-md">➕ ADD TO JOB QUEUE</button>
+        <button onclick="addCurrentJobToLedger(event)" class="w-full mt-2 py-1.5 bg-purple-800 hover:bg-purple-700 text-purple-100 font-bold rounded transition text-sm mono flex items-center justify-center gap-1 border border-purple-500/30 shadow-md">➕ ADD TO JOB QUEUE</button>
       </div>
     `;
   }
@@ -1440,7 +1440,7 @@ function createNodeCard(node) {
       const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)${rigTEBonus > 0 ? `\n• Rig Bonus: -${rigTEBonus.toFixed(2)}% TE` : ''}\n• Base SDE Time: ${window.formatDuration(baseTime)}`;
 
       buildTimeUI = `
-        <div class="flex justify-between text-[10px] text-slate-400 mono cursor-help" title="${window.esc(hoverTitle)}">
+        <div class="flex justify-between text-xs text-slate-400 mono cursor-help" title="${window.esc(hoverTitle)}">
           <span>Est. Build Time:</span>
           <span class="text-slate-300 font-semibold">${window.formatDuration(totalSeconds)}</span>
         </div>
@@ -1449,7 +1449,7 @@ function createNodeCard(node) {
       // Be honest that the line exists but the underlying duration data is missing, instead of
       // silently disappearing - a permanently blank line with no data at all looks identical to a bug.
       buildTimeUI = `
-        <div class="flex justify-between text-[10px] text-slate-400 mono cursor-help" title="No manufacturing time data found for this blueprint in the local database or Fuzzwork lookup.">
+        <div class="flex justify-between text-xs text-slate-400 mono cursor-help" title="No manufacturing time data found for this blueprint in the local database or Fuzzwork lookup.">
           <span>Est. Build Time:</span>
           <span class="text-slate-500 italic">No Time Data</span>
         </div>
@@ -1468,8 +1468,8 @@ function createNodeCard(node) {
           <div class="flex items-center space-x-1 flex-shrink-0 ml-1">
             ${isRoot ? `
               <div class="relative group inline-block" onclick="event.stopPropagation()">
-                <span class="bg-amber-900/80 hover:bg-amber-700 text-amber-300 text-[9px] px-1.5 py-0.5 rounded mono border border-amber-500/80 cursor-help font-bold tracking-wider" title="Unit EIV: ${formattedUnitEIV} | Total Job EIV: ${formattedTotalEIV}">EIV</span>
-                <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-[#070b0f] border border-amber-500 text-white text-[10px] p-2 rounded shadow-2xl z-[999] whitespace-nowrap mono pointer-events-none">
+                <span class="bg-amber-900/80 hover:bg-amber-700 text-amber-300 text-xs px-1.5 py-0.5 rounded mono border border-amber-500/80 cursor-help font-bold tracking-wider" title="Unit EIV: ${formattedUnitEIV} | Total Job EIV: ${formattedTotalEIV}">EIV</span>
+                <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-[#070b0f] border border-amber-500 text-white text-xs p-2 rounded shadow-2xl z-[999] whitespace-nowrap mono pointer-events-none">
                   <div class="text-amber-300 font-bold border-b border-[#1e3348] pb-1 mb-1">Estimated Item Value (EIV)</div>
                   <div class="flex justify-between space-x-4 text-slate-300"><span>Unit EIV:</span> <span class="text-cyan-300 font-bold">${formattedUnitEIV}</span></div>
                   <div class="flex justify-between space-x-4 text-slate-300"><span>Total Job EIV:</span> <span class="text-amber-400 font-bold">${formattedTotalEIV}</span></div>
@@ -1477,38 +1477,38 @@ function createNodeCard(node) {
               </div>
             ` : ''}
             ${node.children && node.children.length > 0 ? `
-              <button onclick="toggleNodeCollapse(event, ${node.instanceId})" class="text-[9px] ${window.collapsedInstanceIds.has(node.instanceId) ? 'bg-amber-700 hover:bg-amber-600 text-white' : 'bg-[#1e3348] hover:bg-slate-600 text-slate-300'} px-1.5 py-0.5 rounded mono transition" title="${window.collapsedInstanceIds.has(node.instanceId) ? 'Expand: show inputs again' : 'Collapse: hide inputs'}">
-                ${window.collapsedInstanceIds.has(node.instanceId) ? `▶ +${countDescendants(node)}` : '▼'}
+              <button onclick="toggleNodeCollapse(event, ${node.instanceId})" class="text-xs ${window.collapsedInstanceIds.has(node.instanceId) ? 'bg-amber-700 hover:bg-amber-600 text-white' : 'bg-[#1e3348] hover:bg-slate-600 text-slate-300'} px-1.5 py-0.5 rounded mono transition" title="${window.collapsedInstanceIds.has(node.instanceId) ? 'Expand: show inputs again' : 'Collapse: hide inputs'}">
+                ${window.collapsedInstanceIds.has(node.instanceId) ? `▶ +${countDescendants(node)}` : '▼ Hide'}
               </button>
             ` : ''}
             ${isIsolated ? `
-              <button onclick="exitIsolation(event)" class="text-[9px] bg-amber-600 hover:bg-amber-500 text-black font-bold px-2 py-0.5 rounded mono transition shadow">Exit ✖</button>
+              <button onclick="exitIsolation(event)" class="text-xs bg-amber-600 hover:bg-amber-500 text-black font-bold px-2 py-0.5 rounded mono transition shadow">Exit ✖</button>
             ` : `
-              <button onclick="isolateComponent(event, ${node.instanceId})" class="text-[9px] bg-[#1e3348] hover:bg-cyan-600 text-cyan-200 px-1.5 py-0.5 rounded mono transition">🔍 Isolate</button>
+              <button onclick="isolateComponent(event, ${node.instanceId})" class="text-xs bg-[#1e3348] hover:bg-cyan-600 text-cyan-200 px-1.5 py-0.5 rounded mono transition">🔍 Isolate</button>
             `}
           </div>
         </div>
-        <div class="text-[11px] text-cyan-400 mono flex items-center justify-between">
+        <div class="text-sm text-cyan-400 mono flex items-center justify-between">
           <span>${isRoot ? 'Output Qty:' : 'Req Qty:'} ${node.qtyNeeded.toLocaleString()} ${node.productName}</span>
-          ${stockQty > 0 ? `<span class="bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-[9px] px-1 rounded font-bold" title="In Stock in Hangar">Stock: ${stockQty.toLocaleString()}</span>` : ''}
+          ${stockQty > 0 ? `<span class="bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-xs px-1 rounded font-bold" title="In Stock in Hangar">Stock: ${stockQty.toLocaleString()}</span>` : ''}
         </div>
-        ${node.isBuildingSelf && node.batchYield > 1 ? `<div class="${node.isReaction ? 'text-purple-300 font-bold' : 'text-amber-300'} text-[10px] mono font-semibold mt-0.5">(${node.runsNeeded} Run${node.runsNeeded > 1 ? 's' : ''} @ ${node.batchYield}/run ${surplus > 0 ? `→ ${surplus} Surplus` : ''})</div>` : ''}
+        ${node.isBuildingSelf && node.batchYield > 1 ? `<div class="${node.isReaction ? 'text-purple-300 font-bold' : 'text-amber-300'} text-xs mono font-semibold mt-0.5">(${node.runsNeeded} Run${node.runsNeeded > 1 ? 's' : ''} @ ${node.batchYield}/run ${surplus > 0 ? `→ ${surplus} Surplus` : ''})</div>` : ''}
       </div>
     </div>
 
     ${isRoot ? `
-      <div class="mb-2 p-1.5 bg-[#070b0f] rounded border border-cyan-500/40 flex items-center justify-between text-[11px] mono" onclick="event.stopPropagation()">
+      <div class="mb-2 p-1.5 bg-[#070b0f] rounded border border-cyan-500/40 flex items-center justify-between text-sm mono" onclick="event.stopPropagation()">
         <span class="text-slate-300 font-bold">Runs:</span>
         <div class="flex items-center space-x-1">
           <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" onchange="syncCardRunsToGlobal(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-16 bg-[#0c1318] border border-cyan-500/60 text-center text-amber-300 font-bold rounded p-0.5 outline-none">
-          <span class="text-slate-400 text-[10px]">Runs</span>
+          <span class="text-slate-400 text-xs">Runs</span>
         </div>
       </div>
     ` : ''}
     ${sellStrategyUI}
 
     ${!isRoot && node.isManufacturable ? `
-      <div class="mb-2 flex items-center justify-between bg-[#070b0f] p-1 rounded border border-[#1e3348]/60 text-[10px] mono">
+      <div class="mb-2 flex items-center justify-between bg-[#070b0f] p-1 rounded border border-[#1e3348]/60 text-xs mono">
         <span class="text-slate-400 font-semibold ml-1">Mode:</span>
         <div class="flex space-x-1" onclick="event.stopPropagation()">
           <button onclick="toggleBuildSelf(event, ${node.typeId})" class="px-2 py-0.5 rounded font-bold transition ${node.isBuildingSelf ? 'bg-green-600 text-white' : 'bg-[#1e3348] text-slate-400 hover:text-white'}">🔨 Build</button>
@@ -1518,7 +1518,7 @@ function createNodeCard(node) {
     ` : ''}
 
     ${!isRoot && (!node.isBuildingSelf || !node.children || node.children.length === 0) ? `
-      <div class="mb-2 flex items-center justify-between bg-[#070b0f] p-1 rounded border border-[#1e3348]/60 text-[10px] mono">
+      <div class="mb-2 flex items-center justify-between bg-[#070b0f] p-1 rounded border border-[#1e3348]/60 text-xs mono">
         <span class="text-slate-400 font-semibold ml-1">Buy via:</span>
         <div class="flex space-x-1" onclick="event.stopPropagation()">
           <button onclick="setComponentBuyMode(event, ${node.typeId}, 'sell')" class="px-1.5 py-0.5 rounded font-bold transition ${currentBuyStrategy === 'sell' ? 'bg-amber-600 text-black' : 'bg-[#1e3348] text-slate-400 hover:text-white'}" title="Instant Buy off Sell Orders">⚡ Sell</button>
@@ -1528,7 +1528,7 @@ function createNodeCard(node) {
     ` : ''}
 
     ${node.isBuildingSelf && node.isManufacturable && !node.isReaction ? `
-      <div class="flex items-center justify-between mb-2 px-1 text-[10px] mono border-b border-[#1e3348]/40 pb-1">
+      <div class="flex items-center justify-between mb-2 px-1 text-xs mono border-b border-[#1e3348]/40 pb-1">
         <span class="text-slate-400 font-semibold">Job ME/TE:</span>
         <div class="flex items-center space-x-1" onclick="event.stopPropagation()" onmousedown="event.stopPropagation()">
           <input type="number" id="card-me-${node.instanceId}" min="0" max="10" value="${node.customME}" onchange="onCardMEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-[#070b0f] border border-[#1e3348] text-center text-cyan-400 font-bold rounded p-0.5 outline-none focus:border-cyan-500">
@@ -1539,16 +1539,16 @@ function createNodeCard(node) {
       </div>
     ` : ''}
 
-    <div class="text-[11px] mono space-y-1">
+    <div class="text-sm mono space-y-1">
       <div class="flex justify-between items-center font-semibold">
         <span class="text-slate-400">Lowest Sell:</span>
         <div class="flex items-center gap-1.5">
           <span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK</span>
-          <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="text-[9px] bg-[#1e3348] hover:bg-cyan-600 text-cyan-200 px-1 py-0.5 rounded transition" title="Compare price and trade volume across your tracked markets">⇄</button>
+          <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="text-xs bg-[#1e3348] hover:bg-cyan-600 text-cyan-200 px-1.5 py-0.5 rounded transition flex items-center gap-1" title="Compare price and trade volume across your tracked markets">⇄ Compare</button>
         </div>
       </div>
       <div class="flex justify-between text-slate-400"><span>Highest Buy:</span><span class="text-slate-300">${prices.buy.toLocaleString()} ISK</span></div>
-      ${!isRoot && savingsPct !== null ? `<div class="flex justify-between text-green-400 font-semibold text-[10px]"><span>Order Savings:</span><span>${savingsPct}%</span></div>` : ''}
+      ${!isRoot && savingsPct !== null ? `<div class="flex justify-between text-green-400 font-semibold text-xs"><span>Order Savings:</span><span>${savingsPct}%</span></div>` : ''}
       ${node.jobFee > 0 && node.isBuildingSelf ? `<div class="flex justify-between text-[#e85555] font-semibold border-t border-[#1e3348]/40 pt-1"><span>Job Inst. Fee:</span><span>+${Math.round(node.jobFee).toLocaleString()} ISK</span></div>` : ''}
       <div class="flex justify-between font-bold border-t border-[#1e3348]/60 pt-1 mt-1"><span class="text-slate-300">${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span><span class="text-amber-400 font-bold">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span></div>
       ${isRoot ? `
@@ -1560,8 +1560,8 @@ function createNodeCard(node) {
     </div>
     ${(buildTimeUI || isRoot) ? `
       <div class="mt-2 pt-1.5 border-t-2 border-dashed border-purple-500/30">
-        <div class="text-[8px] text-purple-300 uppercase font-bold tracking-wider mb-1">Time &amp; Efficiency</div>
-        <div class="text-[11px] mono space-y-1">
+        <div class="text-xs text-purple-300 uppercase font-bold tracking-wider mb-1">Time &amp; Efficiency</div>
+        <div class="text-sm mono space-y-1">
           ${buildTimeUI}
           ${isRoot ? `
             <div class="flex justify-between font-bold" title="This job's own time PLUS every sub-component you're manufacturing yourself (not buying) - this is the number the Ledger's countdown timer actually uses, since building sub-components takes real time before you can even start the final job.">

@@ -150,11 +150,11 @@ function updateProfitStockToggleButton() {
   const mode = getProfitStockMode();
   if (mode === 'with') {
     btn.textContent = 'Crediting Stock';
-    btn.className = 'text-[8px] px-1.5 py-0.5 rounded font-bold mono uppercase tracking-wide bg-amber-800 text-amber-100 flex-shrink-0';
+    btn.className = 'text-xs px-1.5 py-0.5 rounded font-bold mono uppercase tracking-wide bg-amber-800 text-amber-100 flex-shrink-0';
     btn.title = 'Materials you already have in stock are being treated as free (0 ISK cost) - click to count them at full value instead';
   } else {
     btn.textContent = 'Full Cost';
-    btn.className = 'text-[8px] px-1.5 py-0.5 rounded font-bold mono uppercase tracking-wide bg-cyan-800 text-cyan-100 flex-shrink-0';
+    btn.className = 'text-xs px-1.5 py-0.5 rounded font-bold mono uppercase tracking-wide bg-cyan-800 text-cyan-100 flex-shrink-0';
     btn.title = 'Materials you already have in stock are valued at their market price (not free) - click to instead treat them as a free cost credit';
   }
 }
@@ -341,7 +341,9 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
 
   let statusText = '⏳ PENDING';
   let statusClass = 'text-slate-400';
+  let isTimerBacked = false;
   if (job.isStarted && job.startedAt) {
+    isTimerBacked = true;
     const elapsedSeconds = (Date.now() - job.startedAt) / 1000;
     const remaining = (job.totalBuildSeconds || 0) - elapsedSeconds;
     const ready = remaining <= 0;
@@ -357,11 +359,11 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
       ${renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled)}
       ${!job.isStarted ? `
         <div class="flex items-center gap-1.5 px-2 py-1.5 mt-2 bg-[#070b0f] rounded border border-[#1e3348]">
-          <span class="text-[10px] text-slate-400 font-bold flex-shrink-0">Runs to start:</span>
+          <span class="text-xs text-slate-400 font-bold flex-shrink-0">Runs to start:</span>
           <input type="number" id="start-runs-${job.id}" value="${job.runsNeeded}" min="1" max="${job.runsNeeded}"
             onmousedown="event.stopPropagation()" onfocus="this.select()"
-            class="w-16 bg-[#0d1922] border border-[#1e3348] text-center text-amber-300 font-bold rounded p-1 outline-none text-[11px]">
-          <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-1 px-2.5 rounded text-[10px] mono transition flex-shrink-0">▶ Start Job</button>
+            class="w-16 bg-[#0d1922] border border-[#1e3348] text-center text-amber-300 font-bold rounded p-1 outline-none text-sm">
+          <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-1 px-2.5 rounded text-xs mono transition flex-shrink-0">▶ Start Job</button>
         </div>
       ` : ''}
     </div>
@@ -378,17 +380,19 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
         <img src="${jobIconUrl}" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
         <div class="min-w-0 flex-1">
           <div class="font-bold text-sm text-white truncate">${window.esc(jobDisplayName)}</div>
-          ${job.isSubBuild ? `<div class="text-[9px] mono text-amber-400 font-bold uppercase truncate">⚙ Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
-          ${job.autoImported ? `<div class="text-[9px] mono text-cyan-400 font-bold uppercase truncate" title="No matching plan existed - imported from your active EVE job.">📥 Auto-imported ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
+          ${job.isSubBuild ? `<div class="text-xs mono text-amber-400 font-bold uppercase truncate">⚙ Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
+          ${job.autoImported ? `<div class="text-xs mono text-cyan-400 font-bold uppercase truncate" title="No matching plan existed - imported from your active EVE job.">📥 Auto-imported ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
         </div>
         <span class="text-lg font-extrabold text-purple-300 mono flex-shrink-0 cursor-pointer hover:text-purple-200" onclick="event.stopPropagation(); copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">${job.runsNeeded.toLocaleString()}</span>
-        <span class="text-[10px] text-slate-500 mono flex-shrink-0 w-14">runs</span>
-        <span class="text-xs font-extrabold ${statusClass} mono flex-shrink-0 w-28 text-center">${statusText}</span>
+        <span class="text-xs text-slate-500 mono flex-shrink-0 w-14">runs</span>
+        ${isTimerBacked
+          ? `<span class="job-timer flex-shrink-0 w-28 text-center" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}"><span class="timer-display text-xs font-extrabold ${statusClass} mono">${statusText}</span></span>`
+          : `<span class="text-xs font-extrabold ${statusClass} mono flex-shrink-0 w-28 text-center">${statusText}</span>`}
         <span class="text-xs font-bold text-cyan-400 mono flex-shrink-0 w-24 text-right">${Math.round(job.calculatedCost || 0).toLocaleString()} ISK</span>
         <span class="text-xs font-bold ${p !== undefined ? (p >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-600'} mono flex-shrink-0 w-24 text-right">${p !== undefined ? Math.round(p).toLocaleString() + ' ISK' : '—'}</span>
         <div class="flex items-center gap-1.5 flex-shrink-0" onclick="event.stopPropagation()">
-          <button onclick="markJobAsBuilt(${job.id})" class="py-1 px-2 bg-green-800/80 hover:bg-green-700 text-white font-bold rounded text-[10px] mono transition">✔</button>
-          <button onclick="deleteJobFromQueue(${job.id})" class="py-1 px-2 bg-red-950/60 hover:bg-red-800 text-red-300 font-bold rounded text-[10px] mono transition">❌</button>
+          <button onclick="markJobAsBuilt(${job.id})" class="py-1 px-2 bg-green-800/80 hover:bg-green-700 text-white font-bold rounded text-xs mono transition">✔</button>
+          <button onclick="deleteJobFromQueue(${job.id})" class="py-1 px-2 bg-red-950/60 hover:bg-red-800 text-red-300 font-bold rounded text-xs mono transition">❌</button>
         </div>
       </div>
       ${expandedDetailHTML}
@@ -410,12 +414,12 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) {
       const isAcquired = netMissing === 0;
 
       return `
-        <div class="flex justify-between items-center text-[10px] mono py-0.5 border-b border-[#1e3348]/20 ${isAcquired ? 'text-green-400' : 'text-slate-400'}">
+        <div class="flex justify-between items-center text-xs mono py-0.5 border-b border-[#1e3348]/20 ${isAcquired ? 'text-green-400' : 'text-slate-400'}">
           <span class="truncate pr-4">${window.esc(mat.name)}</span>
           <span class="flex-shrink-0">${isAcquired ? `✔ ${mat.qtyNeeded.toLocaleString()}` : `x${mat.qtyNeeded.toLocaleString()} (Deficit: ${netMissing.toLocaleString()})`}</span>
         </div>
       `;
-    }).join('') : '<div class="text-[10px] text-slate-500 italic py-1">No materials logged for this build.</div>';
+    }).join('') : '<div class="text-xs text-slate-500 italic py-1">No materials logged for this build.</div>';
 
     let buildTimeUI = '';
     let totalBuildSeconds = job.totalBuildSeconds;
@@ -449,11 +453,11 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) {
       const effJobProfit = getEffectiveJobProfit(job);
       const iskPerHour = effJobProfit !== undefined ? (effJobProfit / (totalBuildSeconds / 3600)) : null;
       const iskPerHourUI = iskPerHour !== null
-        ? `<div class="flex justify-between text-[10px] mono"><span class="text-slate-400">Est. ISK/Hour:</span><span class="font-bold ${iskPerHour >= 0 ? 'text-green-400' : 'text-red-400'}">${Math.round(iskPerHour).toLocaleString()} ISK</span></div>`
+        ? `<div class="flex justify-between text-xs mono"><span class="text-slate-400">Est. ISK/Hour:</span><span class="font-bold ${iskPerHour >= 0 ? 'text-green-400' : 'text-red-400'}">${Math.round(iskPerHour).toLocaleString()} ISK</span></div>`
         : '';
 
       buildTimeUI = `
-        <div class="flex justify-between text-[10px] text-slate-400 mono cursor-help" title="${window.esc(hoverTitle)}">
+        <div class="flex justify-between text-xs text-slate-400 mono cursor-help" title="${window.esc(hoverTitle)}">
           <span>Est. Build Time:</span>
           <span class="text-slate-300 font-semibold">${window.formatDuration(totalBuildSeconds)}</span>
         </div>
@@ -463,7 +467,7 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) {
       // Be honest that no time data was found, rather than silently omitting the line entirely -
       // a permanently missing line with no data looks identical to a rendering bug.
       buildTimeUI = `
-        <div class="flex justify-between text-[10px] text-slate-400 mono cursor-help" title="No manufacturing time data was found for this job's blueprint at the time it was added.">
+        <div class="flex justify-between text-xs text-slate-400 mono cursor-help" title="No manufacturing time data was found for this job's blueprint at the time it was added.">
           <span>Est. Build Time:</span>
           <span class="text-slate-500 italic">No Time Data</span>
         </div>
@@ -473,15 +477,15 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) {
     return `
       <div class="p-2 bg-[#070b0f] rounded border border-[#1e3348]/40">
         <div class="flex justify-between items-center mb-1.5 pb-1 border-b border-[#1e3348]/40">
-          <span class="text-[10px] text-cyan-400 font-bold uppercase tracking-wider rajdhani">Job Materials (BOM)</span>
-          <button onclick="copyIndividualJobMultibuy(event, ${job.id})" class="text-[9px] bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-1.5 py-0.5 rounded mono transition">
+          <span class="text-xs text-cyan-400 font-bold uppercase tracking-wider rajdhani">Job Materials (BOM)</span>
+          <button onclick="copyIndividualJobMultibuy(event, ${job.id})" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-1.5 py-0.5 rounded mono transition">
             📋 Copy BOM
           </button>
         </div>
         <div class="max-h-28 overflow-y-auto scrollbar-thin">
           ${individualBOMHTML}
         </div>
-        <div class="flex flex-col text-[10px] mono font-bold pt-1.5 border-t border-[#1e3348]/40 mt-1 space-y-1">
+        <div class="flex flex-col text-xs mono font-bold pt-1.5 border-t border-[#1e3348]/40 mt-1 space-y-1">
           ${buildTimeUI}
           <div class="flex justify-between items-center mt-0.5">
             <span class="text-slate-300">Total Build Cost:</span>
@@ -536,14 +540,14 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
       const text = ready ? '✓ READY TO COLLECT!' : `⏱ ${window.formatDuration(Math.ceil(remaining))} remaining`;
       statusBannerHTML = `
         <div class="job-timer flex items-center justify-between px-2.5 py-2 rounded border-2 ${ready ? 'bg-green-950/40 border-green-500/70' : 'bg-cyan-950/30 border-cyan-500/50'}" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}">
-          <span class="text-[10px] text-slate-300 font-bold uppercase tracking-wide flex-shrink-0">Status:</span>
+          <span class="text-xs text-slate-300 font-bold uppercase tracking-wide flex-shrink-0">Status:</span>
           <span class="timer-display text-sm font-extrabold ${ready ? 'text-green-400' : 'text-cyan-300'} mono">${text}</span>
         </div>
       `;
     } else {
       statusBannerHTML = `
         <div class="flex items-center justify-between px-2.5 py-2 rounded border-2 bg-[#0d1922] border-slate-600/50">
-          <span class="text-[10px] text-slate-300 font-bold uppercase tracking-wide flex-shrink-0">Status:</span>
+          <span class="text-xs text-slate-300 font-bold uppercase tracking-wide flex-shrink-0">Status:</span>
           <span class="text-sm font-extrabold text-slate-400 mono">⏳ PENDING</span>
         </div>
       `;
@@ -551,11 +555,11 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
 
     const startJobRowHTML = (!job.isStarted) ? `
       <div class="flex items-center gap-1.5 px-2 py-1.5 bg-[#070b0f] rounded border border-[#1e3348]" onclick="event.stopPropagation()">
-        <span class="text-[10px] text-slate-400 font-bold flex-shrink-0" title="Starting fewer than all runs splits this into a started job plus a still-queued job for the rest, matching how EVE actually queues manufacturing jobs.">Runs to start:</span>
+        <span class="text-xs text-slate-400 font-bold flex-shrink-0" title="Starting fewer than all runs splits this into a started job plus a still-queued job for the rest, matching how EVE actually queues manufacturing jobs.">Runs to start:</span>
         <input type="number" id="start-runs-${job.id}" value="${job.runsNeeded}" min="1" max="${job.runsNeeded}"
           onmousedown="event.stopPropagation()" onfocus="this.select()"
-          class="w-16 bg-[#0d1922] border border-[#1e3348] text-center text-amber-300 font-bold rounded p-1 outline-none text-[11px]">
-        <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-1 px-2.5 rounded text-[10px] mono transition flex-shrink-0">▶ Start Job</button>
+          class="w-16 bg-[#0d1922] border border-[#1e3348] text-center text-amber-300 font-bold rounded p-1 outline-none text-sm">
+        <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-1 px-2.5 rounded text-xs mono transition flex-shrink-0">▶ Start Job</button>
       </div>
     ` : '';
 
@@ -569,9 +573,9 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
             <img src="${jobIconUrl}" class="w-12 h-12 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
               <h3 class="font-bold text-base text-white truncate">${window.esc(jobDisplayName)}</h3>
-              ${job.isSubBuild ? `<div class="text-[9px] mono text-amber-400 font-bold uppercase tracking-wide mt-0.5" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
-              ${job.autoImported ? `<div class="text-[9px] mono text-cyan-400 font-bold uppercase tracking-wide mt-0.5" title="No matching plan existed for this job - imported directly from your active EVE industry job using its real ME/TE and market sell pricing.">📥 Auto-imported from EVE ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
-              <div class="text-[10px] mono text-slate-500 mt-0.5">Added on: ${formattedDate}</div>
+              ${job.isSubBuild ? `<div class="text-xs mono text-amber-400 font-bold uppercase tracking-wide mt-0.5" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
+              ${job.autoImported ? `<div class="text-xs mono text-cyan-400 font-bold uppercase tracking-wide mt-0.5" title="No matching plan existed for this job - imported directly from your active EVE industry job using its real ME/TE and market sell pricing.">📥 Auto-imported from EVE ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
+              <div class="text-xs mono text-slate-500 mt-0.5">Added on: ${formattedDate}</div>
             </div>
           </div>
           ${dragHandleHTML}
@@ -586,11 +590,11 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
             title="Click to copy the run count to clipboard">
             ${job.runsNeeded.toLocaleString()} Run${job.runsNeeded > 1 ? 's' : ''}
           </span>
-          <span class="text-[11px] text-slate-400 mono">${job.qtyNeeded.toLocaleString()} units total</span>
+          <span class="text-sm text-slate-400 mono">${job.qtyNeeded.toLocaleString()} units total</span>
         </div>
 
         ${!isCollapsed ? renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) : `
-          <div class="px-2 py-1 text-[10px] text-slate-500 italic text-center border border-[#1e3348]/40 rounded">
+          <div class="px-2 py-1 text-xs text-slate-500 italic text-center border border-[#1e3348]/40 rounded">
             Details minimized - click ▸ above to expand
           </div>
         `}
@@ -598,10 +602,10 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
         ${startJobRowHTML}
 
         <div class="flex items-center space-x-2 pt-1">
-          <button onclick="markJobAsBuilt(${job.id})" class="flex-1 py-1.5 bg-green-800/80 hover:bg-green-700 text-white font-bold rounded text-[11px] mono transition border border-green-600/30 flex items-center justify-center gap-1">
+          <button onclick="markJobAsBuilt(${job.id})" class="flex-1 py-1.5 bg-green-800/80 hover:bg-green-700 text-white font-bold rounded text-sm mono transition border border-green-600/30 flex items-center justify-center gap-1">
             ✔ Built
           </button>
-          <button onclick="deleteJobFromQueue(${job.id})" class="py-1.5 px-3 bg-red-950/60 hover:bg-red-800 text-red-300 font-bold rounded text-[11px] mono transition border border-red-800/30 flex items-center justify-center">
+          <button onclick="deleteJobFromQueue(${job.id})" class="py-1.5 px-3 bg-red-950/60 hover:bg-red-800 text-red-300 font-bold rounded text-sm mono transition border border-red-800/30 flex items-center justify-center">
             ❌ Delete
           </button>
         </div>
@@ -620,7 +624,7 @@ function setJobStatusFilter(status) {
   activeJobStatusFilter = status;
   ['all', 'started', 'pending'].forEach(s => {
     const btn = document.getElementById(`btn-status-${s}`);
-    if (btn) btn.className = `px-2.5 py-1.5 rounded-md font-bold transition text-[10px] mono ${s === status ? 'bg-purple-800 text-white border border-purple-600/30' : 'bg-[#1e3348] text-slate-400 hover:text-white'}`;
+    if (btn) btn.className = `px-2.5 py-1.5 rounded-md font-bold transition text-xs mono ${s === status ? 'bg-purple-800 text-white border border-purple-600/30' : 'bg-[#1e3348] text-slate-400 hover:text-white'}`;
   });
   renderJournalPage();
 }
@@ -786,10 +790,10 @@ function copyIndividualJobMultibuy(e, jobId) {
     if (btn) {
       const origText = btn.innerHTML;
       btn.innerHTML = 'Copied!';
-      btn.className = 'text-[9px] bg-green-600 text-white font-bold px-1.5 py-0.5 rounded mono transition';
+      btn.className = 'text-xs bg-green-600 text-white font-bold px-1.5 py-0.5 rounded mono transition';
       setTimeout(() => {
         btn.innerHTML = origText;
-        btn.className = 'text-[9px] bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-1.5 py-0.5 rounded mono transition';
+        btn.className = 'text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-1.5 py-0.5 rounded mono transition';
       }, 1500);
     }
   });
@@ -818,12 +822,12 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
     const isCompleted = item.netMissingQty === 0;
     const rowBg = isCompleted ? 'bg-[#0a0f14]/50 border-green-950 opacity-60' : 'bg-[#0c1318] border-[#1e3348] hover:border-purple-500/40';
     const statusBadge = isCompleted 
-      ? `<span class="bg-green-950 text-green-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">Acquired</span>` 
-      : `<span class="bg-amber-950 text-amber-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">Missing</span>`;
+      ? `<span class="bg-green-950 text-green-300 text-xs px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">Acquired</span>` 
+      : `<span class="bg-amber-950 text-amber-300 text-xs px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">Missing</span>`;
 
     const strategyBadge = item.strategy === 'sell' 
-      ? `<span class="bg-amber-900/60 text-amber-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">SELL</span>` 
-      : `<span class="bg-cyan-900/60 text-cyan-300 text-[9px] px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">BUY</span>`;
+      ? `<span class="bg-amber-900/60 text-amber-300 text-xs px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">SELL</span>` 
+      : `<span class="bg-cyan-900/60 text-cyan-300 text-xs px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">BUY</span>`;
 
     // CORRECTION: Direct blueprint path safety check inside the consolidated BOM prevents any imageservers 400 errors [1.1.1, 1.1.4]
     const itemNameLower = (window.TYPE_ID_TO_NAME[item.typeId] || item.name || '').toLowerCase();
@@ -842,10 +846,10 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
               ${statusBadge}
               ${strategyBadge}
             </div>
-            <div class="text-[10px] text-slate-400 mono mt-0.5">
+            <div class="text-xs text-slate-400 mono mt-0.5">
               Needed: ${item.totalQtyNeeded.toLocaleString()} | Stock: ${item.stockQty.toLocaleString()}
             </div>
-            ${item.netMissingQty > 0 ? `<div class="text-[9px] text-amber-300 mono mt-0.5 font-bold">Deficit: &times;${item.netMissingQty.toLocaleString()}</div>` : ''}
+            ${item.netMissingQty > 0 ? `<div class="text-xs text-amber-300 mono mt-0.5 font-bold">Deficit: &times;${item.netMissingQty.toLocaleString()}</div>` : ''}
           </div>
         </div>
         <div class="text-right mono font-bold text-cyan-400 flex-shrink-0 ml-2">
@@ -964,7 +968,7 @@ function updateJobTimers() {
     const remaining = totalSeconds - elapsedSeconds;
     if (remaining <= 0) {
       display.textContent = '✓ Ready to Collect!';
-      display.className = 'timer-display text-[11px] font-bold text-green-400 mono';
+      display.className = 'timer-display text-sm font-bold text-green-400 mono';
       el.classList.remove('border-cyan-600/40');
       el.classList.add('border-green-600/50');
       // The parent card only shows the bold "ready" color once actually ready - update it live here
@@ -976,7 +980,7 @@ function updateJobTimers() {
       }
     } else {
       display.textContent = `⏱ ${window.formatDuration(Math.ceil(remaining))} remaining`;
-      display.className = 'timer-display text-[11px] font-bold text-cyan-300 mono';
+      display.className = 'timer-display text-sm font-bold text-cyan-300 mono';
     }
   });
 }
@@ -1356,17 +1360,17 @@ function renderBuildHistoryLedger() {
     return `
       <tr class="hover:bg-[#0c1318]/50 text-slate-300 border-b border-[#1e3348]/20">
         <td class="p-1.5 py-2">${formattedDate}</td>
-        <td class="p-1.5 py-2 font-bold text-white">${window.esc(recordDisplayName)}${record.isSubBuild ? `<span class="ml-1.5 text-[9px] text-amber-400 font-semibold normal-case" title="Prerequisite for: ${window.esc(record.parentJobName || 'another job')}">⚙ prereq</span>` : ''}</td>
+        <td class="p-1.5 py-2 font-bold text-white">${window.esc(recordDisplayName)}${record.isSubBuild ? `<span class="ml-1.5 text-xs text-amber-400 font-semibold normal-case" title="Prerequisite for: ${window.esc(record.parentJobName || 'another job')}">⚙ prereq</span>` : ''}</td>
         <td class="p-1.5 py-2 text-right">${record.runsNeeded.toLocaleString()}</td>
         <td class="p-1.5 py-2 text-right text-purple-300 font-bold">${record.qtyNeeded.toLocaleString()}</td>
         <td class="p-1.5 py-2 text-right text-cyan-400 font-bold">${Math.round(record.calculatedCost || 0).toLocaleString()} ISK</td>
         <td class="p-1.5 py-2">
           <div class="flex items-center space-x-2">
-            <span class="text-green-400 font-bold uppercase text-[9px] bg-green-950 px-1 py-0.5 rounded">✔ Built</span>
-            <button onclick="requeueCompletedJob(${record.id})" class="px-2 py-0.5 bg-purple-950/60 hover:bg-purple-800 text-purple-300 font-semibold rounded text-[9px] mono border border-purple-800/40 transition">
+            <span class="text-green-400 font-bold uppercase text-xs bg-green-950 px-1 py-0.5 rounded">✔ Built</span>
+            <button onclick="requeueCompletedJob(${record.id})" class="px-2 py-0.5 bg-purple-950/60 hover:bg-purple-800 text-purple-300 font-semibold rounded text-xs mono border border-purple-800/40 transition">
               🔄 Re-queue
             </button>
-            <button onclick="deleteHistoryRecord(${record.id})" class="px-2 py-0.5 bg-red-950/60 hover:bg-red-800 text-red-300 font-semibold rounded text-[9px] mono border border-red-800/40 transition" title="Delete this entry">
+            <button onclick="deleteHistoryRecord(${record.id})" class="px-2 py-0.5 bg-red-950/60 hover:bg-red-800 text-red-300 font-semibold rounded text-xs mono border border-red-800/40 transition" title="Delete this entry">
               ❌
             </button>
           </div>
