@@ -483,6 +483,65 @@ async function scanBlueprintProfits() {
 }
 window.scanBlueprintProfits = scanBlueprintProfits;
 
+// --- What Can I Build Right Now ---
+// Checks a blueprint's DIRECT materials (its own immediate ingredient list, ME-adjusted using the
+// same formula the calculator uses elsewhere) against current stock - deliberately not a full
+// recursive tree check, since "what can I build right now" means "could I click Build in-game with
+// zero shopping trip", not "do I have raw materials for the entire multi-stage supply chain".
+function computeBlueprintReadiness(bp) {
+  const recipe = window.recipeMap && window.recipeMap[bp.type_id];
+  if (!recipe) return null;
+  const isReaction = !!(recipe.reactionMaterials && recipe.reactionMaterials.length > 0);
+  const materials = isReaction ? recipe.reactionMaterials : recipe.mfgMaterials;
+  if (!materials || materials.length === 0) return null;
+
+  const runsToCheck = (bp.quantity === -1) ? 1 : Math.max(1, bp.runs);
+  const me = bp.material_efficiency || 0;
+  const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { meBonus: 0 };
+  const facilityBonus = (structureType.meBonus || 0) / 100;
+  const rigMEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(bp.productTypeId, 'ME') : 0;
+
+  let allInStock = true;
+  const missingItems = [];
+  materials.forEach(m => {
+    const baseQty = m.baseQty !== undefined ? m.baseQty : (m.qty || 1);
+    const neededQty = window.calculateInputQuantity
+      ? window.calculateInputQuantity(baseQty, runsToCheck, me, facilityBonus, isReaction, rigMEBonus)
+      : Math.ceil(baseQty * runsToCheck);
+    const owned = (window.userStockMap && window.userStockMap[m.typeId]) || 0;
+    if (owned < neededQty) {
+      allInStock = false;
+      missingItems.push({ name: m.name, needed: neededQty, owned, missing: neededQty - owned });
+    }
+  });
+
+  return { allInStock, missingItems, runsChecked: runsToCheck, isReaction };
+}
+
+let _blueprintReadinessCache = {}; // same cache-key scheme as the profit scanner
+
+async function scanBlueprintReadiness() {
+  const btn = document.getElementById('blueprint-readiness-btn');
+  if (btn) btn.disabled = true;
+  _blueprintReadinessCache = {}; // stock changes constantly, unlike ME/TE - always fresh, no persistence
+
+  const currentFiltered = getCurrentlyFilteredBlueprints();
+  const stackEnabled = document.getElementById('blueprint-stack-toggle')?.checked ?? true;
+  const toCheck = stackEnabled ? stackBlueprints(currentFiltered) : currentFiltered;
+
+  toCheck.forEach(bp => {
+    const key = getBlueprintProfitCacheKey(bp);
+    _blueprintReadinessCache[key] = computeBlueprintReadiness(bp);
+  });
+
+  if (btn) { btn.disabled = false; }
+  const readyCount = Object.values(_blueprintReadinessCache).filter(r => r && r.allInStock).length;
+  const checkedCount = Object.values(_blueprintReadinessCache).filter(r => r !== null).length;
+  if (btn) btn.title = `${readyCount} of ${checkedCount} checked blueprints are fully in stock right now`;
+  filterBlueprintBrowser();
+}
+window.scanBlueprintReadiness = scanBlueprintReadiness;
+
 function stackBlueprints(list) {
   const groups = {};
   const order = [];
@@ -513,7 +572,11 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
 
   // Attach scanned profit data (if any) from the cache, keyed by (type, ME, TE, runs-if-BPC).
   const profitCache = getBlueprintProfitCache();
-  processedList = processedList.map(bp => ({ ...bp, _profitResult: profitCache[getBlueprintProfitCacheKey(bp)] }));
+  processedList = processedList.map(bp => ({
+    ...bp,
+    _profitResult: profitCache[getBlueprintProfitCacheKey(bp)],
+    _readinessResult: _blueprintReadinessCache[getBlueprintProfitCacheKey(bp)]
+  }));
 
   const renderRow = (bp, showStationLabel) => {
     const name = window.TYPE_ID_TO_NAME[bp.type_id] || `Type ${bp.type_id}`;
@@ -536,12 +599,21 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
       const profitColor = p.profit >= 0 ? 'text-green-400' : 'text-red-400';
       profitBadge = `<span class="text-sm font-extrabold ${profitColor} flex-shrink-0 whitespace-nowrap" title="Manufacturing profit for ${p.runsUsed} run${p.runsUsed > 1 ? 's' : ''} (${p.qtyProduced} units)${p.iskPerHour !== null ? `, ${Math.round(p.iskPerHour).toLocaleString()} ISK/hour` : ''} - scanned ${formatScanAge(p.scannedAt)}">${Math.round(p.profit).toLocaleString()} ISK</span>`;
     }
+    let readinessBadge = '';
+    if (bp._readinessResult === null) {
+      readinessBadge = `<span class="text-xs text-slate-500 flex-shrink-0" title="No direct material data found for this blueprint">—</span>`;
+    } else if (bp._readinessResult) {
+      const r = bp._readinessResult;
+      readinessBadge = r.allInStock
+        ? `<span class="text-xs font-bold text-emerald-300 bg-emerald-950/50 border border-emerald-600/50 rounded px-1.5 py-0.5 flex-shrink-0" title="All direct materials for ${r.runsChecked} run${r.runsChecked > 1 ? 's' : ''} are in stock - ready to build right now">✔ Ready</span>`
+        : `<span class="text-xs font-bold text-amber-300 bg-amber-950/50 border border-amber-600/50 rounded px-1.5 py-0.5 flex-shrink-0" title="Missing: ${r.missingItems.map(m => `${m.name} (need ${m.missing.toLocaleString()} more)`).join(', ')}">⚠ Missing ${r.missingItems.length}</span>`;
+    }
     return `
       <div class="bg-[#0d1922] border border-[#1e3348] hover:border-cyan-500 rounded p-2.5 transition space-y-2">
         <div class="flex items-center gap-2 min-w-0">
           <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" title="${isOriginal ? 'Blueprint Original (BPO)' : 'Blueprint Copy (BPC)'}">
           <span class="font-bold text-slate-200 min-w-0">${window.esc(name)}</span>
-          ${stackBadge}
+          ${stackBadge}${readinessBadge}
         </div>
         <div class="flex items-center justify-between gap-3">
           <div class="text-[10px] text-slate-500 truncate flex items-center gap-1.5 min-w-0">
@@ -626,6 +698,89 @@ function loadBlueprintIntoCalculator(blueprintTypeId, me, te, runs) {
   }
 }
 window.loadBlueprintIntoCalculator = loadBlueprintIntoCalculator;
+
+// --- Production Presets (system + structure + rigs) ---
+function getProductionPresets() {
+  return window.safeParseJSON(localStorage.getItem('eve_production_presets'), {});
+}
+
+function renderProductionPresetDropdown() {
+  const select = document.getElementById('production-preset-select');
+  if (!select) return;
+  const presets = getProductionPresets();
+  const currentValue = select.value;
+  select.innerHTML = `<option value="">— Load a saved production station —</option>` +
+    Object.keys(presets).sort().map(name => `<option value="${window.esc(name)}">${window.esc(name)} (${window.esc(presets[name].systemName)}, ${window.esc(presets[name].facilityLabel)})</option>`).join('');
+  if (presets[currentValue]) select.value = currentValue;
+}
+window.renderProductionPresetDropdown = renderProductionPresetDropdown;
+
+function saveProductionPreset() {
+  const name = prompt('Name this production station preset (e.g. "Home Sotiyo", "Staging Raitaru"):');
+  if (!name || !name.trim()) return;
+
+  const savedSystem = window.safeParseJSON(localStorage.getItem('eve_selected_system'), { id: null, name: 'JITA' });
+  const facilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
+  const facilitySelect = document.getElementById('facility-select');
+  const facilityLabel = facilitySelect ? (facilitySelect.options[facilitySelect.selectedIndex]?.text || facilityKey) : facilityKey;
+
+  const presets = getProductionPresets();
+  presets[name.trim()] = {
+    systemId: savedSystem.id,
+    systemName: savedSystem.name,
+    facilityKey: facilityKey,
+    facilityLabel: facilityLabel,
+    rig1: localStorage.getItem('eve_rig_slot_1') || '',
+    rig2: localStorage.getItem('eve_rig_slot_2') || '',
+    rig3: localStorage.getItem('eve_rig_slot_3') || ''
+  };
+  localStorage.setItem('eve_production_presets', JSON.stringify(presets));
+  renderProductionPresetDropdown();
+  const select = document.getElementById('production-preset-select');
+  if (select) select.value = name.trim();
+}
+window.saveProductionPreset = saveProductionPreset;
+
+async function loadProductionPreset(name) {
+  if (!name) return;
+  const presets = getProductionPresets();
+  const preset = presets[name];
+  if (!preset) return;
+
+  if (preset.systemId && typeof window.selectSolarSystem === 'function') {
+    await window.selectSolarSystem(preset.systemId, preset.systemName);
+  }
+
+  const facilitySelect = document.getElementById('facility-select');
+  if (facilitySelect) {
+    facilitySelect.value = preset.facilityKey;
+    onStructureTypeChange();
+  }
+
+  [1, 2, 3].forEach(slot => {
+    const rigTypeId = preset[`rig${slot}`];
+    localStorage.setItem(`eve_rig_slot_${slot}`, rigTypeId || '');
+  });
+  restoreRigSlotInputs();
+
+  if (typeof window.recalculate === 'function') window.recalculate();
+}
+window.loadProductionPreset = loadProductionPreset;
+
+function deleteProductionPreset() {
+  const select = document.getElementById('production-preset-select');
+  const name = select?.value;
+  if (!name) {
+    alert('Select a preset from the dropdown first, then click delete.');
+    return;
+  }
+  if (!confirm(`Delete the "${name}" preset? This can't be undone.`)) return;
+  const presets = getProductionPresets();
+  delete presets[name];
+  localStorage.setItem('eve_production_presets', JSON.stringify(presets));
+  renderProductionPresetDropdown();
+}
+window.deleteProductionPreset = deleteProductionPreset;
 
 function restoreRigSlotInputs() {
   for (let slot = 1; slot <= 3; slot++) {
@@ -2291,6 +2446,7 @@ window.onload = async () => {
   // Load static local states instantly so the app is interactive immediately!
   try {
     restoreRigSlotInputs(); // Show each rig slot's saved rig name (if any) before restoring other tax settings
+    renderProductionPresetDropdown();
     restoreHomeMarketInput();
     renderTrackedMarketsList();
     if (typeof window.ensureDefaultTrackedMarkets === 'function') {
