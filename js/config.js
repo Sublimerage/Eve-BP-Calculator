@@ -117,7 +117,12 @@ function extractJobMaterialsForNode(startNode) {
 
   function walk(node) {
     if (!node) return;
-    if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
+    // A sub-build boundary (same criteria collectSubBuildNodes uses) becomes its OWN separate ledger
+    // job - recursing past it here would re-list its raw ingredients as if they belonged directly to
+    // THIS job too, double-counting materials the separate sub-build job already accounts for on its
+    // own. Treat it as a leaf: list the sub-build's own product as the material needed, stop there.
+    const isSubBuildBoundary = node.depth > 0 && node.isBuildingSelf && node.children && node.children.length > 0;
+    if (!node.isBuildingSelf || !node.children || node.children.length === 0 || isSubBuildBoundary) {
       const productTypeId = node.productTypeId || node.typeId;
       const strategy = window.getNodePriceStrategy ? window.getNodePriceStrategy(node) : 'sell';
       const availableStock = isStockDeductEnabled ? (allocatedStockPool[productTypeId] || allocatedStockPool[node.typeId] || 0) : 0;
