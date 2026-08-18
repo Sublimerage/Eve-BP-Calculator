@@ -611,7 +611,7 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     return `
       <div class="bg-[#0d1922] border border-[#1e3348] hover:border-cyan-500 rounded p-2.5 transition space-y-2">
         <div class="flex items-center gap-2 min-w-0">
-          <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" title="${isOriginal ? 'Blueprint Original (BPO)' : 'Blueprint Copy (BPC)'}">
+          <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" loading="lazy" title="${isOriginal ? 'Blueprint Original (BPO)' : 'Blueprint Copy (BPC)'}">
           <span class="font-bold text-slate-200 min-w-0">${window.esc(name)}</span>
           ${stackBadge}${readinessBadge}
         </div>
@@ -1102,7 +1102,7 @@ if (searchInput) {
         return `
         <div class="px-3 py-2 hover:bg-[#1e3348] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#1e3348]/40"
              onclick="selectItem(${item.id}, '${window.esc(item.name)}')">
-          <img src="https://images.evetech.net/types/${displayIconId}/icon?size=32" class="w-6 h-6 rounded" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${displayIconId}/render?size=32';">
+          <img src="https://images.evetech.net/types/${displayIconId}/icon?size=32" class="w-6 h-6 rounded" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${displayIconId}/render?size=32';">
           <span class="font-semibold text-slate-200">${window.esc(item.name)}</span>
         </div>
       `;
@@ -2310,7 +2310,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
 
     row.innerHTML = `
       <div class="flex items-center space-x-2.5 min-w-0">
-        <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-7 h-7 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
+        <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-7 h-7 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
         <div class="min-w-0 flex-1">
           <div class="font-semibold text-slate-200 truncate flex items-center gap-1.5">
             <span class="truncate">${item.name}</span>

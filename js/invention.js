@@ -91,7 +91,7 @@ function renderInventionSearchResults(hits, profitById) {
       : '';
     return `
     <div class="px-3 py-2 hover:bg-[#1e3348] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#1e3348]/40" onmousedown="selectInventionItem(${h.id}, '${window.esc(h.name)}')">
-      <img src="https://images.evetech.net/types/${h.id}/icon?size=32" class="w-6 h-6 rounded flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${h.id}/render?size=32';">
+      <img src="https://images.evetech.net/types/${h.id}/icon?size=32" class="w-6 h-6 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${h.id}/render?size=32';">
       <span class="font-semibold text-slate-200 truncate">${window.esc(h.name)}</span>
       ${profitBadge}
     </div>
@@ -253,7 +253,7 @@ async function selectInventionItem(typeId, name, skipSave) {
   await renderInventionDatacoreList(t1Recipe.inventionMaterials || []);
 
   if (!skipSave) saveInventionState();
-  recalculateInvention();
+  recalculateInventionImpl();
 }
 window.selectInventionItem = selectInventionItem;
 
@@ -318,7 +318,7 @@ async function renderInventionDatacoreList(materials) {
 }
 
 // --- Core calculation + Profit Comparer ---
-async function recalculateInvention() {
+async function recalculateInventionImpl() {
   if (!_inventionCurrentBlueprint || !_inventionCurrentProduct) return;
   saveInventionState();
 
@@ -496,6 +496,20 @@ async function recalculateInvention() {
 
   document.getElementById('invention-empty-state').classList.add('hidden');
   document.getElementById('invention-results-area').classList.remove('hidden');
+}
+let _recalculateInventionDebounceTimer = null;
+// The public name every HTML oninput handler calls. Debouncing serializes rapid repeated triggers
+// (typing multiple digits fires this several times in quick succession) into a single delayed call,
+// which both avoids redundant work (9 full recipe tree builds with market fetches per call) and
+// fixes a real race condition: without this, an older/slower calculation could finish after a newer
+// one and silently overwrite the UI with stale results, since there was no protection against
+// overlapping async calls.
+function recalculateInvention() {
+  if (_recalculateInventionDebounceTimer) clearTimeout(_recalculateInventionDebounceTimer);
+  _recalculateInventionDebounceTimer = setTimeout(() => {
+    _recalculateInventionDebounceTimer = null;
+    recalculateInventionImpl();
+  }, 400);
 }
 window.recalculateInvention = recalculateInvention;
 
@@ -675,7 +689,7 @@ async function restoreInventionState() {
     });
   }
 
-  recalculateInvention();
+  recalculateInventionImpl();
 }
 window.restoreInventionState = restoreInventionState;
 
@@ -733,7 +747,7 @@ window.onload = async () => {
   // the user already selected an item before EIV/SCI data was ready - force one more recalculation
   // now that it actually is, rather than leaving a stale zero-fee calculation on screen.
   if (_inventionCurrentBlueprint) {
-    recalculateInvention();
+    recalculateInventionImpl();
   }
   try {
     await restoreInventionState();
