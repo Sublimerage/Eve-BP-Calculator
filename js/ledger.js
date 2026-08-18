@@ -1016,12 +1016,16 @@ async function syncWithEveIndustryJobs(silent) {
 
   loadJournalState();
 
-  // Anything already tracked by an existing STARTED ledger job (from a previous sync) must be
-  // skipped entirely here - otherwise every sync re-imports the same still-active real job as a
-  // brand new duplicate, since it's no longer sitting in the pending pool to be "matched" against.
-  const alreadyTrackedEveJobIds = new Set(
-    activeJobs.filter(j => j && j.isStarted && j.eveJobId !== undefined).map(j => j.eveJobId)
-  );
+  // Anything already tracked by an existing STARTED ledger job (from a previous sync), OR already
+  // marked Built and moved to history, must be skipped here - otherwise every sync re-imports the
+  // same real job as a brand new duplicate. History matters just as much as active jobs: if you mark
+  // a job Built in the app but haven't clicked Deliver in EVE yet, ESI keeps reporting that job as
+  // active, and the very next silent auto-sync (which runs on every page load) would otherwise see it
+  // as untracked and bring it back as a "new" ready-to-collect job.
+  const alreadyTrackedEveJobIds = new Set([
+    ...activeJobs.filter(j => j && j.isStarted && j.eveJobId !== undefined).map(j => j.eveJobId),
+    ...buildHistory.filter(r => r && r.eveJobId !== undefined).map(r => r.eveJobId)
+  ]);
   const untrackedRealJobs = activeRealJobs.filter(rj => !alreadyTrackedEveJobIds.has(rj.job_id));
   console.info(`[JobSync] ${activeRealJobs.length - untrackedRealJobs.length} real job(s) already tracked by an existing started ledger job - skipping those, ${untrackedRealJobs.length} remain to match/import.`);
 
@@ -1245,7 +1249,8 @@ function markJobAsBuilt(jobId) {
     isSubBuild: job.isSubBuild,
     parentJobName: job.parentJobName,
     autoImported: job.autoImported,
-    materials: job.materials, 
+    materials: job.materials,
+    eveJobId: job.eveJobId,
     completedAt: new Date().toISOString()
   };
 
