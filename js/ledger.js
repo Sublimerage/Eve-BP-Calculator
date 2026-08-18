@@ -164,6 +164,14 @@ function renderJournalPage() {
   }
 
   const consolidatedBOM = {};
+  // Anything that's the PRODUCT of another job already in the queue is being supplied internally,
+  // not something to shop for - without this, a prerequisite job's own output (e.g. "Pure Synth Exile
+  // Booster", produced by its own reaction job sitting right there in the queue) would show up in the
+  // shopping list as if it needed to be bought from the market, even though it's already accounted
+  // for by the job that makes it.
+  const internallySuppliedTypeIds = new Set(
+    activeJobs.filter(j => j && j.productTypeId !== undefined).map(j => j.productTypeId)
+  );
   console.info(`[BOM Debug] Full active job list (${activeJobs.length} jobs):`, activeJobs.map(j => j && ({ id: j.id, name: j.name, isStarted: j.isStarted, isSubBuild: j.isSubBuild, parentJobName: j.parentJobName })));
   activeJobs.forEach(job => {
     // Already-started jobs have already committed their materials - a "what do I still need to
@@ -173,6 +181,7 @@ function renderJournalPage() {
       console.info(`[BOM Debug] Including job "${job.name}" (id=${job.id}, isStarted=${job.isStarted}, isSubBuild=${job.isSubBuild}, parentJobName=${job.parentJobName || 'n/a'}) in consolidated BOM.`);
       job.materials.forEach(mat => {
         if (!mat || !mat.typeId) return;
+        if (internallySuppliedTypeIds.has(mat.typeId)) return;
         if (activeOrderFilter !== 'all' && mat.strategy !== activeOrderFilter) return;
 
         const category = getItemCategory(mat.typeId, mat.name);
@@ -1251,6 +1260,8 @@ function markJobAsBuilt(jobId) {
     autoImported: job.autoImported,
     materials: job.materials,
     eveJobId: job.eveJobId,
+    baseTime: job.baseTime,
+    totalBuildSeconds: job.totalBuildSeconds,
     completedAt: new Date().toISOString()
   };
 
@@ -1272,11 +1283,14 @@ function requeueCompletedJob(recordId) {
   const job = {
     id: Date.now() + Math.floor(Math.random() * 1000), 
     typeId: record.typeId,
+    productTypeId: record.productTypeId,
     name: record.name,
     runsNeeded: record.runsNeeded,
     qtyNeeded: record.qtyNeeded,
     calculatedCost: record.calculatedCost,
     materials: record.materials || [],
+    baseTime: record.baseTime,
+    totalBuildSeconds: record.totalBuildSeconds,
     addedAt: new Date().toISOString()
   };
 
