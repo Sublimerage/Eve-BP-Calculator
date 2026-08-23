@@ -21,11 +21,11 @@ function updateDeductStockButtonVisual(btn) {
   if (!btn) return;
   if (btn.value === 'true') {
     btn.textContent = '✔ Deducting Stock';
-    btn.className = 'w-full px-3 py-1.5 rounded font-bold text-xs transition flex items-center justify-center gap-1.5 bg-cyan-700 hover:bg-cyan-600 text-white border border-cyan-400 shadow shadow-cyan-900/40';
+    btn.className = 'btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5';
     btn.title = 'Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead';
   } else {
     btn.textContent = '✖ Not Deducting Stock';
-    btn.className = 'w-full px-3 py-1.5 rounded font-bold text-xs transition flex items-center justify-center gap-1.5 bg-[#1e3348] hover:bg-slate-600 text-slate-300 border border-slate-600';
+    btn.className = 'btn-glass btn-glass-muted w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5';
     btn.title = 'Shopping list/multibuy below shows the FULL amount needed, even for materials you already own - click to deduct owned stock instead';
   }
 }
