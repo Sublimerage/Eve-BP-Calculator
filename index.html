@@ -9,12 +9,12 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Deep-Industry Engine</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=9.0.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=9.1.0">
 </head>
-<body class="flex flex-col min-h-screen bg-[#030405] text-slate-200">
+<body class="flex flex-col min-h-screen bg-[#07090b] text-slate-200">
 
   <!-- Header: branding + primary account/nav actions only -->
-  <header class="bg-[#0a0d0e] border-b border-[#1c2426] px-5 py-2.5 flex flex-wrap justify-between items-center gap-3 shadow-xl z-30">
+  <header class="bg-[#0f1418] border-b border-[#2a343c] px-5 py-2.5 flex flex-wrap justify-between items-center gap-3 shadow-xl z-30">
     <div class="flex items-center space-x-3">
       <div class="w-10 h-10 bg-cyan-500 rounded flex items-center justify-center font-bold text-black text-2xl rajdhani shadow-lg shadow-cyan-500/20">E</div>
       <h1 class="text-lg font-bold tracking-widest text-white rajdhani leading-none">EVE DEEP-INDUSTRY ENGINE</h1>
@@ -38,19 +38,19 @@
         </a>
       </nav>
 
-      <div class="w-px h-7 bg-[#1c2426] hidden md:block"></div>
+      <div class="w-px h-7 bg-[#2a343c] hidden md:block"></div>
 
       <!-- Secondary utilities: used rarely, so deliberately quieter and smaller than the destinations above. -->
       <div class="flex items-center gap-1.5">
-        <button onclick="refreshLiveAssets()" class="px-2 py-1.5 bg-transparent hover:bg-[#1c2426] text-slate-500 hover:text-slate-200 hud-badge transition text-[10px] flex items-center gap-1" title="Fetch latest live character and corp assets from EVE Online">
+        <button onclick="refreshLiveAssets()" class="px-2 py-1.5 bg-transparent hover:bg-[#2a343c] text-slate-500 hover:text-slate-200 hud-badge transition text-[10px] flex items-center gap-1" title="Fetch latest live character and corp assets from EVE Online">
           🔄 <span class="hidden xl:inline">Refresh Assets</span>
         </button>
-        <button onclick="openPasteModal()" class="px-2 py-1.5 bg-transparent hover:bg-[#1c2426] text-slate-500 hover:text-slate-200 hud-badge transition text-[10px] flex items-center gap-1" title="Paste in-game inventory text to import stock">
+        <button onclick="openPasteModal()" class="px-2 py-1.5 bg-transparent hover:bg-[#2a343c] text-slate-500 hover:text-slate-200 hud-badge transition text-[10px] flex items-center gap-1" title="Paste in-game inventory text to import stock">
           📋 <span class="hidden xl:inline">Paste Hangar</span>
         </button>
       </div>
 
-      <div class="w-px h-7 bg-[#1c2426] hidden md:block"></div>
+      <div class="w-px h-7 bg-[#2a343c] hidden md:block"></div>
 
       <div id="esi-login-container">
         <button onclick="startEsiSSOLogin()" class="px-3.5 py-2 hud-panel bg-cyan-900/60 hover:bg-cyan-700 text-cyan-200 hover:text-white font-bold transition flex items-center gap-1.5 border border-cyan-600/30 text-xs" title="Login with EVE Online to import your character assets">
@@ -58,7 +58,7 @@
         </button>
       </div>
 
-      <div id="status-badge" class="px-3 py-2 bg-[#08090a] border border-[#1c2426] rounded-md flex items-center gap-2 text-xs shadow">
+      <div id="status-badge" class="px-3 py-2 bg-[#171f26] border border-[#2a343c] rounded-md flex items-center gap-2 text-xs shadow">
         <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-cyan-400 flex-shrink-0"></span>
         <span id="status-text" class="text-slate-300 font-semibold hidden sm:inline">INITIALIZING INDEX...</span>
       </div>
@@ -66,31 +66,31 @@
   </header>
 
   <!-- Dashboard Summary Bar: live metrics for whatever is currently selected -->
-  <section class="p-2.5 grid grid-cols-2 md:grid-cols-5 gap-2.5 bg-[#0a0f14] relative z-10 border-b border-[#1c2426]">
-    <div class="bg-[#08090a] border border-[#1c2426] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+  <section class="p-2.5 grid grid-cols-2 md:grid-cols-5 gap-2.5 bg-[#0a0f14] relative z-10 border-b border-[#2a343c]">
+    <div class="bg-[#171f26] border border-[#2a343c] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
       <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Production Cost</div>
       <div id="summary-build-cost" class="text-lg font-bold text-cyan-400 mono leading-tight">0 ISK</div>
       <div id="summary-runs-subtext" class="text-[9px] text-slate-500 truncate mt-0.5">Mat: 0 + Fee: 0</div>
     </div>
 
-    <div class="bg-[#08090a] border border-cyan-500/40 px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+    <div class="bg-[#171f26] border border-cyan-500/40 px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
       <div class="text-[10px] text-cyan-300 uppercase font-bold mono tracking-wide truncate">Surplus Leftovers Credit</div>
       <div id="summary-surplus-credit" class="text-lg font-bold text-cyan-300 mono leading-tight">0 ISK</div>
     </div>
 
-    <div class="bg-[#08090a] border border-[#1c2426] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+    <div class="bg-[#171f26] border border-[#2a343c] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
       <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Net Output Revenue</div>
       <div id="summary-output-sell" class="text-lg font-bold text-cyan-300 mono leading-tight">0 ISK</div>
       <div id="summary-output-buy" class="text-[9px] text-slate-500 truncate mt-0.5">Instant Buy: 0 ISK</div>
     </div>
 
-    <div class="bg-[#08090a] border border-green-600/40 px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+    <div class="bg-[#171f26] border border-green-600/40 px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
       <div id="summary-profit-sell-label" class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Net Profit (Sell Output)</div>
       <div id="summary-profit-sell" class="text-lg font-bold text-green-400 mono leading-tight">0 ISK</div>
       <div id="summary-roi-sell" class="text-[9px] text-green-400 truncate mt-0.5">ROI: 0%</div>
     </div>
 
-    <div class="bg-[#08090a] border border-[#1c2426] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+    <div class="bg-[#171f26] border border-[#2a343c] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
       <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Net Profit (Instant Buy)</div>
       <div id="summary-profit-buy" class="text-lg font-bold text-green-400 mono leading-tight">0 ISK</div>
       <div id="summary-roi-buy" class="text-[9px] text-green-400 truncate mt-0.5">ROI: 0%</div>
@@ -103,22 +103,22 @@
     <!-- Control Sidebar: everything that used to be crammed into two toolbar rows, now grouped into
          clear, spacious, labeled sections. Frequently-used sections (Search, Build, Optimizers,
          System, Stock) are open by default; set-once sections (Taxes, Contracts) start collapsed. -->
-    <aside id="control-sidebar" class="w-full md:w-[300px] xl:w-[320px] bg-[#0a0d0e] border-r border-[#1c2426] flex flex-col overflow-y-auto shadow-2xl z-30 flex-shrink-0 scrollbar-thin">
+    <aside id="control-sidebar" class="w-full md:w-[300px] xl:w-[320px] bg-[#0f1418] border-r border-[#2a343c] flex flex-col overflow-y-auto shadow-2xl z-30 flex-shrink-0 scrollbar-thin">
 
       <!-- Search & Pricing -->
-      <div class="p-3.5 border-b border-[#1c2426]">
+      <div class="p-3.5 border-b border-[#2a343c]">
         <h2 class="hud-tag-label text-cyan-400 text-xs mb-2">Search and Pricing</h2>
         <div class="relative mb-2">
           <input type="text" id="item-search" autocomplete="off" placeholder="Search item to build..."
-            class="w-full bg-[#030405] border border-[#1c2426] rounded-md px-2.5 py-2 text-white font-bold focus:border-cyan-500 outline-none mono text-sm shadow-inner">
-          <div id="search-results" class="absolute top-full left-0 right-0 bg-[#08090a] border border-cyan-500 rounded-b-md max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
+            class="w-full bg-[#07090b] border border-[#2a343c] rounded-md px-2.5 py-2 text-white font-bold focus:border-cyan-500 outline-none mono text-sm shadow-inner">
+          <div id="search-results" class="absolute top-full left-0 right-0 bg-[#171f26] border border-cyan-500 rounded-b-md max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
         </div>
         <div class="flex gap-2">
-          <select id="input-price-mode" onchange="recalculate()" class="flex-1 bg-[#030405] border border-[#1c2426] rounded-md px-2 py-1.5 text-white font-bold text-[11px] outline-none">
+          <select id="input-price-mode" onchange="recalculate()" class="flex-1 bg-[#07090b] border border-[#2a343c] rounded-md px-2 py-1.5 text-white font-bold text-[11px] outline-none">
             <option value="sell" selected>Sell (Instant)</option>
             <option value="buy">Buy Order</option>
           </select>
-          <select id="include-reactions" onchange="if(currentProduct) selectItem(currentProduct.id, currentProduct.name, true)" class="flex-1 bg-[#030405] border border-[#1c2426] rounded-md px-2 py-1.5 text-cyan-300 font-bold text-[11px] outline-none">
+          <select id="include-reactions" onchange="if(currentProduct) selectItem(currentProduct.id, currentProduct.name, true)" class="flex-1 bg-[#07090b] border border-[#2a343c] rounded-md px-2 py-1.5 text-cyan-300 font-bold text-[11px] outline-none">
             <option value="true" selected>Reactions ON</option>
             <option value="false">Reactions OFF</option>
           </select>
@@ -126,7 +126,7 @@
       </div>
 
       <!-- Build Actions -->
-      <div class="p-3.5 border-b border-[#1c2426]">
+      <div class="p-3.5 border-b border-[#2a343c]">
         <h2 class="hud-tag-label text-green-400 text-xs mb-2">Build Actions</h2>
         <div class="grid grid-cols-2 gap-2 mb-2">
           <button onclick="buildAllComponents()" class="hud-panel bg-green-800/90 hover:bg-green-700 text-white font-bold py-2 px-2 text-xs mono transition shadow border border-green-600/40">
@@ -136,10 +136,10 @@
             🛒 Buy All
           </button>
         </div>
-        <div class="hud-panel bg-[#030405] p-2 border border-green-500/30 flex items-center gap-1.5" title="Build Margin Threshold">
+        <div class="hud-panel bg-[#07090b] p-2 border border-green-500/30 flex items-center gap-1.5" title="Build Margin Threshold">
           <span class="text-slate-400 text-[10px] font-bold flex-shrink-0">Min Profit:</span>
           <input type="number" id="build-profit-threshold" value="5.0" step="0.5" min="0" max="100"
-            class="w-14 bg-[#08090a] border border-green-500/40 text-center text-green-300 font-bold rounded p-1 outline-none text-xs">
+            class="w-14 bg-[#171f26] border border-green-500/40 text-center text-green-300 font-bold rounded p-1 outline-none text-xs">
           <span class="text-slate-500 text-xs flex-shrink-0">%</span>
           <button onclick="applyBuildProfitOptimizer()" class="ml-auto hud-badge bg-green-800 hover:bg-green-700 text-white font-semibold py-1 px-2 text-[10px] transition shadow mono flex-shrink-0">
             ⚡ Optimize
@@ -148,55 +148,55 @@
       </div>
 
       <!-- Smart Optimizers -->
-      <div class="p-3.5 border-b border-[#1c2426]">
+      <div class="p-3.5 border-b border-[#2a343c]">
         <h2 class="hud-tag-label text-cyan-300 text-xs mb-2">Smart Optimizers</h2>
         <div class="space-y-2">
-          <div class="hud-panel bg-[#030405] p-2 border border-[#1c2426] flex items-center gap-1.5" title="Component Market Spread Threshold">
+          <div class="hud-panel bg-[#07090b] p-2 border border-[#2a343c] flex items-center gap-1.5" title="Component Market Spread Threshold">
             <span class="text-slate-400 text-[10px] flex-shrink-0">Spread:</span>
             <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100"
-              class="w-14 bg-[#08090a] border border-cyan-500/40 text-center text-cyan-300 font-bold rounded p-1 outline-none text-xs">
+              class="w-14 bg-[#171f26] border border-cyan-500/40 text-center text-cyan-300 font-bold rounded p-1 outline-none text-xs">
             <span class="text-slate-500 text-xs flex-shrink-0">%</span>
             <button onclick="applyComponentSpreadOptimizer()" class="ml-auto hud-badge bg-cyan-700 hover:bg-cyan-600 text-white font-semibold py-1 px-2 text-[10px] transition flex-shrink-0">
               Optimize
             </button>
           </div>
-          <div class="hud-panel bg-[#030405] p-2 border border-[#1c2426] flex items-center gap-1.5" title="Build Cost Savings Impact Threshold">
+          <div class="hud-panel bg-[#07090b] p-2 border border-[#2a343c] flex items-center gap-1.5" title="Build Cost Savings Impact Threshold">
             <span class="text-slate-400 text-[10px] flex-shrink-0">Budget:</span>
             <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100"
-              class="w-14 bg-[#08090a] border border-cyan-500/40 text-center text-cyan-300 font-bold rounded p-1 outline-none text-xs">
+              class="w-14 bg-[#171f26] border border-cyan-500/40 text-center text-cyan-300 font-bold rounded p-1 outline-none text-xs">
             <span class="text-slate-500 text-xs flex-shrink-0">%</span>
             <button onclick="applyBudgetImpactOptimizer()" class="ml-auto hud-badge bg-cyan-700 hover:bg-cyan-600 text-white font-semibold py-1 px-2 text-[10px] transition flex-shrink-0">
               Optimize
             </button>
           </div>
-          <button onclick="resetSmartBuyModes()" class="w-full hud-panel text-slate-400 hover:text-white hover:border-slate-500 text-[11px] mono transition py-1.5 border border-[#1c2426]" title="Reset buy modes">
+          <button onclick="resetSmartBuyModes()" class="w-full hud-panel text-slate-400 hover:text-white hover:border-slate-500 text-[11px] mono transition py-1.5 border border-[#2a343c]" title="Reset buy modes">
             Reset Buy Modes
           </button>
         </div>
       </div>
 
       <!-- System & Structure -->
-      <details open class="border-b border-[#1c2426] group">
-        <summary class="p-3.5 cursor-pointer text-cyan-400 text-xs select-none hover:bg-[#08090a] flex items-center justify-between list-none">
+      <details open class="border-b border-[#2a343c] group">
+        <summary class="p-3.5 cursor-pointer text-cyan-400 text-xs select-none hover:bg-[#171f26] flex items-center justify-between list-none">
           <span class="hud-tag-label flex items-center gap-1.5">System and Structure</span>
           <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
         </summary>
         <div class="px-3.5 pb-3.5 space-y-2">
-          <div class="p-2 bg-[#030405] rounded-md border border-[#1c2426] space-y-1.5">
+          <div class="p-2 bg-[#07090b] rounded-md border border-[#2a343c] space-y-1.5">
             <div class="flex items-center gap-1.5">
-              <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="flex-1 min-w-0 bg-[#08090a] border border-[#1c2426] rounded px-2 py-1.5 text-emerald-300 font-bold text-xs outline-none">
+              <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="flex-1 min-w-0 bg-[#171f26] border border-[#2a343c] rounded px-2 py-1.5 text-emerald-300 font-bold text-xs outline-none">
                 <option value="">— Load a saved production station —</option>
               </select>
-              <button onclick="deleteProductionPreset()" class="px-2 py-1.5 bg-[#1c2426] hover:bg-red-800 text-slate-400 hover:text-red-200 rounded transition text-xs flex-shrink-0" title="Delete the currently-selected preset">🗑</button>
+              <button onclick="deleteProductionPreset()" class="px-2 py-1.5 bg-[#2a343c] hover:bg-red-800 text-slate-400 hover:text-red-200 rounded transition text-xs flex-shrink-0" title="Delete the currently-selected preset">🗑</button>
             </div>
             <button onclick="saveProductionPreset()" class="w-full px-2 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-emerald-100 font-bold rounded text-xs transition" title="Saves your current system, structure type, and rig fitting as a named preset you can switch back to instantly">💾 Save Current as Preset</button>
           </div>
           <div class="relative">
             <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="System..."
-              class="w-full bg-[#030405] border border-[#1c2426] rounded-md px-2.5 py-2 text-cyan-300 font-bold mono uppercase focus:border-cyan-500 outline-none text-sm">
-            <div id="system-results" class="absolute top-full left-0 right-0 bg-[#08090a] border border-cyan-500 rounded-b-md max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
+              class="w-full bg-[#07090b] border border-[#2a343c] rounded-md px-2.5 py-2 text-cyan-300 font-bold mono uppercase focus:border-cyan-500 outline-none text-sm">
+            <div id="system-results" class="absolute top-full left-0 right-0 bg-[#171f26] border border-cyan-500 rounded-b-md max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
           </div>
-          <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); recalculate();" class="w-full bg-[#030405] border border-[#1c2426] rounded-md px-2.5 py-2 text-white font-semibold text-xs outline-none" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
+          <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); recalculate();" class="w-full bg-[#07090b] border border-[#2a343c] rounded-md px-2.5 py-2 text-white font-semibold text-xs outline-none" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
             <option value="npc">NPC Station (0% ME / 0% TE / 0% Fee)</option>
             <option value="raitaru">Raitaru - M EC (1% ME / 15% TE / 3% Fee)</option>
             <option value="azbel">Azbel - L EC (1% ME / 20% TE / 4% Fee)</option>
@@ -208,24 +208,24 @@
               <div class="relative">
                 <input type="text" id="rig-slot-1-input" placeholder="Rig Slot 1: None" autocomplete="off"
                   oninput="searchRigSlot(1, this.value)" onfocus="searchRigSlot(1, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-1-results'); if (el) el.classList.add('hidden'); }, 200)"
-                  class="w-full bg-[#030405] border border-[#1c2426] rounded-md px-2.5 py-1.5 text-cyan-300 font-semibold text-[11px] outline-none focus:border-cyan-500">
-                <div id="rig-slot-1-results" class="absolute top-full left-0 right-0 bg-[#08090a] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+                  class="w-full bg-[#07090b] border border-[#2a343c] rounded-md px-2.5 py-1.5 text-cyan-300 font-semibold text-[11px] outline-none focus:border-cyan-500">
+                <div id="rig-slot-1-results" class="absolute top-full left-0 right-0 bg-[#171f26] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
               </div>
               <div class="relative">
                 <input type="text" id="rig-slot-2-input" placeholder="Rig Slot 2: None" autocomplete="off"
                   oninput="searchRigSlot(2, this.value)" onfocus="searchRigSlot(2, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-2-results'); if (el) el.classList.add('hidden'); }, 200)"
-                  class="w-full bg-[#030405] border border-[#1c2426] rounded-md px-2.5 py-1.5 text-cyan-300 font-semibold text-[11px] outline-none focus:border-cyan-500">
-                <div id="rig-slot-2-results" class="absolute top-full left-0 right-0 bg-[#08090a] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+                  class="w-full bg-[#07090b] border border-[#2a343c] rounded-md px-2.5 py-1.5 text-cyan-300 font-semibold text-[11px] outline-none focus:border-cyan-500">
+                <div id="rig-slot-2-results" class="absolute top-full left-0 right-0 bg-[#171f26] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
               </div>
               <div class="relative">
                 <input type="text" id="rig-slot-3-input" placeholder="Rig Slot 3: None" autocomplete="off"
                   oninput="searchRigSlot(3, this.value)" onfocus="searchRigSlot(3, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-3-results'); if (el) el.classList.add('hidden'); }, 200)"
-                  class="w-full bg-[#030405] border border-[#1c2426] rounded-md px-2.5 py-1.5 text-cyan-300 font-semibold text-[11px] outline-none focus:border-cyan-500">
-                <div id="rig-slot-3-results" class="absolute top-full left-0 right-0 bg-[#08090a] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+                  class="w-full bg-[#07090b] border border-[#2a343c] rounded-md px-2.5 py-1.5 text-cyan-300 font-semibold text-[11px] outline-none focus:border-cyan-500">
+                <div id="rig-slot-3-results" class="absolute top-full left-0 right-0 bg-[#171f26] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
               </div>
             </div>
           </div>
-          <div class="bg-[#030405] rounded-md p-2 border border-[#1c2426] space-y-1 text-[10px] mono">
+          <div class="bg-[#07090b] rounded-md p-2 border border-[#2a343c] space-y-1 text-[10px] mono">
             <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">SCI:</span><span id="sci-badge" class="text-cyan-300 font-bold text-right truncate">SCI: 4.25% (Mfg) / 1.10% (React)</span></div>
             <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">Stock:</span><span id="stock-status-text" class="text-cyan-400 font-bold text-right truncate"><span id="stock-count-display">0 items</span> in Stock</span></div>
             <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">EIV:</span><span id="eiv-status-text" class="text-cyan-400 font-bold text-right truncate">Fetching...</span></div>
@@ -234,58 +234,58 @@
       </details>
 
       <!-- Taxes & Fees (collapsed by default - set-once values) -->
-      <details class="border-b border-[#1c2426] group">
-        <summary class="p-3.5 cursor-pointer text-cyan-400 font-bold uppercase text-xs rajdhani tracking-wider select-none hover:bg-[#08090a] flex items-center justify-between list-none">
+      <details class="border-b border-[#2a343c] group">
+        <summary class="p-3.5 cursor-pointer text-cyan-400 font-bold uppercase text-xs rajdhani tracking-wider select-none hover:bg-[#171f26] flex items-center justify-between list-none">
           <span class="hud-tag-label flex items-center gap-1.5">Taxes and Fees</span>
           <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
         </summary>
         <div class="px-3.5 pb-3.5 grid grid-cols-2 gap-2 text-[11px] mono">
-          <div class="flex items-center gap-1.5 bg-[#030405] rounded-md p-1.5 border border-[#1c2426]" title="Facility Structure Tax %">
+          <div class="flex items-center gap-1.5 bg-[#07090b] rounded-md p-1.5 border border-[#2a343c]" title="Facility Structure Tax %">
             <span class="text-slate-400 font-semibold flex-shrink-0">Fac:</span>
-            <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#08090a] border border-[#1c2426] rounded text-center text-cyan-400 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#171f26] border border-[#2a343c] rounded text-center text-cyan-400 font-bold p-1 outline-none text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
-          <div class="flex items-center gap-1.5 bg-[#030405] rounded-md p-1.5 border border-[#1c2426]" title="SCC Surcharge %">
+          <div class="flex items-center gap-1.5 bg-[#07090b] rounded-md p-1.5 border border-[#2a343c]" title="SCC Surcharge %">
             <span class="text-slate-400 font-semibold flex-shrink-0">SCC:</span>
-            <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#08090a] border border-[#1c2426] rounded text-center text-cyan-400 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#171f26] border border-[#2a343c] rounded text-center text-cyan-400 font-bold p-1 outline-none text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
-          <div class="flex items-center gap-1.5 bg-[#030405] rounded-md p-1.5 border border-[#1c2426]" title="Sales Tax %">
+          <div class="flex items-center gap-1.5 bg-[#07090b] rounded-md p-1.5 border border-[#2a343c]" title="Sales Tax %">
             <span class="text-slate-400 font-semibold flex-shrink-0">Sales:</span>
-            <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#08090a] border border-[#1c2426] rounded text-center text-cyan-300 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#171f26] border border-[#2a343c] rounded text-center text-cyan-300 font-bold p-1 outline-none text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
-          <div class="flex items-center gap-1.5 bg-[#030405] rounded-md p-1.5 border border-[#1c2426]" title="Broker Fee %">
+          <div class="flex items-center gap-1.5 bg-[#07090b] rounded-md p-1.5 border border-[#2a343c]" title="Broker Fee %">
             <span class="text-slate-400 font-semibold flex-shrink-0">Broker:</span>
-            <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#08090a] border border-[#1c2426] rounded text-center text-cyan-300 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#171f26] border border-[#2a343c] rounded text-center text-cyan-300 font-bold p-1 outline-none text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
         </div>
       </details>
 
       <!-- Contract Settings (collapsed by default - set-once values) -->
-      <details class="border-b border-[#1c2426] group">
-        <summary class="p-3.5 cursor-pointer text-cyan-400 text-xs select-none hover:bg-[#08090a] flex items-center justify-between list-none">
+      <details class="border-b border-[#2a343c] group">
+        <summary class="p-3.5 cursor-pointer text-cyan-400 text-xs select-none hover:bg-[#171f26] flex items-center justify-between list-none">
           <span class="hud-tag-label flex items-center gap-1.5">Contract Settings</span>
           <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
         </summary>
         <div class="px-3.5 pb-3.5 grid grid-cols-2 gap-2 text-[11px] mono">
-          <div class="flex items-center gap-1.5 bg-[#030405] rounded-md p-1.5 border border-[#1c2426]" title="Contract Sales Tax %">
+          <div class="flex items-center gap-1.5 bg-[#07090b] rounded-md p-1.5 border border-[#2a343c]" title="Contract Sales Tax %">
             <span class="text-slate-400 font-semibold flex-shrink-0">C.Tax:</span>
-            <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#08090a] border border-[#1c2426] rounded text-center text-cyan-400 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#171f26] border border-[#2a343c] rounded text-center text-cyan-400 font-bold p-1 outline-none text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
-          <div class="flex items-center gap-1.5 bg-[#030405] rounded-md p-1.5 border border-[#1c2426]" title="Contract Broker Fee %">
+          <div class="flex items-center gap-1.5 bg-[#07090b] rounded-md p-1.5 border border-[#2a343c]" title="Contract Broker Fee %">
             <span class="text-slate-400 font-semibold flex-shrink-0">C.Brk:</span>
-            <input type="number" id="contract-broker" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#08090a] border border-[#1c2426] rounded text-center text-cyan-400 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="contract-broker" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#171f26] border border-[#2a343c] rounded text-center text-cyan-400 font-bold p-1 outline-none text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
         </div>
       </details>
 
       <!-- Markets: home market selection + tracked markets for the Compare Markets feature -->
-      <details open class="border-b border-[#1c2426] group">
-        <summary class="p-3.5 cursor-pointer text-cyan-400 text-xs select-none hover:bg-[#08090a] flex items-center justify-between list-none">
+      <details open class="border-b border-[#2a343c] group">
+        <summary class="p-3.5 cursor-pointer text-cyan-400 text-xs select-none hover:bg-[#171f26] flex items-center justify-between list-none">
           <span class="hud-tag-label flex items-center gap-1.5">Markets</span>
           <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
         </summary>
@@ -296,8 +296,8 @@
               <input type="text" id="home-market-input" placeholder="Search station name..." autocomplete="off"
                 oninput="searchHomeMarket(this.value)" onfocus="searchHomeMarket(this.value)"
                 onblur="setTimeout(() => { const el = document.getElementById('home-market-results'); if (el) el.classList.add('hidden'); }, 200)"
-                class="w-full bg-[#030405] border border-[#1c2426] rounded-md px-2.5 py-2 text-cyan-300 font-bold mono text-xs outline-none focus:border-cyan-500">
-              <div id="home-market-results" class="absolute top-full left-0 right-0 bg-[#08090a] border border-cyan-500 rounded-b-md max-h-52 overflow-y-auto hidden z-50 shadow-2xl text-xs"></div>
+                class="w-full bg-[#07090b] border border-[#2a343c] rounded-md px-2.5 py-2 text-cyan-300 font-bold mono text-xs outline-none focus:border-cyan-500">
+              <div id="home-market-results" class="absolute top-full left-0 right-0 bg-[#171f26] border border-cyan-500 rounded-b-md max-h-52 overflow-y-auto hidden z-50 shadow-2xl text-xs"></div>
             </div>
           </div>
           <div title="Markets compared side-by-side (price AND real daily trade volume) whenever you use Compare Markets on a card or BOM row.">
@@ -307,8 +307,8 @@
               <input type="text" id="add-market-input" placeholder="Add a market (search station)..." autocomplete="off"
                 oninput="searchAddMarket(this.value)" onfocus="searchAddMarket(this.value)"
                 onblur="setTimeout(() => { const el = document.getElementById('add-market-results'); if (el) el.classList.add('hidden'); }, 200)"
-                class="w-full bg-[#030405] border border-[#1c2426] rounded-md px-2.5 py-1.5 text-slate-200 text-[11px] outline-none focus:border-cyan-500">
-              <div id="add-market-results" class="absolute top-full left-0 right-0 bg-[#08090a] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[11px]"></div>
+                class="w-full bg-[#07090b] border border-[#2a343c] rounded-md px-2.5 py-1.5 text-slate-200 text-[11px] outline-none focus:border-cyan-500">
+              <div id="add-market-results" class="absolute top-full left-0 right-0 bg-[#171f26] border border-cyan-500 rounded-b-md max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[11px]"></div>
             </div>
           </div>
         </div>
@@ -317,7 +317,7 @@
     </aside>
 
     <!-- Interactive Diagram Viewport -->
-    <main class="flex-1 relative bg-[#05080c] border-t border-[#1c2426]" id="viewport" onclick="clearHighlight()">
+    <main class="flex-1 relative bg-[#05080c] border-t border-[#2a343c]" id="viewport" onclick="clearHighlight()">
       <div id="pan-zoom-content">
         <svg id="tree-svg"></svg>
         <div id="tree-container" class="relative flex justify-center items-center space-x-24 p-24 min-w-max min-h-max">
@@ -327,30 +327,30 @@
 
       <!-- Floating viewport controls: view-related actions live on the canvas they act on -->
       <div class="absolute top-3 right-3 z-40 flex items-center gap-2 mono text-xs" onclick="event.stopPropagation()">
-        <span id="zoom-level-text" class="px-2.5 py-1.5 bg-[#0a0d0e]/90 border border-[#1c2426] rounded-md text-slate-400 shadow-lg">Zoom: 100%</span>
-        <button onclick="collapseAllNodes()" class="px-3 py-1.5 bg-[#0a0d0e]/90 hover:bg-cyan-700 border border-[#1c2426] text-white font-bold rounded-md transition shadow-lg" title="Collapse every branch that has inputs, to shrink very tall builds">
+        <span id="zoom-level-text" class="px-2.5 py-1.5 bg-[#0f1418]/90 border border-[#2a343c] rounded-md text-slate-400 shadow-lg">Zoom: 100%</span>
+        <button onclick="collapseAllNodes()" class="px-3 py-1.5 bg-[#0f1418]/90 hover:bg-cyan-700 border border-[#2a343c] text-white font-bold rounded-md transition shadow-lg" title="Collapse every branch that has inputs, to shrink very tall builds">
           ▼⇥ Collapse All
         </button>
-        <button onclick="expandAllNodes()" class="px-3 py-1.5 bg-[#0a0d0e]/90 hover:bg-cyan-700 border border-[#1c2426] text-white font-bold rounded-md transition shadow-lg" title="Expand every collapsed branch">
+        <button onclick="expandAllNodes()" class="px-3 py-1.5 bg-[#0f1418]/90 hover:bg-cyan-700 border border-[#2a343c] text-white font-bold rounded-md transition shadow-lg" title="Expand every collapsed branch">
           ▶⇥ Expand All
         </button>
-        <button onclick="centerOnSelectedNode()" class="px-3 py-1.5 bg-[#0a0d0e]/90 hover:bg-cyan-600 border border-[#1c2426] text-white font-bold rounded-md transition shadow-lg" title="Center on selected card, or the final output if nothing is selected">
+        <button onclick="centerOnSelectedNode()" class="px-3 py-1.5 bg-[#0f1418]/90 hover:bg-cyan-600 border border-[#2a343c] text-white font-bold rounded-md transition shadow-lg" title="Center on selected card, or the final output if nothing is selected">
           🎯 Center [F]
         </button>
-        <button onclick="resetPanZoom()" class="px-3 py-1.5 bg-[#0a0d0e]/90 hover:bg-cyan-600 border border-[#1c2426] text-white font-bold rounded-md transition shadow-lg">
+        <button onclick="resetPanZoom()" class="px-3 py-1.5 bg-[#0f1418]/90 hover:bg-cyan-600 border border-[#2a343c] text-white font-bold rounded-md transition shadow-lg">
           ⟳ Reset View
         </button>
       </div>
 
       <!-- Floating controls hint -->
-      <div class="absolute bottom-3 left-3 z-40 px-3 py-1.5 bg-[#0a0d0e]/90 border border-[#1c2426] rounded-md mono text-slate-400 text-[11px] shadow-lg max-w-lg">
+      <div class="absolute bottom-3 left-3 z-40 px-3 py-1.5 bg-[#0f1418]/90 border border-[#2a343c] rounded-md mono text-slate-400 text-[11px] shadow-lg max-w-lg">
         💡 <b>Click Card:</b> Highlight Inputs &amp; Output &nbsp;|&nbsp; <b>Click BOM Row:</b> Center Material &nbsp;|&nbsp; <b>[F]:</b> Center Output
       </div>
     </main>
 
     <!-- Bill of Materials (BOM) Sidebar -->
-    <aside class="w-80 md:w-96 bg-[#0a0d0e] border-l border-[#1c2426] flex flex-col z-20 shadow-2xl">
-      <div class="p-4 border-b border-[#1c2426] flex justify-between items-center bg-[#08090a]">
+    <aside class="w-80 md:w-96 bg-[#0f1418] border-l border-[#2a343c] flex flex-col z-20 shadow-2xl">
+      <div class="p-4 border-b border-[#2a343c] flex justify-between items-center bg-[#171f26]">
         <div>
           <h2 class="font-bold text-white rajdhani tracking-wider text-lg">BILL OF MATERIALS</h2>
           <div class="text-[10px] mono text-slate-400">CLICK ROW TO FOCUS CARD IN DIAGRAM</div>
@@ -360,12 +360,12 @@
         </button>
       </div>
 
-      <details open class="border-b border-[#1c2426] group">
-        <summary class="px-4 py-2.5 cursor-pointer bg-[#08090a] flex items-center justify-between list-none hover:bg-[#101c26]" title="Only affects this shopping list and Copy Multibuy - materials you already have in stock are excluded from what's shown/copied here. Does NOT affect Total Production Cost or Profit, which always reflect full market value regardless of stock.">
+      <details open class="border-b border-[#2a343c] group">
+        <summary class="px-4 py-2.5 cursor-pointer bg-[#171f26] flex items-center justify-between list-none hover:bg-[#101c26]" title="Only affects this shopping list and Copy Multibuy - materials you already have in stock are excluded from what's shown/copied here. Does NOT affect Total Production Cost or Profit, which always reflect full market value regardless of stock.">
           <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide flex items-center gap-1.5">📦 Stock &amp; Location <span id="location-search-feedback" class="text-[9px] text-cyan-300 font-mono font-bold normal-case hidden"></span></span>
           <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
         </summary>
-        <div class="px-4 pb-3 pt-1 bg-[#08090a] space-y-2">
+        <div class="px-4 pb-3 pt-1 bg-[#171f26] space-y-2">
           <button id="deduct-stock-mode" value="true" onclick="toggleDeductStockButton(this, 'recalculate')" class="w-full px-3 py-1.5 hud-panel font-bold text-xs transition flex items-center justify-center gap-1.5 bg-cyan-700 hover:bg-cyan-600 text-white border border-cyan-400 shadow shadow-cyan-900/40" title="Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead">✔ Deducting Stock</button>
 
           <div class="flex items-center gap-2">
@@ -379,8 +379,8 @@
             </label>
           </div>
           <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterLocationDropdownOptions()"
-            class="w-full bg-[#030405] border border-[#1c2426] rounded-md px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-cyan-500">
-          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-[#030405] border border-[#1c2426] rounded-md px-2.5 py-1.5 text-cyan-300 font-bold text-[11px] outline-none truncate">
+            class="w-full bg-[#07090b] border border-[#2a343c] rounded-md px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-cyan-500">
+          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-[#07090b] border border-[#2a343c] rounded-md px-2.5 py-1.5 text-cyan-300 font-bold text-[11px] outline-none truncate">
             <option value="all" selected>All Locations (Combined Assets)</option>
             <option value="industry_system">Current System Only (JITA)</option>
           </select>
@@ -393,7 +393,7 @@
       </div>
 
       <!-- BOM Total Summary Footer -->
-      <div class="p-4 border-t border-[#1c2426] bg-[#08090a] mono">
+      <div class="p-4 border-t border-[#2a343c] bg-[#171f26] mono">
         <div class="flex justify-between text-slate-400 text-xs">
           <span>Unique Material Types:</span>
           <span id="bom-type-count" class="text-white font-bold">0</span>
@@ -413,19 +413,19 @@
 
   <!-- Blueprint Browser Drawer -->
   <div id="blueprint-browser-backdrop" class="fixed inset-0 bg-black/70 z-[998] hidden transition-opacity duration-300" onclick="closeBlueprintBrowser()"></div>
-  <div id="blueprint-browser-drawer" class="fixed top-0 right-0 h-full w-full sm:w-[clamp(920px,62vw,1300px)] max-w-full bg-[#0a0d0e] border-l border-cyan-500/60 shadow-2xl z-[999] flex flex-col text-xs mono transform translate-x-full transition-transform duration-300 ease-out">
-    <div class="flex justify-between items-center border-b border-[#1c2426] px-5 py-3.5 flex-shrink-0">
+  <div id="blueprint-browser-drawer" class="fixed top-0 right-0 h-full w-full sm:w-[clamp(920px,62vw,1300px)] max-w-full bg-[#0f1418] border-l border-cyan-500/60 shadow-2xl z-[999] flex flex-col text-xs mono transform translate-x-full transition-transform duration-300 ease-out">
+    <div class="flex justify-between items-center border-b border-[#2a343c] px-5 py-3.5 flex-shrink-0">
       <h3 class="text-base font-bold text-cyan-300 rajdhani tracking-wider">📘 MY BLUEPRINTS</h3>
       <button onclick="closeBlueprintBrowser()" class="text-slate-400 hover:text-white font-bold text-lg leading-none">✖</button>
     </div>
 
     <div class="flex flex-1 overflow-hidden">
       <!-- Filter sidebar -->
-      <aside class="w-[260px] flex-shrink-0 border-r border-[#1c2426] flex flex-col overflow-hidden">
-        <div class="p-3.5 space-y-3 flex-shrink-0 border-b border-[#1c2426] overflow-y-auto">
+      <aside class="w-[260px] flex-shrink-0 border-r border-[#2a343c] flex flex-col overflow-hidden">
+        <div class="p-3.5 space-y-3 flex-shrink-0 border-b border-[#2a343c] overflow-y-auto">
           <div>
             <input type="text" id="blueprint-browser-search" placeholder="🔍 Search blueprint name..." autocomplete="off" oninput="filterBlueprintBrowser()"
-              class="w-full bg-[#030405] border border-[#1c2426] rounded-md px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-cyan-500">
+              class="w-full bg-[#07090b] border border-[#2a343c] rounded-md px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-cyan-500">
           </div>
           <div class="flex items-center justify-between">
             <button onclick="loadBlueprintBrowserData(true)" class="px-2.5 py-1.5 bg-cyan-800 hover:bg-cyan-700 text-cyan-100 font-semibold rounded text-[10px] transition">🔄 Refresh</button>
@@ -457,7 +457,7 @@
 
           <div>
             <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Type</div>
-            <select id="blueprint-type-filter" onchange="filterBlueprintBrowser()" class="w-full bg-[#030405] border border-[#1c2426] rounded-md px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
+            <select id="blueprint-type-filter" onchange="filterBlueprintBrowser()" class="w-full bg-[#07090b] border border-[#2a343c] rounded-md px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
               <option value="all" selected>All (BPO + BPC)</option>
               <option value="bpo">BPO Only</option>
               <option value="bpc">BPC Only</option>
@@ -465,7 +465,7 @@
           </div>
           <div>
             <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Category</div>
-            <select id="blueprint-category-filter" onchange="filterBlueprintBrowser()" class="w-full bg-[#030405] border border-[#1c2426] rounded-md px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
+            <select id="blueprint-category-filter" onchange="filterBlueprintBrowser()" class="w-full bg-[#07090b] border border-[#2a343c] rounded-md px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
               <option value="all" selected>All Categories</option>
               <option value="6">Ships</option>
               <option value="7">Modules</option>
@@ -481,8 +481,8 @@
         <div class="flex-1 flex flex-col min-h-0 p-3.5">
           <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1 flex-shrink-0">Location</div>
           <input type="text" id="blueprint-location-search" autocomplete="off" placeholder="Filter locations..." oninput="filterBlueprintLocationDropdownOptions()"
-            class="w-full bg-[#030405] border border-[#1c2426] rounded-md px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-cyan-500 mb-1.5 flex-shrink-0">
-          <select id="blueprint-location-filter" onchange="filterBlueprintBrowser()" size="20" class="flex-1 w-full bg-[#030405] border border-[#1c2426] rounded-md px-2 py-1.5 text-cyan-300 font-bold text-[10px] outline-none">
+            class="w-full bg-[#07090b] border border-[#2a343c] rounded-md px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-cyan-500 mb-1.5 flex-shrink-0">
+          <select id="blueprint-location-filter" onchange="filterBlueprintBrowser()" size="20" class="flex-1 w-full bg-[#07090b] border border-[#2a343c] rounded-md px-2 py-1.5 text-cyan-300 font-bold text-[10px] outline-none">
             <option value="all" selected>All Locations</option>
           </select>
         </div>
@@ -497,21 +497,21 @@
 
   <!-- Clipboard Hangar Stock Import Modal -->
   <div id="paste-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[999] hidden p-4">
-    <div class="bg-[#0a0d0e] border border-cyan-500/80 rounded-lg p-6 w-full max-w-xl shadow-2xl flex flex-col space-y-4 text-xs mono">
-      <div class="flex justify-between items-center border-b border-[#1c2426] pb-3">
+    <div class="bg-[#0f1418] border border-cyan-500/80 rounded-lg p-6 w-full max-w-xl shadow-2xl flex flex-col space-y-4 text-xs mono">
+      <div class="flex justify-between items-center border-b border-[#2a343c] pb-3">
         <h3 class="text-base font-bold text-cyan-300 rajdhani tracking-wider">📋 IMPORT HANGAR STOCK FROM CLIPBOARD</h3>
         <button onclick="closePasteModal()" class="text-slate-400 hover:text-white font-bold text-base">✖</button>
       </div>
       <p class="text-slate-300 leading-relaxed">
-        Select items in your in-game hangar or container, press <kbd class="bg-[#1c2426] px-1 py-0.5 rounded text-cyan-300">Ctrl + C</kbd> to copy, then paste (<kbd class="bg-[#1c2426] px-1 py-0.5 rounded text-cyan-300">Ctrl + V</kbd>) into the box below:
+        Select items in your in-game hangar or container, press <kbd class="bg-[#2a343c] px-1 py-0.5 rounded text-cyan-300">Ctrl + C</kbd> to copy, then paste (<kbd class="bg-[#2a343c] px-1 py-0.5 rounded text-cyan-300">Ctrl + V</kbd>) into the box below:
       </p>
-      <textarea id="paste-stock-input" rows="8" placeholder="Paste in-game inventory text here (e.g. Tritanium 500,000 Mineral...)" class="w-full bg-[#030405] border border-[#1c2426] rounded p-3 text-slate-200 focus:border-cyan-500 outline-none mono text-xs"></textarea>
+      <textarea id="paste-stock-input" rows="8" placeholder="Paste in-game inventory text here (e.g. Tritanium 500,000 Mineral...)" class="w-full bg-[#07090b] border border-[#2a343c] rounded p-3 text-slate-200 focus:border-cyan-500 outline-none mono text-xs"></textarea>
       <div class="flex justify-between items-center pt-2">
         <button onclick="clearUserStock()" class="px-3 py-1.5 bg-red-900/60 hover:bg-red-800 text-red-300 font-bold rounded transition">
           Clear All Stock
         </button>
         <div class="flex space-x-2">
-          <button onclick="closePasteModal()" class="px-4 py-1.5 bg-[#1c2426] hover:bg-slate-600 text-slate-300 font-bold rounded transition">
+          <button onclick="closePasteModal()" class="px-4 py-1.5 bg-[#2a343c] hover:bg-slate-600 text-slate-300 font-bold rounded transition">
             Cancel
           </button>
           <button onclick="processPastedStock()" class="px-5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded transition shadow">
@@ -523,11 +523,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=9.0.0"></script>
-  <script src="js/config.js?v=9.0.0"></script>
-  <script src="js/esi.js?v=9.0.0"></script>
-  <script src="js/tree.js?v=9.0.0"></script>
-  <script src="js/optimizers.js?v=9.0.0"></script>
-  <script src="js/app.js?v=9.0.0"></script>
+  <script src="eve_db.js?v=9.1.0"></script>
+  <script src="js/config.js?v=9.1.0"></script>
+  <script src="js/esi.js?v=9.1.0"></script>
+  <script src="js/tree.js?v=9.1.0"></script>
+  <script src="js/optimizers.js?v=9.1.0"></script>
+  <script src="js/app.js?v=9.1.0"></script>
 </body>
 </html>
