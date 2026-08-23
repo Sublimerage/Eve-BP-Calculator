@@ -2368,7 +2368,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
 
   bomItems.forEach(item => {
     const row = document.createElement('div');
-    row.className = 'bg-[#0c1318] border border-[#1e3348] hover:border-cyan-500 hover:bg-[#101d2a] rounded p-2 flex items-center justify-between cursor-pointer transition shadow-sm';
+    row.className = 'bg-[#0c1318] hud-panel border border-[#1e3348] hover:border-cyan-500 hover:bg-[#101d2a] p-2 flex items-center justify-between cursor-pointer transition shadow-sm';
     row.title = 'Click to find and focus this material in the build diagram';
     row.onclick = () => highlightNodeByTypeId(item.typeId);
 
