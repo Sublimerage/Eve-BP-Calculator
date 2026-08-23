@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Deep-Industry Engine</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=10.1.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=11.0.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#030405] text-slate-200">
 
@@ -103,10 +103,31 @@
     <!-- Control Sidebar: everything that used to be crammed into two toolbar rows, now grouped into
          clear, spacious, labeled sections. Frequently-used sections (Search, Build, Optimizers,
          System, Stock) are open by default; set-once sections (Taxes, Contracts) start collapsed. -->
-    <aside id="control-sidebar" class="w-full md:w-[300px] xl:w-[320px] bg-[#0a0d0e] border-r border-[#3a4a4c] flex flex-col overflow-y-auto shadow-2xl z-30 flex-shrink-0 scrollbar-thin">
+    <aside id="control-sidebar" class="icon-rail">
+      <div id="icon-btn-search" class="icon-rail-btn icon-rail-btn-active" style="--glow-color:#4fd8e8; --glow-rgb:79,216,232;" onclick="toggleFlyout('search')">
+        <span class="icon-glow">🔍</span><span class="icon-label">Search</span>
+      </div>
+      <div id="icon-btn-build" class="icon-rail-btn" style="--glow-color:#5fce8a; --glow-rgb:95,206,138;" onclick="toggleFlyout('build')">
+        <span class="icon-glow">🔨</span><span class="icon-label">Build</span>
+      </div>
+      <div id="icon-btn-optimize" class="icon-rail-btn" style="--glow-color:#b98ee8; --glow-rgb:185,142,232;" onclick="toggleFlyout('optimize')">
+        <span class="icon-glow">⚡</span><span class="icon-label">Optimize</span>
+      </div>
+      <div id="icon-btn-structure" class="icon-rail-btn" style="--glow-color:#6b9ee8; --glow-rgb:107,158,232;" onclick="toggleFlyout('structure')">
+        <span class="icon-glow">🏭</span><span class="icon-label">Structure</span>
+      </div>
+      <div id="icon-btn-taxes" class="icon-rail-btn" style="--glow-color:#e8c96a; --glow-rgb:232,201,106;" onclick="toggleFlyout('taxes')">
+        <span class="icon-glow">💰</span><span class="icon-label">Taxes</span>
+      </div>
+      <div id="icon-btn-contract" class="icon-rail-btn" style="--glow-color:#e86ab8; --glow-rgb:232,106,184;" onclick="toggleFlyout('contract')">
+        <span class="icon-glow">📜</span><span class="icon-label">Contract</span>
+      </div>
+      <div id="icon-btn-markets" class="icon-rail-btn" style="--glow-color:#4fe8c9; --glow-rgb:79,232,201;" onclick="toggleFlyout('markets')">
+        <span class="icon-glow">💹</span><span class="icon-label">Markets</span>
+      </div>
 
-      <!-- Search & Pricing -->
-      <div class="p-3.5 border-b border-[#3a4a4c]">
+      <!-- Search and Pricing -->
+      <div id="flyout-search" class="flyout-panel open" style="--glow-color:#4fd8e8; --glow-rgb:79,216,232; top:12px;">
         <h2 class="section-label text-cyan-400 text-xs mb-2">Search and Pricing</h2>
         <div class="relative mb-2">
           <input type="text" id="item-search" autocomplete="off" placeholder="Search item to build..."
@@ -126,7 +147,7 @@
       </div>
 
       <!-- Build Actions -->
-      <div class="p-3.5 border-b border-[#3a4a4c]">
+      <div id="flyout-build" class="flyout-panel" style="--glow-color:#5fce8a; --glow-rgb:95,206,138; top:12px;">
         <h2 class="section-label text-green-400 text-xs mb-2">Build Actions</h2>
         <div class="grid grid-cols-2 gap-2 mb-2">
           <button onclick="buildAllComponents()" class="surface bg-green-800/90 hover:bg-green-700 text-white font-bold py-2 px-2 text-xs mono transition shadow">
@@ -148,7 +169,7 @@
       </div>
 
       <!-- Smart Optimizers -->
-      <div class="p-3.5 border-b border-[#3a4a4c]">
+      <div id="flyout-optimize" class="flyout-panel" style="--glow-color:#b98ee8; --glow-rgb:185,142,232; top:12px;">
         <h2 class="section-label text-cyan-300 text-xs mb-2">Smart Optimizers</h2>
         <div class="space-y-2">
           <div class="rounded bg-[#030405] p-2 border border-[#3a4a4c] flex items-center gap-1.5" title="Component Market Spread Threshold">
@@ -176,12 +197,9 @@
       </div>
 
       <!-- System & Structure -->
-      <details open class="border-b border-[#3a4a4c] group">
-        <summary class="p-3.5 cursor-pointer text-cyan-400 text-xs select-none hover:bg-[#202a2e] flex items-center justify-between list-none">
-          <span class="section-label flex items-center gap-1.5">System and Structure</span>
-          <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
-        </summary>
-        <div class="px-3.5 pb-3.5 space-y-2">
+      <div id="flyout-structure" class="flyout-panel" style="--glow-color:#6b9ee8; --glow-rgb:107,158,232; top:12px;">
+        <h2 class="section-label text-cyan-400 text-xs mb-2">System and Structure</h2>
+        <div class="space-y-2">
           <div class="p-2 bg-[#030405] border border-[#3a4a4c] space-y-1.5">
             <div class="flex items-center gap-1.5">
               <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="flex-1 min-w-0 bg-[#202a2e] border border-[#3a4a4c] px-2 py-1.5 text-emerald-300 font-bold text-xs outline-none">
@@ -231,15 +249,12 @@
             <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">EIV:</span><span id="eiv-status-text" class="text-cyan-400 font-bold text-right truncate">Fetching...</span></div>
           </div>
         </div>
-      </details>
+      </div>
 
-      <!-- Taxes & Fees (collapsed by default - set-once values) -->
-      <details class="border-b border-[#3a4a4c] group">
-        <summary class="p-3.5 cursor-pointer text-cyan-400 font-bold uppercase text-xs rajdhani tracking-wider select-none hover:bg-[#202a2e] flex items-center justify-between list-none">
-          <span class="section-label flex items-center gap-1.5">Taxes and Fees</span>
-          <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
-        </summary>
-        <div class="px-3.5 pb-3.5 grid grid-cols-2 gap-2 text-[11px] mono">
+      <!-- Taxes & Fees -->
+      <div id="flyout-taxes" class="flyout-panel" style="--glow-color:#e8c96a; --glow-rgb:232,201,106; top:12px;">
+        <h2 class="section-label text-cyan-400 text-xs mb-2">Taxes and Fees</h2>
+        <div class="grid grid-cols-2 gap-2 text-[11px] mono">
           <div class="flex items-center gap-1.5 bg-[#030405] p-1.5 border border-[#3a4a4c]" title="Facility Structure Tax %">
             <span class="text-slate-400 font-semibold flex-shrink-0">Fac:</span>
             <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#202a2e] border border-[#3a4a4c] text-center text-cyan-400 font-bold p-1 outline-none text-[11px]">
@@ -261,15 +276,12 @@
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
         </div>
-      </details>
+      </div>
 
-      <!-- Contract Settings (collapsed by default - set-once values) -->
-      <details class="border-b border-[#3a4a4c] group">
-        <summary class="p-3.5 cursor-pointer text-cyan-400 text-xs select-none hover:bg-[#202a2e] flex items-center justify-between list-none">
-          <span class="section-label flex items-center gap-1.5">Contract Settings</span>
-          <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
-        </summary>
-        <div class="px-3.5 pb-3.5 grid grid-cols-2 gap-2 text-[11px] mono">
+      <!-- Contract Settings -->
+      <div id="flyout-contract" class="flyout-panel" style="--glow-color:#e86ab8; --glow-rgb:232,106,184; top:12px;">
+        <h2 class="section-label text-cyan-400 text-xs mb-2">Contract Settings</h2>
+        <div class="grid grid-cols-2 gap-2 text-[11px] mono">
           <div class="flex items-center gap-1.5 bg-[#030405] p-1.5 border border-[#3a4a4c]" title="Contract Sales Tax %">
             <span class="text-slate-400 font-semibold flex-shrink-0">C.Tax:</span>
             <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#202a2e] border border-[#3a4a4c] text-center text-cyan-400 font-bold p-1 outline-none text-[11px]">
@@ -281,15 +293,12 @@
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
         </div>
-      </details>
+      </div>
 
-      <!-- Markets: home market selection + tracked markets for the Compare Markets feature -->
-      <details open class="border-b border-[#3a4a4c] group">
-        <summary class="p-3.5 cursor-pointer text-cyan-400 text-xs select-none hover:bg-[#202a2e] flex items-center justify-between list-none">
-          <span class="section-label flex items-center gap-1.5">Markets</span>
-          <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
-        </summary>
-        <div class="px-3.5 pb-3.5 space-y-2">
+      <!-- Markets -->
+      <div id="flyout-markets" class="flyout-panel" style="--glow-color:#4fe8c9; --glow-rgb:79,232,201; top:12px;">
+        <h2 class="section-label text-cyan-400 text-xs mb-2">Markets</h2>
+        <div class="space-y-2">
           <div title="All prices (materials and output) are fetched from this station - this is your 'home base' for pricing.">
             <div class="text-slate-400 text-[10px] font-bold uppercase tracking-wide mb-1">Home Market</div>
             <div class="relative">
@@ -312,7 +321,7 @@
             </div>
           </div>
         </div>
-      </details>
+      </div>
 
     </aside>
 
@@ -523,11 +532,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=10.1.0"></script>
-  <script src="js/config.js?v=10.1.0"></script>
-  <script src="js/esi.js?v=10.1.0"></script>
-  <script src="js/tree.js?v=10.1.0"></script>
-  <script src="js/optimizers.js?v=10.1.0"></script>
-  <script src="js/app.js?v=10.1.0"></script>
+  <script src="eve_db.js?v=11.0.0"></script>
+  <script src="js/config.js?v=11.0.0"></script>
+  <script src="js/esi.js?v=11.0.0"></script>
+  <script src="js/tree.js?v=11.0.0"></script>
+  <script src="js/optimizers.js?v=11.0.0"></script>
+  <script src="js/app.js?v=11.0.0"></script>
 </body>
 </html>
