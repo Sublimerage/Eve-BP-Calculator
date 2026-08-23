@@ -1667,18 +1667,18 @@ function createNodeCard(node) {
     }
   }
 
-  card.className = `diagram-node rounded p-3 shadow-2xl transition-all ${cardStyle}`;
+  card.className = `diagram-node hud-panel ${isRoot ? 'hud-bracket' : ''} p-3 shadow-2xl transition-all relative overflow-hidden ${cardStyle}`;
   card.innerHTML = `
-    <div class="flex items-center space-x-3 border-b border-[#1e3348] pb-2.5 mb-2.5">
-      <img src="${iconUrl}" class="w-10 h-10 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
+    ${isRoot ? '<div class="hud-scanline"></div>' : ''}
+    <div class="flex items-center space-x-3 hud-divider pb-2.5 mb-2.5">
+      <img src="${iconUrl}" class="w-10 h-10 border border-slate-700 bg-[#070b0f] flex-shrink-0" style="clip-path: polygon(0 4px, 4px 0, 100% 0, 100% 100%, 0 100%);" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
       <div class="min-w-0 flex-1">
         <div class="font-bold text-sm text-white truncate flex items-center justify-between">
-          <!-- CORRECTION: Strictly show the final manufactured product name on card headers instead of blueprints! [1] -->
           <span class="truncate cursor-pointer hover:text-cyan-300 hover:underline transition" onclick="copyMaterialNameToClipboard(event, this, '${window.esc(node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()).replace(/'/g, "\\'")}')" title="Click to copy this item's exact name to your clipboard, ready to paste into EVE's search/market">${node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()}</span>
           <div class="flex items-center space-x-1 flex-shrink-0 ml-1">
             ${isRoot ? `
               <div class="relative group inline-block" onclick="event.stopPropagation()">
-                <span class="bg-amber-900/80 hover:bg-amber-700 text-amber-300 text-xs px-1.5 py-0.5 rounded mono border border-amber-500/80 cursor-help font-bold tracking-wider" title="Unit EIV: ${formattedUnitEIV} | Total Job EIV: ${formattedTotalEIV}">EIV</span>
+                <span class="hud-badge bg-amber-900/80 hover:bg-amber-700 text-amber-300 text-xs px-1.5 py-0.5 border border-amber-500/80 cursor-help font-bold tracking-wider" title="Unit EIV: ${formattedUnitEIV} | Total Job EIV: ${formattedTotalEIV}">EIV</span>
                 <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-[#070b0f] border border-amber-500 text-white text-xs p-2 rounded shadow-2xl z-[999] whitespace-nowrap mono pointer-events-none">
                   <div class="text-amber-300 font-bold border-b border-[#1e3348] pb-1 mb-1">Estimated Item Value (EIV)</div>
                   <div class="flex justify-between space-x-4 text-slate-300"><span>Unit EIV:</span> <span class="text-cyan-300 font-bold">${formattedUnitEIV}</span></div>
@@ -1687,28 +1687,33 @@ function createNodeCard(node) {
               </div>
             ` : ''}
             ${node.children && node.children.length > 0 ? `
-              <button onclick="toggleNodeCollapse(event, ${node.instanceId})" class="text-xs ${window.collapsedInstanceIds.has(node.instanceId) ? 'bg-amber-700 hover:bg-amber-600 text-white' : 'bg-[#1e3348] hover:bg-slate-600 text-slate-300'} px-1.5 py-0.5 rounded mono transition" title="${window.collapsedInstanceIds.has(node.instanceId) ? 'Expand: show inputs again' : 'Collapse: hide inputs'}">
+              <button onclick="toggleNodeCollapse(event, ${node.instanceId})" class="hud-badge text-xs ${window.collapsedInstanceIds.has(node.instanceId) ? 'bg-amber-700 hover:bg-amber-600 text-white' : 'bg-[#1e3348] hover:bg-slate-600 text-slate-300'} px-1.5 py-0.5 mono transition" title="${window.collapsedInstanceIds.has(node.instanceId) ? 'Expand: show inputs again' : 'Collapse: hide inputs'}">
                 ${window.collapsedInstanceIds.has(node.instanceId) ? `▶ +${countDescendants(node)}` : '▼ Hide'}
               </button>
             ` : ''}
             ${isIsolated ? `
-              <button onclick="exitIsolation(event)" class="text-xs bg-amber-600 hover:bg-amber-500 text-black font-bold px-2 py-0.5 rounded mono transition shadow">Exit ✖</button>
+              <button onclick="exitIsolation(event)" class="hud-badge text-xs bg-amber-600 hover:bg-amber-500 text-black font-bold px-2 py-0.5 mono transition shadow">Exit ✖</button>
             ` : `
-              <button onclick="isolateComponent(event, ${node.instanceId})" class="text-xs bg-[#1e3348] hover:bg-cyan-600 text-cyan-200 px-1.5 py-0.5 rounded mono transition">🔍 Isolate</button>
+              <button onclick="isolateComponent(event, ${node.instanceId})" class="hud-badge text-xs bg-[#1e3348] hover:bg-cyan-600 text-cyan-200 px-1.5 py-0.5 mono transition">🔍 Isolate</button>
             `}
           </div>
         </div>
         <div class="text-sm text-cyan-400 mono flex items-center justify-between mt-0.5">
           <span>${isRoot ? 'Output Qty:' : 'Req Qty:'} ${node.qtyNeeded.toLocaleString()} ${node.productName}</span>
-          ${stockQty > 0 ? `<span class="bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-xs px-1 rounded font-bold" title="In Stock in Hangar">Stock: ${stockQty.toLocaleString()}</span>` : ''}
+          ${stockQty > 0 ? `<span class="hud-badge bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-xs px-1 font-bold" title="In Stock in Hangar">Stock: ${stockQty.toLocaleString()}</span>` : ''}
         </div>
+        ${stockQty > 0 ? (() => {
+          const totalSegs = 10;
+          const filledSegs = Math.min(totalSegs, Math.round((stockQty / node.qtyNeeded) * totalSegs));
+          return `<div class="seg-bar mt-1.5" title="Stock covers ${Math.min(100, Math.round((stockQty / node.qtyNeeded) * 100))}% of what this needs">${Array.from({length: totalSegs}, (_, i) => `<div class="${i < filledSegs ? 'filled' : ''}"></div>`).join('')}</div>`;
+        })() : ''}
         ${node.isBuildingSelf && node.batchYield > 1 ? `<div class="${node.isReaction ? 'text-purple-300 font-bold' : 'text-amber-300'} text-xs mono font-semibold mt-0.5">(${node.runsNeeded} Run${node.runsNeeded > 1 ? 's' : ''} @ ${node.batchYield}/run ${surplus > 0 ? `→ ${surplus} Surplus` : ''})</div>` : ''}
       </div>
     </div>
 
     <div class="space-y-2.5">
       ${isRoot ? `
-        <div class="p-1.5 bg-[#070b0f] rounded border border-cyan-500/40 flex items-center justify-between text-sm mono" onclick="event.stopPropagation()">
+        <div class="p-1.5 bg-[#070b0f] hud-panel border border-cyan-500/40 flex items-center justify-between text-sm mono" onclick="event.stopPropagation()">
           <span class="text-slate-300 font-bold">Runs:</span>
           <div class="flex items-center space-x-1">
             <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" onchange="syncCardRunsToGlobal(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-16 bg-[#0c1318] border border-cyan-500/60 text-center text-amber-300 font-bold rounded p-0.5 outline-none">
@@ -1719,13 +1724,13 @@ function createNodeCard(node) {
       ${sellStrategyUI}
 
       ${(!isRoot && node.isManufacturable) || (!isRoot && (!node.isBuildingSelf || !node.children || node.children.length === 0)) || (node.isBuildingSelf && node.isManufacturable && !node.isReaction) ? `
-        <div class="bg-[#070b0f] rounded border border-[#1e3348]/60 divide-y divide-[#1e3348]/40" onclick="event.stopPropagation()">
+        <div class="bg-[#070b0f] hud-panel border border-[#1e3348]/60 divide-y divide-[#1e3348]/40" onclick="event.stopPropagation()">
           ${!isRoot && node.isManufacturable ? `
             <div class="flex items-center justify-between px-2 py-1.5 text-xs mono">
               <span class="text-slate-400 font-semibold">Mode:</span>
               <div class="flex space-x-1">
-                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="px-2 py-0.5 rounded font-bold transition ${node.isBuildingSelf ? 'bg-green-600 text-white' : 'bg-[#1e3348] text-slate-400 hover:text-white'}">🔨 Build</button>
-                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="px-2 py-0.5 rounded font-bold transition ${!node.isBuildingSelf ? 'bg-amber-600 text-black' : 'bg-[#1e3348] text-slate-400 hover:text-white'}">🛒 Buy</button>
+                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="hud-badge px-2 py-0.5 font-bold transition ${node.isBuildingSelf ? 'bg-green-600 text-white' : 'bg-[#1e3348] text-slate-400 hover:text-white'}">🔨 Build</button>
+                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="hud-badge px-2 py-0.5 font-bold transition ${!node.isBuildingSelf ? 'bg-amber-600 text-black' : 'bg-[#1e3348] text-slate-400 hover:text-white'}">🛒 Buy</button>
               </div>
             </div>
           ` : ''}
@@ -1733,8 +1738,8 @@ function createNodeCard(node) {
             <div class="flex items-center justify-between px-2 py-1.5 text-xs mono">
               <span class="text-slate-400 font-semibold">Buy via:</span>
               <div class="flex space-x-1">
-                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'sell')" class="px-1.5 py-0.5 rounded font-bold transition ${currentBuyStrategy === 'sell' ? 'bg-amber-600 text-black' : 'bg-[#1e3348] text-slate-400 hover:text-white'}" title="Instant Buy off Sell Orders">⚡ Sell</button>
-                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'buy')" class="px-1.5 py-0.5 rounded font-bold transition ${currentBuyStrategy === 'buy' ? 'bg-cyan-600 text-white' : 'bg-[#1e3348] text-slate-400 hover:text-white'}" title="Order Placing via Buy Orders">📜 Buy</button>
+                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'sell')" class="hud-badge px-1.5 py-0.5 font-bold transition ${currentBuyStrategy === 'sell' ? 'bg-amber-600 text-black' : 'bg-[#1e3348] text-slate-400 hover:text-white'}" title="Instant Buy off Sell Orders">⚡ Sell</button>
+                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'buy')" class="hud-badge px-1.5 py-0.5 font-bold transition ${currentBuyStrategy === 'buy' ? 'bg-cyan-600 text-white' : 'bg-[#1e3348] text-slate-400 hover:text-white'}" title="Order Placing via Buy Orders">📜 Buy</button>
               </div>
             </div>
           ` : ''}
@@ -1752,20 +1757,20 @@ function createNodeCard(node) {
         </div>
       ` : ''}
 
-      <div class="text-sm mono space-y-1 border-t border-[#1e3348]/60 pt-2">
+      <div class="text-sm mono space-y-1 hud-divider pt-2">
         <div class="flex justify-between items-center font-semibold">
           <span class="text-slate-400">Lowest Sell:</span>
           <div class="flex items-center gap-1.5">
             <span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK</span>
-            <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="text-xs bg-[#1e3348] hover:bg-cyan-600 text-cyan-200 px-1.5 py-0.5 rounded transition flex items-center gap-1" title="Compare price and trade volume across your tracked markets">⇄ Compare</button>
+            <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="hud-badge text-xs bg-[#1e3348] hover:bg-cyan-600 text-cyan-200 px-1.5 py-0.5 transition flex items-center gap-1" title="Compare price and trade volume across your tracked markets">⇄ Compare</button>
           </div>
         </div>
         <div class="flex justify-between text-slate-400"><span>Highest Buy:</span><span class="text-slate-300">${prices.buy.toLocaleString()} ISK</span></div>
         ${!isRoot && savingsPct !== null ? `<div class="flex justify-between text-green-400 font-semibold text-xs"><span>Order Savings:</span><span>${savingsPct}%</span></div>` : ''}
-        ${node.jobFee > 0 && node.isBuildingSelf ? `<div class="flex justify-between text-[#e85555] font-semibold border-t border-[#1e3348]/40 pt-1"><span>Job Inst. Fee:</span><span>+${Math.round(node.jobFee).toLocaleString()} ISK</span></div>` : ''}
-        <div class="flex justify-between font-bold border-t border-[#1e3348]/60 pt-1 mt-1"><span class="text-slate-300">${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span><span class="text-amber-400 font-bold">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span></div>
+        ${node.jobFee > 0 && node.isBuildingSelf ? `<div class="flex justify-between text-[#e85555] font-semibold hud-divider pt-1"><span>Job Inst. Fee:</span><span>+${Math.round(node.jobFee).toLocaleString()} ISK</span></div>` : ''}
+        <div class="flex justify-between font-bold hud-divider pt-1 mt-1"><span class="text-slate-300">${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span><span class="text-amber-400 font-bold">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span></div>
         ${isRoot ? `
-          <div class="flex justify-between font-bold border-t border-green-500/40 pt-1 mt-1 bg-green-950/30 p-1.5 rounded">
+          <div class="flex justify-between font-bold border-t border-green-500/40 pt-1 mt-1 bg-green-950/30 p-1.5 hud-panel">
             <span class="text-slate-300">${window.rootSellStrategy === 'custom-contract' ? 'Net Profit (Contract Output):' : 'Net Profit (Sell Output):'}</span>
             <span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${Math.round(node.netProfitSell || 0).toLocaleString()} ISK</span>
           </div>
@@ -1773,7 +1778,7 @@ function createNodeCard(node) {
       </div>
       ${(buildTimeUI || isRoot) ? `
         <div class="pt-2 border-t-2 border-dashed border-purple-500/30">
-          <div class="text-xs text-purple-300 uppercase font-bold tracking-wider mb-1">Time &amp; Efficiency</div>
+          <div class="hud-tag-label text-xs text-purple-300 mb-1">Time and Efficiency</div>
           <div class="text-sm mono space-y-1">
             ${buildTimeUI}
             ${isRoot ? `
