@@ -296,7 +296,7 @@ async function startEsiSSOLogin() {
   // (https://developers.eveonline.com) for this Client ID. Log it so it can be copied verbatim -
   // including the trailing slash, which EVE matches exactly.
   console.info(`[EVE SSO] Sending redirect_uri: "${redirectUri}" - this exact string must be registered as a Callback URL for Client ID ${clientId} at https://developers.eveonline.com`);
-  const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1 esi-corporations.read_divisions.v1 esi-industry.read_character_jobs.v1 esi-industry.read_corporation_jobs.v1 esi-characters.read_blueprints.v1 esi-corporations.read_blueprints.v1';
+  const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1 esi-corporations.read_divisions.v1 esi-industry.read_character_jobs.v1 esi-industry.read_corporation_jobs.v1 esi-characters.read_blueprints.v1 esi-corporations.read_blueprints.v1 esi-search.search_structures.v1';
   const state = generateRandomString(16);
   localStorage.setItem('esi_auth_state', state);
   const authUrl = `https://login.eveonline.com/v2/oauth/authorize/?response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&client_id=${encodeURIComponent(clientId)}&scope=${encodeURIComponent(scope)}&code_challenge=${challenge}&code_challenge_method=S256&state=${state}`;
