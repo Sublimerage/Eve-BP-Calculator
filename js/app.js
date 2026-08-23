@@ -466,7 +466,6 @@ async function scanBlueprintProfits() {
   let done = 0;
   for (const bp of toScan) {
     const key = getBlueprintProfitCacheKey(bp);
-    if (cache[key] !== undefined) { done++; continue; }
     try {
       cache[key] = await computeBlueprintManufacturingProfit(bp);
     } catch (e) {
@@ -529,6 +528,16 @@ async function scanBlueprintReadiness() {
   const stackEnabled = document.getElementById('blueprint-stack-toggle')?.checked ?? true;
   const toCheck = stackEnabled ? stackBlueprints(currentFiltered) : currentFiltered;
 
+  if (toCheck.length === 0) {
+    if (btn) {
+      btn.disabled = false;
+      const originalText = btn.textContent;
+      btn.textContent = '⚠ No blueprints match your current filters';
+      setTimeout(() => { if (btn) btn.textContent = originalText; }, 3000);
+    }
+    return;
+  }
+
   toCheck.forEach(bp => {
     const key = getBlueprintProfitCacheKey(bp);
     _blueprintReadinessCache[key] = computeBlueprintReadiness(bp);
@@ -537,7 +546,12 @@ async function scanBlueprintReadiness() {
   if (btn) { btn.disabled = false; }
   const readyCount = Object.values(_blueprintReadinessCache).filter(r => r && r.allInStock).length;
   const checkedCount = Object.values(_blueprintReadinessCache).filter(r => r !== null).length;
-  if (btn) btn.title = `${readyCount} of ${checkedCount} checked blueprints are fully in stock right now`;
+  if (btn) {
+    btn.title = `${readyCount} of ${checkedCount} checked blueprints are fully in stock right now`;
+    const originalText = '🧰 What Can I Build Right Now?';
+    btn.textContent = checkedCount > 0 ? `✔ ${readyCount} of ${checkedCount} Ready` : `⚠ No material data found`;
+    setTimeout(() => { if (btn) btn.textContent = originalText; }, 4000);
+  }
   filterBlueprintBrowser();
 }
 window.scanBlueprintReadiness = scanBlueprintReadiness;
