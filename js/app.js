@@ -1677,7 +1677,10 @@ function createNodeCard(node) {
           <div class="flex items-center space-x-1 flex-shrink-0 ml-1">
             ${isRoot ? `
               <div class="relative group inline-block" onclick="event.stopPropagation()">
-                <span class="btn-glass btn-glass-muted text-xs px-1.5 py-0.5 cursor-help tracking-wider inline-block" title="Unit EIV: ${formattedUnitEIV} | Total Job EIV: ${formattedTotalEIV}">EIV</span>
+                <span class="toggle-btn cursor-help" title="Unit EIV: ${formattedUnitEIV} | Total Job EIV: ${formattedTotalEIV}">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="8.01"/><line x1="12" y1="11" x2="12" y2="16"/></svg>
+                  EIV
+                </span>
                 <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-black/90 border border-[var(--accent)] text-white text-xs p-2 rounded shadow-2xl z-[999] whitespace-nowrap mono pointer-events-none">
                   <div class="text-orange-300 font-bold border-b border-[#3a3025] pb-1 mb-1">Estimated Item Value (EIV)</div>
                   <div class="flex justify-between space-x-4 text-slate-300"><span>Unit EIV:</span> <span class="text-orange-300 font-bold">${formattedUnitEIV}</span></div>
@@ -1686,14 +1689,22 @@ function createNodeCard(node) {
               </div>
             ` : ''}
             ${node.children && node.children.length > 0 ? `
-              <button onclick="toggleNodeCollapse(event, ${node.instanceId})" class="btn-glass ${window.collapsedInstanceIds.has(node.instanceId) ? '' : 'btn-glass-muted'} text-xs px-1.5 py-0.5 mono" title="${window.collapsedInstanceIds.has(node.instanceId) ? 'Expand: show inputs again' : 'Collapse: hide inputs'}">
-                ${window.collapsedInstanceIds.has(node.instanceId) ? `▶ +${countDescendants(node)}` : '▼ Hide'}
+              <button onclick="toggleNodeCollapse(event, ${node.instanceId})" class="toggle-btn ${window.collapsedInstanceIds.has(node.instanceId) ? 'toggle-btn-active-accent' : ''}" title="${window.collapsedInstanceIds.has(node.instanceId) ? 'Expand: show inputs again' : 'Collapse: hide inputs'}">
+                ${window.collapsedInstanceIds.has(node.instanceId)
+                  ? `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,18 15,12 9,6"/></svg> +${countDescendants(node)}`
+                  : `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"/></svg> Hide`}
               </button>
             ` : ''}
             ${isIsolated ? `
-              <button onclick="exitIsolation(event)" class="btn-glass text-xs px-2 py-0.5 mono">Exit ✖</button>
+              <button onclick="exitIsolation(event)" class="toggle-btn toggle-btn-active-accent">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                Exit
+              </button>
             ` : `
-              <button onclick="isolateComponent(event, ${node.instanceId})" class="btn-glass btn-glass-muted text-xs px-1.5 py-0.5 mono">🔍 Isolate</button>
+              <button onclick="isolateComponent(event, ${node.instanceId})" class="toggle-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.5" y2="15.5"/></svg>
+                Isolate
+              </button>
             `}
           </div>
         </div>
@@ -1728,8 +1739,14 @@ function createNodeCard(node) {
             <div class="flex items-center justify-between text-xs mono">
               <span class="text-slate-400 font-semibold">Mode:</span>
               <div class="flex space-x-1">
-                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="btn-glass ${node.isBuildingSelf ? '' : 'btn-glass-muted'} text-xs px-2 py-0.5">🔨 Build</button>
-                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="btn-glass ${!node.isBuildingSelf ? '' : 'btn-glass-muted'} text-xs px-2 py-0.5">🛒 Buy</button>
+                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="toggle-btn ${node.isBuildingSelf ? 'toggle-btn-active-accent' : ''}">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l4 4-8.5 8.5a2 2 0 01-2.8 0v0a2 2 0 010-2.8L15.2 7.2"/><path d="M12 8l4-4 4 4-4 4"/></svg>
+                  Build
+                </button>
+                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="toggle-btn ${!node.isBuildingSelf ? 'toggle-btn-active-buy' : ''}">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M2 4h2l2.4 12.4a2 2 0 002 1.6h8.4a2 2 0 002-1.6L21 8H6"/></svg>
+                  Buy
+                </button>
               </div>
             </div>
           ` : ''}
@@ -1737,8 +1754,14 @@ function createNodeCard(node) {
             <div class="flex items-center justify-between text-xs mono">
               <span class="text-slate-400 font-semibold">Buy via:</span>
               <div class="flex space-x-1">
-                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'sell')" class="btn-glass ${currentBuyStrategy === 'sell' ? '' : 'btn-glass-muted'} text-xs px-1.5 py-0.5" title="Instant Buy off Sell Orders">⚡ Sell</button>
-                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'buy')" class="btn-glass ${currentBuyStrategy === 'buy' ? '' : 'btn-glass-muted'} text-xs px-1.5 py-0.5" title="Order Placing via Buy Orders">📜 Buy</button>
+                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'sell')" class="toggle-btn ${currentBuyStrategy === 'sell' ? 'toggle-btn-active-accent' : ''}" title="Instant Buy off Sell Orders">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13,2 3,14 11,14 9,22 21,10 13,10"/></svg>
+                  Sell
+                </button>
+                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'buy')" class="toggle-btn ${currentBuyStrategy === 'buy' ? 'toggle-btn-active-buy' : ''}" title="Order Placing via Buy Orders">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l3 3v15H6z"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/></svg>
+                  Buy
+                </button>
               </div>
             </div>
           ` : ''}
@@ -1761,7 +1784,10 @@ function createNodeCard(node) {
           <span class="text-slate-400">Lowest Sell:</span>
           <div class="flex items-center gap-1.5">
             <span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK</span>
-            <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="btn-glass btn-glass-muted text-xs px-1.5 py-0.5 flex items-center gap-1" title="Compare price and trade volume across your tracked markets">⇄ Compare</button>
+            <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="toggle-btn" title="Compare price and trade volume across your tracked markets">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17,1 21,5 17,9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7,23 3,19 7,15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+              Compare
+            </button>
           </div>
         </div>
         <div class="flex justify-between text-slate-400"><span>Highest Buy:</span><span class="text-slate-300">${prices.buy.toLocaleString()} ISK</span></div>
@@ -2541,7 +2567,45 @@ window.copyMultibuyText = copyMultibuyText;
 window.resolveProductIdFromBlueprintNameAsync = resolveProductIdFromBlueprintNameAsync;
 
 // Initialize Application
+// --- Halftone triangle background ---
+// Generates a radial halftone of triangles: large/dense near the edges, shrinking and fading
+// toward the center. A true radial halftone can't be done with repeating CSS patterns alone
+// (they're uniform, not distance-varying), so this computes it directly in JS.
+function generateHalftoneBackground() {
+  const svg = document.getElementById('halftone-bg');
+  if (!svg) return;
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const cx = W / 2, cy = H / 2;
+  const maxDist = Math.sqrt(cx * cx + cy * cy);
+  const spacing = 34;
+  let svgContent = '';
+
+  for (let y = -spacing; y < H + spacing; y += spacing * 0.87) {
+    const rowIndex = Math.round(y / (spacing * 0.87));
+    const xOffset = (rowIndex % 2 === 0) ? 0 : spacing / 2;
+    for (let x = -spacing + xOffset; x < W + spacing; x += spacing) {
+      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2) / maxDist; // 0 (center) to 1 (corner)
+      const size = 2 + dist * 13;
+      const opacity = Math.min(0.07, dist * 0.09);
+      if (opacity < 0.004) continue;
+      const half = size / 2;
+      svgContent += `<polygon points="${x},${y - half} ${x + half},${y + half} ${x - half},${y + half}" fill="rgba(255,150,90,${opacity.toFixed(3)})"/>`;
+    }
+  }
+  svg.innerHTML = svgContent;
+}
+window.generateHalftoneBackground = generateHalftoneBackground;
+
+let halftoneResizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(halftoneResizeTimer);
+  halftoneResizeTimer = setTimeout(generateHalftoneBackground, 200);
+});
+
 window.onload = async () => {
+  generateHalftoneBackground();
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }

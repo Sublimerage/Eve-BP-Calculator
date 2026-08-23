@@ -389,10 +389,12 @@ function updateEsiUserUI(charName, charId) {
   const safeName = window.esc(charName);
   if (container) {
     container.innerHTML = `
-      <div class="flex items-center space-x-2 text-xs mono bg-[#0d1922] px-3 py-1.5 rounded-md border border-cyan-500/50 shadow">
-        <img src="https://images.evetech.net/characters/${charId}/portrait?size=128" class="w-6 h-6 rounded-full border border-cyan-400" onerror="this.onerror=null; this.src='https://images.evetech.net/characters/1/portrait?size=128';">
-        <span class="text-cyan-300 font-bold">${safeName}</span>
-        <button onclick="logoutEsiSSO()" class="text-slate-400 hover:text-red-400 font-bold ml-1.5" title="Log out ESI Character">✖</button>
+      <div class="flex items-center space-x-2 text-xs mono bg-black/40 px-3 py-1.5 rounded border border-orange-500/30" style="backdrop-filter:blur(8px);">
+        <img src="https://images.evetech.net/characters/${charId}/portrait?size=128" class="w-6 h-6 rounded-full border border-orange-400" onerror="this.onerror=null; this.src='https://images.evetech.net/characters/1/portrait?size=128';">
+        <span class="text-orange-300 font-bold">${safeName}</span>
+        <button onclick="logoutEsiSSO()" class="text-slate-400 hover:text-red-400 ml-1.5 flex items-center" title="Log out ESI Character">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
     `;
   }
@@ -412,8 +414,9 @@ function logoutEsiSSO() {
   const container = document.getElementById('esi-login-container');
   if (container) {
     container.innerHTML = `
-      <button onclick="startEsiSSOLogin()" class="px-4 py-2 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-md transition flex items-center gap-2 shadow text-xs" title="Login with EVE Online to import your character assets">
-        🔐 EVE SSO Login
+      <button onclick="startEsiSSOLogin()" class="btn-glass btn-glass-muted px-3.5 py-2 text-xs flex items-center gap-1.5" title="Login with EVE Online to import your character assets">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+        EVE SSO Login
       </button>
     `;
   }
