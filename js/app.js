@@ -2427,13 +2427,6 @@ function toggleFlyout(sectionId) {
 }
 window.toggleFlyout = toggleFlyout;
 
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.icon-rail') && !e.target.closest('.flyout-panel')) {
-    document.querySelectorAll('.flyout-panel').forEach(f => f.classList.remove('open'));
-    document.querySelectorAll('.icon-rail-btn').forEach(b => b.classList.remove('icon-rail-btn-active'));
-  }
-});
-
 function copyMaterialNameToClipboard(event, el, name) {
   if (event) event.stopPropagation();
   navigator.clipboard.writeText(name).then(() => {
