@@ -1094,9 +1094,16 @@ async function esiCharacterSearch(searchTerm, categories) {
   }
   try {
     const url = `https://esi.evetech.net/latest/characters/${charId}/search/?categories=${encodeURIComponent(categories)}&search=${encodeURIComponent(searchTerm)}&datasource=tranquility&strict=false`;
+    console.info(`[ESISearch] Requesting: ${url}`);
     const res = await fetchWithAuth(url, {}, accessToken, true);
-    if (!res || !res.ok) return {};
-    return await res.json();
+    if (!res) {
+      console.warn('[ESISearch] fetchWithAuth returned no response object at all (network-level failure).');
+      return {};
+    }
+    const bodyText = await res.text();
+    console.info(`[ESISearch] Response status: ${res.status} ${res.statusText}. Body: ${bodyText}`);
+    if (!res.ok) return {};
+    return JSON.parse(bodyText);
   } catch (e) {
     console.warn('[ESISearch] Character search failed:', e);
     return {};
