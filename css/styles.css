@@ -229,7 +229,6 @@ img {
   gap: 6px;
   padding: 12px 0;
   flex-shrink: 0;
-  overflow-y: auto;
   position: relative;
 }
 
