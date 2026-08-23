@@ -212,3 +212,100 @@ img {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent);
 }
+
+/* ============================================================
+   Icon rail navigation - a narrow, always-visible column of glowing icon buttons that each
+   reveal a flyout panel on click, replacing the old always-expanded stacked sidebar sections.
+   ============================================================ */
+
+.icon-rail {
+  width: 76px;
+  background: rgba(10, 13, 14, 0.7);
+  backdrop-filter: blur(10px);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 0;
+  flex-shrink: 0;
+  overflow-y: auto;
+  position: relative;
+}
+
+.icon-rail-btn {
+  width: 58px;
+  height: 56px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.02);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.07);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+}
+.icon-rail-btn:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.15);
+}
+
+.icon-rail-btn .icon-glow {
+  font-size: 19px;
+  line-height: 1;
+  filter: drop-shadow(0 0 3px var(--glow-color)) drop-shadow(0 0 7px var(--glow-color));
+}
+
+.icon-rail-btn .icon-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7a8688;
+  font-weight: 600;
+}
+
+.icon-rail-btn-active {
+  background: rgba(var(--glow-rgb), 0.12);
+  border-color: rgba(var(--glow-rgb), 0.45);
+}
+.icon-rail-btn-active::before {
+  content: '';
+  position: absolute;
+  left: -1px; top: 10px; bottom: 10px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--glow-color);
+  box-shadow: 0 0 8px var(--glow-color);
+}
+.icon-rail-btn-active .icon-label {
+  color: var(--glow-color);
+}
+
+/* Flyout panel - pops out from the rail on click, holds one section's full settings. Anchored to
+   the icon-rail container (position: absolute) rather than the viewport (position: fixed), since
+   the rail already starts in the correct position below the header - fixed positioning would
+   place this at a viewport-relative offset that could overlap the header instead. */
+.flyout-panel {
+  display: none;
+  position: absolute;
+  left: 76px;
+  width: 320px;
+  max-height: calc(100vh - 76px);
+  overflow-y: auto;
+  background: rgba(10, 13, 14, 0.92);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(var(--glow-rgb), 0.3);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 24px rgba(var(--glow-rgb), 0.15);
+  z-index: 100;
+  padding: 16px;
+}
+.flyout-panel.open {
+  display: block;
+}
