@@ -269,6 +269,15 @@ img {
   border-color: rgba(var(--accent-rgb),0.2);
 }
 
+/* Global fix: every line icon in the app uses fill="none" with no explicit stroke color set on
+   the SVG tag itself (relying instead on a CSS rule, same as the design mockups did) - without
+   this, SVG's default stroke is "none", making every icon completely invisible despite the
+   markup being present. Applies to all icon SVGs; the tree diagram's own connector lines set
+   their own explicit stroke via inline style/attribute, which takes precedence over this. */
+svg[viewBox] {
+  stroke: currentColor;
+}
+
 .icon-rail-btn svg {
   width: 20px;
   height: 20px;
