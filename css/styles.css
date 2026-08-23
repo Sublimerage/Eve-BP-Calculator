@@ -24,10 +24,6 @@ html {
 
 body {
   background-color: var(--bg);
-  background-image:
-    radial-gradient(ellipse 1400px 700px at 50% 0%, rgba(79,216,232,0.05) 0%, transparent 60%),
-    radial-gradient(ellipse 1200px 900px at 50% 100%, rgba(0,0,0,0.35) 0%, transparent 70%);
-  background-attachment: fixed;
   color: #c8d8e8;
   font-family: 'Share Tech Mono', monospace;
   min-height: 100vh;
@@ -152,7 +148,6 @@ img {
 .hud-panel {
   position: relative;
   clip-path: polygon(0 10px, 10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
-  background-image: linear-gradient(160deg, rgba(255,255,255,0.035) 0%, transparent 40%, rgba(0,0,0,0.12) 100%);
   z-index: 0;
 }
 .hud-panel::before {
@@ -174,7 +169,6 @@ img {
 /* Smaller clip for compact elements (badges, buttons) */
 .hud-badge {
   clip-path: polygon(5px 0, 100% 0, 100% 100%, 0 100%, 0 5px);
-  background-image: linear-gradient(160deg, rgba(255,255,255,0.08) 0%, transparent 45%, rgba(0,0,0,0.14) 100%);
 }
 
 /* Targeting-HUD corner bracket frame - reserved for the one active/focused
