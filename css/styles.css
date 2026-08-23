@@ -9,10 +9,10 @@ html {
 }
 
 :root {
-  --bg: #030405;
-  --bg2: #0a0d0e;
-  --bg3: #08090a;
-  --border: #1c2426;
+  --bg: #07090b;
+  --bg2: #0f1418;
+  --bg3: #12181d;
+  --border: #2a343c;
   --glow: #1f4a50;
   --accent: #4fd8e8;
   --accent2: #7ec8f5;
@@ -25,7 +25,7 @@ html {
 body {
   background-color: var(--bg);
   color: #c8d8e8;
-  font-family: 'Exo 2', sans-serif;
+  font-family: 'Share Tech Mono', monospace;
   min-height: 100vh;
   user-select: none;
   -webkit-user-select: none;
