@@ -278,6 +278,13 @@ svg[viewBox] {
   stroke: currentColor;
 }
 
+/* Exclude the halftone background specifically - its triangles use fill, not stroke, and
+   SVG's default stroke-width is 1 (not 0), so the global rule above was giving every tiny
+   triangle a bright unwanted outline that visually overwhelmed the gradient underneath. */
+#halftone-bg {
+  stroke: none;
+}
+
 .icon-rail-btn svg {
   width: 20px;
   height: 20px;
