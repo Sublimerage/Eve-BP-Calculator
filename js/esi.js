@@ -1015,15 +1015,17 @@ async function fetchSystemSCIById(systemId, systemName) {
     if (!sysRes.ok) return;
     const sysData = await sysRes.json();
     const sysEntry = sysData.find(s => s.solar_system_id === systemId);
-    let mfgSCI = 0.01, reactSCI = 0.01;
+    let mfgSCI = 0.01, reactSCI = 0.01, inventionSCI = 0.02;
     if (sysEntry && sysEntry.cost_indices) {
       sysEntry.cost_indices.forEach(ci => {
         if (ci.activity === 'manufacturing') mfgSCI = ci.cost_index;
         if (ci.activity === 'reaction') reactSCI = ci.cost_index;
+        if (ci.activity === 'invention') inventionSCI = ci.cost_index;
       });
     }
     window.activeMfgSCI = mfgSCI;
     window.activeReactSCI = reactSCI;
+    window.activeInventionSCI = inventionSCI;
 
     // Security status drives the rig bonus multiplier (highsec x1.0, lowsec x1.9, null/WH x2.1).
     let secLabel = '';
@@ -1044,7 +1046,7 @@ async function fetchSystemSCIById(systemId, systemName) {
 
     const sciBadgeEl = document.getElementById('sci-badge');
     if (sciBadgeEl) {
-      sciBadgeEl.textContent = `System: ${systemName.toUpperCase()}${secLabel} | SCI: ${(mfgSCI * 100).toFixed(2)}% (Mfg) / ${(reactSCI * 100).toFixed(2)}% (React)`;
+      sciBadgeEl.textContent = `System: ${systemName.toUpperCase()}${secLabel} | SCI: ${(mfgSCI * 100).toFixed(2)}% (Mfg) / ${(reactSCI * 100).toFixed(2)}% (React) / ${(inventionSCI * 100).toFixed(2)}% (Invention)`;
     }
     if (typeof recalculate === 'function') recalculate();
   } catch (err) {
@@ -1088,7 +1090,7 @@ async function esiCharacterSearch(searchTerm, categories) {
   const accessToken = localStorage.getItem('esi_access_token');
   if (!charId || !accessToken) {
     console.warn('[ESISearch] No results possible - ESI search requires being logged in via EVE SSO (the old public /search/ endpoint was removed by CCP).');
-    return {};
+    return { __notLoggedIn: true };
   }
   try {
     const url = `https://esi.evetech.net/latest/characters/${charId}/search/?categories=${encodeURIComponent(categories)}&search=${encodeURIComponent(searchTerm)}&datasource=tranquility&strict=false`;
@@ -1105,6 +1107,7 @@ window.esiCharacterSearch = esiCharacterSearch;
 async function searchStationsByName(query) {
   if (!query || query.length < 3) return [];
   const data = await esiCharacterSearch(query, 'station');
+  if (data.__notLoggedIn) return null; // distinct from [] - "couldn't search" vs "searched, found nothing"
   const stationIds = (data.station || []).slice(0, 15);
   if (stationIds.length === 0) return [];
   try {

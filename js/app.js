@@ -494,34 +494,52 @@ function computeBlueprintReadiness(bp) {
   const materials = isReaction ? recipe.reactionMaterials : recipe.mfgMaterials;
   if (!materials || materials.length === 0) return null;
 
-  const runsToCheck = (bp.quantity === -1) ? 1 : Math.max(1, bp.runs);
   const me = bp.material_efficiency || 0;
   const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { meBonus: 0 };
   const facilityBonus = (structureType.meBonus || 0) / 100;
   const rigMEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(bp.productTypeId, 'ME') : 0;
 
-  let allInStock = true;
-  const missingItems = [];
+  // Per-1-run quantity for each material, then how many WHOLE runs current stock covers for THAT
+  // material alone - the true buildable run count is the minimum across all materials (the single
+  // most limiting ingredient). This is a close approximation, not perfectly exact in every edge case
+  // (the real per-N-runs formula rounds once for the whole batch, not per-run), but well within a
+  // rounding error and far more useful than a binary yes/no.
+  let maxRunsFromStock = Infinity;
   materials.forEach(m => {
     const baseQty = m.baseQty !== undefined ? m.baseQty : (m.qty || 1);
-    const neededQty = window.calculateInputQuantity
-      ? window.calculateInputQuantity(baseQty, runsToCheck, me, facilityBonus, isReaction, rigMEBonus)
-      : Math.ceil(baseQty * runsToCheck);
+    const perRunQty = window.calculateInputQuantity
+      ? window.calculateInputQuantity(baseQty, 1, me, facilityBonus, isReaction, rigMEBonus)
+      : Math.ceil(baseQty);
     const owned = (window.userStockMap && window.userStockMap[m.typeId]) || 0;
-    if (owned < neededQty) {
-      allInStock = false;
-      missingItems.push({ name: m.name, needed: neededQty, owned, missing: neededQty - owned });
-    }
+    const runsThisAllows = perRunQty > 0 ? Math.floor(owned / perRunQty) : Infinity;
+    if (runsThisAllows < maxRunsFromStock) maxRunsFromStock = runsThisAllows;
   });
+  if (!isFinite(maxRunsFromStock)) maxRunsFromStock = 0; // no real materials data resolved
 
-  return { allInStock, missingItems, runsChecked: runsToCheck, isReaction };
+  const isBPO = bp.quantity === -1;
+  const buildableRuns = isBPO ? maxRunsFromStock : Math.min(maxRunsFromStock, Math.max(1, bp.runs));
+
+  return { buildableRuns, isReaction };
 }
 
 let _blueprintReadinessCache = {}; // same cache-key scheme as the profit scanner
+let _readinessFilterActive = false;
 
 async function scanBlueprintReadiness() {
   const btn = document.getElementById('blueprint-readiness-btn');
-  if (btn) btn.disabled = true;
+  if (!btn) return;
+
+  // Already showing filtered results - this click means "go back to showing everything", using the
+  // already-cached data, no need to rescan since stock hasn't been touched by this action.
+  if (_readinessFilterActive) {
+    _readinessFilterActive = false;
+    btn.textContent = '🧰 What Can I Build Right Now?';
+    btn.className = 'w-full px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded text-[10px] transition';
+    filterBlueprintBrowser();
+    return;
+  }
+
+  btn.disabled = true;
   _blueprintReadinessCache = {}; // stock changes constantly, unlike ME/TE - always fresh, no persistence
 
   const currentFiltered = getCurrentlyFilteredBlueprints();
@@ -529,12 +547,10 @@ async function scanBlueprintReadiness() {
   const toCheck = stackEnabled ? stackBlueprints(currentFiltered) : currentFiltered;
 
   if (toCheck.length === 0) {
-    if (btn) {
-      btn.disabled = false;
-      const originalText = btn.textContent;
-      btn.textContent = '⚠ No blueprints match your current filters';
-      setTimeout(() => { if (btn) btn.textContent = originalText; }, 3000);
-    }
+    btn.disabled = false;
+    const originalText = btn.textContent;
+    btn.textContent = '⚠ No blueprints match your current filters';
+    setTimeout(() => { if (btn) btn.textContent = originalText; }, 3000);
     return;
   }
 
@@ -543,15 +559,21 @@ async function scanBlueprintReadiness() {
     _blueprintReadinessCache[key] = computeBlueprintReadiness(bp);
   });
 
-  if (btn) { btn.disabled = false; }
-  const readyCount = Object.values(_blueprintReadinessCache).filter(r => r && r.allInStock).length;
+  btn.disabled = false;
+  const buildableCount = Object.values(_blueprintReadinessCache).filter(r => r && r.buildableRuns > 0).length;
   const checkedCount = Object.values(_blueprintReadinessCache).filter(r => r !== null).length;
-  if (btn) {
-    btn.title = `${readyCount} of ${checkedCount} checked blueprints are fully in stock right now`;
-    const originalText = '🧰 What Can I Build Right Now?';
-    btn.textContent = checkedCount > 0 ? `✔ ${readyCount} of ${checkedCount} Ready` : `⚠ No material data found`;
+
+  if (buildableCount === 0) {
+    const originalText = btn.textContent;
+    btn.textContent = checkedCount > 0 ? '⚠ Nothing buildable with current stock' : '⚠ No material data found';
     setTimeout(() => { if (btn) btn.textContent = originalText; }, 4000);
+    return;
   }
+
+  _readinessFilterActive = true;
+  btn.textContent = `👁 Show All (${buildableCount} Buildable)`;
+  btn.className = 'w-full px-2.5 py-1.5 bg-amber-700 hover:bg-amber-600 text-white font-bold rounded text-[10px] transition';
+  btn.title = `Showing only the ${buildableCount} of ${checkedCount} checked blueprints you can build right now with current stock - click to show everything again`;
   filterBlueprintBrowser();
 }
 window.scanBlueprintReadiness = scanBlueprintReadiness;
@@ -592,6 +614,17 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     _readinessResult: _blueprintReadinessCache[getBlueprintProfitCacheKey(bp)]
   }));
 
+  // "What Can I Build" filter mode: only show items with at least 1 buildable run, hiding anything
+  // missing components entirely - the point of this mode is "show me what's actually buildable",
+  // not a full inventory audit.
+  if (_readinessFilterActive) {
+    processedList = processedList.filter(bp => bp._readinessResult && bp._readinessResult.buildableRuns > 0);
+    if (processedList.length === 0) {
+      listEl.innerHTML = `<div class="text-slate-500 italic p-4 text-center">Nothing buildable with current stock under your active filters. Click "Show All" to see everything again.</div>`;
+      return;
+    }
+  }
+
   const renderRow = (bp, showStationLabel) => {
     const name = window.TYPE_ID_TO_NAME[bp.type_id] || `Type ${bp.type_id}`;
     const isOriginal = bp.quantity === -1;
@@ -618,9 +651,9 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
       readinessBadge = `<span class="text-xs text-slate-500 flex-shrink-0" title="No direct material data found for this blueprint">—</span>`;
     } else if (bp._readinessResult) {
       const r = bp._readinessResult;
-      readinessBadge = r.allInStock
-        ? `<span class="text-xs font-bold text-emerald-300 bg-emerald-950/50 border border-emerald-600/50 rounded px-1.5 py-0.5 flex-shrink-0" title="All direct materials for ${r.runsChecked} run${r.runsChecked > 1 ? 's' : ''} are in stock - ready to build right now">✔ Ready</span>`
-        : `<span class="text-xs font-bold text-amber-300 bg-amber-950/50 border border-amber-600/50 rounded px-1.5 py-0.5 flex-shrink-0" title="Missing: ${r.missingItems.map(m => `${m.name} (need ${m.missing.toLocaleString()} more)`).join(', ')}">⚠ Missing ${r.missingItems.length}</span>`;
+      readinessBadge = r.buildableRuns > 0
+        ? `<span class="text-xs font-bold text-emerald-300 bg-emerald-950/50 border border-emerald-600/50 rounded px-1.5 py-0.5 flex-shrink-0" title="Current stock covers ${r.buildableRuns.toLocaleString()} full run${r.buildableRuns > 1 ? 's' : ''}">✔ ${r.buildableRuns.toLocaleString()} run${r.buildableRuns > 1 ? 's' : ''}</span>`
+        : `<span class="text-xs font-bold text-amber-300 bg-amber-950/50 border border-amber-600/50 rounded px-1.5 py-0.5 flex-shrink-0" title="Not enough stock for even 1 run right now">⚠ 0 runs</span>`;
     }
     return `
       <div class="bg-[#0d1922] border border-[#1e3348] hover:border-cyan-500 rounded p-2.5 transition space-y-2">
@@ -820,6 +853,10 @@ async function searchHomeMarket(query) {
   resultsEl.classList.remove('hidden');
   const matches = await window.searchStationsByName(q);
   if (token !== _homeMarketSearchToken) return; // a newer search superseded this one
+  if (matches === null) {
+    resultsEl.innerHTML = `<div class="p-1.5 text-amber-400">⚠ Log in via EVE SSO first - station search requires an authenticated character (ESI removed the old public search endpoint).</div>`;
+    return;
+  }
   if (matches.length === 0) {
     resultsEl.innerHTML = `<div class="p-1.5 text-slate-500">No matching stations found.</div>`;
     return;
@@ -893,6 +930,10 @@ async function searchAddMarket(query) {
   resultsEl.classList.remove('hidden');
   const matches = await window.searchStationsByName(q);
   if (token !== _addMarketSearchToken) return;
+  if (matches === null) {
+    resultsEl.innerHTML = `<div class="p-1.5 text-amber-400">⚠ Log in via EVE SSO first - station search requires an authenticated character (ESI removed the old public search endpoint).</div>`;
+    return;
+  }
   if (matches.length === 0) {
     resultsEl.innerHTML = `<div class="p-1.5 text-slate-500">No matching stations found.</div>`;
     return;
@@ -1633,7 +1674,7 @@ function createNodeCard(node) {
       <div class="min-w-0 flex-1">
         <div class="font-bold text-sm text-white truncate flex items-center justify-between">
           <!-- CORRECTION: Strictly show the final manufactured product name on card headers instead of blueprints! [1] -->
-          <span class="truncate">${node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()}</span>
+          <span class="truncate cursor-pointer hover:text-cyan-300 hover:underline transition" onclick="copyMaterialNameToClipboard(event, this, '${window.esc(node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()).replace(/'/g, "\\'")}')" title="Click to copy this item's exact name to your clipboard, ready to paste into EVE's search/market">${node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()}</span>
           <div class="flex items-center space-x-1 flex-shrink-0 ml-1">
             ${isRoot ? `
               <div class="relative group inline-block" onclick="event.stopPropagation()">
@@ -2302,6 +2343,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
 
   const bomItems = Object.values(bomMap).filter(item => item.qty > 0);
   let totalBOMCost = 0;
+  let totalBOMVolume = 0;
 
   bomItems.forEach(item => {
     const prices = window.priceCache[item.typeId] || { sell: 0, buy: 0 };
@@ -2312,6 +2354,9 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
     item.unitPrice = unitPrice;
     item.lineCost = unitPrice * item.qty;
     totalBOMCost += item.lineCost;
+    const unitVolume = (window.EVE_VOLUMES && window.EVE_VOLUMES[item.typeId]) || 0;
+    item.lineVolume = unitVolume * item.qty;
+    totalBOMVolume += item.lineVolume;
   });
 
   bomItems.sort((a, b) => b.lineCost - a.lineCost);
@@ -2332,7 +2377,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
               ${item.strategy === 'sell' ? 'SELL' : 'BUY'}
             </span>
           </div>
-          <div class="text-[10px] text-slate-400 mono font-semibold">Qty: ${item.qty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK</div>
+          <div class="text-[10px] text-slate-400 mono font-semibold">Qty: ${item.qty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK${item.lineVolume > 0 ? ` &bull; ${item.lineVolume.toLocaleString(undefined, {maximumFractionDigits: 1})} m3` : ''}</div>
         </div>
       </div>
       <div class="text-right mono font-bold text-cyan-400 flex-shrink-0 ml-2">
@@ -2349,6 +2394,9 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
   const totalEl = document.getElementById('bom-total-isk');
   if (totalEl) totalEl.textContent = Math.round(totalBOMCost).toLocaleString() + ' ISK';
 
+  const volumeEl = document.getElementById('bom-total-volume');
+  if (volumeEl) volumeEl.textContent = totalBOMVolume.toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' m3';
+
   window.currentBOMText = bomItems.map(i => `${i.name} x${i.qty}`).join('\n');
 }
 
@@ -2357,6 +2405,22 @@ function getNodeStrategyOnly(node) {
   const globalStrategy = document.getElementById('input-price-mode')?.value || 'sell';
   return window.customBuyModes[node.typeId] || globalStrategy;
 }
+
+function copyMaterialNameToClipboard(event, el, name) {
+  if (event) event.stopPropagation();
+  navigator.clipboard.writeText(name).then(() => {
+    if (!el) return;
+    const orig = el.textContent;
+    const origClass = el.className;
+    el.textContent = '✔ Copied!';
+    el.className = 'truncate text-green-400 font-bold transition';
+    setTimeout(() => {
+      el.textContent = orig;
+      el.className = origClass;
+    }, 1200);
+  }).catch(() => {});
+}
+window.copyMaterialNameToClipboard = copyMaterialNameToClipboard;
 
 function copyMultibuyText() {
   if (!window.currentBOMText) return;
