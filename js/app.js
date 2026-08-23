@@ -2588,10 +2588,10 @@ function generateHalftoneBackground() {
     for (let x = -spacing + xOffset; x < W + spacing; x += spacing) {
       const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2) / maxDist; // 0 (center) to 1 (corner)
       const size = 2 + dist * 13;
-      const opacity = Math.min(0.07, dist * 0.09);
+      const opacity = Math.min(0.13, dist * 0.1671);
       if (opacity < 0.004) continue;
       const half = size / 2;
-      svgContent += `<polygon points="${x},${y - half} ${x + half},${y + half} ${x - half},${y + half}" fill="rgba(255,150,90,${opacity.toFixed(3)})"/>`;
+      svgContent += `<polygon points="${x},${y - half} ${x + half},${y + half} ${x - half},${y + half}" fill="rgba(102,37,0,${opacity.toFixed(3)})"/>`;
     }
   }
   svg.innerHTML = svgContent;
