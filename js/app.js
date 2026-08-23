@@ -1677,7 +1677,7 @@ function createNodeCard(node) {
           <div class="flex items-center space-x-1 flex-shrink-0 ml-1">
             ${isRoot ? `
               <div class="relative group inline-block" onclick="event.stopPropagation()">
-                <span class="rounded bg-black/30 hover:bg-black/50 text-orange-300 text-xs px-1.5 py-0.5 border border-[var(--accent)]/40 cursor-help font-bold tracking-wider" title="Unit EIV: ${formattedUnitEIV} | Total Job EIV: ${formattedTotalEIV}">EIV</span>
+                <span class="btn-glass btn-glass-muted text-xs px-1.5 py-0.5 cursor-help tracking-wider inline-block" title="Unit EIV: ${formattedUnitEIV} | Total Job EIV: ${formattedTotalEIV}">EIV</span>
                 <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-black/90 border border-[var(--accent)] text-white text-xs p-2 rounded shadow-2xl z-[999] whitespace-nowrap mono pointer-events-none">
                   <div class="text-orange-300 font-bold border-b border-[#3a3025] pb-1 mb-1">Estimated Item Value (EIV)</div>
                   <div class="flex justify-between space-x-4 text-slate-300"><span>Unit EIV:</span> <span class="text-orange-300 font-bold">${formattedUnitEIV}</span></div>
@@ -1686,14 +1686,14 @@ function createNodeCard(node) {
               </div>
             ` : ''}
             ${node.children && node.children.length > 0 ? `
-              <button onclick="toggleNodeCollapse(event, ${node.instanceId})" class="rounded text-xs ${window.collapsedInstanceIds.has(node.instanceId) ? 'bg-orange-700 hover:bg-orange-600 text-white' : 'bg-black/30 hover:bg-black/50 text-slate-300 border border-[#3a3025]'} px-1.5 py-0.5 mono transition" title="${window.collapsedInstanceIds.has(node.instanceId) ? 'Expand: show inputs again' : 'Collapse: hide inputs'}">
+              <button onclick="toggleNodeCollapse(event, ${node.instanceId})" class="btn-glass ${window.collapsedInstanceIds.has(node.instanceId) ? '' : 'btn-glass-muted'} text-xs px-1.5 py-0.5 mono" title="${window.collapsedInstanceIds.has(node.instanceId) ? 'Expand: show inputs again' : 'Collapse: hide inputs'}">
                 ${window.collapsedInstanceIds.has(node.instanceId) ? `▶ +${countDescendants(node)}` : '▼ Hide'}
               </button>
             ` : ''}
             ${isIsolated ? `
-              <button onclick="exitIsolation(event)" class="rounded text-xs bg-orange-600 hover:bg-orange-500 text-black font-bold px-2 py-0.5 mono transition">Exit ✖</button>
+              <button onclick="exitIsolation(event)" class="btn-glass text-xs px-2 py-0.5 mono">Exit ✖</button>
             ` : `
-              <button onclick="isolateComponent(event, ${node.instanceId})" class="rounded text-xs bg-black/30 hover:bg-black/50 text-slate-300 hover:text-orange-300 border border-[#3a3025] px-1.5 py-0.5 mono transition">🔍 Isolate</button>
+              <button onclick="isolateComponent(event, ${node.instanceId})" class="btn-glass btn-glass-muted text-xs px-1.5 py-0.5 mono">🔍 Isolate</button>
             `}
           </div>
         </div>
@@ -1728,8 +1728,8 @@ function createNodeCard(node) {
             <div class="flex items-center justify-between text-xs mono">
               <span class="text-slate-400 font-semibold">Mode:</span>
               <div class="flex space-x-1">
-                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="rounded px-2 py-0.5 font-bold transition border ${node.isBuildingSelf ? 'border-green-500 text-green-400 bg-green-950/30' : 'border-[#3a3025] text-slate-400'}">🔨 Build</button>
-                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="rounded px-2 py-0.5 font-bold transition border ${!node.isBuildingSelf ? 'border-[var(--accent)] text-orange-300 bg-orange-950/30' : 'border-[#3a3025] text-slate-400'}">🛒 Buy</button>
+                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="btn-glass ${node.isBuildingSelf ? '' : 'btn-glass-muted'} text-xs px-2 py-0.5">🔨 Build</button>
+                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="btn-glass ${!node.isBuildingSelf ? '' : 'btn-glass-muted'} text-xs px-2 py-0.5">🛒 Buy</button>
               </div>
             </div>
           ` : ''}
@@ -1737,8 +1737,8 @@ function createNodeCard(node) {
             <div class="flex items-center justify-between text-xs mono">
               <span class="text-slate-400 font-semibold">Buy via:</span>
               <div class="flex space-x-1">
-                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'sell')" class="rounded px-1.5 py-0.5 font-bold transition border ${currentBuyStrategy === 'sell' ? 'border-[var(--accent)] text-orange-300 bg-orange-950/30' : 'border-[#3a3025] text-slate-400'}" title="Instant Buy off Sell Orders">⚡ Sell</button>
-                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'buy')" class="rounded px-1.5 py-0.5 font-bold transition border ${currentBuyStrategy === 'buy' ? 'border-[var(--accent)] text-orange-300 bg-orange-950/30' : 'border-[#3a3025] text-slate-400'}" title="Order Placing via Buy Orders">📜 Buy</button>
+                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'sell')" class="btn-glass ${currentBuyStrategy === 'sell' ? '' : 'btn-glass-muted'} text-xs px-1.5 py-0.5" title="Instant Buy off Sell Orders">⚡ Sell</button>
+                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'buy')" class="btn-glass ${currentBuyStrategy === 'buy' ? '' : 'btn-glass-muted'} text-xs px-1.5 py-0.5" title="Order Placing via Buy Orders">📜 Buy</button>
               </div>
             </div>
           ` : ''}
@@ -1761,7 +1761,7 @@ function createNodeCard(node) {
           <span class="text-slate-400">Lowest Sell:</span>
           <div class="flex items-center gap-1.5">
             <span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK</span>
-            <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="rounded text-xs bg-transparent hover:bg-black/30 text-orange-300 border border-[#3a3025] px-1.5 py-0.5 transition flex items-center gap-1" title="Compare price and trade volume across your tracked markets">⇄ Compare</button>
+            <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="btn-glass btn-glass-muted text-xs px-1.5 py-0.5 flex items-center gap-1" title="Compare price and trade volume across your tracked markets">⇄ Compare</button>
           </div>
         </div>
         <div class="flex justify-between text-slate-400"><span>Highest Buy:</span><span class="text-slate-300">${prices.buy.toLocaleString()} ISK</span></div>
