@@ -9,10 +9,10 @@ html {
 }
 
 :root {
-  --bg: #07090b;
-  --bg2: #0f1418;
-  --bg3: #12181d;
-  --border: #2a343c;
+  --bg: #030405;
+  --bg2: #0a0d0e;
+  --bg3: #202a2e;
+  --border: #3a4a4c;
   --glow: #1f4a50;
   --accent: #4fd8e8;
   --accent2: #7ec8f5;
@@ -88,18 +88,21 @@ img {
 
 /* Node Highlight Styles */
 .node-selected {
+  border-image: none !important;
   border-color: #4caf6f !important;
   box-shadow: 0 0 20px rgba(76, 175, 111, 0.7) !important;
   opacity: 1 !important;
 }
 
 .node-child-highlight {
+  border-image: none !important;
   border-color: #4caf6f !important;
   box-shadow: 0 0 12px rgba(76, 175, 111, 0.4) !important;
   opacity: 1 !important;
 }
 
 .node-parent-highlight {
+  border-image: none !important;
   border-color: #e8c96a !important;
   box-shadow: 0 0 15px rgba(232, 201, 106, 0.6) !important;
   opacity: 1 !important;
@@ -141,6 +144,15 @@ img {
 /* Two corners clipped diagonally - the core shape signature */
 .hud-panel {
   clip-path: polygon(0 10px, 10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%);
+  border: 1px solid transparent;
+  border-image: linear-gradient(135deg, var(--border) 0%, transparent 20%, transparent 80%, var(--border) 100%) 1;
+}
+
+/* Cyan-tinted version of the fading corner border, for the one emphasized/active card (root) -
+   a separate class rather than overriding hud-panel globally, since most panels want the neutral
+   border-image above, not this accent color. */
+.hud-panel-accent {
+  border-image: linear-gradient(135deg, #4fd8e8 0%, transparent 20%, transparent 80%, #4fd8e8 100%) 1;
 }
 
 /* Smaller clip for compact elements (badges, buttons) */
