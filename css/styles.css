@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@600;700&family=Share+Tech+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap');
 
 /* Readability fix for high-DPI/4K displays: Tailwind's default text-* utility classes (text-xs,
    text-sm, text-base, etc.) are rem-based, so scaling the root font-size scales all of them
@@ -9,26 +9,28 @@ html {
 }
 
 :root {
-  --bg: #030405;
+  --bg: #060608;
   --bg2: #0a0d0e;
   --bg3: #141a1c;
   --border: #262e30;
   --border-strong: #3a4648;
-  --accent: #4fd8e8;
-  --accent-dim: #2c8a96;
+  --accent: #ff5e1a;
+  --accent-rgb: 255,94,26;
+  --accent-dim: #b8460f;
   --gold: #c8a84b;
   --gold2: #e8c96a;
   --green: #4caf6f;
   --red: #e85555;
 }
 
-/* Proportional sans-serif is the default everywhere - matches how the reference uses a clean
-   body face for actual content (item names, labels, descriptions). Monospace is reserved
-   specifically for status/telemetry/numeric readouts via .mono, not applied globally. */
 body {
   background-color: var(--bg);
-  color: #c4d0d2;
-  font-family: 'Exo 2', sans-serif;
+  background-image:
+    radial-gradient(ellipse 550px 380px at 15% 20%, rgba(var(--accent-rgb),0.16) 0%, transparent 60%),
+    radial-gradient(ellipse 450px 550px at 85% 80%, rgba(120,60,220,0.13) 0%, transparent 60%);
+  background-attachment: fixed;
+  color: #e8e8e8;
+  font-family: 'Chakra Petch', sans-serif;
   min-height: 100vh;
   user-select: none;
   -webkit-user-select: none;
@@ -43,13 +45,12 @@ input, textarea, select, [contenteditable="true"], .mono, aside, .selectable {
   -webkit-user-select: text !important;
 }
 
-.mono { font-family: 'Share Tech Mono', monospace; }
-.rajdhani { font-family: 'Rajdhani', sans-serif; }
+.mono { font-family: 'Chakra Petch', sans-serif; }
+.rajdhani { font-family: 'Chakra Petch', sans-serif; }
 
-/* Clean uppercase section label - no bracket/slash decoration, just disciplined letter-spacing,
-   matching the reference's plain eyebrow labels ("MARKET SCREENER", "ITEM"). */
+/* Clean uppercase section label */
 .section-label {
-  font-family: 'Rajdhani', sans-serif;
+  font-family: 'Chakra Petch', sans-serif;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -144,55 +145,65 @@ img {
 }
 
 /* ============================================================
-   Restrained flat design language - a deliberate correction from an earlier, more decorated
-   direction (clipped corners everywhere, corner brackets, scanline animation, gradients) that
-   read as busy rather than clean. Flat surfaces, thin hairline dividers instead of boxed panels,
-   accent color reserved for active/selected states rather than broad background fills.
+   Finalized design language: glassmorphism + gradient backdrop + orange accent + original
+   corner-bracket buttons ("5C" from the mockup rounds). Font is Chakra Petch throughout.
    ============================================================ */
 
-/* Refined surface treatment - modest rounded corners, subtle vertical gradient (lighter at top,
-   fading to slightly darker at bottom), and a two-tone border for a touch of depth. Applied
-   alongside Tailwind's own bg-[#hex] color as an overlay, and alongside `rounded` for the corner
-   radius - this class only adds the gradient/border refinement on top. */
-.surface {
-  border-radius: 8px;
-  background-image: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0) 35%, rgba(0,0,0,0.14) 100%);
-  border: 1px solid var(--border);
-  border-top-color: var(--border-strong);
+/* Glass card - translucent gradient fill + backdrop blur so the page's own background gradient
+   shows through softened, angled bottom-left corner, left border accent stripe. This is the
+   tree-card / panel surface used throughout the app. */
+.glass-card {
+  background: linear-gradient(160deg, rgba(40,30,25,0.5) 0%, rgba(15,12,10,0.6) 60%, rgba(8,6,5,0.65) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(var(--accent-rgb),0.25);
+  border-left: 3px solid var(--accent);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
 }
 
-/* Same treatment, tuned for the one emphasized/active surface (root card) - a touch brighter at
-   the top and a visible accent-colored border instead of the neutral default. */
-.surface-accent {
-  border-radius: 8px;
-  background-image: linear-gradient(180deg, rgba(79,216,232,0.05) 0%, rgba(255,255,255,0) 35%, rgba(0,0,0,0.16) 100%);
-  border: 1px solid var(--accent-dim);
-  border-top-color: var(--accent);
+/* Primary button - dark-to-orange gradient fill, small square corner-border brackets with glow
+   (the "5C" style) at the top-left and bottom-right corners. This exact technique - a small
+   square element with only two border sides visible, plus box-shadow glow - is what reads as
+   the "small square corner" look, not a plain thin line. */
+.btn-glass {
+  border-radius: 2px;
+  border: none;
+  background: linear-gradient(160deg, rgba(var(--accent-rgb),0.18), rgba(21,21,21,1) 55%);
+  color: #fff;
+  font-family: 'Chakra Petch', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition: filter 0.15s ease;
+}
+.btn-glass:hover { filter: brightness(1.12); }
+.btn-glass::before, .btn-glass::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  box-shadow: 0 0 8px rgba(var(--accent-rgb),0.5);
+}
+.btn-glass::before {
+  top: -1px; left: -1px;
+  border-top: 2px solid var(--accent);
+  border-left: 2px solid var(--accent);
+}
+.btn-glass::after {
+  bottom: -1px; right: -1px;
+  border-bottom: 2px solid var(--accent);
+  border-right: 2px solid var(--accent);
 }
 
-/* Flat row - replaces boxed sub-panels (like the old "Mode:"/"Buy via:" bordered boxes) with a
-   simple row separated by a thin top divider, matching the reference's flat list-row approach. */
-.flat-row {
-  border-top: 1px solid var(--border);
+/* Secondary/muted button variant - same bracket technique, quieter fill for non-primary actions. */
+.btn-glass-muted {
+  background: rgba(40,30,25,0.4);
+  border: 1px solid rgba(var(--accent-rgb),0.25);
 }
 
-/* Simple pill toggle - flat background, thin border, active state is just a color change, not a
-   different shape. Matches the reference's market/tab selector pills exactly. */
-.pill {
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: #8a9496;
-  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
-}
-.pill-active {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: rgba(79, 216, 232, 0.06);
-}
-
-/* Segmented indicator bar - flat blocks, no clip-path, kept because it's functionally useful
-   (visualizing stock coverage as discrete units), just restyled to be flat/simple. */
+/* Segmented indicator bar - flat blocks, kept because it's functionally useful (visualizing
+   stock coverage as discrete units). */
 .seg-bar { display: flex; gap: 2px; height: 5px; }
 .seg-bar > div { flex: 1; background: var(--border); }
 .seg-bar > div.filled { background: var(--accent); }
@@ -215,128 +226,95 @@ img {
 
 /* ============================================================
    Icon rail navigation - a narrow, always-visible column of glowing icon buttons that each
-   reveal a flyout panel on click, replacing the old always-expanded stacked sidebar sections.
+   reveal a flyout panel on click. All buttons share one accent color (--accent, set globally
+   in :root) rather than per-button colors - "all different colors was a bad decision" per
+   direct feedback, so --glow-color/--glow-rgb are set once here rather than per button inline.
    ============================================================ */
 
 .icon-rail {
-  width: 76px;
-  background: rgba(10, 13, 14, 0.7);
-  backdrop-filter: blur(10px);
-  border-right: 1px solid var(--border);
+  width: 84px;
+  background: rgba(15,10,8,0.35);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-right: 1px solid rgba(var(--accent-rgb),0.15);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 12px 0;
+  gap: 8px;
+  padding: 20px 0;
   flex-shrink: 0;
   position: relative;
+  --glow-color: var(--accent);
+  --glow-rgb: var(--accent-rgb);
 }
 
 .icon-rail-btn {
-  width: 58px;
-  height: 56px;
-  border-radius: 12px;
+  width: 62px;
+  height: 62px;
+  border-radius: 4px;
   background: rgba(255,255,255,0.02);
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.06);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 4px;
   transition: background 0.2s ease, border-color 0.2s ease;
   cursor: pointer;
   position: relative;
   flex-shrink: 0;
 }
 .icon-rail-btn:hover {
-  background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.15);
+  background: rgba(var(--accent-rgb),0.08);
+  border-color: rgba(var(--accent-rgb),0.2);
 }
 
-.icon-rail-btn .icon-glow {
-  font-size: 19px;
-  line-height: 1;
-  filter: drop-shadow(0 0 3px var(--glow-color)) drop-shadow(0 0 7px var(--glow-color));
+.icon-rail-btn svg {
+  width: 20px;
+  height: 20px;
+  stroke: #9aa0a4;
+  transition: stroke 0.2s ease;
 }
+.icon-rail-btn:hover svg { stroke: var(--accent); }
 
 .icon-rail-btn .icon-label {
-  font-family: 'Rajdhani', sans-serif;
+  font-family: 'Chakra Petch', sans-serif;
   font-size: 8.5px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #7a8688;
+  color: #7a8286;
   font-weight: 600;
 }
+.icon-rail-btn:hover .icon-label { color: var(--accent); }
 
 .icon-rail-btn-active {
-  background: rgba(var(--glow-rgb), 0.12);
-  border-color: rgba(var(--glow-rgb), 0.45);
+  background: linear-gradient(160deg, rgba(var(--accent-rgb),0.22), rgba(21,21,21,0.4) 65%);
+  border-color: transparent;
 }
-.icon-rail-btn-active::before {
-  content: '';
-  position: absolute;
-  left: -1px; top: 10px; bottom: 10px;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--glow-color);
-  box-shadow: 0 0 8px var(--glow-color);
-}
-.icon-rail-btn-active .icon-label {
-  color: var(--glow-color);
-}
+.icon-rail-btn-active svg { stroke: var(--accent); }
+.icon-rail-btn-active .icon-label { color: var(--accent); }
 
-/* Flyout panel - pops out from the rail on click, holds one section's full settings. Anchored to
-   the icon-rail container (position: absolute) rather than the viewport (position: fixed), since
-   the rail already starts in the correct position below the header. Vertically centered with a
-   generous max-height (85vh) rather than anchored near the top, so content-heavy sections (like
-   System & Structure, with many fields) have real room instead of needing to scroll in a cramped
-   fixed-height box. */
+/* Flyout panel - pops out from the rail on click, holds one section's full settings. Vertically
+   centered with a generous max-height (85vh) so content-heavy sections have real room instead of
+   needing to scroll in a cramped fixed-height box. Stays open until explicitly closed. */
 .flyout-panel {
   display: none;
   position: absolute;
-  left: 84px;
+  left: 92px;
   top: 50%;
   transform: translateY(-50%);
-  width: 380px;
+  width: 340px;
   max-height: 85vh;
   overflow-y: auto;
-  background: rgba(10, 13, 14, 0.94);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(var(--glow-rgb), 0.3);
-  border-radius: 10px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 24px rgba(var(--glow-rgb), 0.15);
+  background: rgba(10, 8, 7, 0.85);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(var(--accent-rgb), 0.25);
+  border-radius: 6px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.55), 0 0 24px rgba(var(--accent-rgb), 0.1);
   z-index: 100;
   padding: 20px;
 }
 .flyout-panel.open {
   display: block;
-}
-
-/* Hexagonal glassy/glowing button - approximates the faceted-crystal reference look using CSS
-   clip-path (shape) + gradient (faceted shading) + drop-shadow (glow, which composes correctly
-   with clip-path, unlike border-image). Not a pixel-perfect 3D render, but a real CSS approximation
-   of the same shape/glow language. */
-.hex-button {
-  position: relative;
-  height: 92px;
-  clip-path: polygon(50% 0%, 95% 25%, 95% 75%, 50% 100%, 5% 75%, 5% 25%);
-  background: linear-gradient(160deg, rgba(var(--hex-rgb), 0.28) 0%, rgba(var(--hex-rgb), 0.06) 45%, rgba(var(--hex-rgb), 0.22) 100%);
-  filter: drop-shadow(0 0 10px rgba(var(--hex-rgb), 0.45));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: filter 0.2s ease, transform 0.15s ease;
-}
-.hex-button:hover {
-  filter: drop-shadow(0 0 16px rgba(var(--hex-rgb), 0.65));
-  transform: translateY(-2px);
-}
-.hex-button-label {
-  font-family: 'Rajdhani', sans-serif;
-  font-weight: 700;
-  font-size: 15px;
-  color: #eaf6f8;
-  text-shadow: 0 0 8px rgba(var(--hex-rgb), 0.6);
 }
