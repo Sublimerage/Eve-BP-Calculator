@@ -1667,56 +1667,55 @@ function createNodeCard(node) {
     }
   }
 
-  card.className = `diagram-node hud-panel ${isRoot ? 'hud-bracket hud-panel-accent' : ''} p-3 shadow-2xl transition-all relative ${cardStyle}`;
+  card.className = `diagram-node p-3 shadow-lg transition-all relative border ${isRoot ? 'border-cyan-500' : 'border-[#262e30]'} ${cardStyle}`;
   card.innerHTML = `
-    ${isRoot ? '<div class="hud-scanline"></div>' : ''}
-    <div class="flex items-center space-x-3 border-b border-[#3a4a4c] pb-2.5 mb-2.5">
-      <img src="${iconUrl}" class="w-10 h-10 border border-slate-700 bg-[#030405] flex-shrink-0" style="clip-path: polygon(0 4px, 4px 0, 100% 0, 100% 100%, 0 100%);" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
+    <div class="flex items-center space-x-3 border-b border-[#262e30] pb-2.5 mb-2.5">
+      <img src="${iconUrl}" class="w-10 h-10 rounded border border-slate-700 bg-[#030405] flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
       <div class="min-w-0 flex-1">
         <div class="font-bold text-sm text-white truncate flex items-center justify-between">
           <span class="truncate cursor-pointer hover:text-cyan-300 hover:underline transition" onclick="copyMaterialNameToClipboard(event, this, '${window.esc(node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()).replace(/'/g, "\\'")}')" title="Click to copy this item's exact name to your clipboard, ready to paste into EVE's search/market">${node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()}</span>
           <div class="flex items-center space-x-1 flex-shrink-0 ml-1">
             ${isRoot ? `
               <div class="relative group inline-block" onclick="event.stopPropagation()">
-                <span class="hud-badge bg-cyan-900/80 hover:bg-cyan-700 text-cyan-300 text-xs px-1.5 py-0.5 border border-cyan-500/80 cursor-help font-bold tracking-wider" title="Unit EIV: ${formattedUnitEIV} | Total Job EIV: ${formattedTotalEIV}">EIV</span>
-                <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-[#030405] border border-cyan-500 text-white text-xs p-2 shadow-2xl z-[999] whitespace-nowrap mono pointer-events-none">
-                  <div class="text-cyan-300 font-bold border-b border-[#3a4a4c] pb-1 mb-1">Estimated Item Value (EIV)</div>
+                <span class="rounded bg-transparent hover:bg-[#141a1c] text-cyan-300 text-xs px-1.5 py-0.5 border border-[#262e30] cursor-help font-bold tracking-wider" title="Unit EIV: ${formattedUnitEIV} | Total Job EIV: ${formattedTotalEIV}">EIV</span>
+                <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-[#030405] border border-cyan-500 text-white text-xs p-2 rounded shadow-2xl z-[999] whitespace-nowrap mono pointer-events-none">
+                  <div class="text-cyan-300 font-bold border-b border-[#262e30] pb-1 mb-1">Estimated Item Value (EIV)</div>
                   <div class="flex justify-between space-x-4 text-slate-300"><span>Unit EIV:</span> <span class="text-cyan-300 font-bold">${formattedUnitEIV}</span></div>
                   <div class="flex justify-between space-x-4 text-slate-300"><span>Total Job EIV:</span> <span class="text-cyan-400 font-bold">${formattedTotalEIV}</span></div>
                 </div>
               </div>
             ` : ''}
             ${node.children && node.children.length > 0 ? `
-              <button onclick="toggleNodeCollapse(event, ${node.instanceId})" class="hud-badge text-xs ${window.collapsedInstanceIds.has(node.instanceId) ? 'bg-cyan-700 hover:bg-cyan-600 text-white' : 'bg-[#3a4a4c] hover:bg-slate-600 text-slate-300'} px-1.5 py-0.5 mono transition" title="${window.collapsedInstanceIds.has(node.instanceId) ? 'Expand: show inputs again' : 'Collapse: hide inputs'}">
+              <button onclick="toggleNodeCollapse(event, ${node.instanceId})" class="rounded text-xs ${window.collapsedInstanceIds.has(node.instanceId) ? 'bg-cyan-700 hover:bg-cyan-600 text-white' : 'bg-transparent hover:bg-[#141a1c] text-slate-400 border border-[#262e30]'} px-1.5 py-0.5 mono transition" title="${window.collapsedInstanceIds.has(node.instanceId) ? 'Expand: show inputs again' : 'Collapse: hide inputs'}">
                 ${window.collapsedInstanceIds.has(node.instanceId) ? `▶ +${countDescendants(node)}` : '▼ Hide'}
               </button>
             ` : ''}
             ${isIsolated ? `
-              <button onclick="exitIsolation(event)" class="hud-badge text-xs bg-cyan-600 hover:bg-cyan-500 text-black font-bold px-2 py-0.5 mono transition shadow">Exit ✖</button>
+              <button onclick="exitIsolation(event)" class="rounded text-xs bg-cyan-600 hover:bg-cyan-500 text-black font-bold px-2 py-0.5 mono transition">Exit ✖</button>
             ` : `
-              <button onclick="isolateComponent(event, ${node.instanceId})" class="hud-badge text-xs bg-[#3a4a4c] hover:bg-cyan-600 text-cyan-200 px-1.5 py-0.5 mono transition">🔍 Isolate</button>
+              <button onclick="isolateComponent(event, ${node.instanceId})" class="rounded text-xs bg-transparent hover:bg-[#141a1c] text-slate-400 hover:text-cyan-300 border border-[#262e30] px-1.5 py-0.5 mono transition">🔍 Isolate</button>
             `}
           </div>
         </div>
         <div class="text-sm text-cyan-400 mono flex items-center justify-between mt-0.5">
           <span>${isRoot ? 'Output Qty:' : 'Req Qty:'} ${node.qtyNeeded.toLocaleString()} ${node.productName}</span>
-          ${stockQty > 0 ? `<span class="hud-badge bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-xs px-1 font-bold" title="In Stock in Hangar">Stock: ${stockQty.toLocaleString()}</span>` : ''}
+          ${stockQty > 0 ? `<span class="text-slate-400 text-xs" title="In Stock in Hangar">Stock: ${stockQty.toLocaleString()}</span>` : ''}
         </div>
         ${stockQty > 0 ? (() => {
           const totalSegs = 10;
           const filledSegs = Math.min(totalSegs, Math.round((stockQty / node.qtyNeeded) * totalSegs));
           return `<div class="seg-bar mt-1.5" title="Stock covers ${Math.min(100, Math.round((stockQty / node.qtyNeeded) * 100))}% of what this needs">${Array.from({length: totalSegs}, (_, i) => `<div class="${i < filledSegs ? 'filled' : ''}"></div>`).join('')}</div>`;
         })() : ''}
-        ${node.isBuildingSelf && node.batchYield > 1 ? `<div class="${node.isReaction ? 'text-cyan-300 font-bold' : 'text-cyan-300'} text-xs mono font-semibold mt-0.5">(${node.runsNeeded} Run${node.runsNeeded > 1 ? 's' : ''} @ ${node.batchYield}/run ${surplus > 0 ? `→ ${surplus} Surplus` : ''})</div>` : ''}
+        ${node.isBuildingSelf && node.batchYield > 1 ? `<div class="text-cyan-300 text-xs mono font-semibold mt-0.5">(${node.runsNeeded} Run${node.runsNeeded > 1 ? 's' : ''} @ ${node.batchYield}/run ${surplus > 0 ? `→ ${surplus} Surplus` : ''})</div>` : ''}
       </div>
     </div>
 
     <div class="space-y-2.5">
       ${isRoot ? `
-        <div class="p-1.5 bg-[#030405] hud-panel border border-cyan-500/40 flex items-center justify-between text-sm mono" onclick="event.stopPropagation()">
+        <div class="flat-row pt-2.5 flex items-center justify-between text-sm mono" onclick="event.stopPropagation()">
           <span class="text-slate-300 font-bold">Runs:</span>
           <div class="flex items-center space-x-1">
-            <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" onchange="syncCardRunsToGlobal(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-16 bg-[#0a0d0e] border border-cyan-500/60 text-center text-cyan-300 font-bold p-0.5 outline-none">
+            <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" onchange="syncCardRunsToGlobal(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-16 bg-[#0a0d0e] border border-cyan-500/60 rounded text-center text-cyan-300 font-bold p-0.5 outline-none">
             <span class="text-slate-400 text-xs">Runs</span>
           </div>
         </div>
@@ -1724,32 +1723,32 @@ function createNodeCard(node) {
       ${sellStrategyUI}
 
       ${(!isRoot && node.isManufacturable) || (!isRoot && (!node.isBuildingSelf || !node.children || node.children.length === 0)) || (node.isBuildingSelf && node.isManufacturable && !node.isReaction) ? `
-        <div class="bg-[#030405] hud-panel border border-[#3a4a4c]/60 divide-y divide-[#3a4a4c]/40" onclick="event.stopPropagation()">
+        <div class="flat-row pt-2.5 space-y-2" onclick="event.stopPropagation()">
           ${!isRoot && node.isManufacturable ? `
-            <div class="flex items-center justify-between px-2 py-1.5 text-xs mono">
+            <div class="flex items-center justify-between text-xs mono">
               <span class="text-slate-400 font-semibold">Mode:</span>
               <div class="flex space-x-1">
-                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="hud-badge px-2 py-0.5 font-bold transition ${node.isBuildingSelf ? 'bg-green-600 text-white' : 'bg-[#3a4a4c] text-slate-400 hover:text-white'}">🔨 Build</button>
-                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="hud-badge px-2 py-0.5 font-bold transition ${!node.isBuildingSelf ? 'bg-cyan-600 text-black' : 'bg-[#3a4a4c] text-slate-400 hover:text-white'}">🛒 Buy</button>
+                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="rounded px-2 py-0.5 font-bold transition border ${node.isBuildingSelf ? 'border-green-500 text-green-400 bg-green-950/30' : 'border-[#262e30] text-slate-400'}">🔨 Build</button>
+                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="rounded px-2 py-0.5 font-bold transition border ${!node.isBuildingSelf ? 'border-cyan-500 text-cyan-300 bg-cyan-950/30' : 'border-[#262e30] text-slate-400'}">🛒 Buy</button>
               </div>
             </div>
           ` : ''}
           ${!isRoot && (!node.isBuildingSelf || !node.children || node.children.length === 0) ? `
-            <div class="flex items-center justify-between px-2 py-1.5 text-xs mono">
+            <div class="flex items-center justify-between text-xs mono">
               <span class="text-slate-400 font-semibold">Buy via:</span>
               <div class="flex space-x-1">
-                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'sell')" class="hud-badge px-1.5 py-0.5 font-bold transition ${currentBuyStrategy === 'sell' ? 'bg-cyan-600 text-black' : 'bg-[#3a4a4c] text-slate-400 hover:text-white'}" title="Instant Buy off Sell Orders">⚡ Sell</button>
-                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'buy')" class="hud-badge px-1.5 py-0.5 font-bold transition ${currentBuyStrategy === 'buy' ? 'bg-cyan-600 text-white' : 'bg-[#3a4a4c] text-slate-400 hover:text-white'}" title="Order Placing via Buy Orders">📜 Buy</button>
+                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'sell')" class="rounded px-1.5 py-0.5 font-bold transition border ${currentBuyStrategy === 'sell' ? 'border-cyan-500 text-cyan-300 bg-cyan-950/30' : 'border-[#262e30] text-slate-400'}" title="Instant Buy off Sell Orders">⚡ Sell</button>
+                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'buy')" class="rounded px-1.5 py-0.5 font-bold transition border ${currentBuyStrategy === 'buy' ? 'border-cyan-500 text-cyan-300 bg-cyan-950/30' : 'border-[#262e30] text-slate-400'}" title="Order Placing via Buy Orders">📜 Buy</button>
               </div>
             </div>
           ` : ''}
           ${node.isBuildingSelf && node.isManufacturable && !node.isReaction ? `
-            <div class="flex items-center justify-between px-2 py-1.5 text-xs mono" onmousedown="event.stopPropagation()">
+            <div class="flex items-center justify-between text-xs mono" onmousedown="event.stopPropagation()">
               <span class="text-slate-400 font-semibold">Job ME/TE:</span>
               <div class="flex items-center space-x-1">
-                <input type="number" id="card-me-${node.instanceId}" min="0" max="10" value="${node.customME}" onchange="onCardMEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-[#0a0d0e] border border-[#3a4a4c] text-center text-cyan-400 font-bold p-0.5 outline-none focus:border-cyan-500">
+                <input type="number" id="card-me-${node.instanceId}" min="0" max="10" value="${node.customME}" onchange="onCardMEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-[#0a0d0e] border border-[#262e30] rounded text-center text-cyan-400 font-bold p-0.5 outline-none focus:border-cyan-500">
                 <span class="text-slate-500">%</span>
-                <input type="number" id="card-te-${node.instanceId}" min="0" max="20" value="${node.customTE}" onchange="onCardTEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-[#0a0d0e] border border-[#3a4a4c] text-center text-cyan-400 font-bold p-0.5 outline-none focus:border-cyan-500">
+                <input type="number" id="card-te-${node.instanceId}" min="0" max="20" value="${node.customTE}" onchange="onCardTEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-[#0a0d0e] border border-[#262e30] rounded text-center text-cyan-400 font-bold p-0.5 outline-none focus:border-cyan-500">
                 <span class="text-slate-500">%</span>
               </div>
             </div>
@@ -1757,28 +1756,28 @@ function createNodeCard(node) {
         </div>
       ` : ''}
 
-      <div class="text-sm mono space-y-1 hud-divider pt-2">
+      <div class="text-sm mono space-y-1 flat-row pt-2.5">
         <div class="flex justify-between items-center font-semibold">
           <span class="text-slate-400">Lowest Sell:</span>
           <div class="flex items-center gap-1.5">
             <span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK</span>
-            <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="hud-badge text-xs bg-[#3a4a4c] hover:bg-cyan-600 text-cyan-200 px-1.5 py-0.5 transition flex items-center gap-1" title="Compare price and trade volume across your tracked markets">⇄ Compare</button>
+            <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="rounded text-xs bg-transparent hover:bg-[#141a1c] text-cyan-300 border border-[#262e30] px-1.5 py-0.5 transition flex items-center gap-1" title="Compare price and trade volume across your tracked markets">⇄ Compare</button>
           </div>
         </div>
         <div class="flex justify-between text-slate-400"><span>Highest Buy:</span><span class="text-slate-300">${prices.buy.toLocaleString()} ISK</span></div>
         ${!isRoot && savingsPct !== null ? `<div class="flex justify-between text-green-400 font-semibold text-xs"><span>Order Savings:</span><span>${savingsPct}%</span></div>` : ''}
-        ${node.jobFee > 0 && node.isBuildingSelf ? `<div class="flex justify-between text-[#e85555] font-semibold hud-divider pt-1"><span>Job Inst. Fee:</span><span>+${Math.round(node.jobFee).toLocaleString()} ISK</span></div>` : ''}
-        <div class="flex justify-between font-bold hud-divider pt-1 mt-1"><span class="text-slate-300">${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span><span class="text-cyan-400 font-bold">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span></div>
+        ${node.jobFee > 0 && node.isBuildingSelf ? `<div class="flex justify-between text-[#e85555] font-semibold flat-row pt-1"><span>Job Inst. Fee:</span><span>+${Math.round(node.jobFee).toLocaleString()} ISK</span></div>` : ''}
+        <div class="flex justify-between font-bold flat-row pt-1 mt-1"><span class="text-slate-300">${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span><span class="text-cyan-400 font-bold">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span></div>
         ${isRoot ? `
-          <div class="flex justify-between font-bold border-t border-green-500/40 pt-1 mt-1 bg-green-950/30 p-1.5 hud-panel">
+          <div class="flex justify-between font-bold border-t border-green-500/40 pt-1.5 mt-1">
             <span class="text-slate-300">${window.rootSellStrategy === 'custom-contract' ? 'Net Profit (Contract Output):' : 'Net Profit (Sell Output):'}</span>
             <span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${Math.round(node.netProfitSell || 0).toLocaleString()} ISK</span>
           </div>
         ` : ''}
       </div>
       ${(buildTimeUI || isRoot) ? `
-        <div class="pt-2 border-t-2 border-dashed border-cyan-500/30">
-          <div class="hud-tag-label text-xs text-cyan-300 mb-1">Time and Efficiency</div>
+        <div class="flat-row pt-2.5">
+          <div class="section-label text-[11px] mb-1">Time and Efficiency</div>
           <div class="text-sm mono space-y-1">
             ${buildTimeUI}
             ${isRoot ? `
@@ -2368,7 +2367,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
 
   bomItems.forEach(item => {
     const row = document.createElement('div');
-    row.className = 'bg-[#0a0d0e] hud-panel border border-[#3a4a4c] hover:border-cyan-500 hover:bg-[#283438] p-2 flex items-center justify-between cursor-pointer transition shadow-sm';
+    row.className = 'bg-[#0a0d0e] rounded border border-[#262e30] hover:border-cyan-500 hover:bg-[#283438] p-2 flex items-center justify-between cursor-pointer transition shadow-sm';
     row.title = 'Click to find and focus this material in the build diagram';
     row.onclick = () => highlightNodeByTypeId(item.typeId);
 
