@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Deep-Industry Engine</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=12.1.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=12.2.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#030405] text-slate-200">
 
@@ -336,17 +336,17 @@
 
       <!-- Floating viewport controls: view-related actions live on the canvas they act on -->
       <div class="absolute top-3 right-3 z-40 flex items-center gap-2 mono text-xs" onclick="event.stopPropagation()">
-        <span id="zoom-level-text" class="px-2.5 py-1.5 bg-[#0a0d0e]/90 border border-[#3a4a4c] text-slate-400 shadow-lg">Zoom: 100%</span>
-        <button onclick="collapseAllNodes()" class="px-3 py-1.5 bg-[#0a0d0e]/90 hover:bg-orange-700 border border-[#3a4a4c] text-white font-bold transition shadow-lg" title="Collapse every branch that has inputs, to shrink very tall builds">
+        <span id="zoom-level-text" class="px-2.5 py-1.5 glass-card text-slate-300 font-semibold">Zoom: 100%</span>
+        <button onclick="collapseAllNodes()" class="btn-glass btn-glass-muted px-3 py-1.5" title="Collapse every branch that has inputs, to shrink very tall builds">
           ▼⇥ Collapse All
         </button>
-        <button onclick="expandAllNodes()" class="px-3 py-1.5 bg-[#0a0d0e]/90 hover:bg-orange-700 border border-[#3a4a4c] text-white font-bold transition shadow-lg" title="Expand every collapsed branch">
+        <button onclick="expandAllNodes()" class="btn-glass btn-glass-muted px-3 py-1.5" title="Expand every collapsed branch">
           ▶⇥ Expand All
         </button>
-        <button onclick="centerOnSelectedNode()" class="px-3 py-1.5 bg-[#0a0d0e]/90 hover:bg-orange-600 border border-[#3a4a4c] text-white font-bold transition shadow-lg" title="Center on selected card, or the final output if nothing is selected">
+        <button onclick="centerOnSelectedNode()" class="btn-glass px-3 py-1.5" title="Center on selected card, or the final output if nothing is selected">
           🎯 Center [F]
         </button>
-        <button onclick="resetPanZoom()" class="px-3 py-1.5 bg-[#0a0d0e]/90 hover:bg-orange-600 border border-[#3a4a4c] text-white font-bold transition shadow-lg">
+        <button onclick="resetPanZoom()" class="btn-glass btn-glass-muted px-3 py-1.5">
           ⟳ Reset View
         </button>
       </div>
@@ -532,11 +532,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=12.1.0"></script>
-  <script src="js/config.js?v=12.1.0"></script>
-  <script src="js/esi.js?v=12.1.0"></script>
-  <script src="js/tree.js?v=12.1.0"></script>
-  <script src="js/optimizers.js?v=12.1.0"></script>
-  <script src="js/app.js?v=12.1.0"></script>
+  <script src="eve_db.js?v=12.2.0"></script>
+  <script src="js/config.js?v=12.2.0"></script>
+  <script src="js/esi.js?v=12.2.0"></script>
+  <script src="js/tree.js?v=12.2.0"></script>
+  <script src="js/optimizers.js?v=12.2.0"></script>
+  <script src="js/app.js?v=12.2.0"></script>
 </body>
 </html>
