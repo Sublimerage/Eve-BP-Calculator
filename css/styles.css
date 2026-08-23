@@ -166,10 +166,12 @@ img {
 }
 .hud-tag-label::before { content: '// '; opacity: 0.5; }
 
-/* Angled divider instead of a straight horizontal rule */
+/* Angled divider instead of a straight horizontal rule - uses border-image so it can be applied
+   directly to a content wrapper (adding a 1px top border) without forcing that wrapper's own
+   height to 1px, which would crush any content inside it into an overlapping mess. */
 .hud-divider {
-  height: 1px;
-  background: linear-gradient(90deg, var(--border) 0%, var(--border) 70%, transparent 70%, transparent 100%);
+  border-top: 1px solid var(--border);
+  border-image: linear-gradient(90deg, var(--border) 0%, var(--border) 70%, transparent 70%, transparent 100%) 1;
 }
 
 /* Segmented indicator bar instead of a smooth solid-fill progress bar */
