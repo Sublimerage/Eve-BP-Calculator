@@ -9,12 +9,12 @@ html {
 }
 
 :root {
-  --bg: #070b0f;
-  --bg2: #0c1318;
-  --bg3: #0d1922;
-  --border: #1e3348;
-  --glow: #2a5a8a;
-  --accent: #06b6d4;
+  --bg: #030405;
+  --bg2: #0a0d0e;
+  --bg3: #08090a;
+  --border: #1c2426;
+  --glow: #1f4a50;
+  --accent: #4fd8e8;
   --accent2: #7ec8f5;
   --gold: #c8a84b;
   --gold2: #e8c96a;
