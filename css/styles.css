@@ -289,23 +289,55 @@ img {
 
 /* Flyout panel - pops out from the rail on click, holds one section's full settings. Anchored to
    the icon-rail container (position: absolute) rather than the viewport (position: fixed), since
-   the rail already starts in the correct position below the header - fixed positioning would
-   place this at a viewport-relative offset that could overlap the header instead. */
+   the rail already starts in the correct position below the header. Vertically centered with a
+   generous max-height (85vh) rather than anchored near the top, so content-heavy sections (like
+   System & Structure, with many fields) have real room instead of needing to scroll in a cramped
+   fixed-height box. */
 .flyout-panel {
   display: none;
   position: absolute;
-  left: 76px;
-  width: 320px;
-  max-height: calc(100vh - 76px);
+  left: 84px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 380px;
+  max-height: 85vh;
   overflow-y: auto;
-  background: rgba(10, 13, 14, 0.92);
+  background: rgba(10, 13, 14, 0.94);
   backdrop-filter: blur(16px);
   border: 1px solid rgba(var(--glow-rgb), 0.3);
   border-radius: 10px;
   box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 24px rgba(var(--glow-rgb), 0.15);
   z-index: 100;
-  padding: 16px;
+  padding: 20px;
 }
 .flyout-panel.open {
   display: block;
+}
+
+/* Hexagonal glassy/glowing button - approximates the faceted-crystal reference look using CSS
+   clip-path (shape) + gradient (faceted shading) + drop-shadow (glow, which composes correctly
+   with clip-path, unlike border-image). Not a pixel-perfect 3D render, but a real CSS approximation
+   of the same shape/glow language. */
+.hex-button {
+  position: relative;
+  height: 92px;
+  clip-path: polygon(50% 0%, 95% 25%, 95% 75%, 50% 100%, 5% 75%, 5% 25%);
+  background: linear-gradient(160deg, rgba(var(--hex-rgb), 0.28) 0%, rgba(var(--hex-rgb), 0.06) 45%, rgba(var(--hex-rgb), 0.22) 100%);
+  filter: drop-shadow(0 0 10px rgba(var(--hex-rgb), 0.45));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: filter 0.2s ease, transform 0.15s ease;
+}
+.hex-button:hover {
+  filter: drop-shadow(0 0 16px rgba(var(--hex-rgb), 0.65));
+  transform: translateY(-2px);
+}
+.hex-button-label {
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #eaf6f8;
+  text-shadow: 0 0 8px rgba(var(--hex-rgb), 0.6);
 }
