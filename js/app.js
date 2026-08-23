@@ -572,7 +572,7 @@ async function scanBlueprintReadiness() {
 
   _readinessFilterActive = true;
   btn.textContent = `👁 Show All (${buildableCount} Buildable)`;
-  btn.className = 'w-full px-2.5 py-1.5 bg-cyan-700 hover:bg-cyan-600 text-white font-bold text-[10px] transition';
+  btn.className = 'w-full px-2.5 py-1.5 bg-orange-700 hover:bg-orange-600 text-white font-bold text-[10px] transition';
   btn.title = `Showing only the ${buildableCount} of ${checkedCount} checked blueprints you can build right now with current stock - click to show everything again`;
   filterBlueprintBrowser();
 }
@@ -630,10 +630,10 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     const isOriginal = bp.quantity === -1;
     const bpImageVariant = isOriginal ? 'bp' : 'bpc';
     const stackBadge = (bp.stackCount && bp.stackCount > 1)
-      ? `<span class="text-[9px] font-bold text-cyan-300 bg-cyan-950/40 border border-cyan-700/40 px-1.5 py-0.5 flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
+      ? `<span class="text-[9px] font-bold text-orange-300 bg-orange-950/40 border border-orange-700/40 px-1.5 py-0.5 flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
       : '';
     const containerBadge = bp.containerName
-      ? `<span class="text-[9px] font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-700/40 px-1.5 py-0.5 flex-shrink-0" title="Inside container: ${window.esc(bp.containerName)}">📦 ${window.esc(bp.containerName)}</span>`
+      ? `<span class="text-[9px] font-bold text-orange-400 bg-orange-950/40 border border-orange-700/40 px-1.5 py-0.5 flex-shrink-0" title="Inside container: ${window.esc(bp.containerName)}">📦 ${window.esc(bp.containerName)}</span>`
       : '';
     const stationBadge = showStationLabel
       ? `<span class="text-[9px] text-slate-500 flex-shrink-0" title="${window.esc(bp.stationName)}">📍 ${window.esc(bp.stationName)}</span>`
@@ -653,10 +653,10 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
       const r = bp._readinessResult;
       readinessBadge = r.buildableRuns > 0
         ? `<span class="text-xs font-bold text-emerald-300 bg-emerald-950/50 border border-emerald-600/50 px-1.5 py-0.5 flex-shrink-0" title="Current stock covers ${r.buildableRuns.toLocaleString()} full run${r.buildableRuns > 1 ? 's' : ''}">✔ ${r.buildableRuns.toLocaleString()} run${r.buildableRuns > 1 ? 's' : ''}</span>`
-        : `<span class="text-xs font-bold text-cyan-300 bg-cyan-950/50 border border-cyan-600/50 px-1.5 py-0.5 flex-shrink-0" title="Not enough stock for even 1 run right now">⚠ 0 runs</span>`;
+        : `<span class="text-xs font-bold text-orange-300 bg-orange-950/50 border border-orange-600/50 px-1.5 py-0.5 flex-shrink-0" title="Not enough stock for even 1 run right now">⚠ 0 runs</span>`;
     }
     return `
-      <div class="bg-[#202a2e] border border-[#3a4a4c] hover:border-cyan-500 p-2.5 transition space-y-2">
+      <div class="bg-[#202a2e] border border-[#3a4a4c] hover:border-orange-500 p-2.5 transition space-y-2">
         <div class="flex items-center gap-2 min-w-0">
           <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 border border-slate-700 bg-[#030405] flex-shrink-0" loading="lazy" title="${isOriginal ? 'Blueprint Original (BPO)' : 'Blueprint Copy (BPC)'}">
           <span class="font-bold text-slate-200 min-w-0">${window.esc(name)}</span>
@@ -669,10 +669,10 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
             ${profitBadge}
-            <span class="text-[11px] font-bold text-cyan-300 bg-cyan-950/50 border border-cyan-700/40 px-1.5 py-0.5 whitespace-nowrap">ME ${bp.material_efficiency}%</span>
-            <span class="text-[11px] font-bold text-cyan-300 bg-cyan-950/50 border border-cyan-700/40 px-1.5 py-0.5 whitespace-nowrap">TE ${bp.time_efficiency}%</span>
-            <button onclick="scanSingleBlueprintProfit(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs}, ${bp.quantity}, ${bp.productTypeId || 'null'}, this)" class="px-2 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold text-[10px] transition" title="Scan just this blueprint's profit">📊</button>
-            <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs})" class="px-2.5 py-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold text-[10px] transition">Load</button>
+            <span class="text-[11px] font-bold text-orange-300 bg-orange-950/50 border border-orange-700/40 px-1.5 py-0.5 whitespace-nowrap">ME ${bp.material_efficiency}%</span>
+            <span class="text-[11px] font-bold text-orange-300 bg-orange-950/50 border border-orange-700/40 px-1.5 py-0.5 whitespace-nowrap">TE ${bp.time_efficiency}%</span>
+            <button onclick="scanSingleBlueprintProfit(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs}, ${bp.quantity}, ${bp.productTypeId || 'null'}, this)" class="px-2 py-1 bg-orange-700 hover:bg-orange-600 text-white font-bold text-[10px] transition" title="Scan just this blueprint's profit">📊</button>
+            <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs})" class="px-2.5 py-1 bg-orange-700 hover:bg-orange-600 text-white font-bold text-[10px] transition">Load</button>
           </div>
         </div>
       </div>
@@ -689,7 +689,7 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     });
     const unscannedCount = sorted.filter(bp => bp._profitResult === undefined).length;
     const hint = unscannedCount > 0
-      ? `<div class="text-[10px] text-cyan-400 italic mb-2 px-1">${unscannedCount} item${unscannedCount > 1 ? 's' : ''} not yet scanned - click "📊 Scan Profit" to include them in the ranking.</div>`
+      ? `<div class="text-[10px] text-orange-400 italic mb-2 px-1">${unscannedCount} item${unscannedCount > 1 ? 's' : ''} not yet scanned - click "📊 Scan Profit" to include them in the ranking.</div>`
       : '';
     listEl.innerHTML = hint + `<div class="space-y-1.5">${sorted.map(bp => renderRow(bp, true)).join('')}</div>`;
     return;
@@ -709,7 +709,7 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     const rows = byStation[stationName].map(bp => renderRow(bp, false)).join('');
     return `
       <div class="mb-3">
-        <div class="text-[10px] font-bold text-cyan-300 uppercase tracking-wide mb-1.5 px-1">📍 ${window.esc(stationName)}</div>
+        <div class="text-[10px] font-bold text-orange-300 uppercase tracking-wide mb-1.5 px-1">📍 ${window.esc(stationName)}</div>
         <div class="space-y-1.5">${rows}</div>
       </div>
     `;
@@ -854,7 +854,7 @@ async function searchHomeMarket(query) {
   const matches = await window.searchStationsByName(q);
   if (token !== _homeMarketSearchToken) return; // a newer search superseded this one
   if (matches === null) {
-    resultsEl.innerHTML = `<div class="p-1.5 text-cyan-400">⚠ Log in via EVE SSO first - station search requires an authenticated character (ESI removed the old public search endpoint).</div>`;
+    resultsEl.innerHTML = `<div class="p-1.5 text-orange-400">⚠ Log in via EVE SSO first - station search requires an authenticated character (ESI removed the old public search endpoint).</div>`;
     return;
   }
   if (matches.length === 0) {
@@ -931,7 +931,7 @@ async function searchAddMarket(query) {
   const matches = await window.searchStationsByName(q);
   if (token !== _addMarketSearchToken) return;
   if (matches === null) {
-    resultsEl.innerHTML = `<div class="p-1.5 text-cyan-400">⚠ Log in via EVE SSO first - station search requires an authenticated character (ESI removed the old public search endpoint).</div>`;
+    resultsEl.innerHTML = `<div class="p-1.5 text-orange-400">⚠ Log in via EVE SSO first - station search requires an authenticated character (ESI removed the old public search endpoint).</div>`;
     return;
   }
   if (matches.length === 0) {
@@ -974,9 +974,9 @@ async function openMarketComparison(e, typeId, itemName) {
   modal.className = 'fixed inset-0 bg-black/80 flex items-center justify-center z-[999] p-4';
   modal.onclick = (evt) => { if (evt.target === modal) modal.remove(); };
   modal.innerHTML = `
-    <div class="bg-[#0a0d0e] border border-cyan-500/80 p-5 w-full max-w-2xl shadow-2xl text-xs mono">
+    <div class="bg-[#0a0d0e] border border-orange-500/80 p-5 w-full max-w-2xl shadow-2xl text-xs mono">
       <div class="flex justify-between items-center border-b border-[#3a4a4c] pb-3 mb-3">
-        <h3 class="text-base font-bold text-cyan-300 rajdhani tracking-wider">💹 Compare Markets: ${window.esc(itemName)}</h3>
+        <h3 class="text-base font-bold text-orange-300 rajdhani tracking-wider">💹 Compare Markets: ${window.esc(itemName)}</h3>
         <button onclick="document.getElementById('market-comparison-modal').remove()" class="text-slate-400 hover:text-white font-bold text-base">✖</button>
       </div>
       <div id="market-comparison-body" class="text-slate-400">Loading prices and trade volume across tracked markets...</div>
@@ -999,9 +999,9 @@ async function openMarketComparison(e, typeId, itemName) {
   const rows = results.map(r => `
     <tr class="border-b border-[#3a4a4c]/40">
       <td class="p-2 text-slate-200">${window.esc(r.stationName)}</td>
-      <td class="p-2 text-right text-cyan-300 font-bold">${r.sell > 0 ? Math.round(r.sell).toLocaleString() : '—'}</td>
-      <td class="p-2 text-right text-cyan-300 font-bold">${r.buy > 0 ? Math.round(r.buy).toLocaleString() : '—'}</td>
-      <td class="p-2 text-right ${r.avgVolume === null ? 'text-slate-500' : (r.avgVolume < 10 ? 'text-red-400' : r.avgVolume < 100 ? 'text-cyan-400' : 'text-green-400')} font-bold">
+      <td class="p-2 text-right text-orange-300 font-bold">${r.sell > 0 ? Math.round(r.sell).toLocaleString() : '—'}</td>
+      <td class="p-2 text-right text-orange-300 font-bold">${r.buy > 0 ? Math.round(r.buy).toLocaleString() : '—'}</td>
+      <td class="p-2 text-right ${r.avgVolume === null ? 'text-slate-500' : (r.avgVolume < 10 ? 'text-red-400' : r.avgVolume < 100 ? 'text-orange-400' : 'text-green-400')} font-bold">
         ${r.avgVolume === null ? 'Unknown' : r.avgVolume.toLocaleString() + '/day'}
       </td>
     </tr>
@@ -1200,7 +1200,7 @@ if (systemSearchInput) {
     }
     if (systemSearchResults) {
       systemSearchResults.innerHTML = hits.map(sys => `
-        <div class="px-3 py-1.5 hover:bg-[#3a4a4c] cursor-pointer text-xs font-bold text-cyan-300 border-b border-[#3a4a4c]/40 mono"
+        <div class="px-3 py-1.5 hover:bg-[#3a4a4c] cursor-pointer text-xs font-bold text-orange-300 border-b border-[#3a4a4c]/40 mono"
              onclick="window.selectSolarSystem(${sys.id}, '${window.esc(sys.name)}')">
           ${window.esc(sys.name)}
         </div>
@@ -1259,7 +1259,7 @@ async function selectItem(typeId, name, preserveView = false) {
   const statusText = document.getElementById('status-text');
   const statusDot = document.getElementById('status-dot');
   if (statusText) statusText.textContent = 'TREE READY | UPDATING MARKET PRICES...';
-  if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-cyan-400';
+  if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-orange-400';
 
   const allTypeIds = new Set();
   window.collectAllTypeIds(window.recipeTreeRoot, allTypeIds);
@@ -1925,12 +1925,12 @@ function addCurrentJobToLedger(e) {
   if (btn) {
     const originalText = btn.innerHTML;
     btn.innerHTML = subBuildJobs.length > 0 ? `✔ ADDED ${subBuildJobs.length + 1} JOBS` : '✔ ADDED TO QUEUE';
-    btn.classList.remove('bg-cyan-800', 'hover:bg-cyan-700', 'text-cyan-100');
+    btn.classList.remove('bg-orange-800', 'hover:bg-orange-700', 'text-orange-100');
     btn.classList.add('bg-green-700', 'text-white');
     setTimeout(() => {
       btn.innerHTML = originalText;
       btn.classList.remove('bg-green-700', 'text-white');
-      btn.classList.add('bg-cyan-800', 'hover:bg-cyan-700', 'text-cyan-100');
+      btn.classList.add('bg-orange-800', 'hover:bg-orange-700', 'text-orange-100');
     }, 1500);
   }
 }
@@ -2092,7 +2092,7 @@ function renderIsolatedDiagram() {
   if (parentNode) {
     outputCol.appendChild(createNodeCard(parentNode));
   } else {
-    outputCol.innerHTML = `<div class="bg-[#0a0d0e] border border-cyan-500/50 p-3 text-xs text-cyan-300 font-bold mono ">Final Target Output</div>`;
+    outputCol.innerHTML = `<div class="bg-[#0a0d0e] border border-orange-500/50 p-3 text-xs text-orange-300 font-bold mono ">Final Target Output</div>`;
   }
 
   container.appendChild(inputCol);
@@ -2139,8 +2139,8 @@ function centerOnSelectedNode() {
   updateTransform();
   drawConnectingLines();
 
-  card.classList.add('ring-4', 'ring-cyan-400');
-  setTimeout(() => card.classList.remove('ring-4', 'ring-cyan-400'), 800);
+  card.classList.add('ring-4', 'ring-orange-400');
+  setTimeout(() => card.classList.remove('ring-4', 'ring-orange-400'), 800);
 }
 
 function drawConnectingLines() {
@@ -2367,7 +2367,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
 
   bomItems.forEach(item => {
     const row = document.createElement('div');
-    row.className = 'bg-[#0a0d0e] rounded border border-[#262e30] hover:border-cyan-500 hover:bg-[#283438] p-2 flex items-center justify-between cursor-pointer transition shadow-sm';
+    row.className = 'bg-[#0a0d0e] rounded border border-[#262e30] hover:border-orange-500 hover:bg-[#283438] p-2 flex items-center justify-between cursor-pointer transition shadow-sm';
     row.title = 'Click to find and focus this material in the build diagram';
     row.onclick = () => highlightNodeByTypeId(item.typeId);
 
@@ -2377,14 +2377,14 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
         <div class="min-w-0 flex-1">
           <div class="font-semibold text-slate-200 truncate flex items-center gap-1.5">
             <span class="truncate">${item.name}</span>
-            <span class="text-[9px] px-1 font-bold mono ${item.strategy === 'sell' ? 'bg-cyan-900/60 text-cyan-300' : 'bg-cyan-900/60 text-cyan-300'}">
+            <span class="text-[9px] px-1 font-bold mono ${item.strategy === 'sell' ? 'bg-orange-900/60 text-orange-300' : 'bg-orange-900/60 text-orange-300'}">
               ${item.strategy === 'sell' ? 'SELL' : 'BUY'}
             </span>
           </div>
           <div class="text-[10px] text-slate-400 mono font-semibold">Qty: ${item.qty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK${item.lineVolume > 0 ? ` &bull; ${item.lineVolume.toLocaleString(undefined, {maximumFractionDigits: 1})} m3` : ''}</div>
         </div>
       </div>
-      <div class="text-right mono font-bold text-cyan-400 flex-shrink-0 ml-2">
+      <div class="text-right mono font-bold text-orange-400 flex-shrink-0 ml-2">
         ${Math.round(item.lineCost).toLocaleString()} ISK
       </div>
     `;
@@ -2453,7 +2453,7 @@ function copyMultibuyText() {
       btn.className = 'px-3.5 py-1.5 bg-green-600 text-white font-bold text-xs mono transition';
       setTimeout(() => {
         btn.textContent = orig;
-        btn.className = 'px-3.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs mono transition shadow';
+        btn.className = 'px-3.5 py-1.5 bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs mono transition shadow';
       }, 1500);
     }
   });
