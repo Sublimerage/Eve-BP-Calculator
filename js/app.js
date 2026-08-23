@@ -1667,7 +1667,7 @@ function createNodeCard(node) {
     }
   }
 
-  card.className = `diagram-node hud-panel ${isRoot ? 'hud-bracket' : ''} p-3 shadow-2xl transition-all relative overflow-hidden ${cardStyle}`;
+  card.className = `diagram-node hud-panel ${isRoot ? 'hud-bracket' : ''} p-3 shadow-2xl transition-all relative ${cardStyle}`;
   card.innerHTML = `
     ${isRoot ? '<div class="hud-scanline"></div>' : ''}
     <div class="flex items-center space-x-3 hud-divider pb-2.5 mb-2.5">
