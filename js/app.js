@@ -1670,7 +1670,7 @@ function createNodeCard(node) {
   card.className = `diagram-node hud-panel ${isRoot ? 'hud-bracket' : ''} p-3 shadow-2xl transition-all relative ${cardStyle}`;
   card.innerHTML = `
     ${isRoot ? '<div class="hud-scanline"></div>' : ''}
-    <div class="flex items-center space-x-3 hud-divider pb-2.5 mb-2.5">
+    <div class="flex items-center space-x-3 border-b border-[#1e3348] pb-2.5 mb-2.5">
       <img src="${iconUrl}" class="w-10 h-10 border border-slate-700 bg-[#070b0f] flex-shrink-0" style="clip-path: polygon(0 4px, 4px 0, 100% 0, 100% 100%, 0 100%);" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
       <div class="min-w-0 flex-1">
         <div class="font-bold text-sm text-white truncate flex items-center justify-between">
