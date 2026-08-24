@@ -1581,12 +1581,16 @@ function createNodeCard(node) {
   card.setAttribute('data-instance-id', node.instanceId);
   card.onclick = (e) => onNodeClick(e, node.instanceId);
 
+  // Card status accent - a colored top edge (matching the same language node-selected/
+  // node-parent-highlight already use), not the old design's hardcoded-hex left-border stripe,
+  // which didn't reference the current palette at all and looked like a leftover from another
+  // theme entirely.
   let cardStyle = 'w-64';
   let borderAccent = '';
   if (isRoot) { cardStyle = 'w-80'; }
-  else if (!node.isBuildingSelf) { cardStyle = 'w-64'; borderAccent = 'border-left-color:#6b9ee8;'; }
-  else if (node.isReaction) { cardStyle = 'w-64'; borderAccent = 'border-left-color:#b98ee8;'; }
-  else if (node.batchYield > 1) { cardStyle = 'w-64'; borderAccent = 'border-left-color:#e8c96a;'; }
+  else if (!node.isBuildingSelf) { cardStyle = 'w-64'; borderAccent = 'border-top-color:var(--blue);'; }
+  else if (node.isReaction) { cardStyle = 'w-64'; borderAccent = 'border-top-color:var(--violet);'; }
+  else if (node.batchYield > 1) { cardStyle = 'w-64'; borderAccent = 'border-top-color:var(--accent);'; }
 
   const totalProduced = node.runsNeeded * node.batchYield;
   const surplus = totalProduced - node.qtyNeeded;
@@ -1613,10 +1617,10 @@ function createNodeCard(node) {
     const isCustomPriceNeeded = curStrategy === 'custom-market-sell' || curStrategy === 'custom-contract';
 
     sellStrategyUI = `
-      <div class="mb-2 p-1.5 bg-black/30 border border-[var(--accent)]/30 space-y-1.5" onclick="event.stopPropagation()">
+      <div class="mb-2 pt-2 border-t border-white/10 space-y-1.5" onclick="event.stopPropagation()">
         <div class="flex justify-between items-center text-xs mono">
-          <span class="text-orange-300 font-bold">Sell Channel:</span>
-          <select id="card-sell-strategy" onchange="syncSellStrategy(event)" class="bg-black/40 text-white p-0.5 border border-orange-500/20 text-xs outline-none">
+          <span class="text-slate-300 font-bold">Sell Channel:</span>
+          <select id="card-sell-strategy" onchange="syncSellStrategy(event)" class="bg-black/30 text-white p-1 rounded border border-white/10 text-xs outline-none">
             <option value="market-sell" ${curStrategy === 'market-sell' ? 'selected' : ''}>Auto</option>
             <option value="custom-market-sell" ${curStrategy === 'custom-market-sell' ? 'selected' : ''}>Custom Market Sell</option>
             <option value="custom-contract" ${curStrategy === 'custom-contract' ? 'selected' : ''}>Custom Contract</option>
@@ -1625,16 +1629,19 @@ function createNodeCard(node) {
         ${isCustomPriceNeeded ? `
           <div class="flex flex-col text-xs mono">
             <div class="flex justify-between items-center">
-              <span class="text-orange-300 font-bold">Custom Sell Price:</span>
+              <span class="text-slate-300 font-bold">Custom Sell Price:</span>
               <div class="flex items-center space-x-1">
-                <input type="number" id="card-custom-price" value="${curCustomPrice}" placeholder="Unit Price" onchange="syncCustomPrice(event)" class="w-24 bg-black/40 border border-orange-500/20 text-center text-green-400 font-bold p-0.5 outline-none text-xs">
+                <input type="number" id="card-custom-price" value="${curCustomPrice}" placeholder="Unit Price" onchange="syncCustomPrice(event)" class="w-24 bg-black/30 rounded border border-white/10 text-center text-green-400 font-bold p-1 outline-none text-xs">
                 <span class="text-slate-500 text-xs">ISK</span>
               </div>
             </div>
             <div class="text-xs text-green-400 text-right font-bold mt-1">${Math.round(window.rootCustomPrice || 0).toLocaleString()} ISK</div>
           </div>
         ` : ''}
-        <button onclick="addCurrentJobToLedger(event)" class="btn-glass w-full mt-2 py-1.5 text-sm flex items-center justify-center gap-1">➕ ADD TO JOB QUEUE</button>
+        <button onclick="addCurrentJobToLedger(event)" class="btn-glass w-full mt-2 py-1.5 text-sm flex items-center justify-center gap-1.5">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add to Job Queue
+        </button>
       </div>
     `;
   }
@@ -1728,7 +1735,7 @@ function createNodeCard(node) {
         <div class="border-t border-[#3a3025] pt-2.5 flex items-center justify-between text-sm mono" onclick="event.stopPropagation()">
           <span class="text-slate-300 font-bold">Runs:</span>
           <div class="flex items-center space-x-1">
-            <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" onchange="syncCardRunsToGlobal(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-16 bg-black/40 border border-[var(--accent)]/60 rounded text-center text-orange-300 font-bold p-0.5 outline-none">
+            <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" onchange="syncCardRunsToGlobal(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-16 bg-black/40 rounded text-center font-bold p-1 outline-none" style="border:1px solid rgba(var(--accent-rgb),0.5); color:var(--accent);">
             <span class="text-slate-400 text-xs">Runs</span>
           </div>
         </div>
