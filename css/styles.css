@@ -88,7 +88,10 @@ html {
   --glass-fill: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.013) 60%);
   --glass-border: rgba(255,255,255,0.09);
   --glass-border-top: rgba(255,255,255,0.18);
-  --glass-shadow: 0 14px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  /* Kept tight on purpose: panels sit only 12-14px apart, and the old 40px blur radius bled
+     well past that gap, smearing a visible shadow seam across the top of the next panel down
+     instead of a clean gap between two independent rounded rectangles. */
+  --glass-shadow: 0 3px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
   --blur: 22px;
 
   --radius-sm: 7px;
