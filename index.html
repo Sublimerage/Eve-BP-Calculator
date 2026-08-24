@@ -9,14 +9,22 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Deep-Industry Engine</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=14.7.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=15.0.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#030405] text-slate-200">
 
-  <svg id="halftone-bg"></svg>
+  <svg id="halftone-bg" width="100%" height="100%">
+    <defs>
+      <pattern id="halftone-tile" width="50" height="43.5" patternUnits="userSpaceOnUse">
+        <polygon points="12.5,3 25,40.5 0,40.5" fill="rgba(102,37,0,0.13)"/>
+        <polygon points="37.5,3 50,40.5 25,40.5" fill="rgba(102,37,0,0.13)"/>
+      </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#halftone-tile)" id="halftone-rect"/>
+  </svg>
 
   <!-- Header: branding + primary account/nav actions only -->
-  <header class="px-5 py-2.5 flex flex-wrap justify-between items-center gap-3 shadow-xl z-30 border-b border-[#3a4a4c]" style="background:rgba(15,10,8,0.5); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);">
+  <header class="px-5 py-2.5 flex flex-wrap justify-between items-center gap-3 shadow-xl z-30 border-b border-orange-500/20" style="background:rgba(15,10,8,0.5); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);">
     <div class="flex items-center space-x-3">
       <div class="w-10 h-10 bg-orange-500 flex items-center justify-center font-bold text-black text-2xl rajdhani shadow-lg shadow-orange-500/20">E</div>
       <h1 class="text-lg font-bold tracking-widest text-white rajdhani leading-none">EVE DEEP-INDUSTRY ENGINE</h1>
@@ -66,7 +74,7 @@
         </button>
       </div>
 
-      <div id="status-badge" class="px-3 py-2 bg-[#202a2e] border border-[#3a4a4c] flex items-center gap-2 text-xs shadow">
+      <div id="status-badge" class="px-3 py-2 bg-[#202a2e] border border-orange-500/20 flex items-center gap-2 text-xs shadow">
         <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0"></span>
         <span id="status-text" class="text-slate-300 font-semibold hidden sm:inline">INITIALIZING INDEX...</span>
       </div>
@@ -74,7 +82,7 @@
   </header>
 
   <!-- Dashboard Summary Bar: live metrics for whatever is currently selected -->
-  <section class="p-2.5 grid grid-cols-2 md:grid-cols-5 gap-2.5 relative z-10 border-b border-[#3a4a4c]">
+  <section class="p-2.5 grid grid-cols-2 md:grid-cols-5 gap-2.5 relative z-10 border-b border-orange-500/20">
     <div class="glass-card px-3.5 py-2.5 flex flex-col justify-center">
       <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Production Cost</div>
       <div id="summary-build-cost" class="text-lg font-bold text-orange-400 mono leading-tight">0 ISK</div>
@@ -339,7 +347,7 @@
     </aside>
 
     <!-- Interactive Diagram Viewport -->
-    <main class="flex-1 relative border-t border-[#3a4a4c]" id="viewport" onclick="clearHighlight()">
+    <main class="flex-1 relative border-t border-orange-500/20" id="viewport" onclick="clearHighlight()">
       <div id="pan-zoom-content">
         <svg id="tree-svg"></svg>
         <div id="tree-container" class="relative flex justify-center items-center space-x-24 p-24 min-w-max min-h-max">
@@ -369,14 +377,14 @@
       </div>
 
       <!-- Floating controls hint -->
-      <div class="absolute bottom-3 left-3 z-40 px-3 py-1.5 bg-[#0a0d0e]/90 border border-[#3a4a4c] mono text-slate-400 text-[11px] shadow-lg max-w-lg">
+      <div class="absolute bottom-3 left-3 z-40 px-3 py-1.5 bg-[#0a0d0e]/90 border border-orange-500/20 mono text-slate-400 text-[11px] shadow-lg max-w-lg">
         💡 <b>Click Card:</b> Highlight Inputs &amp; Output &nbsp;|&nbsp; <b>Click BOM Row:</b> Center Material &nbsp;|&nbsp; <b>[F]:</b> Center Output
       </div>
     </main>
 
     <!-- Bill of Materials (BOM) Sidebar -->
     <aside class="w-80 md:w-96 flex flex-col z-20 shadow-2xl" style="background:rgba(15,10,8,0.5); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-left:1px solid rgba(var(--accent-rgb),0.2);">
-      <div class="p-4 border-b border-[#3a4a4c] flex justify-between items-center" style="background:rgba(20,15,12,0.4);">
+      <div class="p-4 border-b border-orange-500/20 flex justify-between items-center" style="background:rgba(20,15,12,0.4);">
         <div>
           <h2 class="font-bold text-white rajdhani tracking-wider text-lg">BILL OF MATERIALS</h2>
           <div class="text-[10px] mono text-slate-400">CLICK ROW TO FOCUS CARD IN DIAGRAM</div>
@@ -386,7 +394,7 @@
         </button>
       </div>
 
-      <details open class="border-b border-[#3a4a4c] group">
+      <details open class="border-b border-orange-500/20 group">
         <summary class="px-4 py-2.5 cursor-pointer flex items-center justify-between list-none hover:bg-orange-500/10" style="background:rgba(20,15,12,0.4);" title="Only affects this shopping list and Copy Multibuy - materials you already have in stock are excluded from what's shown/copied here. Does NOT affect Total Production Cost or Profit, which always reflect full market value regardless of stock.">
           <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide flex items-center gap-1.5">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><line x1="12" y1="13" x2="12" y2="21"/></svg>
@@ -408,8 +416,8 @@
             </label>
           </div>
           <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterLocationDropdownOptions()"
-            class="w-full bg-black/40 border border-[#3a4a4c] px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-orange-500">
-          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-black/40 border border-[#3a4a4c] px-2.5 py-1.5 text-orange-300 font-bold text-[11px] outline-none truncate">
+            class="w-full bg-black/40 border border-orange-500/20 px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-orange-500">
+          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-black/40 border border-orange-500/20 px-2.5 py-1.5 text-orange-300 font-bold text-[11px] outline-none truncate">
             <option value="all" selected>All Locations (Combined Assets)</option>
             <option value="industry_system">Current System Only (JITA)</option>
           </select>
@@ -422,7 +430,7 @@
       </div>
 
       <!-- BOM Total Summary Footer -->
-      <div class="p-4 border-t border-[#3a4a4c] mono" style="background:rgba(20,15,12,0.4);">
+      <div class="p-4 border-t border-orange-500/20 mono" style="background:rgba(20,15,12,0.4);">
         <div class="flex justify-between text-slate-400 text-xs">
           <span>Unique Material Types:</span>
           <span id="bom-type-count" class="text-white font-bold">0</span>
@@ -443,18 +451,18 @@
   <!-- Blueprint Browser Drawer -->
   <div id="blueprint-browser-backdrop" class="fixed inset-0 bg-black/70 z-[998] hidden transition-opacity duration-300" onclick="closeBlueprintBrowser()"></div>
   <div id="blueprint-browser-drawer" class="fixed top-0 right-0 h-full w-full sm:w-[clamp(920px,62vw,1300px)] max-w-full bg-[#0a0d0e] border-l border-orange-500/60 shadow-2xl z-[999] flex flex-col text-xs mono transform translate-x-full transition-transform duration-300 ease-out">
-    <div class="flex justify-between items-center border-b border-[#3a4a4c] px-5 py-3.5 flex-shrink-0">
+    <div class="flex justify-between items-center border-b border-orange-500/20 px-5 py-3.5 flex-shrink-0">
       <h3 class="text-base font-bold text-orange-300 rajdhani tracking-wider">📘 MY BLUEPRINTS</h3>
       <button onclick="closeBlueprintBrowser()" class="text-slate-400 hover:text-white font-bold text-lg leading-none">✖</button>
     </div>
 
     <div class="flex flex-1 overflow-hidden">
       <!-- Filter sidebar -->
-      <aside class="w-[260px] flex-shrink-0 border-r border-[#3a4a4c] flex flex-col overflow-hidden">
-        <div class="p-3.5 space-y-3 flex-shrink-0 border-b border-[#3a4a4c] overflow-y-auto">
+      <aside class="w-[260px] flex-shrink-0 border-r border-orange-500/20 flex flex-col overflow-hidden">
+        <div class="p-3.5 space-y-3 flex-shrink-0 border-b border-orange-500/20 overflow-y-auto">
           <div>
             <input type="text" id="blueprint-browser-search" placeholder="🔍 Search blueprint name..." autocomplete="off" oninput="filterBlueprintBrowser()"
-              class="w-full bg-[#030405] border border-[#3a4a4c] px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-orange-500">
+              class="w-full bg-[#030405] border border-orange-500/20 px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-orange-500">
           </div>
           <div class="flex items-center justify-between">
             <button onclick="loadBlueprintBrowserData(true)" class="px-2.5 py-1.5 bg-orange-800 hover:bg-orange-700 text-orange-100 font-semibold text-[10px] transition">🔄 Refresh</button>
@@ -486,7 +494,7 @@
 
           <div>
             <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Type</div>
-            <select id="blueprint-type-filter" onchange="filterBlueprintBrowser()" class="w-full bg-[#030405] border border-[#3a4a4c] px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
+            <select id="blueprint-type-filter" onchange="filterBlueprintBrowser()" class="w-full bg-[#030405] border border-orange-500/20 px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
               <option value="all" selected>All (BPO + BPC)</option>
               <option value="bpo">BPO Only</option>
               <option value="bpc">BPC Only</option>
@@ -494,7 +502,7 @@
           </div>
           <div>
             <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Category</div>
-            <select id="blueprint-category-filter" onchange="filterBlueprintBrowser()" class="w-full bg-[#030405] border border-[#3a4a4c] px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
+            <select id="blueprint-category-filter" onchange="filterBlueprintBrowser()" class="w-full bg-[#030405] border border-orange-500/20 px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
               <option value="all" selected>All Categories</option>
               <option value="6">Ships</option>
               <option value="7">Modules</option>
@@ -510,8 +518,8 @@
         <div class="flex-1 flex flex-col min-h-0 p-3.5">
           <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1 flex-shrink-0">Location</div>
           <input type="text" id="blueprint-location-search" autocomplete="off" placeholder="Filter locations..." oninput="filterBlueprintLocationDropdownOptions()"
-            class="w-full bg-[#030405] border border-[#3a4a4c] px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-orange-500 mb-1.5 flex-shrink-0">
-          <select id="blueprint-location-filter" onchange="filterBlueprintBrowser()" size="20" class="flex-1 w-full bg-[#030405] border border-[#3a4a4c] px-2 py-1.5 text-orange-300 font-bold text-[10px] outline-none">
+            class="w-full bg-[#030405] border border-orange-500/20 px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-orange-500 mb-1.5 flex-shrink-0">
+          <select id="blueprint-location-filter" onchange="filterBlueprintBrowser()" size="20" class="flex-1 w-full bg-[#030405] border border-orange-500/20 px-2 py-1.5 text-orange-300 font-bold text-[10px] outline-none">
             <option value="all" selected>All Locations</option>
           </select>
         </div>
@@ -527,14 +535,14 @@
   <!-- Clipboard Hangar Stock Import Modal -->
   <div id="paste-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[999] hidden p-4">
     <div class="bg-[#0a0d0e] border border-orange-500/80 p-6 w-full max-w-xl shadow-2xl flex flex-col space-y-4 text-xs mono">
-      <div class="flex justify-between items-center border-b border-[#3a4a4c] pb-3">
+      <div class="flex justify-between items-center border-b border-orange-500/20 pb-3">
         <h3 class="text-base font-bold text-orange-300 rajdhani tracking-wider">📋 IMPORT HANGAR STOCK FROM CLIPBOARD</h3>
         <button onclick="closePasteModal()" class="text-slate-400 hover:text-white font-bold text-base">✖</button>
       </div>
       <p class="text-slate-300 leading-relaxed">
         Select items in your in-game hangar or container, press <kbd class="bg-[#3a4a4c] px-1 py-0.5 text-orange-300">Ctrl + C</kbd> to copy, then paste (<kbd class="bg-[#3a4a4c] px-1 py-0.5 text-orange-300">Ctrl + V</kbd>) into the box below:
       </p>
-      <textarea id="paste-stock-input" rows="8" placeholder="Paste in-game inventory text here (e.g. Tritanium 500,000 Mineral...)" class="w-full bg-[#030405] border border-[#3a4a4c] p-3 text-slate-200 focus:border-orange-500 outline-none mono text-xs"></textarea>
+      <textarea id="paste-stock-input" rows="8" placeholder="Paste in-game inventory text here (e.g. Tritanium 500,000 Mineral...)" class="w-full bg-[#030405] border border-orange-500/20 p-3 text-slate-200 focus:border-orange-500 outline-none mono text-xs"></textarea>
       <div class="flex justify-between items-center pt-2">
         <button onclick="clearUserStock()" class="px-3 py-1.5 bg-red-900/60 hover:bg-red-800 text-red-300 font-bold transition">
           Clear All Stock
@@ -552,11 +560,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=14.7.0"></script>
-  <script src="js/config.js?v=14.7.0"></script>
-  <script src="js/esi.js?v=14.7.0"></script>
-  <script src="js/tree.js?v=14.7.0"></script>
-  <script src="js/optimizers.js?v=14.7.0"></script>
-  <script src="js/app.js?v=14.7.0"></script>
+  <script src="eve_db.js?v=15.0.0"></script>
+  <script src="js/config.js?v=15.0.0"></script>
+  <script src="js/esi.js?v=15.0.0"></script>
+  <script src="js/tree.js?v=15.0.0"></script>
+  <script src="js/optimizers.js?v=15.0.0"></script>
+  <script src="js/app.js?v=15.0.0"></script>
 </body>
 </html>
