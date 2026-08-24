@@ -2583,23 +2583,29 @@ function generateHalftoneBackground() {
   const rowHeight = spacing * 0.87;
   let svgContent = '';
 
-  // Triangular tessellation: within each row, up-pointing and down-pointing triangles alternate
-  // at half-spacing intervals, sharing edges so they tile continuously with no gaps - matching
-  // the reference's true tessellating mesh instead of isolated same-orientation triangles.
+  // Triangular tessellation: the outer grid (tile positions) stays at the ORIGINAL density -
+  // spacing horizontally, rowHeight vertically - matching a correct equilateral-triangle rhythm.
+  // Each tile then contains one up-pointing and one down-pointing triangle side by side, splitting
+  // the tile's own width in half, rather than doubling the grid's iteration density (which was the
+  // actual cause of the horizontal crowding in the previous attempt).
   for (let y = -rowHeight; y < H + rowHeight; y += rowHeight) {
-    let pointsDown = false;
-    for (let x = -spacing; x < W + spacing; x += spacing / 2) {
-      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2) / maxDist; // 0 (center) to 1 (corner)
-      const size = 2 + dist * 13;
+    for (let x = -spacing; x < W + spacing; x += spacing) {
+      const tileCenterX = x + spacing / 2;
+      const dist = Math.sqrt((tileCenterX - cx) ** 2 + (y - cy) ** 2) / maxDist; // 0 (center) to 1 (corner)
+      const sizeScale = Math.min(1, 0.15 + dist * 0.95); // how much of the tile's half-width each triangle actually fills
       const opacity = Math.min(0.13, dist * 0.1671);
-      pointsDown = !pointsDown;
-      if (opacity < 0.004) { continue; }
-      const halfW = size / 2;
-      const halfH = size * 0.435; // half of (size * 0.87), keeps the same row-height proportion
-      const points = pointsDown
-        ? `${x - halfW},${y - halfH} ${x + halfW},${y - halfH} ${x},${y + halfH}` // apex at bottom
-        : `${x},${y - halfH} ${x + halfW},${y + halfH} ${x - halfW},${y + halfH}`; // apex at top
-      svgContent += `<polygon points="${points}" fill="rgba(102,37,0,${opacity.toFixed(3)})"/>`;
+      if (opacity < 0.004) continue;
+
+      const halfW = (spacing / 2) * sizeScale / 2;
+      const halfH = rowHeight * sizeScale / 2;
+
+      // Up-pointing triangle, left half of the tile
+      const upX = x + spacing / 4;
+      svgContent += `<polygon points="${upX},${y - halfH} ${upX + halfW},${y + halfH} ${upX - halfW},${y + halfH}" fill="rgba(102,37,0,${opacity.toFixed(3)})"/>`;
+
+      // Down-pointing triangle, right half of the tile
+      const downX = x + spacing * 3 / 4;
+      svgContent += `<polygon points="${downX - halfW},${y - halfH} ${downX + halfW},${y - halfH} ${downX},${y + halfH}" fill="rgba(102,37,0,${opacity.toFixed(3)})"/>`;
     }
   }
   svg.innerHTML = svgContent;
