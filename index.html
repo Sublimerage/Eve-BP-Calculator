@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Deep-Industry Engine</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=14.3.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=14.5.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#030405] text-slate-200">
 
@@ -139,15 +139,15 @@
         <h2 class="section-label text-orange-400 text-xs mb-2">Search and Pricing</h2>
         <div class="relative mb-2">
           <input type="text" id="item-search" autocomplete="off" placeholder="Search item to build..."
-            class="w-full bg-[#030405] border border-[#3a4a4c] px-2.5 py-2 text-white font-bold focus:border-orange-500 outline-none mono text-sm shadow-inner">
-          <div id="search-results" class="absolute top-full left-0 right-0 bg-[#202a2e] border border-orange-500 max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
+            class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-2 text-white font-bold focus:border-orange-500 outline-none mono text-sm shadow-inner">
+          <div id="search-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
         </div>
         <div class="flex gap-2">
-          <select id="input-price-mode" onchange="recalculate()" class="flex-1 bg-[#030405] border border-[#3a4a4c] px-2 py-1.5 text-white font-bold text-[11px] outline-none">
+          <select id="input-price-mode" onchange="recalculate()" class="flex-1 bg-black/35 border border-orange-500/20 px-2 py-1.5 text-white font-bold text-[11px] outline-none">
             <option value="sell" selected>Sell (Instant)</option>
             <option value="buy">Buy Order</option>
           </select>
-          <select id="include-reactions" onchange="if(currentProduct) selectItem(currentProduct.id, currentProduct.name, true)" class="flex-1 bg-[#030405] border border-[#3a4a4c] px-2 py-1.5 text-orange-300 font-bold text-[11px] outline-none">
+          <select id="include-reactions" onchange="if(currentProduct) selectItem(currentProduct.id, currentProduct.name, true)" class="flex-1 bg-black/35 border border-orange-500/20 px-2 py-1.5 text-orange-300 font-bold text-[11px] outline-none">
             <option value="true" selected>Reactions ON</option>
             <option value="false">Reactions OFF</option>
           </select>
@@ -165,10 +165,10 @@
             🛒 Buy All
           </button>
         </div>
-        <div class="rounded bg-[#030405] p-2 border border-green-500/30 flex items-center gap-1.5" title="Build Margin Threshold">
+        <div class="rounded bg-black/35 p-2 border border-green-500/30 flex items-center gap-1.5" title="Build Margin Threshold">
           <span class="text-slate-400 text-[10px] font-bold flex-shrink-0">Min Profit:</span>
           <input type="number" id="build-profit-threshold" value="5.0" step="0.5" min="0" max="100"
-            class="w-14 bg-[#202a2e] border border-green-500/40 text-center text-green-300 font-bold p-1 outline-none text-xs">
+            class="w-14 bg-black/25 border border-green-500/40 text-center text-green-300 font-bold p-1 outline-none text-xs">
           <span class="text-slate-500 text-xs flex-shrink-0">%</span>
           <button onclick="applyBuildProfitOptimizer()" class="ml-auto rounded bg-green-800 hover:bg-green-700 text-white font-semibold py-1 px-2 text-[10px] transition shadow mono flex-shrink-0">
             ⚡ Optimize
@@ -180,25 +180,25 @@
       <div id="flyout-optimize" class="flyout-panel" style="--glow-color:#4fd8e8; --glow-rgb:79,216,232;">
         <h2 class="section-label text-orange-300 text-xs mb-2">Smart Optimizers</h2>
         <div class="space-y-2">
-          <div class="rounded bg-[#030405] p-2 border border-[#3a4a4c] flex items-center gap-1.5" title="Component Market Spread Threshold">
+          <div class="rounded bg-black/35 p-2 border border-orange-500/20 flex items-center gap-1.5" title="Component Market Spread Threshold">
             <span class="text-slate-400 text-[10px] flex-shrink-0">Spread:</span>
             <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100"
-              class="w-14 bg-[#202a2e] border border-orange-500/40 text-center text-orange-300 font-bold p-1 outline-none text-xs">
+              class="w-14 bg-black/25 border border-orange-500/40 text-center text-orange-300 font-bold p-1 outline-none text-xs">
             <span class="text-slate-500 text-xs flex-shrink-0">%</span>
             <button onclick="applyComponentSpreadOptimizer()" class="ml-auto rounded bg-orange-700 hover:bg-orange-600 text-white font-semibold py-1 px-2 text-[10px] transition flex-shrink-0">
               Optimize
             </button>
           </div>
-          <div class="rounded bg-[#030405] p-2 border border-[#3a4a4c] flex items-center gap-1.5" title="Build Cost Savings Impact Threshold">
+          <div class="rounded bg-black/35 p-2 border border-orange-500/20 flex items-center gap-1.5" title="Build Cost Savings Impact Threshold">
             <span class="text-slate-400 text-[10px] flex-shrink-0">Budget:</span>
             <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100"
-              class="w-14 bg-[#202a2e] border border-orange-500/40 text-center text-orange-300 font-bold p-1 outline-none text-xs">
+              class="w-14 bg-black/25 border border-orange-500/40 text-center text-orange-300 font-bold p-1 outline-none text-xs">
             <span class="text-slate-500 text-xs flex-shrink-0">%</span>
             <button onclick="applyBudgetImpactOptimizer()" class="ml-auto rounded bg-orange-700 hover:bg-orange-600 text-white font-semibold py-1 px-2 text-[10px] transition flex-shrink-0">
               Optimize
             </button>
           </div>
-          <button onclick="resetSmartBuyModes()" class="w-full rounded text-slate-400 hover:text-white hover:border-slate-500 text-[11px] mono transition py-1.5 border border-[#3a4a4c]" title="Reset buy modes">
+          <button onclick="resetSmartBuyModes()" class="w-full rounded text-slate-400 hover:text-white hover:border-slate-500 text-[11px] mono transition py-1.5 border border-orange-500/20" title="Reset buy modes">
             Reset Buy Modes
           </button>
         </div>
@@ -210,7 +210,7 @@
         <div class="space-y-2">
           <div class="p-2 rounded" style="background:rgba(0,0,0,0.3); border:1px solid rgba(var(--accent-rgb),0.2);">
             <div class="flex items-center gap-1.5 mb-1.5">
-              <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="flex-1 min-w-0 bg-black/40 border border-[#3a4a4c] px-2 py-1.5 text-orange-300 font-bold text-xs outline-none rounded">
+              <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="flex-1 min-w-0 bg-black/40 border border-orange-500/20 px-2 py-1.5 text-orange-300 font-bold text-xs outline-none rounded">
                 <option value="">— Load a saved production station —</option>
               </select>
               <button onclick="deleteProductionPreset()" class="toggle-btn" title="Delete the currently-selected preset">
@@ -224,10 +224,10 @@
           </div>
           <div class="relative">
             <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="System..."
-              class="w-full bg-[#030405] border border-[#3a4a4c] px-2.5 py-2 text-orange-300 font-bold mono uppercase focus:border-orange-500 outline-none text-sm">
-            <div id="system-results" class="absolute top-full left-0 right-0 bg-[#202a2e] border border-orange-500 max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
+              class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-2 text-orange-300 font-bold mono uppercase focus:border-orange-500 outline-none text-sm">
+            <div id="system-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
           </div>
-          <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); recalculate();" class="w-full bg-[#030405] border border-[#3a4a4c] px-2.5 py-2 text-white font-semibold text-xs outline-none" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
+          <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); recalculate();" class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-2 text-white font-semibold text-xs outline-none" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
             <option value="npc">NPC Station (0% ME / 0% TE / 0% Fee)</option>
             <option value="raitaru">Raitaru - M EC (1% ME / 15% TE / 3% Fee)</option>
             <option value="azbel">Azbel - L EC (1% ME / 20% TE / 4% Fee)</option>
@@ -239,24 +239,24 @@
               <div class="relative">
                 <input type="text" id="rig-slot-1-input" placeholder="Rig Slot 1: None" autocomplete="off"
                   oninput="searchRigSlot(1, this.value)" onfocus="searchRigSlot(1, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-1-results'); if (el) el.classList.add('hidden'); }, 200)"
-                  class="w-full bg-[#030405] border border-[#3a4a4c] px-2.5 py-1.5 text-orange-300 font-semibold text-[11px] outline-none focus:border-orange-500">
-                <div id="rig-slot-1-results" class="absolute top-full left-0 right-0 bg-[#202a2e] border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+                  class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-1.5 text-orange-300 font-semibold text-[11px] outline-none focus:border-orange-500">
+                <div id="rig-slot-1-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
               </div>
               <div class="relative">
                 <input type="text" id="rig-slot-2-input" placeholder="Rig Slot 2: None" autocomplete="off"
                   oninput="searchRigSlot(2, this.value)" onfocus="searchRigSlot(2, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-2-results'); if (el) el.classList.add('hidden'); }, 200)"
-                  class="w-full bg-[#030405] border border-[#3a4a4c] px-2.5 py-1.5 text-orange-300 font-semibold text-[11px] outline-none focus:border-orange-500">
-                <div id="rig-slot-2-results" class="absolute top-full left-0 right-0 bg-[#202a2e] border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+                  class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-1.5 text-orange-300 font-semibold text-[11px] outline-none focus:border-orange-500">
+                <div id="rig-slot-2-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
               </div>
               <div class="relative">
                 <input type="text" id="rig-slot-3-input" placeholder="Rig Slot 3: None" autocomplete="off"
                   oninput="searchRigSlot(3, this.value)" onfocus="searchRigSlot(3, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-3-results'); if (el) el.classList.add('hidden'); }, 200)"
-                  class="w-full bg-[#030405] border border-[#3a4a4c] px-2.5 py-1.5 text-orange-300 font-semibold text-[11px] outline-none focus:border-orange-500">
-                <div id="rig-slot-3-results" class="absolute top-full left-0 right-0 bg-[#202a2e] border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+                  class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-1.5 text-orange-300 font-semibold text-[11px] outline-none focus:border-orange-500">
+                <div id="rig-slot-3-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
               </div>
             </div>
           </div>
-          <div class="bg-[#030405] p-2 border border-[#3a4a4c] space-y-1 text-[10px] mono">
+          <div class="bg-black/35 p-2 border border-orange-500/20 space-y-1 text-[10px] mono">
             <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">SCI:</span><span id="sci-badge" class="text-orange-300 font-bold text-right truncate">SCI: 4.25% (Mfg) / 1.10% (React)</span></div>
             <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">Stock:</span><span id="stock-status-text" class="text-orange-400 font-bold text-right truncate"><span id="stock-count-display">0 items</span> in Stock</span></div>
             <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">EIV:</span><span id="eiv-status-text" class="text-orange-400 font-bold text-right truncate">Fetching...</span></div>
@@ -268,24 +268,24 @@
       <div id="flyout-taxes" class="flyout-panel" style="--glow-color:#4fd8e8; --glow-rgb:79,216,232;">
         <h2 class="section-label text-orange-400 text-xs mb-2">Taxes and Fees</h2>
         <div class="grid grid-cols-2 gap-2 text-[11px] mono">
-          <div class="flex items-center gap-1.5 bg-[#030405] p-1.5 border border-[#3a4a4c]" title="Facility Structure Tax %">
+          <div class="flex items-center gap-1.5 bg-black/35 p-1.5 border border-orange-500/20" title="Facility Structure Tax %">
             <span class="text-slate-400 font-semibold flex-shrink-0">Fac:</span>
-            <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#202a2e] border border-[#3a4a4c] text-center text-orange-400 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-black/25 border border-orange-500/20 text-center text-orange-400 font-bold p-1 outline-none text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
-          <div class="flex items-center gap-1.5 bg-[#030405] p-1.5 border border-[#3a4a4c]" title="SCC Surcharge %">
+          <div class="flex items-center gap-1.5 bg-black/35 p-1.5 border border-orange-500/20" title="SCC Surcharge %">
             <span class="text-slate-400 font-semibold flex-shrink-0">SCC:</span>
-            <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#202a2e] border border-[#3a4a4c] text-center text-orange-400 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-black/25 border border-orange-500/20 text-center text-orange-400 font-bold p-1 outline-none text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
-          <div class="flex items-center gap-1.5 bg-[#030405] p-1.5 border border-[#3a4a4c]" title="Sales Tax %">
+          <div class="flex items-center gap-1.5 bg-black/35 p-1.5 border border-orange-500/20" title="Sales Tax %">
             <span class="text-slate-400 font-semibold flex-shrink-0">Sales:</span>
-            <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#202a2e] border border-[#3a4a4c] text-center text-orange-300 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-black/25 border border-orange-500/20 text-center text-orange-300 font-bold p-1 outline-none text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
-          <div class="flex items-center gap-1.5 bg-[#030405] p-1.5 border border-[#3a4a4c]" title="Broker Fee %">
+          <div class="flex items-center gap-1.5 bg-black/35 p-1.5 border border-orange-500/20" title="Broker Fee %">
             <span class="text-slate-400 font-semibold flex-shrink-0">Broker:</span>
-            <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#202a2e] border border-[#3a4a4c] text-center text-orange-300 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-black/25 border border-orange-500/20 text-center text-orange-300 font-bold p-1 outline-none text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
         </div>
@@ -295,14 +295,14 @@
       <div id="flyout-contract" class="flyout-panel" style="--glow-color:#4fd8e8; --glow-rgb:79,216,232;">
         <h2 class="section-label text-orange-400 text-xs mb-2">Contract Settings</h2>
         <div class="grid grid-cols-2 gap-2 text-[11px] mono">
-          <div class="flex items-center gap-1.5 bg-[#030405] p-1.5 border border-[#3a4a4c]" title="Contract Sales Tax %">
+          <div class="flex items-center gap-1.5 bg-black/35 p-1.5 border border-orange-500/20" title="Contract Sales Tax %">
             <span class="text-slate-400 font-semibold flex-shrink-0">C.Tax:</span>
-            <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#202a2e] border border-[#3a4a4c] text-center text-orange-400 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-black/25 border border-orange-500/20 text-center text-orange-400 font-bold p-1 outline-none text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
-          <div class="flex items-center gap-1.5 bg-[#030405] p-1.5 border border-[#3a4a4c]" title="Contract Broker Fee %">
+          <div class="flex items-center gap-1.5 bg-black/35 p-1.5 border border-orange-500/20" title="Contract Broker Fee %">
             <span class="text-slate-400 font-semibold flex-shrink-0">C.Brk:</span>
-            <input type="number" id="contract-broker" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-[#202a2e] border border-[#3a4a4c] text-center text-orange-400 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="contract-broker" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-black/25 border border-orange-500/20 text-center text-orange-400 font-bold p-1 outline-none text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
         </div>
@@ -318,8 +318,8 @@
               <input type="text" id="home-market-input" placeholder="Search station name..." autocomplete="off"
                 oninput="searchHomeMarket(this.value)" onfocus="searchHomeMarket(this.value)"
                 onblur="setTimeout(() => { const el = document.getElementById('home-market-results'); if (el) el.classList.add('hidden'); }, 200)"
-                class="w-full bg-[#030405] border border-[#3a4a4c] px-2.5 py-2 text-orange-300 font-bold mono text-xs outline-none focus:border-orange-500">
-              <div id="home-market-results" class="absolute top-full left-0 right-0 bg-[#202a2e] border border-orange-500 max-h-52 overflow-y-auto hidden z-50 shadow-2xl text-xs"></div>
+                class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-2 text-orange-300 font-bold mono text-xs outline-none focus:border-orange-500">
+              <div id="home-market-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-52 overflow-y-auto hidden z-50 shadow-2xl text-xs"></div>
             </div>
           </div>
           <div title="Markets compared side-by-side (price AND real daily trade volume) whenever you use Compare Markets on a card or BOM row.">
@@ -329,8 +329,8 @@
               <input type="text" id="add-market-input" placeholder="Add a market (search station)..." autocomplete="off"
                 oninput="searchAddMarket(this.value)" onfocus="searchAddMarket(this.value)"
                 onblur="setTimeout(() => { const el = document.getElementById('add-market-results'); if (el) el.classList.add('hidden'); }, 200)"
-                class="w-full bg-[#030405] border border-[#3a4a4c] px-2.5 py-1.5 text-slate-200 text-[11px] outline-none focus:border-orange-500">
-              <div id="add-market-results" class="absolute top-full left-0 right-0 bg-[#202a2e] border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[11px]"></div>
+                class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-1.5 text-slate-200 text-[11px] outline-none focus:border-orange-500">
+              <div id="add-market-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[11px]"></div>
             </div>
           </div>
         </div>
@@ -552,11 +552,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=14.3.0"></script>
-  <script src="js/config.js?v=14.3.0"></script>
-  <script src="js/esi.js?v=14.3.0"></script>
-  <script src="js/tree.js?v=14.3.0"></script>
-  <script src="js/optimizers.js?v=14.3.0"></script>
-  <script src="js/app.js?v=14.3.0"></script>
+  <script src="eve_db.js?v=14.5.0"></script>
+  <script src="js/config.js?v=14.5.0"></script>
+  <script src="js/esi.js?v=14.5.0"></script>
+  <script src="js/tree.js?v=14.5.0"></script>
+  <script src="js/optimizers.js?v=14.5.0"></script>
+  <script src="js/app.js?v=14.5.0"></script>
 </body>
 </html>
