@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Deep-Industry Engine</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=14.2.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=14.3.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#030405] text-slate-200">
 
@@ -208,14 +208,19 @@
       <div id="flyout-structure" class="flyout-panel" style="--glow-color:#4fd8e8; --glow-rgb:79,216,232;">
         <h2 class="section-label text-orange-400 text-xs mb-2">System and Structure</h2>
         <div class="space-y-2">
-          <div class="p-2 bg-[#030405] border border-[#3a4a4c] space-y-1.5">
-            <div class="flex items-center gap-1.5">
-              <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="flex-1 min-w-0 bg-[#202a2e] border border-[#3a4a4c] px-2 py-1.5 text-emerald-300 font-bold text-xs outline-none">
+          <div class="p-2 rounded" style="background:rgba(0,0,0,0.3); border:1px solid rgba(var(--accent-rgb),0.2);">
+            <div class="flex items-center gap-1.5 mb-1.5">
+              <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="flex-1 min-w-0 bg-black/40 border border-[#3a4a4c] px-2 py-1.5 text-orange-300 font-bold text-xs outline-none rounded">
                 <option value="">— Load a saved production station —</option>
               </select>
-              <button onclick="deleteProductionPreset()" class="px-2 py-1.5 bg-[#3a4a4c] hover:bg-red-800 text-slate-400 hover:text-red-200 transition text-xs flex-shrink-0" title="Delete the currently-selected preset">🗑</button>
+              <button onclick="deleteProductionPreset()" class="toggle-btn" title="Delete the currently-selected preset">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+              </button>
             </div>
-            <button onclick="saveProductionPreset()" class="w-full px-2 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-emerald-100 font-bold text-xs transition" title="Saves your current system, structure type, and rig fitting as a named preset you can switch back to instantly">💾 Save Current as Preset</button>
+            <button onclick="saveProductionPreset()" class="btn-glass w-full py-1.5 text-xs flex items-center justify-center gap-1.5" title="Saves your current system, structure type, and rig fitting as a named preset you can switch back to instantly">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
+              Save Current as Preset
+            </button>
           </div>
           <div class="relative">
             <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="System..."
@@ -547,11 +552,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=14.2.0"></script>
-  <script src="js/config.js?v=14.2.0"></script>
-  <script src="js/esi.js?v=14.2.0"></script>
-  <script src="js/tree.js?v=14.2.0"></script>
-  <script src="js/optimizers.js?v=14.2.0"></script>
-  <script src="js/app.js?v=14.2.0"></script>
+  <script src="eve_db.js?v=14.3.0"></script>
+  <script src="js/config.js?v=14.3.0"></script>
+  <script src="js/esi.js?v=14.3.0"></script>
+  <script src="js/tree.js?v=14.3.0"></script>
+  <script src="js/optimizers.js?v=14.3.0"></script>
+  <script src="js/app.js?v=14.3.0"></script>
 </body>
 </html>
