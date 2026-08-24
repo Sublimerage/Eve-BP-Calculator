@@ -84,11 +84,11 @@ html {
   /* Glass surface - a genuinely lighter "elevated" tone (--surface-rgb), not the page canvas
      color, layered at partial opacity so it reads as a lifted card even before any blur is
      considered, and so backdrop-filter actually has something translucent to blur. */
-  --surface-rgb: 32,26,20;
-  --glass-fill: linear-gradient(165deg, rgba(var(--surface-rgb),0.92), rgba(var(--surface-rgb),0.72));
-  --glass-fill-panel: linear-gradient(165deg, rgba(var(--surface-rgb),0.62), rgba(var(--surface-rgb),0.40));
-  --glass-border: rgba(255,255,255,0.12);
-  --glass-border-top: rgba(255,255,255,0.24);
+  --surface-rgb: 58,48,38;
+  --glass-fill: linear-gradient(165deg, rgba(var(--surface-rgb),0.97), rgba(var(--surface-rgb),0.88));
+  --glass-fill-panel: linear-gradient(165deg, rgba(var(--surface-rgb),0.78), rgba(var(--surface-rgb),0.58));
+  --glass-border: rgba(255,255,255,0.16);
+  --glass-border-top: rgba(255,255,255,0.32);
   --glass-shadow: 0 14px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07);
   --blur: 22px;
 
@@ -100,15 +100,21 @@ html {
   --radius-input: 7px;
 }
 
+/* Page composition: a padded canvas with floating rounded glass panels and visible gaps between
+   them (header, stat strip, icon rail, viewport, BOM sidebar), not edge-to-edge toolbar chrome -
+   that gap + rounded-corner language is what actually reads as "glass" rather than a flat reskin. */
 body {
   background:
-    radial-gradient(ellipse 1100px 700px at 10% -10%, rgba(var(--accent-rgb),0.14) 0%, transparent 60%),
-    radial-gradient(ellipse 900px 750px at 95% 12%, rgba(var(--violet-rgb),0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 1100px 700px at 10% -10%, rgba(var(--accent-rgb),0.22) 0%, transparent 60%),
+    radial-gradient(ellipse 900px 750px at 95% 12%, rgba(var(--violet-rgb),0.16) 0%, transparent 60%),
     var(--bg-0);
   background-attachment: fixed;
   color: var(--text);
   font-family: 'Inter', sans-serif;
-  min-height: 100vh;
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 16px;
+  gap: 12px;
   user-select: none;
   -webkit-user-select: none;
   -webkit-font-smoothing: antialiased;
@@ -235,16 +241,20 @@ img {
    ============================================================ */
 .glass-panel, header, .icon-rail, .flyout-panel, #status-badge,
 #blueprint-browser-drawer, #paste-modal > div, .stat-strip, #bom-sidebar, #history-drawer,
-#invention-sidebar {
+#invention-sidebar, #viewport, #journal-main-area, #invention-main-area {
   background: var(--glass-fill-panel);
   backdrop-filter: blur(var(--blur));
   -webkit-backdrop-filter: blur(var(--blur));
   border: 1px solid var(--glass-border);
   border-top-color: var(--glass-border-top);
+  border-radius: var(--radius-panel);
   box-shadow: var(--glass-shadow);
 }
-header { border-radius: 0; border-left: none; border-right: none; border-top: none; height: 56px; flex-shrink: 0; }
-#invention-sidebar { border-radius: 0; border-top: none; border-bottom: none; border-left: none; }
+header { height: 56px; flex-shrink: 0; }
+/* The diagram canvas holds dozens of node cards during pan/zoom - real backdrop blur on a
+   container that size would be a real compositing cost for no visible benefit (nothing moves
+   behind it), so it gets the opaque card-style fill instead of the panel fill. */
+#viewport, #journal-main-area, #invention-main-area { background: var(--glass-fill); backdrop-filter: none; -webkit-backdrop-filter: none; }
 
 .icon-btn {
   width: 30px; height: 30px; border-radius: var(--radius-btn);
@@ -256,9 +266,13 @@ header { border-radius: 0; border-left: none; border-right: none; border-top: no
 }
 .icon-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
 .icon-btn:hover { color: var(--accent); background: rgba(var(--accent-rgb),0.1); border-color: rgba(var(--accent-rgb),0.2); }
+/* The blueprint browser is a full-height edge-attached drawer (native-panel pattern), so it
+   stays flush and square against the right edge rather than floating with rounded corners. */
 #blueprint-browser-drawer { border-radius: 0; border-right: none; border-top: none; border-bottom: none; }
-#bom-sidebar { border-radius: 0; border-top: none; border-bottom: none; border-right: none; }
-#history-drawer { border-radius: 0; border-left: none; border-right: none; border-bottom: none; }
+/* Everything else floats with a margin from the viewport edge (see body padding), so it keeps
+   full rounded corners on every side. The history drawer is fixed-positioned, so its inset needs
+   to match the page padding explicitly rather than relying on flow layout. */
+#history-drawer { position: fixed; left: 16px; right: 16px; bottom: 16px; width: auto; }
 
 /* ===== Buttons ===== */
 .btn-glass {
@@ -317,8 +331,6 @@ nav.primary-tabs { display: flex; align-items: center; gap: 4px; height: 100%; }
 .stat-strip {
   display: flex;
   flex-wrap: wrap;
-  border-radius: 0;
-  border-left: none; border-right: none; border-top: none;
 }
 .stat {
   padding: 11px 20px;
@@ -338,11 +350,11 @@ nav.primary-tabs { display: flex; align-items: center; gap: 4px; height: 100%; }
 /* ============================================================
    Icon rail navigation
    ============================================================ */
+.content-row { gap: 12px; }
+
 .icon-rail {
   width: 80px;
   z-index: 40;
-  border-radius: 0;
-  border-top: none; border-left: none; border-bottom: none;
   display: flex;
   flex-direction: column;
   align-items: center;
