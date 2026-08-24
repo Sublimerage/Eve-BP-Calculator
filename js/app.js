@@ -88,9 +88,9 @@ function searchRigSlot(slotNum, query) {
   }
   const q = (query || '').trim().toLowerCase();
   const matches = (q ? catalog.filter(r => r.name.toLowerCase().includes(q)) : catalog).slice(0, 25);
-  const noneRow = `<div class="px-1.5 py-1 hover:bg-[#3a4a4c] cursor-pointer text-slate-400 border-b border-[#3a4a4c]/40" onmousedown="selectRigForSlot(${slotNum}, 0, '')">— None —</div>`;
+  const noneRow = `<div class="px-1.5 py-1 hover:bg-orange-500/15 cursor-pointer text-slate-400 border-b border-orange-500/15" onmousedown="selectRigForSlot(${slotNum}, 0, '')">— None —</div>`;
   const matchRows = matches.length > 0
-    ? matches.map(r => `<div class="px-1.5 py-1 hover:bg-[#3a4a4c] cursor-pointer border-b border-[#3a4a4c]/20" onmousedown="selectRigForSlot(${slotNum}, ${r.typeId}, '${window.esc(r.name)}')">${window.esc(r.name)}</div>`).join('')
+    ? matches.map(r => `<div class="px-1.5 py-1 hover:bg-orange-500/15 cursor-pointer border-b border-orange-500/15" onmousedown="selectRigForSlot(${slotNum}, ${r.typeId}, '${window.esc(r.name)}')">${window.esc(r.name)}</div>`).join('')
     : `<div class="p-1.5 text-slate-500">No matching rigs found.</div>`;
   resultsEl.innerHTML = noneRow + matchRows;
   resultsEl.classList.remove('hidden');
@@ -656,7 +656,7 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
         : `<span class="text-xs font-bold text-orange-300 bg-orange-950/50 border border-orange-600/50 px-1.5 py-0.5 flex-shrink-0" title="Not enough stock for even 1 run right now">⚠ 0 runs</span>`;
     }
     return `
-      <div class="bg-[#202a2e] border border-[#3a4a4c] hover:border-orange-500 p-2.5 transition space-y-2">
+      <div class="bg-[#202a2e] border border-orange-500/20 hover:border-orange-500 p-2.5 transition space-y-2">
         <div class="flex items-center gap-2 min-w-0">
           <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 border border-slate-700 bg-[#030405] flex-shrink-0" loading="lazy" title="${isOriginal ? 'Blueprint Original (BPO)' : 'Blueprint Copy (BPC)'}">
           <span class="font-bold text-slate-200 min-w-0">${window.esc(name)}</span>
@@ -862,7 +862,7 @@ async function searchHomeMarket(query) {
     return;
   }
   resultsEl.innerHTML = matches.map(m => `
-    <div class="px-2 py-1.5 hover:bg-[#3a4a4c] cursor-pointer border-b border-[#3a4a4c]/20" onmousedown="selectHomeMarket(${m.stationId}, '${window.esc(m.stationName)}')">
+    <div class="px-2 py-1.5 hover:bg-orange-500/15 cursor-pointer border-b border-orange-500/15" onmousedown="selectHomeMarket(${m.stationId}, '${window.esc(m.stationName)}')">
       ${window.esc(m.stationName)}
     </div>
   `).join('');
@@ -901,9 +901,11 @@ function renderTrackedMarketsList() {
     return;
   }
   listEl.innerHTML = markets.map(m => `
-    <div class="flex items-center justify-between bg-[#030405] border border-[#3a4a4c] px-2 py-1 text-[10px]">
+    <div class="flex items-center justify-between bg-black/30 border border-orange-500/20 px-2 py-1 text-[10px] rounded">
       <span class="text-slate-300 truncate mono">${window.esc(m.stationName)}</span>
-      <button onclick="removeTrackedMarketAndRefresh(${m.stationId})" class="text-red-400 hover:text-red-300 font-bold ml-1.5 flex-shrink-0" title="Stop tracking this market">✖</button>
+      <button onclick="removeTrackedMarketAndRefresh(${m.stationId})" class="text-red-400 hover:text-red-300 ml-1.5 flex-shrink-0 flex" title="Stop tracking this market">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" style="width:11px;height:11px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
   `).join('');
 }
@@ -939,7 +941,7 @@ async function searchAddMarket(query) {
     return;
   }
   resultsEl.innerHTML = matches.map(m => `
-    <div class="px-2 py-1.5 hover:bg-[#3a4a4c] cursor-pointer border-b border-[#3a4a4c]/20" onmousedown="confirmAddMarket(${m.stationId}, '${window.esc(m.stationName)}')">
+    <div class="px-2 py-1.5 hover:bg-orange-500/15 cursor-pointer border-b border-orange-500/15" onmousedown="confirmAddMarket(${m.stationId}, '${window.esc(m.stationName)}')">
       ${window.esc(m.stationName)}
     </div>
   `).join('');
@@ -975,7 +977,7 @@ async function openMarketComparison(e, typeId, itemName) {
   modal.onclick = (evt) => { if (evt.target === modal) modal.remove(); };
   modal.innerHTML = `
     <div class="bg-[#0a0d0e] border border-orange-500/80 p-5 w-full max-w-2xl shadow-2xl text-xs mono">
-      <div class="flex justify-between items-center border-b border-[#3a4a4c] pb-3 mb-3">
+      <div class="flex justify-between items-center border-b border-orange-500/20 pb-3 mb-3">
         <h3 class="text-base font-bold text-orange-300 rajdhani tracking-wider">💹 Compare Markets: ${window.esc(itemName)}</h3>
         <button onclick="document.getElementById('market-comparison-modal').remove()" class="text-slate-400 hover:text-white font-bold text-base">✖</button>
       </div>
@@ -997,7 +999,7 @@ async function openMarketComparison(e, typeId, itemName) {
   }
 
   const rows = results.map(r => `
-    <tr class="border-b border-[#3a4a4c]/40">
+    <tr class="border-b border-orange-500/15">
       <td class="p-2 text-slate-200">${window.esc(r.stationName)}</td>
       <td class="p-2 text-right text-orange-300 font-bold">${r.sell > 0 ? Math.round(r.sell).toLocaleString() : '—'}</td>
       <td class="p-2 text-right text-orange-300 font-bold">${r.buy > 0 ? Math.round(r.buy).toLocaleString() : '—'}</td>
@@ -1010,7 +1012,7 @@ async function openMarketComparison(e, typeId, itemName) {
   bodyEl.innerHTML = `
     <table class="w-full text-left border-collapse">
       <thead>
-        <tr class="text-slate-400 border-b border-[#3a4a4c] uppercase text-[10px] font-bold">
+        <tr class="text-slate-400 border-b border-orange-500/20 uppercase text-[10px] font-bold">
           <th class="p-2">Market</th>
           <th class="p-2 text-right">Lowest Sell</th>
           <th class="p-2 text-right">Highest Buy</th>
@@ -1155,7 +1157,7 @@ if (searchInput) {
           ? (window.resolveProductIdFromBlueprintName(item.name) || window.BLUEPRINT_TO_PRODUCT_MAP[item.id] || item.id)
           : item.id;
         return `
-        <div class="px-3 py-2 hover:bg-[#3a4a4c] cursor-pointer flex items-center space-x-3 text-xs border-b border-[#3a4a4c]/40"
+        <div class="px-3 py-2 hover:bg-orange-500/15 cursor-pointer flex items-center space-x-3 text-xs border-b border-orange-500/15"
              onclick="selectItem(${item.id}, '${window.esc(item.name)}')">
           <img src="https://images.evetech.net/types/${displayIconId}/icon?size=32" class="w-6 h-6 " loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${displayIconId}/render?size=32';">
           <span class="font-semibold text-slate-200">${window.esc(item.name)}</span>
@@ -1200,7 +1202,7 @@ if (systemSearchInput) {
     }
     if (systemSearchResults) {
       systemSearchResults.innerHTML = hits.map(sys => `
-        <div class="px-3 py-1.5 hover:bg-[#3a4a4c] cursor-pointer text-xs font-bold text-orange-300 border-b border-[#3a4a4c]/40 mono"
+        <div class="px-3 py-1.5 hover:bg-orange-500/15 cursor-pointer text-xs font-bold text-orange-300 border-b border-orange-500/15 mono"
              onclick="window.selectSolarSystem(${sys.id}, '${window.esc(sys.name)}')">
           ${window.esc(sys.name)}
         </div>
@@ -1614,7 +1616,7 @@ function createNodeCard(node) {
       <div class="mb-2 p-1.5 bg-black/30 border border-[var(--accent)]/30 space-y-1.5" onclick="event.stopPropagation()">
         <div class="flex justify-between items-center text-xs mono">
           <span class="text-orange-300 font-bold">Sell Channel:</span>
-          <select id="card-sell-strategy" onchange="syncSellStrategy(event)" class="bg-black/40 text-white p-0.5 border border-[#3a4a4c] text-xs outline-none">
+          <select id="card-sell-strategy" onchange="syncSellStrategy(event)" class="bg-black/40 text-white p-0.5 border border-orange-500/20 text-xs outline-none">
             <option value="market-sell" ${curStrategy === 'market-sell' ? 'selected' : ''}>Auto</option>
             <option value="custom-market-sell" ${curStrategy === 'custom-market-sell' ? 'selected' : ''}>Custom Market Sell</option>
             <option value="custom-contract" ${curStrategy === 'custom-contract' ? 'selected' : ''}>Custom Contract</option>
@@ -1625,7 +1627,7 @@ function createNodeCard(node) {
             <div class="flex justify-between items-center">
               <span class="text-orange-300 font-bold">Custom Sell Price:</span>
               <div class="flex items-center space-x-1">
-                <input type="number" id="card-custom-price" value="${curCustomPrice}" placeholder="Unit Price" onchange="syncCustomPrice(event)" class="w-24 bg-black/40 border border-[#3a4a4c] text-center text-green-400 font-bold p-0.5 outline-none text-xs">
+                <input type="number" id="card-custom-price" value="${curCustomPrice}" placeholder="Unit Price" onchange="syncCustomPrice(event)" class="w-24 bg-black/40 border border-orange-500/20 text-center text-green-400 font-bold p-0.5 outline-none text-xs">
                 <span class="text-slate-500 text-xs">ISK</span>
               </div>
             </div>
@@ -2101,7 +2103,7 @@ function renderIsolatedDiagram() {
   inputCol.className = 'flex flex-col space-y-4 justify-center';
   
   if (!isolatedNode.isBuildingSelf || isolatedNode.children.length === 0) {
-    inputCol.innerHTML = `<div class="bg-[#0a0d0e] border border-[#3a4a4c] p-3 text-xs text-slate-400 mono ">${!isolatedNode.isBuildingSelf ? 'Purchased off Market (No decomposed inputs)' : 'No inputs (Base Material)'}</div>`;
+    inputCol.innerHTML = `<div class="bg-[#0a0d0e] border border-orange-500/20 p-3 text-xs text-slate-400 mono ">${!isolatedNode.isBuildingSelf ? 'Purchased off Market (No decomposed inputs)' : 'No inputs (Base Material)'}</div>`;
   } else {
     isolatedNode.children.forEach(child => {
       if (child) inputCol.appendChild(createNodeCard(child));
@@ -2602,55 +2604,7 @@ window.resolveProductIdFromBlueprintNameAsync = resolveProductIdFromBlueprintNam
 // Generates a radial halftone of triangles: large/dense near the edges, shrinking and fading
 // toward the center. A true radial halftone can't be done with repeating CSS patterns alone
 // (they're uniform, not distance-varying), so this computes it directly in JS.
-function generateHalftoneBackground() {
-  const svg = document.getElementById('halftone-bg');
-  if (!svg) return;
-  const W = window.innerWidth;
-  const H = window.innerHeight;
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  const cx = W / 2, cy = H / 2;
-  const maxDist = Math.sqrt(cx * cx + cy * cy);
-  const spacing = 50;
-  const rowHeight = spacing * 0.87;
-  let svgContent = '';
-
-  // Triangular tessellation: the outer grid (tile positions) stays at the ORIGINAL density -
-  // spacing horizontally, rowHeight vertically - matching a correct equilateral-triangle rhythm.
-  // Each tile then contains one up-pointing and one down-pointing triangle side by side, splitting
-  // the tile's own width in half, rather than doubling the grid's iteration density (which was the
-  // actual cause of the horizontal crowding in the previous attempt).
-  for (let y = -rowHeight; y < H + rowHeight; y += rowHeight) {
-    for (let x = -spacing; x < W + spacing; x += spacing) {
-      const tileCenterX = x + spacing / 2;
-      const dist = Math.sqrt((tileCenterX - cx) ** 2 + (y - cy) ** 2) / maxDist; // 0 (center) to 1 (corner)
-      const sizeScale = Math.min(1, 0.15 + dist * 0.95); // how much of the tile's half-width each triangle actually fills
-      const opacity = Math.min(0.13, dist * 0.1671);
-      if (opacity < 0.004) continue;
-
-      const halfW = (spacing / 2) * sizeScale / 2;
-      const halfH = rowHeight * sizeScale / 2;
-
-      // Up-pointing triangle, left half of the tile
-      const upX = x + spacing / 4;
-      svgContent += `<polygon points="${upX},${y - halfH} ${upX + halfW},${y + halfH} ${upX - halfW},${y + halfH}" fill="rgba(102,37,0,${opacity.toFixed(3)})"/>`;
-
-      // Down-pointing triangle, right half of the tile
-      const downX = x + spacing * 3 / 4;
-      svgContent += `<polygon points="${downX - halfW},${y - halfH} ${downX + halfW},${y - halfH} ${downX},${y + halfH}" fill="rgba(102,37,0,${opacity.toFixed(3)})"/>`;
-    }
-  }
-  svg.innerHTML = svgContent;
-}
-window.generateHalftoneBackground = generateHalftoneBackground;
-
-let halftoneResizeTimer = null;
-window.addEventListener('resize', () => {
-  clearTimeout(halftoneResizeTimer);
-  halftoneResizeTimer = setTimeout(generateHalftoneBackground, 200);
-});
-
 window.onload = async () => {
-  generateHalftoneBackground();
   layoutAllFlyouts();
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
