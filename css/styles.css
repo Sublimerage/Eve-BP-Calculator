@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 /* Readability fix for high-DPI/4K displays: Tailwind's default text-* utility classes (text-xs,
    text-sm, text-base, etc.) are rem-based, so scaling the root font-size scales all of them
@@ -8,29 +8,102 @@ html {
   font-size: 118%;
 }
 
+/* ============================================================
+   Design tokens - "dark luxury glass" language: layered translucent panels over a softly-lit
+   graphite backdrop, one warm copper accent, cool blue/violet reserved for secondary meaning
+   (buy vs build, per-tool identity), green/red for profit/loss. Depth comes from blur + a
+   brighter top edge catching light + a soft shadow, not from clip-path or neon glow brackets.
+   ============================================================ */
 :root {
-  --bg: #121212;
-  --bg2: #0a0d0e;
-  --bg3: #141a1c;
-  --border: #262e30;
-  --border-strong: #3a4648;
-  --accent: #b34414;
-  --accent-rgb: 179,68,20;
-  --accent-dim: #b8460f;
-  --gold: #c8a84b;
-  --gold2: #e8c96a;
-  --green: #4caf6f;
-  --red: #e85555;
+  --bg-0: #0b0906;
+  --text: #f1ece4;
+  --text-soft: #b3a696;
+  --text-mute: #79695a;
+
+  --accent: #d3915a;
+  --accent-2: #a86336;
+  --accent-rgb: 211,145,90;
+
+  --blue: #6a98de;
+  --blue-rgb: 106,152,222;
+  --buy: #6a98de;
+  --buy-rgb: 106,152,222;
+
+  --violet: #9a86d6;
+  --violet-rgb: 154,134,214;
+
+  --green: #4cc491;
+  --green-rgb: 76,196,145;
+
+  --red: #dd6b64;
+  --red-rgb: 221,107,100;
+
+  /* Copper ramp (replaces Tailwind's orange/amber) */
+  --copper-100: #f3ddc7;
+  --copper-200: #ecc9a3;
+  --copper-300: #e3b17d;
+  --copper-400: #d3915a;
+  --copper-500: #d3915a;
+  --copper-600: #b97847;
+  --copper-700: #a86336;
+  --copper-800: #855231;
+  --copper-900: #5f3a22;
+  --copper-950: #3d2515;
+
+  /* Blue ramp (replaces Tailwind's cyan) */
+  --blue-300: #b7d3f5;
+  --blue-400: #8bb3ea;
+  --blue-500: #6a98de;
+  --blue-600: #5483c9;
+  --blue-700: #3f6cb0;
+  --blue-800: #345a8f;
+  --blue-900: #2a4670;
+
+  /* Violet ramp (replaces Tailwind's purple) */
+  --violet-100: #ded7f7;
+  --violet-300: #c3b4ef;
+  --violet-400: #a98fe4;
+  --violet-500: #9a86d6;
+  --violet-600: #8a72c9;
+  --violet-700: #7a5fb8;
+  --violet-800: #6a4fa3;
+
+  /* Green ramp (profit) */
+  --green-300: #a3e8cb;
+  --green-400: #4cc491;
+  --green-500: #3fae7c;
+  --green-600: #349a6c;
+  --green-700: #2b7f59;
+  --green-800: #235f45;
+
+  /* Red ramp (loss) */
+  --red-300: #f0b3ae;
+  --red-400: #dd6b64;
+  --red-500: #cf5a53;
+
+  /* Glass surface */
+  --glass-fill: linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.014) 60%);
+  --glass-border: rgba(255,255,255,0.10);
+  --glass-border-top: rgba(255,255,255,0.20);
+  --glass-shadow: 0 14px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+  --blur: 22px;
+
+  --radius-sm: 7px;
+  --radius-btn: 9px;
+  --radius-panel: 14px;
+  --radius-card: 16px;
+  --radius-pill: 999px;
+  --radius-input: 7px;
 }
 
 body {
-  background-color: var(--bg);
-  background-image:
-    radial-gradient(ellipse 1100px 900px at 15% 20%, rgba(var(--accent-rgb),0.10) 0%, transparent 70%),
-    radial-gradient(ellipse 950px 1100px at 85% 80%, rgba(120,56,220,0.13) 0%, transparent 70%);
+  background:
+    radial-gradient(ellipse 1100px 700px at 10% -10%, rgba(var(--accent-rgb),0.14) 0%, transparent 60%),
+    radial-gradient(ellipse 900px 750px at 95% 12%, rgba(var(--violet-rgb),0.10) 0%, transparent 60%),
+    var(--bg-0);
   background-attachment: fixed;
-  color: #e8e8e8;
-  font-family: 'Chakra Petch', sans-serif;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
   min-height: 100vh;
   user-select: none;
   -webkit-user-select: none;
@@ -45,16 +118,20 @@ input, textarea, select, [contenteditable="true"], .mono, aside, .selectable {
   -webkit-user-select: text !important;
 }
 
-.mono { font-family: 'Chakra Petch', sans-serif; }
-.rajdhani { font-family: 'Chakra Petch', sans-serif; }
+/* .mono is applied throughout the app to every ISK/quantity/percentage value - repointed to a
+   monospace built for data (tabular figures) instead of the old sci-fi display font. .rajdhani
+   is the heading/wordmark hook - repointed to Inter with tight tracking instead of a wide
+   uppercase tech-font look. */
+.mono { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+.rajdhani { font-family: 'Inter', sans-serif; font-weight: 600; letter-spacing: -0.005em; }
 
-/* Clean uppercase section label */
 .section-label {
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #6b7a7c;
+  color: var(--text-mute);
 }
 
 #viewport {
@@ -100,161 +177,180 @@ img {
   transform: translateY(-2px);
 }
 
-/* Node Highlight Styles - plain border-color overrides, no pseudo-element indirection needed
-   now that cards use a simple real border instead of clip-path + border-image. */
 .node-selected {
-  border-color: #4caf6f !important;
-  box-shadow: 0 0 20px rgba(76, 175, 111, 0.7) !important;
+  border-color: var(--green) !important;
+  box-shadow: var(--glass-shadow), 0 0 0 1px rgba(var(--green-rgb),0.4), 0 0 22px rgba(var(--green-rgb),0.35) !important;
   opacity: 1 !important;
 }
-
 .node-child-highlight {
-  border-color: #4caf6f !important;
-  box-shadow: 0 0 12px rgba(76, 175, 111, 0.4) !important;
+  border-color: var(--green) !important;
+  box-shadow: var(--glass-shadow), 0 0 14px rgba(var(--green-rgb),0.25) !important;
   opacity: 1 !important;
 }
-
 .node-parent-highlight {
-  border-color: #e8c96a !important;
-  box-shadow: 0 0 15px rgba(232, 201, 106, 0.6) !important;
+  border-color: var(--accent) !important;
+  box-shadow: var(--glass-shadow), 0 0 16px rgba(var(--accent-rgb),0.35) !important;
   opacity: 1 !important;
 }
-
 .node-dimmed {
   opacity: 0.25 !important;
 }
 
-/* Dynamic Centering feedback ring animation */
-.ring-4 {
-  animation: pulse-ring 0.8s ease-out;
-}
-
+.ring-4 { animation: pulse-ring 0.8s ease-out; }
 @keyframes pulse-ring {
-  0% {
-    box-shadow: 0 0 0 0px rgba(6, 182, 212, 0.8);
-  }
-  100% {
-    box-shadow: 0 0 0 15px rgba(6, 182, 212, 0);
-  }
+  0% { box-shadow: 0 0 0 0px rgba(var(--accent-rgb), 0.8); }
+  100% { box-shadow: 0 0 0 15px rgba(var(--accent-rgb), 0); }
 }
 
-/* Cross-Browser Custom Thin Scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border) var(--bg);
+  scrollbar-color: var(--glass-border) transparent;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--glass-border-top); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* ============================================================
+   Card surface (tree node cards - potentially dozens on screen at once during pan/zoom, so this
+   is deliberately glass WITHOUT backdrop-filter: gradient fill + edge-lit border + soft shadow
+   gives the same material without the compositing cost of blurring many overlapping layers).
+   ============================================================ */
+.glass-card {
+  background: var(--glass-fill), var(--bg-0);
+  border: 1px solid var(--glass-border);
+  border-top-color: var(--glass-border-top);
+  border-radius: var(--radius-card);
+  box-shadow: var(--glass-shadow);
 }
 
 /* ============================================================
-   Finalized design language: glassmorphism + gradient backdrop + orange accent + original
-   corner-bracket buttons ("5C" from the mockup rounds). Font is Chakra Petch throughout.
+   Panel surface - the real glass material (blur included) for fixed, low-count chrome: header,
+   icon rail, flyout panels, BOM sidebar, drawers, modals. Applied directly to the relevant
+   elements below rather than requiring new classes sprinkled through the HTML.
    ============================================================ */
-
-/* Glass card - translucent gradient fill + backdrop blur so the page's own background gradient
-   shows through softened, angled bottom-left corner, left border accent stripe. This is the
-   tree-card / panel surface used throughout the app. */
-.glass-card {
-  background: linear-gradient(160deg, rgba(40,30,25,0.5) 0%, rgba(15,12,10,0.6) 60%, rgba(8,6,5,0.65) 100%);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(var(--accent-rgb),0.25);
-  border-left: 3px solid var(--accent);
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 12px 100%, 0 calc(100% - 12px));
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+.glass-panel, header, .icon-rail, .flyout-panel, #status-badge,
+#blueprint-browser-drawer, #paste-modal > div, .stat-strip, #bom-sidebar, #history-drawer {
+  background: var(--glass-fill), var(--bg-0);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  border: 1px solid var(--glass-border);
+  border-top-color: var(--glass-border-top);
+  box-shadow: var(--glass-shadow);
 }
+header { border-radius: 0; border-left: none; border-right: none; border-top: none; height: 56px; flex-shrink: 0; }
 
-/* Primary button - dark-to-orange gradient fill, small square corner-border brackets with glow
-   (the "5C" style) at the top-left and bottom-right corners. This exact technique - a small
-   square element with only two border sides visible, plus box-shadow glow - is what reads as
-   the "small square corner" look, not a plain thin line. */
+.icon-btn {
+  width: 30px; height: 30px; border-radius: var(--radius-btn);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-mute); border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.icon-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
+.icon-btn:hover { color: var(--accent); background: rgba(var(--accent-rgb),0.1); border-color: rgba(var(--accent-rgb),0.2); }
+#blueprint-browser-drawer { border-radius: 0; border-right: none; border-top: none; border-bottom: none; }
+#bom-sidebar { border-radius: 0; border-top: none; border-bottom: none; border-right: none; }
+#history-drawer { border-radius: 0; border-left: none; border-right: none; border-bottom: none; }
+
+/* ===== Buttons ===== */
 .btn-glass {
-  border-radius: 2px;
-  border: none;
-  background: linear-gradient(160deg, rgba(var(--accent-rgb),0.18), rgba(21,21,21,1) 55%);
-  color: #fff;
-  font-family: 'Chakra Petch', sans-serif;
-  font-weight: 600;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--glass-border);
+  background: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012));
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
   cursor: pointer;
   position: relative;
-  transition: filter 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
-.btn-glass:hover { filter: brightness(1.12); }
-.btn-glass::before, .btn-glass::after {
-  content: '';
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  box-shadow: 0 0 8px rgba(var(--accent-rgb),0.5);
+.btn-glass:hover {
+  background: linear-gradient(160deg, rgba(var(--accent-rgb),0.22), rgba(var(--accent-rgb),0.05));
+  border-color: rgba(var(--accent-rgb), 0.4);
+  color: #fff;
 }
-.btn-glass::before {
-  top: -1px; left: -1px;
-  border-top: 2px solid var(--accent);
-  border-left: 2px solid var(--accent);
-}
-.btn-glass::after {
-  bottom: -1px; right: -1px;
-  border-bottom: 2px solid var(--accent);
-  border-right: 2px solid var(--accent);
-}
-
-/* Secondary/muted button variant - same bracket technique, quieter fill for non-primary actions. */
 .btn-glass-muted {
-  background: rgba(40,30,25,0.4);
-  border: 1px solid rgba(var(--accent-rgb),0.25);
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  color: var(--text-soft);
+}
+.btn-glass-muted:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: var(--glass-border-top);
+  color: var(--text);
 }
 
-/* Segmented indicator bar - flat blocks, kept because it's functionally useful (visualizing
-   stock coverage as discrete units). */
-.seg-bar { display: flex; gap: 2px; height: 5px; }
-.seg-bar > div { flex: 1; background: var(--border); }
-.seg-bar > div.filled { background: var(--accent); }
+/* ===== Header nav tabs (Calculator / Ledger / Invention cross-links) ===== */
+nav.primary-tabs { display: flex; align-items: center; gap: 4px; height: 100%; }
+.nav-tab {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius-btn);
+  font-size: 12.5px; font-weight: 500;
+  color: var(--text-mute);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+.nav-tab:hover { color: var(--text-soft); }
+.nav-tab svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; flex-shrink: 0; }
+.nav-tab-active {
+  color: var(--text) !important;
+  background: linear-gradient(160deg, rgba(var(--accent-rgb),0.22), rgba(var(--accent-rgb),0.05));
+  border-color: rgba(var(--accent-rgb), 0.32);
+}
+.nav-tab-active-violet {
+  color: var(--text) !important;
+  background: linear-gradient(160deg, rgba(var(--violet-rgb),0.24), rgba(var(--violet-rgb),0.06));
+  border-color: rgba(var(--violet-rgb), 0.34);
+}
 
-/* Webkit Scrollbars fallback */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* ===== Stat strip (replaces the old grid-of-boxed-cards summary bar) ===== */
+.stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  border-radius: 0;
+  border-left: none; border-right: none; border-top: none;
 }
-::-webkit-scrollbar-track {
-  background: var(--bg);
+.stat {
+  padding: 11px 20px;
+  border-right: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  min-width: 150px;
+  flex: 1;
 }
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--accent);
-}
+.stat:last-child { border-right: none; }
+.stat-label { font-size: 10.5px; color: var(--text-mute); letter-spacing: 0.03em; text-transform: uppercase; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat-value { font-size: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat-sub { font-size: 10.5px; color: var(--text-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ============================================================
-   Icon rail navigation - a narrow, always-visible column of glowing icon buttons that each
-   reveal a flyout panel on click. All buttons share one accent color (--accent, set globally
-   in :root) rather than per-button colors - "all different colors was a bad decision" per
-   direct feedback, so --glow-color/--glow-rgb are set once here rather than per button inline.
+   Icon rail navigation
    ============================================================ */
-
 .icon-rail {
-  width: 84px;
+  width: 80px;
   z-index: 40;
-  background: rgba(15,10,8,0.35);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-right: 1px solid rgba(var(--accent-rgb),0.15);
+  border-radius: 0;
+  border-top: none; border-left: none; border-bottom: none;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 20px 0;
+  gap: 6px;
+  padding: 18px 0;
   flex-shrink: 0;
   position: relative;
-  --glow-color: var(--accent);
-  --glow-rgb: var(--accent-rgb);
 }
-
 .icon-rail-btn {
-  width: 62px;
-  height: 62px;
-  border-radius: 4px;
-  background: rgba(255,255,255,0.02);
-  border: 1px solid rgba(255,255,255,0.06);
+  width: 58px;
+  height: 58px;
+  border-radius: 11px;
+  background: transparent;
+  border: 1px solid transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -267,152 +363,226 @@ img {
 }
 .icon-rail-btn:hover {
   background: rgba(var(--accent-rgb),0.08);
-  border-color: rgba(var(--accent-rgb),0.2);
+  border-color: rgba(var(--accent-rgb),0.18);
 }
-
-/* Global fix: every line icon in the app uses fill="none" with no explicit stroke color set on
-   the SVG tag itself (relying instead on a CSS rule, same as the design mockups did) - without
-   this, SVG's default stroke is "none", making every icon completely invisible despite the
-   markup being present. Applies to all icon SVGs; the tree diagram's own connector lines set
-   their own explicit stroke via inline style/attribute, which takes precedence over this. */
-/* Override Tailwind's orange-* utility classes to derive from the tuned --accent color instead
-   of Tailwind's fixed default orange palette. Without this, only CSS-variable-driven elements
-   (buttons, cards, icon rail) would reflect a new accent color choice, while the ~139 instances
-   of text-orange-*/bg-orange-*/border-orange-* used throughout the tree card and elsewhere would
-   silently stay on Tailwind's original orange - this keeps the whole app in sync from one value. */
-.text-orange-100 { color: #e9cabd !important; }
-.text-orange-200 { color: #dfb09c !important; }
-.text-orange-300 { color: #d29276 !important; }
-.text-orange-400 { color: #c36d47 !important; }
-.bg-orange-400 { background-color: #c36d47 !important; }
-.bg-orange-500 { background-color: var(--accent) !important; }
-.border-orange-500 { border-color: var(--accent) !important; }
-.bg-orange-600 { background-color: #9d3b11 !important; }
-.border-orange-600 { border-color: #9d3b11 !important; }
-.bg-orange-700 { background-color: #80300e !important; }
-.border-orange-700 { border-color: #80300e !important; }
-.bg-orange-800 { background-color: #62250b !important; }
-.bg-orange-900 { background-color: #471b08 !important; }
-.bg-orange-950 { background-color: #2c1105 !important; }
-
-svg[viewBox] {
-  stroke: currentColor;
+.icon-rail-btn-active {
+  background: linear-gradient(160deg, rgba(var(--accent-rgb),0.24), rgba(var(--accent-rgb),0.05));
+  border-color: rgba(var(--accent-rgb),0.32);
 }
-
-/* Cohesive styling for all inputs/selects inside flyout panels - rounds corners, lightens the
-   background slightly, and adds an orange-tinted border/focus glow, so these fields feel like
-   part of the same system instead of plain flat boxes that clash with the rest of the app. */
-.flyout-panel input, .flyout-panel select {
-  border-radius: 3px !important;
-  background-color: rgba(0,0,0,0.35) !important;
-  border-color: rgba(var(--accent-rgb), 0.25) !important;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-.flyout-panel input:focus, .flyout-panel select:focus {
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.15);
-}
-
-/* Fix native <select> dropdown option-list readability - the closed box takes on whatever
-   Tailwind classes are applied to it, but the opened list of <option> elements often falls back
-   to browser/OS default styling (light background, blue selection highlight) unless explicitly
-   set here, which was causing orange text on a near-white background to be nearly unreadable. */
-select option {
-  background-color: #1a1210;
-  color: #e8e8e8;
-}
-select option:checked, select option:hover {
-  background-color: var(--accent);
-  color: #1a1210;
-}
-
+.icon-rail-btn-active svg { stroke: var(--accent); }
+.icon-rail-btn-active .icon-label { color: var(--accent); }
 .icon-rail-btn svg {
-  width: 20px;
-  height: 20px;
-  stroke: #9aa0a4;
+  width: 19px;
+  height: 19px;
+  stroke: var(--text-mute);
   transition: stroke 0.2s ease;
 }
 .icon-rail-btn:hover svg { stroke: var(--accent); }
-
 .icon-rail-btn .icon-label {
-  font-family: 'Chakra Petch', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 8.5px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: #7a8286;
+  color: var(--text-mute);
   font-weight: 600;
 }
 .icon-rail-btn:hover .icon-label { color: var(--accent); }
 
-.icon-rail-btn-active {
-  background: linear-gradient(160deg, rgba(var(--accent-rgb),0.22), rgba(21,21,21,0.4) 65%);
-  border-color: transparent;
-}
-.icon-rail-btn-active svg { stroke: var(--accent); }
-.icon-rail-btn-active .icon-label { color: var(--accent); }
+svg[viewBox] { stroke: currentColor; }
 
-/* Flyout panel - pops out from the rail on click, holds one section's full settings. Vertically
-   centered with a generous max-height (85vh) so content-heavy sections have real room instead of
-   needing to scroll in a cramped fixed-height box. Stays open until explicitly closed. */
 .flyout-panel {
   display: none;
   position: absolute;
-  left: 92px;
+  left: 88px;
   top: 50%;
   transform: translateY(-50%);
   width: 340px;
   max-height: 85vh;
   overflow-y: auto;
-  background: rgba(10, 8, 7, 0.85);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(var(--accent-rgb), 0.25);
-  border-radius: 6px;
-  box-shadow: 0 16px 48px rgba(0,0,0,0.55), 0 0 24px rgba(var(--accent-rgb), 0.1);
+  border-radius: var(--radius-panel);
   z-index: 100;
   padding: 14px 16px;
 }
-.flyout-panel.open {
-  display: block;
+.flyout-panel.open { display: block; }
+
+.flyout-panel input, .flyout-panel select {
+  border-radius: var(--radius-input) !important;
+  background: rgba(0,0,0,0.28) !important;
+  border-color: var(--glass-border) !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.flyout-panel input:focus, .flyout-panel select:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.18);
 }
 
-/* Simple flat toggle for small in-card buttons - no corner brackets, since those become visual
-   noise at this size. Buy gets its own blue accent instead of sharing orange with everything,
-   restoring a real color distinction between build/sell (orange) and buy (blue) actions. */
-:root { --buy: #53b6f3; --buy-rgb: 83,182,243; }
+select option { background-color: #191411; color: var(--text); }
+select option:checked, select option:hover { background-color: var(--accent); color: #201206; }
+
+.seg-bar { display: flex; gap: 2px; height: 5px; }
+.seg-bar > div { flex: 1; background: var(--glass-border-top); border-radius: 1px; }
+.seg-bar > div.filled { background: var(--accent); }
 
 .toggle-btn {
-  border-radius: 3px;
+  border-radius: var(--radius-pill);
   padding: 5px 10px;
-  font-family: 'Chakra Petch', sans-serif;
-  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
   font-size: 11px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 5px;
   transition: all 0.15s ease;
-  border: 1px solid transparent;
+  border: 1px solid var(--glass-border);
   background: rgba(255,255,255,0.03);
-  color: #8a9496;
+  color: var(--text-soft);
 }
-.toggle-btn svg {
-  width: 13px;
-  height: 13px;
-  stroke: currentColor;
-  flex-shrink: 0;
-}
-.toggle-btn:hover {
-  background: rgba(255,255,255,0.07);
-  color: #c4d0d2;
-}
+.toggle-btn svg { width: 13px; height: 13px; stroke: currentColor; flex-shrink: 0; }
+.toggle-btn:hover { background: rgba(255,255,255,0.07); border-color: var(--glass-border-top); color: var(--text); }
 .toggle-btn-active-accent {
-  background: rgba(var(--accent-rgb),0.15);
-  border-color: rgba(var(--accent-rgb),0.5);
-  color: #ffb27a;
+  background: linear-gradient(160deg, rgba(var(--accent-rgb),0.22), rgba(var(--accent-rgb),0.06));
+  border-color: rgba(var(--accent-rgb),0.4);
+  color: var(--copper-200);
 }
 .toggle-btn-active-buy {
-  background: rgba(var(--buy-rgb),0.15);
-  border-color: rgba(var(--buy-rgb),0.5);
-  color: #a8d4f0;
+  background: linear-gradient(160deg, rgba(var(--buy-rgb),0.22), rgba(var(--buy-rgb),0.06));
+  border-color: rgba(var(--buy-rgb),0.4);
+  color: var(--blue-300);
 }
+
+/* ============================================================
+   Compatibility layer - JS-generated markup (tree node cards, ledger job cards, invention
+   comparison rows, BOM lists) is built in app.js/ledger.js/invention.js/esi.js as plain Tailwind
+   utility classes, ~400 occurrences across 5 files. Rather than hand-editing every template
+   string, every Tailwind class those templates already use is redirected here onto the design
+   tokens above - colors, corner radius, and shadow all flow through automatically. Attribute
+   "contains" selectors ([class*="..."]) catch every opacity-suffixed variant (e.g. bg-green-600
+   AND bg-green-600/80) in one rule without needing to enumerate each exact alpha used.
+   ============================================================ */
+
+/* ---- shape: radius + shadow utilities used throughout static HTML and JS templates ---- */
+.rounded { border-radius: var(--radius-sm) !important; }
+.rounded-md { border-radius: var(--radius-btn) !important; }
+.rounded-lg { border-radius: var(--radius-panel) !important; }
+.rounded-xl { border-radius: var(--radius-card) !important; }
+.rounded-b-md { border-radius: 0 0 var(--radius-btn) var(--radius-btn) !important; }
+.shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl {
+  box-shadow: var(--glass-shadow) !important;
+}
+
+/* ---- copper (orange/amber) ---- */
+.text-orange-100, .text-amber-100 { color: var(--copper-100) !important; }
+.text-orange-200, .text-amber-200 { color: var(--copper-200) !important; }
+.text-orange-300, .text-amber-300 { color: var(--copper-300) !important; }
+.text-orange-400, .text-amber-400 { color: var(--copper-400) !important; }
+.bg-orange-400, .bg-amber-400 { background: var(--copper-400) !important; }
+.bg-orange-500, [class^="bg-orange-500/"], [class*=" bg-orange-500/"] {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
+}
+[class*="hover:bg-orange-500/"]:hover { background: rgba(var(--accent-rgb),0.16) !important; }
+.border-orange-500, [class^="border-orange-500/"], [class*=" border-orange-500/"] { border-color: rgba(var(--accent-rgb),0.45) !important; }
+[class*="hover:border-orange-500"]:hover { border-color: var(--accent) !important; }
+.bg-orange-600 { background: var(--copper-600) !important; }
+[class*="hover:bg-orange-600"]:hover { background: var(--copper-500) !important; }
+.border-orange-600, [class^="border-orange-600/"], [class*=" border-orange-600/"] { border-color: rgba(185,120,71,0.5) !important; }
+.bg-orange-700, .bg-amber-700 { background: var(--copper-700) !important; }
+[class*="hover:bg-orange-700"]:hover, [class*="hover:bg-amber-600"]:hover { background: var(--copper-600) !important; }
+.border-orange-700, [class^="border-orange-700/"], [class*=" border-orange-700/"] { border-color: rgba(168,99,54,0.45) !important; }
+.bg-orange-800 { background: var(--copper-800) !important; }
+[class*="hover:bg-orange-800"]:hover { background: var(--copper-700) !important; }
+.bg-orange-900, [class^="bg-orange-900/"], [class*=" bg-orange-900/"] { background: rgba(95,58,34,0.6) !important; }
+.bg-orange-950, [class^="bg-orange-950/"], [class*=" bg-orange-950/"] { background: rgba(61,37,21,0.55) !important; }
+.border-amber-500, [class^="border-amber-500/"], [class*=" border-amber-500/"] { border-color: rgba(var(--accent-rgb),0.45) !important; }
+[class^="border-amber-600/"], [class*=" border-amber-600/"] { border-color: rgba(185,120,71,0.4) !important; }
+[class*="hover:border-amber-400"]:hover { border-color: var(--copper-300) !important; }
+.bg-amber-900, [class^="bg-amber-900/"], [class*=" bg-amber-900/"] { background: rgba(95,58,34,0.6) !important; }
+.bg-amber-950, [class^="bg-amber-950/"], [class*=" bg-amber-950/"] { background: rgba(61,37,21,0.55) !important; }
+[class*="ring-orange-400"] { --tw-ring-color: rgba(var(--accent-rgb),0.7) !important; }
+.accent-purple-500 { accent-color: var(--violet) !important; }
+.accent-cyan-500 { accent-color: var(--blue) !important; }
+
+/* ---- blue (cyan) ---- */
+.text-cyan-100 { color: #dbe8fb !important; }
+.text-cyan-200 { color: var(--blue-300) !important; }
+.text-cyan-300 { color: var(--blue-300) !important; }
+.text-cyan-400 { color: var(--blue-400) !important; }
+.bg-cyan-700, [class^="bg-cyan-700/"], [class*=" bg-cyan-700/"] { background: linear-gradient(135deg, var(--blue-500), var(--blue-700)) !important; }
+[class*="hover:bg-cyan-600"]:hover { background: var(--blue-500) !important; }
+[class*="hover:bg-cyan-700"]:hover { background: var(--blue-600) !important; }
+.bg-cyan-800 { background: var(--blue-700) !important; }
+.bg-cyan-900, [class^="bg-cyan-900/"], [class*=" bg-cyan-900/"] { background: rgba(42,70,112,0.6) !important; }
+.bg-cyan-950, [class^="bg-cyan-950/"], [class*=" bg-cyan-950/"] { background: rgba(42,70,112,0.32) !important; }
+.border-cyan-400, .border-cyan-500, [class^="border-cyan-400/"], [class*=" border-cyan-400/"], [class^="border-cyan-500/"], [class*=" border-cyan-500/"] { border-color: rgba(var(--blue-rgb),0.5) !important; }
+.border-cyan-600, [class^="border-cyan-600/"], [class*=" border-cyan-600/"] { border-color: rgba(84,131,201,0.4) !important; }
+[class*="ring-cyan-400"] { --tw-ring-color: rgba(var(--blue-rgb),0.7) !important; }
+
+/* ---- violet (purple) ---- */
+.text-purple-100 { color: var(--violet-100) !important; }
+.text-purple-300 { color: var(--violet-300) !important; }
+.text-purple-400 { color: var(--violet-400) !important; }
+[class*="hover:text-purple-200"]:hover, [class*="hover:text-purple-300"]:hover { color: var(--violet-300) !important; }
+.bg-purple-500, .bg-purple-600, [class^="bg-purple-600/"], [class*=" bg-purple-600/"] { background: linear-gradient(135deg, var(--violet-500), var(--violet-700)) !important; }
+[class*="hover:bg-purple-500"]:hover { background: var(--violet-400) !important; }
+[class*="hover:bg-purple-600"]:hover { background: var(--violet-500) !important; }
+.bg-purple-700, [class^="bg-purple-700/"], [class*=" bg-purple-700/"] { background: var(--violet-600) !important; }
+[class*="hover:bg-purple-700"]:hover { background: var(--violet-500) !important; }
+.bg-purple-800, [class^="bg-purple-800/"], [class*=" bg-purple-800/"] { background: var(--violet-700) !important; }
+[class*="hover:bg-purple-800"]:hover { background: var(--violet-600) !important; }
+.bg-purple-950, [class^="bg-purple-950/"], [class*=" bg-purple-950/"] { background: rgba(90,70,140,0.42) !important; }
+.border-purple-500, [class^="border-purple-500/"], [class*=" border-purple-500/"] { border-color: rgba(var(--violet-rgb),0.45) !important; }
+.border-purple-600, [class^="border-purple-600/"], [class*=" border-purple-600/"] { border-color: rgba(138,114,201,0.35) !important; }
+.border-purple-800, [class^="border-purple-800/"], [class*=" border-purple-800/"] { border-color: rgba(106,79,163,0.4) !important; }
+[class*="hover:border-purple-500"]:hover { border-color: rgba(var(--violet-rgb),0.5) !important; }
+
+/* ---- green (profit) ---- */
+.text-green-300 { color: var(--green-300) !important; }
+.text-green-400 { color: var(--green-400) !important; }
+.bg-green-400 { background: var(--green-400) !important; }
+.bg-green-600 { background: var(--green-600) !important; }
+.bg-green-700, [class^="bg-green-700/"], [class*=" bg-green-700/"] { background: var(--green-700) !important; }
+.bg-green-800, [class^="bg-green-800/"], [class*=" bg-green-800/"] { background: var(--green-700) !important; }
+[class*="hover:bg-green-700"]:hover { background: var(--green-600) !important; }
+.bg-green-950, [class^="bg-green-950/"], [class*=" bg-green-950/"] { background: rgba(45,110,80,0.28) !important; }
+.border-green-500, [class^="border-green-500/"], [class*=" border-green-500/"] { border-color: rgba(var(--green-rgb),0.5) !important; }
+.border-green-600, [class^="border-green-600/"], [class*=" border-green-600/"] { border-color: rgba(52,154,108,0.4) !important; }
+.border-green-700, [class^="border-green-700/"], [class*=" border-green-700/"] { border-color: rgba(43,127,89,0.4) !important; }
+[class*="hover:border-green-400"]:hover, [class*="hover:border-green-500"]:hover { border-color: var(--green-400) !important; }
+
+/* ---- red (loss / destructive) ---- */
+.text-red-300 { color: var(--red-300) !important; }
+.text-red-400 { color: var(--red-400) !important; }
+.text-red-500 { color: var(--red-500) !important; }
+[class*="hover:text-red-300"]:hover, [class*="hover:text-red-400"]:hover { color: var(--red-400) !important; }
+.bg-red-500 { background: var(--red-500) !important; }
+.bg-red-800, [class^="bg-red-800/"], [class*=" bg-red-800/"] { background: #8f3a35 !important; }
+.bg-red-950, [class^="bg-red-950/"], [class*=" bg-red-950/"] { background: rgba(140,50,45,0.32) !important; }
+[class*="hover:bg-red-800"]:hover { background: #a3423c !important; }
+.border-red-800, [class^="border-red-800/"], [class*=" border-red-800/"] { border-color: rgba(140,50,45,0.45) !important; }
+
+/* ---- emerald (aliased to the green ramp) ---- */
+.text-emerald-300 { color: var(--green-300) !important; }
+.bg-emerald-700, [class^="bg-emerald-700/"], [class*=" bg-emerald-700/"] { background: var(--green-700) !important; }
+[class*="hover:bg-emerald-600"]:hover { background: var(--green-600) !important; }
+.bg-emerald-950, [class^="bg-emerald-950/"], [class*=" bg-emerald-950/"] { background: rgba(45,110,80,0.35) !important; }
+.border-emerald-600, [class^="border-emerald-600/"], [class*=" border-emerald-600/"] { border-color: rgba(52,154,108,0.4) !important; }
+
+/* ---- literal bg-[#hex]/border-[#hex] classes from the pre-redesign palette (index.html /
+   ledger.html / invention.html static shells) ---- */
+[class*="bg-[#3a4a4c]"] { background: rgba(255,255,255,0.08) !important; }
+[class*="bg-[#202a2e]"] { background: var(--glass-fill), var(--bg-0) !important; }
+[class*="bg-[#0a0d0e]"] { background: var(--glass-fill), var(--bg-0) !important; }
+[class*="bg-[#030405]"] { background: rgba(0,0,0,0.35) !important; }
+[class*="bg-[#070b0f]"] { background: var(--bg-0) !important; }
+[class*="bg-[#0c1318]"] { background: var(--glass-fill), var(--bg-0) !important; }
+[class*="bg-[#0d1922]"] { background: var(--glass-fill), var(--bg-0) !important; }
+[class*="bg-[#0a0f14]"] { background: transparent !important; }
+[class*="bg-[#05080c]"] { background: rgba(0,0,0,0.2) !important; }
+[class*="bg-[#1e3348]"] { background: rgba(255,255,255,0.07) !important; }
+[class*="border-[#1e3348]"] { border-color: var(--glass-border) !important; }
+[class*="divide-[#1e3348]"] > :not([hidden]) ~ :not([hidden]) { border-color: var(--glass-border) !important; }
+[class*="text-[#c8d8e8]"] { color: var(--text-soft) !important; }
+[class*="border-[#3a3025]"] { border-color: var(--glass-border) !important; }
+[class*="bg-[#0d2818]"] { background: rgba(45,110,80,0.24) !important; }
+[class*="text-[#e85555]"] { color: var(--red) !important; }
+[class*="text-[#a8d4f0]"] { color: var(--blue-300) !important; }
