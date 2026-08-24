@@ -2440,16 +2440,30 @@ function getNodeStrategyOnly(node) {
 function toggleFlyout(sectionId) {
   const targetFlyout = document.getElementById(`flyout-${sectionId}`);
   const targetBtn = document.getElementById(`icon-btn-${sectionId}`);
-  if (!targetFlyout || !targetBtn) return;
+  const rail = document.getElementById('control-sidebar');
+  if (!targetFlyout || !targetBtn || !rail) return;
   const isCurrentlyOpen = targetFlyout.classList.contains('open');
 
-  document.querySelectorAll('.flyout-panel').forEach(f => f.classList.remove('open'));
-  document.querySelectorAll('.icon-rail-btn').forEach(b => b.classList.remove('icon-rail-btn-active'));
-
-  if (!isCurrentlyOpen) {
-    targetFlyout.classList.add('open');
-    targetBtn.classList.add('icon-rail-btn-active');
+  if (isCurrentlyOpen) {
+    targetFlyout.classList.remove('open');
+    targetBtn.classList.remove('icon-rail-btn-active');
+    return;
   }
+
+  targetFlyout.classList.add('open');
+  targetBtn.classList.add('icon-rail-btn-active');
+
+  // Position near the clicked icon's own vertical spot instead of always vertically centering,
+  // clamped so it never renders below the visible rail height.
+  targetFlyout.style.transform = 'none';
+  const iconTop = targetBtn.offsetTop;
+  const flyoutHeight = targetFlyout.offsetHeight;
+  const railHeight = rail.offsetHeight;
+  let top = iconTop;
+  if (top + flyoutHeight > railHeight) {
+    top = Math.max(12, railHeight - flyoutHeight - 12);
+  }
+  targetFlyout.style.top = `${top}px`;
 }
 window.toggleFlyout = toggleFlyout;
 
@@ -2620,6 +2634,14 @@ window.addEventListener('resize', () => {
 
 window.onload = async () => {
   generateHalftoneBackground();
+  (function positionDefaultFlyout() {
+    const rail = document.getElementById('control-sidebar');
+    const btn = document.getElementById('icon-btn-search');
+    const flyout = document.getElementById('flyout-search');
+    if (!rail || !btn || !flyout) return;
+    flyout.style.transform = 'none';
+    flyout.style.top = `${btn.offsetTop}px`;
+  })();
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
