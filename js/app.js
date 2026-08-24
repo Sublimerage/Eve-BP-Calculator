@@ -2292,11 +2292,11 @@ function drawConnectingLinesForTree(root) {
             path.setAttribute('stroke-width', '3.5');
             path.setAttribute('stroke-opacity', '1.0');
           } else if (isDimmedConnection) {
-            path.setAttribute('stroke', '#06b6d4');
+            path.setAttribute('stroke', '#b34414');
             path.setAttribute('stroke-width', '1.5');
             path.setAttribute('stroke-opacity', '0.12');
           } else {
-            path.setAttribute('stroke', '#06b6d4');
+            path.setAttribute('stroke', '#b34414');
             path.setAttribute('stroke-width', '2');
             path.setAttribute('stroke-opacity', '0.75');
           }
@@ -2443,13 +2443,22 @@ const FLYOUT_ORDER = ['search', 'build', 'optimize', 'structure', 'taxes', 'cont
 
 function layoutAllFlyouts() {
   const gap = 10;
+  const openFlyouts = FLYOUT_ORDER
+    .map(id => document.getElementById(`flyout-${id}`))
+    .filter(f => f && f.classList.contains('open'));
+
+  // Read pass: measure every open flyout's height first, before writing any styles - avoids
+  // forcing a synchronous reflow on every iteration (each flyout has its own backdrop-filter
+  // blur, which makes forced reflows here noticeably more expensive than for plain elements).
+  const heights = openFlyouts.map(f => f.offsetHeight);
+
+  // Write pass: now that every height is already known, apply all position changes without
+  // interleaving any further layout-forcing reads.
   let currentTop = 12;
-  FLYOUT_ORDER.forEach(id => {
-    const flyout = document.getElementById(`flyout-${id}`);
-    if (!flyout || !flyout.classList.contains('open')) return;
+  openFlyouts.forEach((flyout, i) => {
     flyout.style.transform = 'none';
     flyout.style.top = `${currentTop}px`;
-    currentTop += flyout.offsetHeight + gap;
+    currentTop += heights[i] + gap;
   });
 }
 window.layoutAllFlyouts = layoutAllFlyouts;
@@ -2601,7 +2610,7 @@ function generateHalftoneBackground() {
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   const cx = W / 2, cy = H / 2;
   const maxDist = Math.sqrt(cx * cx + cy * cy);
-  const spacing = 34;
+  const spacing = 50;
   const rowHeight = spacing * 0.87;
   let svgContent = '';
 
