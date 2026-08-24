@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Deep-Industry Engine</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=14.6.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=14.7.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#030405] text-slate-200">
 
@@ -398,11 +398,11 @@
           <button id="deduct-stock-mode" value="true" onclick="toggleDeductStockButton(this, 'recalculate')" class="btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5" title="Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead">✔ Deducting Stock</button>
 
           <div class="flex items-center gap-2">
-            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+            <label class="flex items-center gap-1 cursor-pointer text-slate-200 font-bold text-[11px] mono">
               <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5" style="accent-color:var(--accent);">
               <span>Pers</span>
             </label>
-            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+            <label class="flex items-center gap-1 cursor-pointer text-slate-200 font-bold text-[11px] mono">
               <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5" style="accent-color:var(--accent);">
               <span>Corp</span>
             </label>
@@ -464,11 +464,11 @@
             </label>
           </div>
           <div class="flex items-center gap-2">
-            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+            <label class="flex items-center gap-1 cursor-pointer text-slate-200 font-bold text-[11px] mono">
               <input type="checkbox" id="blueprint-use-char" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
               <span>Pers</span>
             </label>
-            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+            <label class="flex items-center gap-1 cursor-pointer text-slate-200 font-bold text-[11px] mono">
               <input type="checkbox" id="blueprint-use-corp" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
               <span>Corp</span>
             </label>
@@ -552,11 +552,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=14.6.0"></script>
-  <script src="js/config.js?v=14.6.0"></script>
-  <script src="js/esi.js?v=14.6.0"></script>
-  <script src="js/tree.js?v=14.6.0"></script>
-  <script src="js/optimizers.js?v=14.6.0"></script>
-  <script src="js/app.js?v=14.6.0"></script>
+  <script src="eve_db.js?v=14.7.0"></script>
+  <script src="js/config.js?v=14.7.0"></script>
+  <script src="js/esi.js?v=14.7.0"></script>
+  <script src="js/tree.js?v=14.7.0"></script>
+  <script src="js/optimizers.js?v=14.7.0"></script>
+  <script src="js/app.js?v=14.7.0"></script>
 </body>
 </html>
