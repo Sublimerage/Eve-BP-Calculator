@@ -233,6 +233,7 @@ img {
 
 .icon-rail {
   width: 84px;
+  z-index: 40;
   background: rgba(15,10,8,0.35);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
