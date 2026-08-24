@@ -299,13 +299,6 @@ svg[viewBox] {
   stroke: currentColor;
 }
 
-/* Exclude the halftone background specifically - its triangles use fill, not stroke, and
-   SVG's default stroke-width is 1 (not 0), so the global rule above was giving every tiny
-   triangle a bright unwanted outline that visually overwhelmed the gradient underneath. */
-#halftone-bg {
-  stroke: none;
-}
-
 /* Cohesive styling for all inputs/selects inside flyout panels - rounds corners, lightens the
    background slightly, and adds an orange-tinted border/focus glow, so these fields feel like
    part of the same system instead of plain flat boxes that clash with the rest of the app. */
@@ -422,20 +415,4 @@ select option:checked, select option:hover {
   background: rgba(var(--buy-rgb),0.15);
   border-color: rgba(var(--buy-rgb),0.5);
   color: #a8d4f0;
-}
-
-/* Halftone triangle backdrop - a single static SVG pattern (2 triangles, tiled natively by the
-   browser via patternUnits, not generated per-shape in JS) with a CSS radial-gradient mask that
-   fades it out toward the center. This replaces an earlier approach that generated ~4000
-   individual polygon elements in JS to get the same size/opacity-by-distance effect - the mask
-   achieves the identical visual result (dense at edges, fading toward the middle) with 3 DOM
-   nodes total instead of thousands, which is what backdrop-filter elements were paying to
-   composite through every time one appeared. */
-#halftone-bg {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  mask-image: radial-gradient(ellipse 70% 70% at center, transparent 0%, black 100%);
-  -webkit-mask-image: radial-gradient(ellipse 70% 70% at center, transparent 0%, black 100%);
 }
