@@ -15,10 +15,10 @@ html {
    brighter top edge catching light + a soft shadow, not from clip-path or neon glow brackets.
    ============================================================ */
 :root {
-  --bg-0: #0b0906;
-  --text: #f1ece4;
-  --text-soft: #b3a696;
-  --text-mute: #79695a;
+  --bg-0: #0a0a0b;
+  --text: #e9e9ea;
+  --text-soft: #a3a3a7;
+  --text-mute: #6b6b70;
 
   --accent: #d3915a;
   --accent-2: #a86336;
@@ -81,15 +81,14 @@ html {
   --red-400: #dd6b64;
   --red-500: #cf5a53;
 
-  /* Glass surface - a genuinely lighter "elevated" tone (--surface-rgb), not the page canvas
-     color, layered at partial opacity so it reads as a lifted card even before any blur is
-     considered, and so backdrop-filter actually has something translucent to blur. */
-  --surface-rgb: 58,48,38;
-  --glass-fill: linear-gradient(165deg, rgba(var(--surface-rgb),0.97), rgba(var(--surface-rgb),0.88));
-  --glass-fill-panel: linear-gradient(165deg, rgba(var(--surface-rgb),0.78), rgba(var(--surface-rgb),0.58));
-  --glass-border: rgba(255,255,255,0.16);
-  --glass-border-top: rgba(255,255,255,0.32);
-  --glass-shadow: 0 14px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07);
+  /* Glass surface - matches the approved mockup exactly: a near-transparent WHITE sheen (not an
+     opaque brown "surface color") over backdrop blur, so the page's own colorful background
+     shows through tinted. This is the actual glass material - do not reintroduce an opaque
+     backing color here, that defeats the whole effect. */
+  --glass-fill: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.013) 60%);
+  --glass-border: rgba(255,255,255,0.09);
+  --glass-border-top: rgba(255,255,255,0.18);
+  --glass-shadow: 0 14px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
   --blur: 22px;
 
   --radius-sm: 7px;
@@ -105,15 +104,15 @@ html {
    that gap + rounded-corner language is what actually reads as "glass" rather than a flat reskin. */
 body {
   background:
-    radial-gradient(ellipse 1100px 700px at 10% -10%, rgba(var(--accent-rgb),0.22) 0%, transparent 60%),
-    radial-gradient(ellipse 900px 750px at 95% 12%, rgba(var(--violet-rgb),0.16) 0%, transparent 60%),
+    radial-gradient(ellipse 1100px 700px at 10% -10%, rgba(var(--accent-rgb),0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 900px 750px at 95% 12%, rgba(var(--violet-rgb),0.05) 0%, transparent 60%),
     var(--bg-0);
   background-attachment: fixed;
   color: var(--text);
   font-family: 'Inter', sans-serif;
   height: 100vh;
   box-sizing: border-box;
-  padding: 16px;
+  padding: 28px;
   gap: 12px;
   user-select: none;
   -webkit-user-select: none;
@@ -222,27 +221,16 @@ img {
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 /* ============================================================
-   Card surface (tree node cards - potentially dozens on screen at once during pan/zoom, so this
-   is deliberately glass WITHOUT backdrop-filter: gradient fill + edge-lit border + soft shadow
-   gives the same material without the compositing cost of blurring many overlapping layers).
+   Glass surface - ONE material, applied everywhere (header, icon rail, flyout panels, BOM
+   sidebar, drawers, modals, AND tree node cards), exactly matching the approved mockup's single
+   .glass class: translucent white sheen + real backdrop blur + edge-lit border + soft shadow.
+   Every one of these gets backdrop-filter - do not split cards out onto a blur-less variant,
+   that was the earlier mistake that produced the flat "opaque brown card" look.
    ============================================================ */
-.glass-card {
-  background: var(--glass-fill);
-  border: 1px solid var(--glass-border);
-  border-top-color: var(--glass-border-top);
-  border-radius: var(--radius-card);
-  box-shadow: var(--glass-shadow);
-}
-
-/* ============================================================
-   Panel surface - the real glass material (blur included) for fixed, low-count chrome: header,
-   icon rail, flyout panels, BOM sidebar, drawers, modals. Applied directly to the relevant
-   elements below rather than requiring new classes sprinkled through the HTML.
-   ============================================================ */
-.glass-panel, header, .icon-rail, .flyout-panel, #status-badge,
+.glass-card, .glass-panel, header, .icon-rail, .flyout-panel, #status-badge,
 #blueprint-browser-drawer, #paste-modal > div, .stat-strip, #bom-sidebar, #history-drawer,
 #invention-sidebar, #viewport, #journal-main-area, #invention-main-area {
-  background: var(--glass-fill-panel);
+  background: var(--glass-fill);
   backdrop-filter: blur(var(--blur));
   -webkit-backdrop-filter: blur(var(--blur));
   border: 1px solid var(--glass-border);
@@ -250,11 +238,8 @@ img {
   border-radius: var(--radius-panel);
   box-shadow: var(--glass-shadow);
 }
+.glass-card { border-radius: var(--radius-card); }
 header { height: 56px; flex-shrink: 0; }
-/* The diagram canvas holds dozens of node cards during pan/zoom - real backdrop blur on a
-   container that size would be a real compositing cost for no visible benefit (nothing moves
-   behind it), so it gets the opaque card-style fill instead of the panel fill. */
-#viewport, #journal-main-area, #invention-main-area { background: var(--glass-fill); backdrop-filter: none; -webkit-backdrop-filter: none; }
 
 .icon-btn {
   width: 30px; height: 30px; border-radius: var(--radius-btn);
@@ -272,28 +257,30 @@ header { height: 56px; flex-shrink: 0; }
 /* Everything else floats with a margin from the viewport edge (see body padding), so it keeps
    full rounded corners on every side. The history drawer is fixed-positioned, so its inset needs
    to match the page padding explicitly rather than relying on flow layout. */
-#history-drawer { position: fixed; left: 16px; right: 16px; bottom: 16px; width: auto; }
+#history-drawer { position: fixed; left: 28px; right: 28px; bottom: 28px; width: auto; }
 
 /* ===== Buttons ===== */
 .btn-glass {
   border-radius: var(--radius-btn);
-  border: 1px solid var(--glass-border);
-  background: linear-gradient(160deg, rgba(var(--surface-rgb),0.85), rgba(var(--surface-rgb),0.6));
-  color: var(--text);
+  border: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb),0.3);
+  color: #201206;
   font-family: 'Inter', sans-serif;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   position: relative;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
 }
 .btn-glass:hover {
-  background: linear-gradient(160deg, rgba(var(--accent-rgb),0.22), rgba(var(--accent-rgb),0.05));
-  border-color: rgba(var(--accent-rgb), 0.4);
-  color: #fff;
+  filter: brightness(1.08);
+  box-shadow: 0 8px 22px rgba(var(--accent-rgb),0.4);
 }
+.btn-glass:active { transform: translateY(1px); }
 .btn-glass-muted {
   background: transparent;
   border: 1px solid var(--glass-border);
+  box-shadow: none;
   color: var(--text-soft);
 }
 .btn-glass-muted:hover {
@@ -316,15 +303,14 @@ nav.primary-tabs { display: flex; align-items: center; gap: 4px; height: 100%; }
 }
 .nav-tab:hover { color: var(--text-soft); }
 .nav-tab svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; flex-shrink: 0; }
-.nav-tab-active {
+/* Coal-neutral: selection/navigation state reads as plain lifted gray, not tinted with the
+   accent - accent color is reserved for the brand mark and true primary actions (see .btn-glass),
+   not sprinkled onto every "this is selected" state. Same treatment regardless of which page's
+   tab is active - the per-page brand color still shows up in the header's logo mark. */
+.nav-tab-active, .nav-tab-active-violet {
   color: var(--text) !important;
-  background: linear-gradient(160deg, rgba(var(--accent-rgb),0.22), rgba(var(--accent-rgb),0.05));
-  border-color: rgba(var(--accent-rgb), 0.32);
-}
-.nav-tab-active-violet {
-  color: var(--text) !important;
-  background: linear-gradient(160deg, rgba(var(--violet-rgb),0.24), rgba(var(--violet-rgb),0.06));
-  border-color: rgba(var(--violet-rgb), 0.34);
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.12);
 }
 
 /* ===== Stat strip (replaces the old grid-of-boxed-cards summary bar) ===== */
@@ -384,11 +370,11 @@ nav.primary-tabs { display: flex; align-items: center; gap: 4px; height: 100%; }
   border-color: rgba(var(--accent-rgb),0.18);
 }
 .icon-rail-btn-active {
-  background: linear-gradient(160deg, rgba(var(--accent-rgb),0.24), rgba(var(--accent-rgb),0.05));
-  border-color: rgba(var(--accent-rgb),0.32);
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.14);
 }
-.icon-rail-btn-active svg { stroke: var(--accent); }
-.icon-rail-btn-active .icon-label { color: var(--accent); }
+.icon-rail-btn-active svg { stroke: var(--text); }
+.icon-rail-btn-active .icon-label { color: var(--text); }
 .icon-rail-btn svg {
   width: 19px;
   height: 19px;
@@ -453,11 +439,11 @@ select option:checked, select option:hover { background-color: var(--accent); co
   gap: 5px;
   transition: all 0.15s ease;
   border: 1px solid var(--glass-border);
-  background: rgba(var(--surface-rgb),0.7);
+  background: rgba(255,255,255,0.04);
   color: var(--text-soft);
 }
 .toggle-btn svg { width: 13px; height: 13px; stroke: currentColor; flex-shrink: 0; }
-.toggle-btn:hover { background: rgba(var(--surface-rgb),0.9); border-color: var(--glass-border-top); color: var(--text); }
+.toggle-btn:hover { background: rgba(255,255,255,0.08); border-color: var(--glass-border-top); color: var(--text); }
 .toggle-btn-active-accent {
   background: linear-gradient(160deg, rgba(var(--accent-rgb),0.22), rgba(var(--accent-rgb),0.06));
   border-color: rgba(var(--accent-rgb),0.4);
@@ -588,8 +574,8 @@ select option:checked, select option:hover { background-color: var(--accent); co
 /* ---- literal bg-[#hex]/border-[#hex] classes from the pre-redesign palette (index.html /
    ledger.html / invention.html static shells) ---- */
 [class*="bg-[#3a4a4c]"] { background: rgba(255,255,255,0.12) !important; }
-[class*="bg-[#202a2e]"] { background: var(--glass-fill-panel) !important; }
-[class*="bg-[#0a0d0e]"] { background: var(--glass-fill-panel) !important; }
+[class*="bg-[#202a2e]"] { background: var(--glass-fill) !important; }
+[class*="bg-[#0a0d0e]"] { background: var(--glass-fill) !important; }
 [class*="bg-[#030405]"] { background: rgba(0,0,0,0.45) !important; }
 [class*="bg-[#070b0f]"] { background: var(--bg-0) !important; }
 [class*="bg-[#0c1318]"] { background: var(--glass-fill) !important; }
