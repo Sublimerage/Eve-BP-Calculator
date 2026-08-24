@@ -2580,18 +2580,26 @@ function generateHalftoneBackground() {
   const cx = W / 2, cy = H / 2;
   const maxDist = Math.sqrt(cx * cx + cy * cy);
   const spacing = 34;
+  const rowHeight = spacing * 0.87;
   let svgContent = '';
 
-  for (let y = -spacing; y < H + spacing; y += spacing * 0.87) {
-    const rowIndex = Math.round(y / (spacing * 0.87));
-    const xOffset = (rowIndex % 2 === 0) ? 0 : spacing / 2;
-    for (let x = -spacing + xOffset; x < W + spacing; x += spacing) {
+  // Triangular tessellation: within each row, up-pointing and down-pointing triangles alternate
+  // at half-spacing intervals, sharing edges so they tile continuously with no gaps - matching
+  // the reference's true tessellating mesh instead of isolated same-orientation triangles.
+  for (let y = -rowHeight; y < H + rowHeight; y += rowHeight) {
+    let pointsDown = false;
+    for (let x = -spacing; x < W + spacing; x += spacing / 2) {
       const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2) / maxDist; // 0 (center) to 1 (corner)
       const size = 2 + dist * 13;
       const opacity = Math.min(0.13, dist * 0.1671);
-      if (opacity < 0.004) continue;
-      const half = size / 2;
-      svgContent += `<polygon points="${x},${y - half} ${x + half},${y + half} ${x - half},${y + half}" fill="rgba(102,37,0,${opacity.toFixed(3)})"/>`;
+      pointsDown = !pointsDown;
+      if (opacity < 0.004) { continue; }
+      const halfW = size / 2;
+      const halfH = size * 0.435; // half of (size * 0.87), keeps the same row-height proportion
+      const points = pointsDown
+        ? `${x - halfW},${y - halfH} ${x + halfW},${y - halfH} ${x},${y + halfH}` // apex at bottom
+        : `${x},${y - halfH} ${x + halfW},${y + halfH} ${x - halfW},${y + halfH}`; // apex at top
+      svgContent += `<polygon points="${points}" fill="rgba(102,37,0,${opacity.toFixed(3)})"/>`;
     }
   }
   svg.innerHTML = svgContent;
