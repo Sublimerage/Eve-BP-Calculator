@@ -13,27 +13,24 @@
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
   <!-- Header -->
-  <header class="bg-[#0c1318] border-b border-[#1e3348] px-5 py-2.5 flex flex-wrap justify-between items-center gap-2 shadow-xl z-30">
+  <header class="px-5 flex flex-wrap justify-between items-center gap-2 z-30">
     <div class="flex items-center space-x-3">
-      <div class="w-10 h-10 bg-purple-500 rounded flex items-center justify-center font-bold text-black text-2xl rajdhani shadow-lg shadow-purple-500/20">I</div>
-      <h1 class="text-lg font-bold tracking-widest text-white rajdhani leading-none">INVENTION CALCULATOR</h1>
+      <div class="w-9 h-9 bg-purple-500 rounded-xl flex items-center justify-center font-bold text-black text-lg rajdhani">I</div>
+      <h1 class="text-[13px] font-semibold tracking-wide text-white rajdhani leading-none">INVENTION CALCULATOR</h1>
     </div>
     <div class="flex items-center gap-3 mono flex-wrap">
-      <nav class="flex items-center gap-2">
-        <a href="index.html" class="px-4 py-2.5 bg-cyan-700 hover:bg-cyan-600 text-white font-bold rounded-lg transition-all text-sm shadow-lg shadow-cyan-900/40 border border-cyan-500/40 flex items-center gap-2 hover:-translate-y-0.5" title="Go back to the interactive recipe tree calculator">
-          <span class="text-base">⬅</span> <span class="hidden sm:inline">Calculator</span>
-        </a>
-
-        <a href="ledger.html" class="px-4 py-2.5 bg-purple-700 hover:bg-purple-600 text-white font-bold rounded-lg transition-all text-sm shadow-lg shadow-purple-900/40 border border-purple-500/40 flex items-center gap-2 hover:-translate-y-0.5" title="View your consolidated manufacturing jobs queue">
-          <span class="text-base">📖</span> <span class="hidden sm:inline">Ledger</span>
-        </a>
+      <nav class="primary-tabs">
+        <a href="index.html" class="nav-tab">Calculator</a>
+        <a href="ledger.html" class="nav-tab">Ledger</a>
+        <div class="nav-tab nav-tab-active-violet">Invention</div>
       </nav>
 
-      <div class="w-px h-7 bg-[#1e3348] hidden md:block"></div>
+      <div class="w-px h-6 bg-[#1e3348] hidden md:block"></div>
 
       <div id="esi-login-container">
-        <button onclick="startEsiSSOLogin()" class="px-3.5 py-2 bg-cyan-900/60 hover:bg-cyan-700 text-cyan-200 hover:text-white font-bold rounded-md transition flex items-center gap-1.5 border border-cyan-600/30 text-xs" title="Login with EVE Online to auto-fill your real skill levels">
-          🔐 <span class="hidden sm:inline">EVE SSO Login</span>
+        <button onclick="startEsiSSOLogin()" class="btn-glass btn-glass-muted px-3.5 py-2 text-xs flex items-center gap-1.5" title="Login with EVE Online to auto-fill your real skill levels">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+          <span class="hidden sm:inline">EVE SSO Login</span>
         </button>
       </div>
     </div>

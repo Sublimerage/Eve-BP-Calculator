@@ -15,92 +15,84 @@
 
 
   <!-- Header: branding + primary account/nav actions only -->
-  <header class="px-5 py-2.5 flex flex-wrap justify-between items-center gap-3 shadow-xl z-30 border-b border-orange-500/20" style="background:rgba(15,10,8,0.5); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);">
+  <header class="px-5 flex flex-wrap justify-between items-center gap-3 z-30">
     <div class="flex items-center space-x-3">
-      <div class="w-10 h-10 bg-orange-500 flex items-center justify-center font-bold text-black text-2xl rajdhani shadow-lg shadow-orange-500/20">E</div>
-      <h1 class="text-lg font-bold tracking-widest text-white rajdhani leading-none">EVE DEEP-INDUSTRY ENGINE</h1>
+      <div class="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center font-bold text-black text-lg rajdhani">E</div>
+      <h1 class="text-[13px] font-semibold tracking-wide text-white rajdhani leading-none">DEEP-INDUSTRY</h1>
     </div>
 
     <div class="flex items-center gap-3 mono flex-wrap">
 
-      <!-- Primary destinations: the app's three main workspaces, given real visual weight so they
-           read as "go here", not just another button in a row of equals. -->
-      <nav class="flex items-center gap-2">
-        <button onclick="openBlueprintBrowser()" class="btn-glass px-4 py-2.5 text-sm flex items-center gap-2 hover:-translate-y-0.5" title="Browse your owned blueprints (BPOs/BPCs) and load one straight into the calculator with its real ME/TE">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M4 6c0-1.1 3.6-2 8-2s8 .9 8 2"/><path d="M4 6v12c0 1.1 3.6 2 8 2s8-.9 8-2V6"/><path d="M4 12c0 1.1 3.6 2 8 2s8-.9 8-2"/></svg>
-          <span class="hidden sm:inline">My Blueprints</span>
-        </button>
-
-        <a href="ledger.html" class="btn-glass px-4 py-2.5 text-sm flex items-center gap-2 hover:-translate-y-0.5" title="View your consolidated manufacturing jobs queue">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M7 3h10a1 1 0 011 1v16l-3-2-3 2-3-2-3 2V4a1 1 0 011-1z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
-          <span class="hidden sm:inline">Ledger</span> <span id="header-journal-count" class="rounded bg-orange-950 text-orange-200 text-[10px] px-1.5 py-0.5 font-bold">0</span>
-        </a>
-
-        <a href="invention.html" class="btn-glass px-4 py-2.5 text-sm flex items-center gap-2 hover:-translate-y-0.5" title="Compare invention decryptor options and see which gives the best expected profit">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><path d="M10 3h4"/><path d="M10 3v6l-5 9a2 2 0 001.8 3h10.4a2 2 0 001.8-3l-5-9V3"/><line x1="8.5" y1="15" x2="15.5" y2="15"/></svg>
-          <span class="hidden sm:inline">Invention</span>
-        </a>
+      <!-- Primary destinations: the app's three workspaces, styled as a quiet tab switcher rather
+           than three equal-weight buttons competing for attention. -->
+      <nav class="primary-tabs">
+        <div class="nav-tab nav-tab-active">Calculator</div>
+        <a href="ledger.html" class="nav-tab">Ledger <span id="header-journal-count" class="rounded bg-orange-950 text-orange-200 text-[10px] px-1.5 py-0.5 font-bold ml-1">0</span></a>
+        <a href="invention.html" class="nav-tab">Invention</a>
       </nav>
 
-      <div class="w-px h-7 bg-[#3a4a4c] hidden md:block"></div>
+      <div class="w-px h-6 bg-[#3a4a4c] hidden md:block"></div>
 
-      <!-- Secondary utilities: used rarely, so deliberately quieter and smaller than the destinations above. -->
-      <div class="flex items-center gap-1.5">
-        <button onclick="refreshLiveAssets()" class="px-2 py-1.5 bg-transparent hover:bg-orange-500/10 text-slate-500 hover:text-orange-300 rounded transition text-[10px] flex items-center gap-1" title="Fetch latest live character and corp assets from EVE Online">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M21 12a9 9 0 11-2.2-5.9"/><polyline points="21,3 21,9 15,9"/></svg>
-          <span class="hidden xl:inline">Refresh Assets</span>
+      <button onclick="openBlueprintBrowser()" class="btn-glass px-3.5 py-2 text-sm flex items-center gap-2" title="Browse your owned blueprints (BPOs/BPCs) and load one straight into the calculator with its real ME/TE">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M4 6c0-1.1 3.6-2 8-2s8 .9 8 2"/><path d="M4 6v12c0 1.1 3.6 2 8 2s8-.9 8-2V6"/><path d="M4 12c0 1.1 3.6 2 8 2s8-.9 8-2"/></svg>
+        <span class="hidden sm:inline">My Blueprints</span>
+      </button>
+
+      <!-- Secondary utilities: icon-only, quieter than the destinations above. -->
+      <div class="flex items-center gap-1">
+        <button onclick="refreshLiveAssets()" class="icon-btn" title="Fetch latest live character and corp assets from EVE Online">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-2.2-5.9"/><polyline points="21,3 21,9 15,9"/></svg>
         </button>
-        <button onclick="openPasteModal()" class="px-2 py-1.5 bg-transparent hover:bg-orange-500/10 text-slate-500 hover:text-orange-300 rounded transition text-[10px] flex items-center gap-1" title="Paste in-game inventory text to import stock">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
-          <span class="hidden xl:inline">Paste Hangar</span>
+        <button onclick="openPasteModal()" class="icon-btn" title="Paste in-game inventory text to import stock">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
         </button>
       </div>
 
-      <div class="w-px h-7 bg-[#3a4a4c] hidden md:block"></div>
+      <div class="w-px h-6 bg-[#3a4a4c] hidden md:block"></div>
 
       <div id="esi-login-container">
         <button onclick="startEsiSSOLogin()" class="btn-glass btn-glass-muted px-3.5 py-2 text-xs flex items-center gap-1.5" title="Login with EVE Online to import your character assets">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
           <span class="hidden sm:inline">EVE SSO Login</span>
         </button>
       </div>
 
-      <div id="status-badge" class="px-3 py-2 bg-[#202a2e] border border-orange-500/20 flex items-center gap-2 text-xs shadow">
-        <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-orange-400 flex-shrink-0"></span>
-        <span id="status-text" class="text-slate-300 font-semibold hidden sm:inline">INITIALIZING INDEX...</span>
+      <div id="status-badge" class="px-3 py-1.5 flex items-center gap-2 text-xs rounded-full">
+        <span id="status-dot" class="w-2 h-2 rounded-full bg-orange-400 flex-shrink-0"></span>
+        <span id="status-text" class="text-slate-300 font-medium hidden sm:inline">INITIALIZING INDEX...</span>
       </div>
     </div>
   </header>
 
-  <!-- Dashboard Summary Bar: live metrics for whatever is currently selected -->
-  <section class="p-2.5 grid grid-cols-2 md:grid-cols-5 gap-2.5 relative z-10 border-b border-orange-500/20">
-    <div class="glass-card px-3.5 py-2.5 flex flex-col justify-center">
-      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Production Cost</div>
-      <div id="summary-build-cost" class="text-lg font-bold text-orange-400 mono leading-tight">0 ISK</div>
-      <div id="summary-runs-subtext" class="text-[9px] text-slate-500 truncate mt-0.5">Mat: 0 + Fee: 0</div>
+  <!-- Dashboard Summary Bar: a single-row ticker strip instead of a grid of boxed cards -->
+  <section class="stat-strip relative z-10">
+    <div class="stat">
+      <div class="stat-label">Total production cost</div>
+      <div id="summary-build-cost" class="stat-value mono">0 ISK</div>
+      <div id="summary-runs-subtext" class="stat-sub mono">Mat: 0 + Fee: 0</div>
     </div>
 
-    <div class="glass-card px-3.5 py-2.5 flex flex-col justify-center">
-      <div class="text-[10px] text-orange-300 uppercase font-bold mono tracking-wide truncate">Surplus Leftovers Credit</div>
-      <div id="summary-surplus-credit" class="text-lg font-bold text-orange-300 mono leading-tight">0 ISK</div>
+    <div class="stat">
+      <div class="stat-label">Surplus leftovers credit</div>
+      <div id="summary-surplus-credit" class="stat-value mono" style="color:var(--accent);">0 ISK</div>
     </div>
 
-    <div class="glass-card px-3.5 py-2.5 flex flex-col justify-center">
-      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Net Output Revenue</div>
-      <div id="summary-output-sell" class="text-lg font-bold text-orange-300 mono leading-tight">0 ISK</div>
-      <div id="summary-output-buy" class="text-[9px] text-slate-500 truncate mt-0.5">Instant Buy: 0 ISK</div>
+    <div class="stat">
+      <div class="stat-label">Net output revenue</div>
+      <div id="summary-output-sell" class="stat-value mono">0 ISK</div>
+      <div id="summary-output-buy" class="stat-sub mono">Instant Buy: 0 ISK</div>
     </div>
 
-    <div class="glass-card px-3.5 py-2.5 flex flex-col justify-center" style="border-left-color:#4caf6f;">
-      <div id="summary-profit-sell-label" class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Net Profit (Sell Output)</div>
-      <div id="summary-profit-sell" class="text-lg font-bold text-green-400 mono leading-tight">0 ISK</div>
-      <div id="summary-roi-sell" class="text-[9px] text-green-400 truncate mt-0.5">ROI: 0%</div>
+    <div class="stat">
+      <div id="summary-profit-sell-label" class="stat-label">Net profit (sell output)</div>
+      <div id="summary-profit-sell" class="stat-value mono" style="color:var(--green);">0 ISK</div>
+      <div id="summary-roi-sell" class="stat-sub mono" style="color:var(--green);">ROI: 0%</div>
     </div>
 
-    <div class="glass-card px-3.5 py-2.5 flex flex-col justify-center">
-      <div class="text-[10px] text-slate-400 uppercase font-bold mono tracking-wide truncate">Net Profit (Instant Buy)</div>
-      <div id="summary-profit-buy" class="text-lg font-bold text-green-400 mono leading-tight">0 ISK</div>
-      <div id="summary-roi-buy" class="text-[9px] text-green-400 truncate mt-0.5">ROI: 0%</div>
+    <div class="stat">
+      <div class="stat-label">Net profit (instant buy)</div>
+      <div id="summary-profit-buy" class="stat-value mono" style="color:var(--green);">0 ISK</div>
+      <div id="summary-roi-buy" class="stat-sub mono" style="color:var(--green);">ROI: 0%</div>
     </div>
   </section>
 
@@ -374,11 +366,11 @@
     </main>
 
     <!-- Bill of Materials (BOM) Sidebar -->
-    <aside class="w-80 md:w-96 flex flex-col z-20 shadow-2xl" style="background:rgba(15,10,8,0.5); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-left:1px solid rgba(var(--accent-rgb),0.2);">
-      <div class="p-4 border-b border-orange-500/20 flex justify-between items-center" style="background:rgba(20,15,12,0.4);">
+    <aside id="bom-sidebar" class="w-80 md:w-96 flex flex-col z-20">
+      <div class="p-4 border-b border-orange-500/20 flex justify-between items-center">
         <div>
-          <h2 class="font-bold text-white rajdhani tracking-wider text-lg">BILL OF MATERIALS</h2>
-          <div class="text-[10px] mono text-slate-400">CLICK ROW TO FOCUS CARD IN DIAGRAM</div>
+          <h2 class="font-bold text-white rajdhani tracking-wide text-base">Bill of materials</h2>
+          <div class="text-[10px] mono text-slate-400">Click row to focus card in diagram</div>
         </div>
         <button onclick="copyMultibuyText()" class="btn-glass px-3.5 py-1.5 text-xs">
           Copy Multibuy
@@ -386,14 +378,14 @@
       </div>
 
       <details open class="border-b border-orange-500/20 group">
-        <summary class="px-4 py-2.5 cursor-pointer flex items-center justify-between list-none hover:bg-orange-500/10" style="background:rgba(20,15,12,0.4);" title="Only affects this shopping list and Copy Multibuy - materials you already have in stock are excluded from what's shown/copied here. Does NOT affect Total Production Cost or Profit, which always reflect full market value regardless of stock.">
+        <summary class="px-4 py-2.5 cursor-pointer flex items-center justify-between list-none hover:bg-orange-500/10" title="Only affects this shopping list and Copy Multibuy - materials you already have in stock are excluded from what's shown/copied here. Does NOT affect Total Production Cost or Profit, which always reflect full market value regardless of stock.">
           <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide flex items-center gap-1.5">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><line x1="12" y1="13" x2="12" y2="21"/></svg>
             Stock &amp; Location <span id="location-search-feedback" class="text-[9px] text-orange-300 font-mono font-bold normal-case hidden"></span>
           </span>
           <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
         </summary>
-        <div class="px-4 pb-3 pt-1 space-y-2" style="background:rgba(20,15,12,0.4);">
+        <div class="px-4 pb-3 pt-1 space-y-2">
           <button id="deduct-stock-mode" value="true" onclick="toggleDeductStockButton(this, 'recalculate')" class="btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5" title="Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead">✔ Deducting Stock</button>
 
           <div class="flex items-center gap-2">
@@ -421,7 +413,7 @@
       </div>
 
       <!-- BOM Total Summary Footer -->
-      <div class="p-4 border-t border-orange-500/20 mono" style="background:rgba(20,15,12,0.4);">
+      <div class="p-4 border-t border-orange-500/20 mono">
         <div class="flex justify-between text-slate-400 text-xs">
           <span>Unique Material Types:</span>
           <span id="bom-type-count" class="text-white font-bold">0</span>
