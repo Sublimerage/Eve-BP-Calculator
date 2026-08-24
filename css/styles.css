@@ -229,7 +229,7 @@ img {
    ============================================================ */
 .glass-card, .glass-panel, header, .icon-rail, .flyout-panel, #status-badge,
 #blueprint-browser-drawer, #paste-modal > div, .stat-strip, #bom-sidebar, #history-drawer,
-#invention-sidebar, #viewport, #journal-main-area, #invention-main-area {
+#invention-sidebar, #viewport, #journal-main-area, #invention-main-area, #viewport-hint {
   background: var(--glass-fill);
   backdrop-filter: blur(var(--blur));
   -webkit-backdrop-filter: blur(var(--blur));
@@ -373,15 +373,16 @@ nav.primary-tabs { display: flex; align-items: center; gap: 4px; height: 100%; }
   background: rgba(255,255,255,0.08);
   border-color: rgba(255,255,255,0.14);
 }
-.icon-rail-btn-active svg { stroke: var(--text); }
-.icon-rail-btn-active .icon-label { color: var(--text); }
+/* Base resting state must come BEFORE the -active overrides below - both are two-class
+   descendant selectors of equal specificity, so whichever is later in the file wins regardless
+   of which one is semantically "more specific". Previously -active was declared first here and
+   silently lost to these, leaving the active rail icon stuck at the resting gray color. */
 .icon-rail-btn svg {
   width: 19px;
   height: 19px;
   stroke: var(--text-mute);
   transition: stroke 0.2s ease;
 }
-.icon-rail-btn:hover svg { stroke: var(--accent); }
 .icon-rail-btn .icon-label {
   font-family: 'Inter', sans-serif;
   font-size: 8.5px;
@@ -390,6 +391,9 @@ nav.primary-tabs { display: flex; align-items: center; gap: 4px; height: 100%; }
   color: var(--text-mute);
   font-weight: 600;
 }
+.icon-rail-btn-active svg { stroke: var(--text); }
+.icon-rail-btn-active .icon-label { color: var(--text); }
+.icon-rail-btn:hover svg { stroke: var(--accent); }
 .icon-rail-btn:hover .icon-label { color: var(--accent); }
 
 svg[viewBox] { stroke: currentColor; }
@@ -398,11 +402,14 @@ svg[viewBox] { stroke: currentColor; }
   display: none;
   position: absolute;
   left: 88px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 340px;
+  /* top is set at runtime by layoutAllFlyouts() in app.js, which stacks multiple simultaneously-
+     open flyouts one under another starting at 12px - do not fight that here with a fixed value,
+     it would just make several open flyouts overlap each other instead. The real conflict this
+     used to have with the viewport's own floating control bar is fixed by moving that control
+     bar to the bottom of the viewport instead (see #viewport > .absolute below). */
   max-height: 85vh;
   overflow-y: auto;
+  width: 340px;
   border-radius: var(--radius-panel);
   z-index: 100;
   padding: 14px 16px;
@@ -475,33 +482,37 @@ select option:checked, select option:hover { background-color: var(--accent); co
   box-shadow: var(--glass-shadow) !important;
 }
 
-/* ---- copper (orange/amber) ---- */
-.text-orange-100, .text-amber-100 { color: var(--copper-100) !important; }
-.text-orange-200, .text-amber-200 { color: var(--copper-200) !important; }
-.text-orange-300, .text-amber-300 { color: var(--copper-300) !important; }
-.text-orange-400, .text-amber-400 { color: var(--copper-400) !important; }
+/* ---- copper (orange/amber) - coal-neutral rule: copper is reserved for actual button fills
+   (bg-orange-*) and nothing else. Text and borders that used to carry a permanent copper tint
+   (section labels, panel borders, badges) go neutral gray instead - that permanent tinting
+   everywhere was exactly the "leftover orange clutter" that needed to go. Hover states keep a
+   light touch of accent since that's transient interaction feedback, not standing chrome. ---- */
+.text-orange-100, .text-amber-100 { color: var(--text) !important; }
+.text-orange-200, .text-amber-200 { color: var(--text) !important; }
+.text-orange-300, .text-amber-300 { color: var(--text-soft) !important; }
+.text-orange-400, .text-amber-400 { color: var(--text-soft) !important; }
 .bg-orange-400, .bg-amber-400 { background: var(--copper-400) !important; }
 .bg-orange-500, [class^="bg-orange-500/"], [class*=" bg-orange-500/"] {
   background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
 }
 [class*="hover:bg-orange-500/"]:hover { background: rgba(var(--accent-rgb),0.16) !important; }
-.border-orange-500, [class^="border-orange-500/"], [class*=" border-orange-500/"] { border-color: rgba(var(--accent-rgb),0.45) !important; }
-[class*="hover:border-orange-500"]:hover { border-color: var(--accent) !important; }
+.border-orange-500, [class^="border-orange-500/"], [class*=" border-orange-500/"] { border-color: var(--glass-border) !important; }
+[class*="hover:border-orange-500"]:hover { border-color: rgba(var(--accent-rgb),0.5) !important; }
 .bg-orange-600 { background: var(--copper-600) !important; }
 [class*="hover:bg-orange-600"]:hover { background: var(--copper-500) !important; }
-.border-orange-600, [class^="border-orange-600/"], [class*=" border-orange-600/"] { border-color: rgba(185,120,71,0.5) !important; }
+.border-orange-600, [class^="border-orange-600/"], [class*=" border-orange-600/"] { border-color: var(--glass-border) !important; }
 .bg-orange-700, .bg-amber-700 { background: var(--copper-700) !important; }
 [class*="hover:bg-orange-700"]:hover, [class*="hover:bg-amber-600"]:hover { background: var(--copper-600) !important; }
-.border-orange-700, [class^="border-orange-700/"], [class*=" border-orange-700/"] { border-color: rgba(168,99,54,0.45) !important; }
+.border-orange-700, [class^="border-orange-700/"], [class*=" border-orange-700/"] { border-color: var(--glass-border) !important; }
 .bg-orange-800 { background: var(--copper-800) !important; }
 [class*="hover:bg-orange-800"]:hover { background: var(--copper-700) !important; }
-.bg-orange-900, [class^="bg-orange-900/"], [class*=" bg-orange-900/"] { background: rgba(95,58,34,0.6) !important; }
-.bg-orange-950, [class^="bg-orange-950/"], [class*=" bg-orange-950/"] { background: rgba(61,37,21,0.55) !important; }
-.border-amber-500, [class^="border-amber-500/"], [class*=" border-amber-500/"] { border-color: rgba(var(--accent-rgb),0.45) !important; }
-[class^="border-amber-600/"], [class*=" border-amber-600/"] { border-color: rgba(185,120,71,0.4) !important; }
-[class*="hover:border-amber-400"]:hover { border-color: var(--copper-300) !important; }
-.bg-amber-900, [class^="bg-amber-900/"], [class*=" bg-amber-900/"] { background: rgba(95,58,34,0.6) !important; }
-.bg-amber-950, [class^="bg-amber-950/"], [class*=" bg-amber-950/"] { background: rgba(61,37,21,0.55) !important; }
+.bg-orange-900, [class^="bg-orange-900/"], [class*=" bg-orange-900/"] { background: rgba(255,255,255,0.08) !important; }
+.bg-orange-950, [class^="bg-orange-950/"], [class*=" bg-orange-950/"] { background: rgba(255,255,255,0.06) !important; }
+.border-amber-500, [class^="border-amber-500/"], [class*=" border-amber-500/"] { border-color: var(--glass-border) !important; }
+[class^="border-amber-600/"], [class*=" border-amber-600/"] { border-color: var(--glass-border) !important; }
+[class*="hover:border-amber-400"]:hover { border-color: rgba(var(--accent-rgb),0.5) !important; }
+.bg-amber-900, [class^="bg-amber-900/"], [class*=" bg-amber-900/"] { background: rgba(255,255,255,0.08) !important; }
+.bg-amber-950, [class^="bg-amber-950/"], [class*=" bg-amber-950/"] { background: rgba(255,255,255,0.06) !important; }
 [class*="ring-orange-400"] { --tw-ring-color: rgba(var(--accent-rgb),0.7) !important; }
 .accent-purple-500 { accent-color: var(--violet) !important; }
 .accent-cyan-500 { accent-color: var(--blue) !important; }
