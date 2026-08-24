@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Deep-Industry Engine</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=14.5.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=14.6.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#030405] text-slate-200">
 
@@ -135,8 +135,8 @@
       </div>
 
       <!-- Search and Pricing -->
-      <div id="flyout-search" class="flyout-panel open" style="--glow-color:#4fd8e8; --glow-rgb:79,216,232;">
-        <h2 class="section-label text-orange-400 text-xs mb-2">Search and Pricing</h2>
+      <div id="flyout-search" class="flyout-panel open">
+        <h2 class="section-label text-orange-400 text-xs mb-1.5">Search and Pricing</h2>
         <div class="relative mb-2">
           <input type="text" id="item-search" autocomplete="off" placeholder="Search item to build..."
             class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-2 text-white font-bold focus:border-orange-500 outline-none mono text-sm shadow-inner">
@@ -155,32 +155,32 @@
       </div>
 
       <!-- Build Actions -->
-      <div id="flyout-build" class="flyout-panel" style="--glow-color:#4fd8e8; --glow-rgb:79,216,232;">
-        <h2 class="section-label text-green-400 text-xs mb-2">Build Actions</h2>
-        <div class="grid grid-cols-2 gap-2 mb-2">
-          <button onclick="buildAllComponents()" class="btn-glass py-3 px-4 text-xs">
+      <div id="flyout-build" class="flyout-panel">
+        <h2 class="section-label text-orange-400 text-xs mb-1.5">Build Actions</h2>
+        <div class="grid grid-cols-2 gap-1.5 mb-1.5">
+          <button onclick="buildAllComponents()" class="btn-glass py-2 px-3 text-xs">
             🔨 Build All
           </button>
-          <button onclick="buyAllSubComponents()" class="btn-glass btn-glass-muted py-3 px-4 text-xs">
+          <button onclick="buyAllSubComponents()" class="btn-glass btn-glass-muted py-2 px-3 text-xs">
             🛒 Buy All
           </button>
         </div>
-        <div class="rounded bg-black/35 p-2 border border-green-500/30 flex items-center gap-1.5" title="Build Margin Threshold">
+        <div class="rounded bg-black/35 p-1.5 border border-orange-500/25 flex items-center gap-1.5" title="Build Margin Threshold">
           <span class="text-slate-400 text-[10px] font-bold flex-shrink-0">Min Profit:</span>
           <input type="number" id="build-profit-threshold" value="5.0" step="0.5" min="0" max="100"
-            class="w-14 bg-black/25 border border-green-500/40 text-center text-green-300 font-bold p-1 outline-none text-xs">
+            class="w-14 bg-black/25 border border-orange-500/40 text-center text-orange-300 font-bold p-1 outline-none text-xs">
           <span class="text-slate-500 text-xs flex-shrink-0">%</span>
-          <button onclick="applyBuildProfitOptimizer()" class="ml-auto rounded bg-green-800 hover:bg-green-700 text-white font-semibold py-1 px-2 text-[10px] transition shadow mono flex-shrink-0">
+          <button onclick="applyBuildProfitOptimizer()" class="ml-auto rounded bg-orange-800 hover:bg-orange-700 text-white font-semibold py-1 px-2 text-[10px] transition shadow mono flex-shrink-0">
             ⚡ Optimize
           </button>
         </div>
       </div>
 
       <!-- Smart Optimizers -->
-      <div id="flyout-optimize" class="flyout-panel" style="--glow-color:#4fd8e8; --glow-rgb:79,216,232;">
+      <div id="flyout-optimize" class="flyout-panel">
         <h2 class="section-label text-orange-300 text-xs mb-2">Smart Optimizers</h2>
-        <div class="space-y-2">
-          <div class="rounded bg-black/35 p-2 border border-orange-500/20 flex items-center gap-1.5" title="Component Market Spread Threshold">
+        <div class="space-y-1.5">
+          <div class="rounded bg-black/35 p-1.5 border border-orange-500/20 flex items-center gap-1.5" title="Component Market Spread Threshold">
             <span class="text-slate-400 text-[10px] flex-shrink-0">Spread:</span>
             <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100"
               class="w-14 bg-black/25 border border-orange-500/40 text-center text-orange-300 font-bold p-1 outline-none text-xs">
@@ -189,7 +189,7 @@
               Optimize
             </button>
           </div>
-          <div class="rounded bg-black/35 p-2 border border-orange-500/20 flex items-center gap-1.5" title="Build Cost Savings Impact Threshold">
+          <div class="rounded bg-black/35 p-1.5 border border-orange-500/20 flex items-center gap-1.5" title="Build Cost Savings Impact Threshold">
             <span class="text-slate-400 text-[10px] flex-shrink-0">Budget:</span>
             <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100"
               class="w-14 bg-black/25 border border-orange-500/40 text-center text-orange-300 font-bold p-1 outline-none text-xs">
@@ -205,9 +205,9 @@
       </div>
 
       <!-- System & Structure -->
-      <div id="flyout-structure" class="flyout-panel" style="--glow-color:#4fd8e8; --glow-rgb:79,216,232;">
-        <h2 class="section-label text-orange-400 text-xs mb-2">System and Structure</h2>
-        <div class="space-y-2">
+      <div id="flyout-structure" class="flyout-panel">
+        <h2 class="section-label text-orange-400 text-xs mb-1.5">System and Structure</h2>
+        <div class="space-y-1.5">
           <div class="p-2 rounded" style="background:rgba(0,0,0,0.3); border:1px solid rgba(var(--accent-rgb),0.2);">
             <div class="flex items-center gap-1.5 mb-1.5">
               <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="flex-1 min-w-0 bg-black/40 border border-orange-500/20 px-2 py-1.5 text-orange-300 font-bold text-xs outline-none rounded">
@@ -256,7 +256,7 @@
               </div>
             </div>
           </div>
-          <div class="bg-black/35 p-2 border border-orange-500/20 space-y-1 text-[10px] mono">
+          <div class="bg-black/35 p-1.5 border border-orange-500/20 space-y-1 text-[10px] mono">
             <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">SCI:</span><span id="sci-badge" class="text-orange-300 font-bold text-right truncate">SCI: 4.25% (Mfg) / 1.10% (React)</span></div>
             <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">Stock:</span><span id="stock-status-text" class="text-orange-400 font-bold text-right truncate"><span id="stock-count-display">0 items</span> in Stock</span></div>
             <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">EIV:</span><span id="eiv-status-text" class="text-orange-400 font-bold text-right truncate">Fetching...</span></div>
@@ -265,9 +265,9 @@
       </div>
 
       <!-- Taxes & Fees -->
-      <div id="flyout-taxes" class="flyout-panel" style="--glow-color:#4fd8e8; --glow-rgb:79,216,232;">
-        <h2 class="section-label text-orange-400 text-xs mb-2">Taxes and Fees</h2>
-        <div class="grid grid-cols-2 gap-2 text-[11px] mono">
+      <div id="flyout-taxes" class="flyout-panel">
+        <h2 class="section-label text-orange-400 text-xs mb-1.5">Taxes and Fees</h2>
+        <div class="grid grid-cols-2 gap-1.5 text-[11px] mono">
           <div class="flex items-center gap-1.5 bg-black/35 p-1.5 border border-orange-500/20" title="Facility Structure Tax %">
             <span class="text-slate-400 font-semibold flex-shrink-0">Fac:</span>
             <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-black/25 border border-orange-500/20 text-center text-orange-400 font-bold p-1 outline-none text-[11px]">
@@ -292,9 +292,9 @@
       </div>
 
       <!-- Contract Settings -->
-      <div id="flyout-contract" class="flyout-panel" style="--glow-color:#4fd8e8; --glow-rgb:79,216,232;">
-        <h2 class="section-label text-orange-400 text-xs mb-2">Contract Settings</h2>
-        <div class="grid grid-cols-2 gap-2 text-[11px] mono">
+      <div id="flyout-contract" class="flyout-panel">
+        <h2 class="section-label text-orange-400 text-xs mb-1.5">Contract Settings</h2>
+        <div class="grid grid-cols-2 gap-1.5 text-[11px] mono">
           <div class="flex items-center gap-1.5 bg-black/35 p-1.5 border border-orange-500/20" title="Contract Sales Tax %">
             <span class="text-slate-400 font-semibold flex-shrink-0">C.Tax:</span>
             <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-black/25 border border-orange-500/20 text-center text-orange-400 font-bold p-1 outline-none text-[11px]">
@@ -309,9 +309,9 @@
       </div>
 
       <!-- Markets -->
-      <div id="flyout-markets" class="flyout-panel" style="--glow-color:#4fd8e8; --glow-rgb:79,216,232;">
-        <h2 class="section-label text-orange-400 text-xs mb-2">Markets</h2>
-        <div class="space-y-2">
+      <div id="flyout-markets" class="flyout-panel">
+        <h2 class="section-label text-orange-400 text-xs mb-1.5">Markets</h2>
+        <div class="space-y-1.5">
           <div title="All prices (materials and output) are fetched from this station - this is your 'home base' for pricing.">
             <div class="text-slate-400 text-[10px] font-bold uppercase tracking-wide mb-1">Home Market</div>
             <div class="relative">
@@ -552,11 +552,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=14.5.0"></script>
-  <script src="js/config.js?v=14.5.0"></script>
-  <script src="js/esi.js?v=14.5.0"></script>
-  <script src="js/tree.js?v=14.5.0"></script>
-  <script src="js/optimizers.js?v=14.5.0"></script>
-  <script src="js/app.js?v=14.5.0"></script>
+  <script src="eve_db.js?v=14.6.0"></script>
+  <script src="js/config.js?v=14.6.0"></script>
+  <script src="js/esi.js?v=14.6.0"></script>
+  <script src="js/tree.js?v=14.6.0"></script>
+  <script src="js/optimizers.js?v=14.6.0"></script>
+  <script src="js/app.js?v=14.6.0"></script>
 </body>
 </html>
