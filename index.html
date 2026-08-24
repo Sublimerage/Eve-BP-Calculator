@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Deep-Industry Engine</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=19.0.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=20.1.0">
 </head>
 <body class="flex flex-col min-h-screen text-slate-200">
 
@@ -338,30 +338,27 @@
         </div>
       </div>
 
-      <!-- Floating viewport controls: view-related actions live on the canvas they act on -->
-      <div class="absolute top-3 right-3 z-40 flex items-center gap-2 mono text-xs" onclick="event.stopPropagation()">
-        <span id="zoom-level-text" class="px-2.5 py-1.5 glass-card text-slate-300 font-semibold">Zoom: 100%</span>
-        <button onclick="collapseAllNodes()" class="btn-glass btn-glass-muted px-3 py-1.5 flex items-center gap-1.5" title="Collapse every branch that has inputs, to shrink very tall builds">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><polyline points="7,4 12,9 17,4"/><polyline points="7,20 12,15 17,20"/></svg>
-          Collapse All
+      <!-- Floating viewport controls: icon-only + tooltips so this stays compact enough to never
+           compete for space with the flyout panels that pop out over the same top-left area. -->
+      <div class="absolute top-3 right-3 z-40 flex items-center gap-1.5 mono text-xs" onclick="event.stopPropagation()">
+        <span id="zoom-level-text" class="px-2.5 py-1.5 glass-card text-slate-300 font-semibold">100%</span>
+        <button onclick="collapseAllNodes()" class="icon-btn" title="Collapse every branch that has inputs, to shrink very tall builds">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7,4 12,9 17,4"/><polyline points="7,20 12,15 17,20"/></svg>
         </button>
-        <button onclick="expandAllNodes()" class="btn-glass btn-glass-muted px-3 py-1.5 flex items-center gap-1.5" title="Expand every collapsed branch">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><polyline points="7,9 12,4 17,9"/><polyline points="7,15 12,20 17,15"/></svg>
-          Expand All
+        <button onclick="expandAllNodes()" class="icon-btn" title="Expand every collapsed branch">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7,9 12,4 17,9"/><polyline points="7,15 12,20 17,15"/></svg>
         </button>
-        <button onclick="centerOnSelectedNode()" class="btn-glass px-3 py-1.5 flex items-center gap-1.5" title="Center on selected card, or the final output if nothing is selected">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
-          Center [F]
+        <button onclick="centerOnSelectedNode()" class="icon-btn" title="Center on selected card, or the final output if nothing is selected [F]">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
         </button>
-        <button onclick="resetPanZoom()" class="btn-glass btn-glass-muted px-3 py-1.5 flex items-center gap-1.5">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M21 12a9 9 0 11-2.2-5.9"/><polyline points="21,3 21,9 15,9"/></svg>
-          Reset View
+        <button onclick="resetPanZoom()" class="icon-btn" title="Reset pan and zoom">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-2.2-5.9"/><polyline points="21,3 21,9 15,9"/></svg>
         </button>
       </div>
 
       <!-- Floating controls hint -->
-      <div class="absolute bottom-3 left-3 z-40 px-3 py-1.5 bg-[#0a0d0e]/90 border border-orange-500/20 mono text-slate-400 text-[11px] shadow-lg max-w-lg">
-        💡 <b>Click Card:</b> Highlight Inputs &amp; Output &nbsp;|&nbsp; <b>Click BOM Row:</b> Center Material &nbsp;|&nbsp; <b>[F]:</b> Center Output
+      <div id="viewport-hint" class="absolute bottom-3 left-3 z-40 px-3 py-1.5 mono text-slate-400 text-[11px]" title="Click Card: Highlight Inputs &amp; Output · Click BOM Row: Center Material · [F]: Center Output">
+        Click card to highlight · Click BOM row to center · [F] to center output
       </div>
     </main>
 
