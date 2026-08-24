@@ -81,11 +81,15 @@ html {
   --red-400: #dd6b64;
   --red-500: #cf5a53;
 
-  /* Glass surface */
-  --glass-fill: linear-gradient(160deg, rgba(255,255,255,0.055), rgba(255,255,255,0.014) 60%);
-  --glass-border: rgba(255,255,255,0.10);
-  --glass-border-top: rgba(255,255,255,0.20);
-  --glass-shadow: 0 14px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+  /* Glass surface - a genuinely lighter "elevated" tone (--surface-rgb), not the page canvas
+     color, layered at partial opacity so it reads as a lifted card even before any blur is
+     considered, and so backdrop-filter actually has something translucent to blur. */
+  --surface-rgb: 32,26,20;
+  --glass-fill: linear-gradient(165deg, rgba(var(--surface-rgb),0.92), rgba(var(--surface-rgb),0.72));
+  --glass-fill-panel: linear-gradient(165deg, rgba(var(--surface-rgb),0.62), rgba(var(--surface-rgb),0.40));
+  --glass-border: rgba(255,255,255,0.12);
+  --glass-border-top: rgba(255,255,255,0.24);
+  --glass-shadow: 0 14px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07);
   --blur: 22px;
 
   --radius-sm: 7px;
@@ -217,7 +221,7 @@ img {
    gives the same material without the compositing cost of blurring many overlapping layers).
    ============================================================ */
 .glass-card {
-  background: var(--glass-fill), var(--bg-0);
+  background: var(--glass-fill);
   border: 1px solid var(--glass-border);
   border-top-color: var(--glass-border-top);
   border-radius: var(--radius-card);
@@ -230,8 +234,9 @@ img {
    elements below rather than requiring new classes sprinkled through the HTML.
    ============================================================ */
 .glass-panel, header, .icon-rail, .flyout-panel, #status-badge,
-#blueprint-browser-drawer, #paste-modal > div, .stat-strip, #bom-sidebar, #history-drawer {
-  background: var(--glass-fill), var(--bg-0);
+#blueprint-browser-drawer, #paste-modal > div, .stat-strip, #bom-sidebar, #history-drawer,
+#invention-sidebar {
+  background: var(--glass-fill-panel);
   backdrop-filter: blur(var(--blur));
   -webkit-backdrop-filter: blur(var(--blur));
   border: 1px solid var(--glass-border);
@@ -239,6 +244,7 @@ img {
   box-shadow: var(--glass-shadow);
 }
 header { border-radius: 0; border-left: none; border-right: none; border-top: none; height: 56px; flex-shrink: 0; }
+#invention-sidebar { border-radius: 0; border-top: none; border-bottom: none; border-left: none; }
 
 .icon-btn {
   width: 30px; height: 30px; border-radius: var(--radius-btn);
@@ -258,7 +264,7 @@ header { border-radius: 0; border-left: none; border-right: none; border-top: no
 .btn-glass {
   border-radius: var(--radius-btn);
   border: 1px solid var(--glass-border);
-  background: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.012));
+  background: linear-gradient(160deg, rgba(var(--surface-rgb),0.85), rgba(var(--surface-rgb),0.6));
   color: var(--text);
   font-family: 'Inter', sans-serif;
   font-weight: 500;
@@ -435,11 +441,11 @@ select option:checked, select option:hover { background-color: var(--accent); co
   gap: 5px;
   transition: all 0.15s ease;
   border: 1px solid var(--glass-border);
-  background: rgba(255,255,255,0.03);
+  background: rgba(var(--surface-rgb),0.7);
   color: var(--text-soft);
 }
 .toggle-btn svg { width: 13px; height: 13px; stroke: currentColor; flex-shrink: 0; }
-.toggle-btn:hover { background: rgba(255,255,255,0.07); border-color: var(--glass-border-top); color: var(--text); }
+.toggle-btn:hover { background: rgba(var(--surface-rgb),0.9); border-color: var(--glass-border-top); color: var(--text); }
 .toggle-btn-active-accent {
   background: linear-gradient(160deg, rgba(var(--accent-rgb),0.22), rgba(var(--accent-rgb),0.06));
   border-color: rgba(var(--accent-rgb),0.4);
@@ -569,16 +575,16 @@ select option:checked, select option:hover { background-color: var(--accent); co
 
 /* ---- literal bg-[#hex]/border-[#hex] classes from the pre-redesign palette (index.html /
    ledger.html / invention.html static shells) ---- */
-[class*="bg-[#3a4a4c]"] { background: rgba(255,255,255,0.08) !important; }
-[class*="bg-[#202a2e]"] { background: var(--glass-fill), var(--bg-0) !important; }
-[class*="bg-[#0a0d0e]"] { background: var(--glass-fill), var(--bg-0) !important; }
-[class*="bg-[#030405]"] { background: rgba(0,0,0,0.35) !important; }
+[class*="bg-[#3a4a4c]"] { background: rgba(255,255,255,0.12) !important; }
+[class*="bg-[#202a2e]"] { background: var(--glass-fill-panel) !important; }
+[class*="bg-[#0a0d0e]"] { background: var(--glass-fill-panel) !important; }
+[class*="bg-[#030405]"] { background: rgba(0,0,0,0.45) !important; }
 [class*="bg-[#070b0f]"] { background: var(--bg-0) !important; }
-[class*="bg-[#0c1318]"] { background: var(--glass-fill), var(--bg-0) !important; }
-[class*="bg-[#0d1922]"] { background: var(--glass-fill), var(--bg-0) !important; }
+[class*="bg-[#0c1318]"] { background: var(--glass-fill) !important; }
+[class*="bg-[#0d1922]"] { background: var(--glass-fill) !important; }
 [class*="bg-[#0a0f14]"] { background: transparent !important; }
-[class*="bg-[#05080c]"] { background: rgba(0,0,0,0.2) !important; }
-[class*="bg-[#1e3348]"] { background: rgba(255,255,255,0.07) !important; }
+[class*="bg-[#05080c]"] { background: rgba(0,0,0,0.3) !important; }
+[class*="bg-[#1e3348]"] { background: rgba(255,255,255,0.1) !important; }
 [class*="border-[#1e3348]"] { border-color: var(--glass-border) !important; }
 [class*="divide-[#1e3348]"] > :not([hidden]) ~ :not([hidden]) { border-color: var(--glass-border) !important; }
 [class*="text-[#c8d8e8]"] { color: var(--text-soft) !important; }
