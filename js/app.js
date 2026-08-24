@@ -1795,7 +1795,7 @@ function createNodeCard(node) {
         <div class="flex justify-between text-slate-400"><span>Highest Buy:</span><span class="text-slate-300">${prices.buy.toLocaleString()} ISK</span></div>
         ${!isRoot && savingsPct !== null ? `<div class="flex justify-between text-green-400 font-semibold text-xs"><span>Order Savings:</span><span>${savingsPct}%</span></div>` : ''}
         ${node.jobFee > 0 && node.isBuildingSelf ? `<div class="flex justify-between text-[#e85555] font-semibold border-t border-[#3a3025] pt-1"><span>Job Inst. Fee:</span><span>+${Math.round(node.jobFee).toLocaleString()} ISK</span></div>` : ''}
-        <div class="flex justify-between font-bold border-t border-[#3a3025] pt-1 mt-1"><span class="text-slate-300">${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span><span class="text-orange-400 font-bold">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span></div>
+        <div class="flex justify-between font-bold border-t border-[#3a3025] pt-1 mt-1"><span class="text-slate-300">${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span><span class="font-bold" style="color:var(--accent);">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span></div>
         ${isRoot ? `
           <div class="flex justify-between font-bold border-t border-green-500/40 pt-1.5 mt-1">
             <span class="text-slate-300">${window.rootSellStrategy === 'custom-contract' ? 'Net Profit (Contract Output):' : 'Net Profit (Sell Output):'}</span>
