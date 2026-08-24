@@ -2393,7 +2393,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
 
   bomItems.forEach(item => {
     const row = document.createElement('div');
-    row.className = 'bg-[#0a0d0e] rounded border border-[#262e30] hover:border-orange-500 hover:bg-[#283438] p-2 flex items-center justify-between cursor-pointer transition shadow-sm';
+    row.className = 'bg-black/25 rounded border border-orange-500/20 hover:border-orange-500 hover:bg-orange-500/10 p-2 flex items-center justify-between cursor-pointer transition shadow-sm';
     row.title = 'Click to find and focus this material in the build diagram';
     row.onclick = () => highlightNodeByTypeId(item.typeId);
 
@@ -2403,7 +2403,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
         <div class="min-w-0 flex-1">
           <div class="font-semibold text-slate-200 truncate flex items-center gap-1.5">
             <span class="truncate">${item.name}</span>
-            <span class="text-[9px] px-1 font-bold mono ${item.strategy === 'sell' ? 'bg-orange-900/60 text-orange-300' : 'bg-orange-900/60 text-orange-300'}">
+            <span class="text-[9px] px-1 font-bold mono ${item.strategy === 'sell' ? 'bg-orange-900/60 text-orange-300' : 'bg-[rgba(79,168,224,0.15)] text-[#a8d4f0]'}">
               ${item.strategy === 'sell' ? 'SELL' : 'BUY'}
             </span>
           </div>
@@ -2437,50 +2437,41 @@ function getNodeStrategyOnly(node) {
 }
 
 // --- Icon rail flyout navigation ---
+// Fixed order matching the icon rail's own top-to-bottom order - flyouts always stack in this
+// relative order regardless of the sequence they were opened in.
+const FLYOUT_ORDER = ['search', 'build', 'optimize', 'structure', 'taxes', 'contract', 'markets'];
+
+function layoutAllFlyouts() {
+  const gap = 10;
+  let currentTop = 12;
+  FLYOUT_ORDER.forEach(id => {
+    const flyout = document.getElementById(`flyout-${id}`);
+    if (!flyout || !flyout.classList.contains('open')) return;
+    flyout.style.transform = 'none';
+    flyout.style.top = `${currentTop}px`;
+    currentTop += flyout.offsetHeight + gap;
+  });
+}
+window.layoutAllFlyouts = layoutAllFlyouts;
+
 function toggleFlyout(sectionId) {
   const targetFlyout = document.getElementById(`flyout-${sectionId}`);
   const targetBtn = document.getElementById(`icon-btn-${sectionId}`);
-  const rail = document.getElementById('control-sidebar');
-  if (!targetFlyout || !targetBtn || !rail) return;
+  if (!targetFlyout || !targetBtn) return;
   const isCurrentlyOpen = targetFlyout.classList.contains('open');
 
   if (isCurrentlyOpen) {
     targetFlyout.classList.remove('open');
     targetBtn.classList.remove('icon-rail-btn-active');
-    return;
+  } else {
+    targetFlyout.classList.add('open');
+    targetBtn.classList.add('icon-rail-btn-active');
   }
 
-  targetFlyout.classList.add('open');
-  targetBtn.classList.add('icon-rail-btn-active');
-
-  // Position near the clicked icon's own vertical spot instead of always vertically centering,
-  // then check every OTHER currently-open flyout and push down past any it would overlap with -
-  // since multiple flyouts can now stay open at once, without this they'd all stack at whatever
-  // position their own icon happens to sit at, overlapping each other illegibly.
-  targetFlyout.style.transform = 'none';
-  const iconTop = targetBtn.offsetTop;
-  const flyoutHeight = targetFlyout.offsetHeight;
-  const railHeight = rail.offsetHeight;
-  let top = iconTop;
-
-  const gap = 10;
-  const others = Array.from(document.querySelectorAll('.flyout-panel.open'))
-    .filter(f => f !== targetFlyout)
-    .map(f => ({ top: parseFloat(f.style.top) || 0, bottom: (parseFloat(f.style.top) || 0) + f.offsetHeight }))
-    .sort((a, b) => a.top - b.top);
-
-  for (const other of others) {
-    const bottom = top + flyoutHeight;
-    const overlaps = top < other.bottom && bottom > other.top;
-    if (overlaps) {
-      top = other.bottom + gap;
-    }
-  }
-
-  if (top + flyoutHeight > railHeight) {
-    top = Math.max(12, railHeight - flyoutHeight - 12);
-  }
-  targetFlyout.style.top = `${top}px`;
+  // Re-layout every currently-open flyout together, in fixed order, so opening or closing any
+  // one of them automatically makes room for (or reclaims space from) all the others - nothing
+  // silently refuses to open, and the relative order never changes.
+  layoutAllFlyouts();
 }
 window.toggleFlyout = toggleFlyout;
 
@@ -2651,14 +2642,7 @@ window.addEventListener('resize', () => {
 
 window.onload = async () => {
   generateHalftoneBackground();
-  (function positionDefaultFlyout() {
-    const rail = document.getElementById('control-sidebar');
-    const btn = document.getElementById('icon-btn-search');
-    const flyout = document.getElementById('flyout-search');
-    if (!rail || !btn || !flyout) return;
-    flyout.style.transform = 'none';
-    flyout.style.top = `${btn.offsetTop}px`;
-  })();
+  layoutAllFlyouts();
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
