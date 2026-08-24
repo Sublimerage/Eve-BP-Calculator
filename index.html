@@ -9,14 +9,14 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Deep-Industry Engine</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=14.1.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=14.2.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#030405] text-slate-200">
 
   <svg id="halftone-bg"></svg>
 
   <!-- Header: branding + primary account/nav actions only -->
-  <header class="bg-[#0a0d0e] border-b border-[#3a4a4c] px-5 py-2.5 flex flex-wrap justify-between items-center gap-3 shadow-xl z-30">
+  <header class="px-5 py-2.5 flex flex-wrap justify-between items-center gap-3 shadow-xl z-30 border-b border-[#3a4a4c]" style="background:rgba(15,10,8,0.5); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);">
     <div class="flex items-center space-x-3">
       <div class="w-10 h-10 bg-orange-500 flex items-center justify-center font-bold text-black text-2xl rajdhani shadow-lg shadow-orange-500/20">E</div>
       <h1 class="text-lg font-bold tracking-widest text-white rajdhani leading-none">EVE DEEP-INDUSTRY ENGINE</h1>
@@ -370,8 +370,8 @@
     </main>
 
     <!-- Bill of Materials (BOM) Sidebar -->
-    <aside class="w-80 md:w-96 bg-[#0a0d0e] border-l border-[#3a4a4c] flex flex-col z-20 shadow-2xl">
-      <div class="p-4 border-b border-[#3a4a4c] flex justify-between items-center bg-[#202a2e]">
+    <aside class="w-80 md:w-96 flex flex-col z-20 shadow-2xl" style="background:rgba(15,10,8,0.5); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-left:1px solid rgba(var(--accent-rgb),0.2);">
+      <div class="p-4 border-b border-[#3a4a4c] flex justify-between items-center" style="background:rgba(20,15,12,0.4);">
         <div>
           <h2 class="font-bold text-white rajdhani tracking-wider text-lg">BILL OF MATERIALS</h2>
           <div class="text-[10px] mono text-slate-400">CLICK ROW TO FOCUS CARD IN DIAGRAM</div>
@@ -382,26 +382,29 @@
       </div>
 
       <details open class="border-b border-[#3a4a4c] group">
-        <summary class="px-4 py-2.5 cursor-pointer bg-[#202a2e] flex items-center justify-between list-none hover:bg-[#283438]" title="Only affects this shopping list and Copy Multibuy - materials you already have in stock are excluded from what's shown/copied here. Does NOT affect Total Production Cost or Profit, which always reflect full market value regardless of stock.">
-          <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide flex items-center gap-1.5">📦 Stock &amp; Location <span id="location-search-feedback" class="text-[9px] text-orange-300 font-mono font-bold normal-case hidden"></span></span>
+        <summary class="px-4 py-2.5 cursor-pointer flex items-center justify-between list-none hover:bg-orange-500/10" style="background:rgba(20,15,12,0.4);" title="Only affects this shopping list and Copy Multibuy - materials you already have in stock are excluded from what's shown/copied here. Does NOT affect Total Production Cost or Profit, which always reflect full market value regardless of stock.">
+          <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide flex items-center gap-1.5">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><line x1="12" y1="13" x2="12" y2="21"/></svg>
+            Stock &amp; Location <span id="location-search-feedback" class="text-[9px] text-orange-300 font-mono font-bold normal-case hidden"></span>
+          </span>
           <span class="text-slate-500 group-open:rotate-90 transition-transform">▶</span>
         </summary>
-        <div class="px-4 pb-3 pt-1 bg-[#202a2e] space-y-2">
+        <div class="px-4 pb-3 pt-1 space-y-2" style="background:rgba(20,15,12,0.4);">
           <button id="deduct-stock-mode" value="true" onclick="toggleDeductStockButton(this, 'recalculate')" class="btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5" title="Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead">✔ Deducting Stock</button>
 
           <div class="flex items-center gap-2">
             <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
-              <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
+              <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5" style="accent-color:var(--accent);">
               <span>Pers</span>
             </label>
             <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
-              <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
+              <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5" style="accent-color:var(--accent);">
               <span>Corp</span>
             </label>
           </div>
           <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterLocationDropdownOptions()"
-            class="w-full bg-[#030405] border border-[#3a4a4c] px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-orange-500">
-          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-[#030405] border border-[#3a4a4c] px-2.5 py-1.5 text-orange-300 font-bold text-[11px] outline-none truncate">
+            class="w-full bg-black/40 border border-[#3a4a4c] px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-orange-500">
+          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-black/40 border border-[#3a4a4c] px-2.5 py-1.5 text-orange-300 font-bold text-[11px] outline-none truncate">
             <option value="all" selected>All Locations (Combined Assets)</option>
             <option value="industry_system">Current System Only (JITA)</option>
           </select>
@@ -414,7 +417,7 @@
       </div>
 
       <!-- BOM Total Summary Footer -->
-      <div class="p-4 border-t border-[#3a4a4c] bg-[#202a2e] mono">
+      <div class="p-4 border-t border-[#3a4a4c] mono" style="background:rgba(20,15,12,0.4);">
         <div class="flex justify-between text-slate-400 text-xs">
           <span>Unique Material Types:</span>
           <span id="bom-type-count" class="text-white font-bold">0</span>
@@ -544,11 +547,11 @@
   </div>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
-  <script src="eve_db.js?v=14.1.0"></script>
-  <script src="js/config.js?v=14.1.0"></script>
-  <script src="js/esi.js?v=14.1.0"></script>
-  <script src="js/tree.js?v=14.1.0"></script>
-  <script src="js/optimizers.js?v=14.1.0"></script>
-  <script src="js/app.js?v=14.1.0"></script>
+  <script src="eve_db.js?v=14.2.0"></script>
+  <script src="js/config.js?v=14.2.0"></script>
+  <script src="js/esi.js?v=14.2.0"></script>
+  <script src="js/tree.js?v=14.2.0"></script>
+  <script src="js/optimizers.js?v=14.2.0"></script>
+  <script src="js/app.js?v=14.2.0"></script>
 </body>
 </html>
