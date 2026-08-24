@@ -2454,12 +2454,29 @@ function toggleFlyout(sectionId) {
   targetBtn.classList.add('icon-rail-btn-active');
 
   // Position near the clicked icon's own vertical spot instead of always vertically centering,
-  // clamped so it never renders below the visible rail height.
+  // then check every OTHER currently-open flyout and push down past any it would overlap with -
+  // since multiple flyouts can now stay open at once, without this they'd all stack at whatever
+  // position their own icon happens to sit at, overlapping each other illegibly.
   targetFlyout.style.transform = 'none';
   const iconTop = targetBtn.offsetTop;
   const flyoutHeight = targetFlyout.offsetHeight;
   const railHeight = rail.offsetHeight;
   let top = iconTop;
+
+  const gap = 10;
+  const others = Array.from(document.querySelectorAll('.flyout-panel.open'))
+    .filter(f => f !== targetFlyout)
+    .map(f => ({ top: parseFloat(f.style.top) || 0, bottom: (parseFloat(f.style.top) || 0) + f.offsetHeight }))
+    .sort((a, b) => a.top - b.top);
+
+  for (const other of others) {
+    const bottom = top + flyoutHeight;
+    const overlaps = top < other.bottom && bottom > other.top;
+    if (overlaps) {
+      top = other.bottom + gap;
+    }
+  }
+
   if (top + flyoutHeight > railHeight) {
     top = Math.max(12, railHeight - flyoutHeight - 12);
   }
