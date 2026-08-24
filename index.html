@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Deep-Industry Engine</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=20.1.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=21.1.0">
 </head>
 <body class="flex flex-col min-h-screen text-slate-200">
 
@@ -150,10 +150,10 @@
         <h2 class="section-label text-orange-400 text-xs mb-1.5">Build Actions</h2>
         <div class="grid grid-cols-2 gap-1.5 mb-1.5">
           <button onclick="buildAllComponents()" class="btn-glass py-2 px-3 text-xs">
-            🔨 Build All
+            Build All
           </button>
           <button onclick="buyAllSubComponents()" class="btn-glass btn-glass-muted py-2 px-3 text-xs">
-            🛒 Buy All
+            Buy All
           </button>
         </div>
         <div class="rounded bg-black/35 p-1.5 border border-orange-500/25 flex items-center gap-1.5" title="Build Margin Threshold">
@@ -162,7 +162,7 @@
             class="w-14 bg-black/25 border border-orange-500/40 text-center text-orange-300 font-bold p-1 outline-none text-xs">
           <span class="text-slate-500 text-xs flex-shrink-0">%</span>
           <button onclick="applyBuildProfitOptimizer()" class="ml-auto rounded bg-orange-800 hover:bg-orange-700 text-white font-semibold py-1 px-2 text-[10px] transition shadow mono flex-shrink-0">
-            ⚡ Optimize
+            Optimize
           </button>
         </div>
       </div>
@@ -432,7 +432,7 @@
   <div id="blueprint-browser-backdrop" class="fixed inset-0 bg-black/70 z-[998] hidden transition-opacity duration-300" onclick="closeBlueprintBrowser()"></div>
   <div id="blueprint-browser-drawer" class="fixed top-0 right-0 h-full w-full sm:w-[clamp(920px,62vw,1300px)] max-w-full bg-[#0a0d0e] border-l border-orange-500/60 shadow-2xl z-[999] flex flex-col text-xs mono transform translate-x-full transition-transform duration-300 ease-out">
     <div class="flex justify-between items-center border-b border-orange-500/20 px-5 py-3.5 flex-shrink-0">
-      <h3 class="text-base font-bold text-orange-300 rajdhani tracking-wider">📘 MY BLUEPRINTS</h3>
+      <h3 class="text-base font-bold text-orange-300 rajdhani tracking-wider">MY BLUEPRINTS</h3>
       <button onclick="closeBlueprintBrowser()" class="text-slate-400 hover:text-white font-bold text-lg leading-none">✖</button>
     </div>
 
@@ -441,11 +441,11 @@
       <aside class="w-[260px] flex-shrink-0 border-r border-orange-500/20 flex flex-col overflow-hidden">
         <div class="p-3.5 space-y-3 flex-shrink-0 border-b border-orange-500/20 overflow-y-auto">
           <div>
-            <input type="text" id="blueprint-browser-search" placeholder="🔍 Search blueprint name..." autocomplete="off" oninput="filterBlueprintBrowser()"
+            <input type="text" id="blueprint-browser-search" placeholder="Search blueprint name..." autocomplete="off" oninput="filterBlueprintBrowser()"
               class="w-full bg-[#030405] border border-orange-500/20 px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-orange-500">
           </div>
           <div class="flex items-center justify-between">
-            <button onclick="loadBlueprintBrowserData(true)" class="px-2.5 py-1.5 bg-orange-800 hover:bg-orange-700 text-orange-100 font-semibold text-[10px] transition">🔄 Refresh</button>
+            <button onclick="loadBlueprintBrowserData(true)" class="px-2.5 py-1.5 bg-orange-800 hover:bg-orange-700 text-orange-100 font-semibold text-[10px] transition">Refresh</button>
             <label class="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-400 font-bold">
               <input type="checkbox" id="blueprint-stack-toggle" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
               Stack identical
@@ -462,14 +462,14 @@
             </label>
           </div>
           <div class="flex items-center gap-2">
-            <button id="blueprint-scan-btn" onclick="scanBlueprintProfits()" class="flex-1 px-2.5 py-1.5 bg-orange-700 hover:bg-orange-600 text-white font-bold text-[10px] transition" title="Computes manufacturing profit for every visible blueprint using its real owned ME/TE/runs - can take a while for large collections">📊 Scan Profit</button>
+            <button id="blueprint-scan-btn" onclick="scanBlueprintProfits()" class="flex-1 px-2.5 py-1.5 bg-orange-700 hover:bg-orange-600 text-white font-bold text-[10px] transition" title="Computes manufacturing profit for every visible blueprint using its real owned ME/TE/runs - can take a while for large collections">Scan Profit</button>
             <label class="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-400 font-bold flex-shrink-0">
               <input type="checkbox" id="blueprint-sort-by-profit" onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-purple-500">
               Sort
             </label>
           </div>
           <div>
-            <button id="blueprint-readiness-btn" onclick="scanBlueprintReadiness()" class="w-full px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] transition" title="Checks each visible blueprint's direct materials against your current stock - shows which ones you could build right now with zero shopping">🧰 What Can I Build Right Now?</button>
+            <button id="blueprint-readiness-btn" onclick="scanBlueprintReadiness()" class="w-full px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] transition" title="Checks each visible blueprint's direct materials against your current stock - shows which ones you could build right now with zero shopping">What Can I Build Right Now?</button>
           </div>
 
           <div>
@@ -516,7 +516,7 @@
   <div id="paste-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[999] hidden p-4">
     <div class="bg-[#0a0d0e] border border-orange-500/80 p-6 w-full max-w-xl shadow-2xl flex flex-col space-y-4 text-xs mono">
       <div class="flex justify-between items-center border-b border-orange-500/20 pb-3">
-        <h3 class="text-base font-bold text-orange-300 rajdhani tracking-wider">📋 IMPORT HANGAR STOCK FROM CLIPBOARD</h3>
+        <h3 class="text-base font-bold text-orange-300 rajdhani tracking-wider">IMPORT HANGAR STOCK FROM CLIPBOARD</h3>
         <button onclick="closePasteModal()" class="text-slate-400 hover:text-white font-bold text-base">✖</button>
       </div>
       <p class="text-slate-300 leading-relaxed">

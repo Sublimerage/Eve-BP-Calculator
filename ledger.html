@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Industry Ledger</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=20.1.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=21.1.0">
 </head>
 <body class="flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -42,7 +42,7 @@
   <section class="bg-[#0d1922] border-b border-[#1e3348] p-3 flex flex-wrap items-center gap-3 text-xs relative z-40">
     <div class="flex flex-col bg-[#0c1318] p-2.5 rounded-lg border border-[#1e3348] shadow flex-grow max-w-[520px]">
       <div class="flex items-center justify-between mb-1.5">
-        <span class="text-cyan-400 text-[11px] font-bold uppercase rajdhani tracking-wide">📦 Stock &amp; Location Filters</span>
+        <span class="text-cyan-400 text-[11px] font-bold uppercase rajdhani tracking-wide">Stock &amp; Location Filters</span>
         <span id="location-search-feedback" class="text-[9px] text-amber-300 font-mono font-bold hidden"></span>
       </div>
 
@@ -111,7 +111,7 @@
         <h2 class="text-sm font-bold uppercase tracking-wider text-purple-300 rajdhani">Active Manufacturing Queue</h2>
         <div class="flex flex-wrap items-center gap-1.5">
           <button onclick="toggleQueueViewMode()" id="btn-view-mode" class="px-2 py-1 bg-[#1e3348] hover:bg-slate-600 text-slate-300 font-semibold rounded text-[10px] mono transition" title="Switch between grid and list view">
-            ☰ List View
+            List View
           </button>
           <button onclick="expandAllJobCards()" class="px-2 py-1 bg-[#1e3348] hover:bg-slate-600 text-slate-300 font-semibold rounded text-[10px] mono transition" title="Show full details on every card">
             ▾ Maximize All
@@ -120,10 +120,10 @@
             ▸ Minimize All
           </button>
           <button onclick="combineDuplicateJobs()" class="px-2 py-1 bg-purple-800 hover:bg-purple-700 text-purple-100 font-semibold rounded text-[10px] mono transition" title="Merge jobs for the same item that are otherwise identical (same build/buy config, same sell strategy, neither already started). Jobs with different settings are left alone.">
-            🔗 Combine Duplicates
+            Combine Duplicates
           </button>
           <button id="btn-sync-eve-jobs" onclick="syncWithEveIndustryJobs()" class="px-2 py-1 bg-cyan-800 hover:bg-cyan-700 text-cyan-100 font-semibold rounded text-[10px] mono transition" title="Check your active EVE industry jobs (your own and, if you have Factory Manager role, your corp's) and auto-start any pending ledger job that matches one, using EVE's real start time and duration.">
-            🔄 Sync EVE Jobs
+            Sync EVE Jobs
           </button>
           <button onclick="collectAllReadyJobs()" class="px-2 py-1 bg-green-800 hover:bg-green-700 text-green-100 font-semibold rounded text-[10px] mono transition" title="Mark every job whose timer has finished as Built">
             ✔ Collect All Ready
@@ -132,11 +132,11 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <input type="text" id="job-search-input" placeholder="🔍 Search queue by name..." autocomplete="off" oninput="filterJobsBySearch(this.value)"
+        <input type="text" id="job-search-input" placeholder="Search queue by name..." autocomplete="off" oninput="filterJobsBySearch(this.value)"
           class="flex-1 min-w-[180px] bg-[#0c1318] border border-[#1e3348] rounded-md px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-purple-500">
         <div class="flex gap-1">
           <button onclick="setJobStatusFilter('all')" id="btn-status-all" class="px-2.5 py-1.5 rounded-md font-bold transition text-[10px] mono bg-purple-800 text-white border border-purple-600/30">All</button>
-          <button onclick="setJobStatusFilter('started')" id="btn-status-started" class="px-2.5 py-1.5 rounded-md font-bold transition text-[10px] mono bg-[#1e3348] text-slate-400 hover:text-white">🟢 In Progress</button>
+          <button onclick="setJobStatusFilter('started')" id="btn-status-started" class="px-2.5 py-1.5 rounded-md font-bold transition text-[10px] mono bg-[#1e3348] text-slate-400 hover:text-white">In Progress</button>
           <button onclick="setJobStatusFilter('pending')" id="btn-status-pending" class="px-2.5 py-1.5 rounded-md font-bold transition text-[10px] mono bg-[#1e3348] text-slate-400 hover:text-white">⏳ Pending</button>
         </div>
       </div>
