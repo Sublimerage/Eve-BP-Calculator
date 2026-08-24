@@ -306,6 +306,33 @@ svg[viewBox] {
   stroke: none;
 }
 
+/* Cohesive styling for all inputs/selects inside flyout panels - rounds corners, lightens the
+   background slightly, and adds an orange-tinted border/focus glow, so these fields feel like
+   part of the same system instead of plain flat boxes that clash with the rest of the app. */
+.flyout-panel input, .flyout-panel select {
+  border-radius: 3px !important;
+  background-color: rgba(0,0,0,0.35) !important;
+  border-color: rgba(var(--accent-rgb), 0.25) !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.flyout-panel input:focus, .flyout-panel select:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.15);
+}
+
+/* Fix native <select> dropdown option-list readability - the closed box takes on whatever
+   Tailwind classes are applied to it, but the opened list of <option> elements often falls back
+   to browser/OS default styling (light background, blue selection highlight) unless explicitly
+   set here, which was causing orange text on a near-white background to be nearly unreadable. */
+select option {
+  background-color: #1a1210;
+  color: #e8e8e8;
+}
+select option:checked, select option:hover {
+  background-color: var(--accent);
+  color: #1a1210;
+}
+
 .icon-rail-btn svg {
   width: 20px;
   height: 20px;
