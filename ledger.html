@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Industry Ledger</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=25.4.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=26.0.0">
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -59,9 +59,9 @@
         </label>
 
         <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterJournalLocationOptions()"
-          class="w-28 bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-cyan-500">
+          class="field-line w-28 px-2 py-1.5 text-slate-200 text-[11px] mono">
 
-        <select id="stock-location-filter" onchange="applyJournalStockFilter()" class="flex-1 bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-amber-300 font-bold text-[11px] outline-none truncate min-w-[140px]">
+        <select id="stock-location-filter" onchange="applyJournalStockFilter()" class="field-line flex-1 px-2 py-1.5 text-amber-300 font-bold text-[11px] truncate min-w-[140px]">
           <option value="all" selected>All Locations (Combined Assets)</option>
         </select>
       </div>
@@ -133,7 +133,7 @@
 
       <div class="flex flex-wrap items-center gap-2">
         <input type="text" id="job-search-input" placeholder="Search queue by name..." autocomplete="off" oninput="filterJobsBySearch(this.value)"
-          class="flex-1 min-w-[180px] bg-[#0c1318] border border-[#1e3348] rounded-md px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-purple-500">
+          class="field-line flex-1 min-w-[180px] px-3 py-1.5 text-slate-200 text-xs mono">
         <div class="flex gap-1">
           <button onclick="setJobStatusFilter('all')" id="btn-status-all" class="px-2.5 py-1.5 rounded-md font-bold transition text-[10px] mono bg-purple-800 text-black">All</button>
           <button onclick="setJobStatusFilter('started')" id="btn-status-started" class="px-2.5 py-1.5 rounded-md font-bold transition text-[10px] mono bg-[#1e3348] text-slate-400 hover:text-white">In Progress</button>
@@ -180,7 +180,7 @@
         <!-- Category Filter dropdown -->
         <div class="flex items-center justify-between text-[11px] mono">
           <span class="text-slate-400 font-bold">Category:</span>
-          <select id="bom-category-select" onchange="setBOMCategoryFilter(this.value)" class="bg-[#070b0f] text-slate-200 border border-[#1e3348] rounded-md px-2 py-1 outline-none text-[11px] w-40 font-semibold">
+          <select id="bom-category-select" onchange="setBOMCategoryFilter(this.value)" class="field-line text-slate-200 px-2 py-1 text-[11px] w-40 font-semibold">
             <option value="all">All Items</option>
             <option value="minerals">Minerals</option>
             <option value="pigas">PI / Gases</option>
@@ -258,6 +258,6 @@
   <script src="js/esi.js?v=8.0.2"></script>
   <script src="js/tree.js?v=8.0.1"></script>
   <script src="js/optimizers.js?v=8.0.1"></script>
-  <script src="js/ledger.js?v=8.0.7"></script>
+  <script src="js/ledger.js?v=8.0.8"></script>
 </body>
 </html>

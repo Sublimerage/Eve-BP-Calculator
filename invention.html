@@ -8,7 +8,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Invention Calculator</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=25.4.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=26.0.0">
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -46,7 +46,7 @@
           <input type="text" id="invention-item-search" placeholder="Search item name (e.g. Wolf)..." autocomplete="off"
             oninput="searchInventionItem(this.value)" onfocus="searchInventionItem(this.value)"
             onblur="setTimeout(() => { const el = document.getElementById('invention-search-results'); if (el) el.classList.add('hidden'); }, 200)"
-            class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-2 text-white font-bold mono text-sm outline-none focus:border-purple-500">
+            class="field-box w-full px-3 py-2.5 text-white font-bold mono text-sm">
           <div id="invention-search-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-purple-500 rounded-b-md max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
         </div>
         <p class="text-[10px] text-slate-500 mt-1.5">Search for the <b>Tech 2</b> item you want to produce (e.g. "Wolf"), not the T1 item it's invented from - the T1 source and its ME/TE requirements are resolved automatically.</p>
@@ -67,7 +67,7 @@
             <span class="text-[9px] text-slate-500" title="Auto-classified from item type. Override if you know the exact value from the in-game invention window.">auto-detected</span>
           </div>
           <div class="flex items-center gap-2">
-            <input type="number" id="invention-base-chance" min="0" max="100" step="0.1" class="w-20 bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-cyan-300 font-bold text-sm outline-none focus:border-cyan-500" oninput="recalculateInvention()">
+            <input type="number" id="invention-base-chance" min="0" max="100" step="0.1" class="field-line w-20 px-2 py-1.5 text-cyan-300 font-bold text-sm" oninput="recalculateInvention()">
             <span class="text-slate-400 text-sm">%</span>
           </div>
         </div>
@@ -102,8 +102,8 @@
             </label>
           </div>
           <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterLocationDropdownOptions()"
-            class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-cyan-500">
-          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2.5 py-1.5 text-amber-300 font-bold text-[11px] outline-none truncate">
+            class="field-line w-full px-2.5 py-1.5 text-slate-200 text-[11px] mono">
+          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="field-line w-full px-2.5 py-1.5 text-amber-300 font-bold text-[11px] truncate">
             <option value="all" selected>All Locations (Combined Assets)</option>
             <option value="industry_system">Current System Only (JITA)</option>
           </select>
@@ -111,7 +111,7 @@
 
         <div class="p-3.5 border-b border-[#1e3348] space-y-2">
           <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide" title="How input materials for manufacturing the resulting BPC are priced.">Material Pricing</div>
-          <select id="input-price-mode" onchange="recalculateInvention()" class="w-full bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-white font-bold text-xs outline-none">
+          <select id="input-price-mode" onchange="recalculateInvention()" class="field-line w-full px-2 py-1.5 text-white font-bold text-xs">
             <option value="sell" selected>Jita Sell (Instant Buy)</option>
             <option value="buy">Jita Buy Order</option>
           </select>
@@ -122,19 +122,19 @@
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="text-[9px] text-slate-500 font-bold uppercase block mb-0.5" title="Facility/structure tax applied to every manufacturing AND invention job's installation cost.">Facility Tax %</label>
-              <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveSharedTaxSettings(); recalculateInvention();" class="w-full bg-[#0d1922] border border-[#1e3348] rounded text-center text-cyan-400 font-bold p-1 outline-none text-[11px]">
+              <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line w-full text-center text-cyan-400 font-bold p-1 text-[11px]">
             </div>
             <div>
               <label class="text-[9px] text-slate-500 font-bold uppercase block mb-0.5" title="SCC surcharge applied to every manufacturing AND invention job's installation cost.">SCC Surcharge %</label>
-              <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="w-full bg-[#0d1922] border border-[#1e3348] rounded text-center text-amber-400 font-bold p-1 outline-none text-[11px]">
+              <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line w-full text-center text-amber-400 font-bold p-1 text-[11px]">
             </div>
             <div>
               <label class="text-[9px] text-slate-500 font-bold uppercase block mb-0.5" title="Sales tax deducted when selling the manufactured output.">Sales Tax %</label>
-              <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="w-full bg-[#0d1922] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-1 outline-none text-[11px]">
+              <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line w-full text-center text-amber-300 font-bold p-1 text-[11px]">
             </div>
             <div>
               <label class="text-[9px] text-slate-500 font-bold uppercase block mb-0.5" title="Broker fee, applied when selling AND when buying materials via buy orders.">Broker Fee %</label>
-              <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="w-full bg-[#0d1922] border border-[#1e3348] rounded text-center text-amber-300 font-bold p-1 outline-none text-[11px]">
+              <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line w-full text-center text-amber-300 font-bold p-1 text-[11px]">
             </div>
           </div>
         </div>
@@ -142,7 +142,7 @@
         <div class="p-3.5 border-b border-[#1e3348] space-y-2">
           <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1" title="How many successful T2 BPCs you want to end up with. For each decryptor, the tool works out how many invention attempts that requires on average given its success chance, then totals the cost of all those attempts (successes AND failures) plus the manufacturing cost for your target BPCs.">Target: T2 BPCs Wanted</div>
           <div class="flex items-center gap-2">
-            <input type="number" id="invention-target-bpcs" min="1" value="1" class="w-20 bg-[#070b0f] border border-[#1e3348] rounded-md px-2 py-1.5 text-amber-300 font-bold text-sm outline-none focus:border-amber-500" oninput="recalculateInvention()">
+            <input type="number" id="invention-target-bpcs" min="1" value="1" class="field-line w-20 px-2 py-1.5 text-amber-300 font-bold text-sm" oninput="recalculateInvention()">
             <span class="text-slate-500 text-[10px]">successful T2 BPCs</span>
           </div>
         </div>
@@ -172,6 +172,6 @@
   <script src="js/esi.js?v=8.0.2"></script>
   <script src="js/tree.js?v=8.0.1"></script>
   <script src="js/optimizers.js?v=8.0.1"></script>
-  <script src="js/invention.js?v=8.0.4"></script>
+  <script src="js/invention.js?v=8.0.5"></script>
 </body>
 </html>
