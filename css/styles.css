@@ -672,7 +672,25 @@ body.page-calc {
 }
 
 body.page-calc {
-  background: radial-gradient(ellipse 1000px 560px at 50% -10%, rgba(200,255,77,.06), transparent 60%), #08090a;
+  background: radial-gradient(ellipse 1000px 560px at 50% -10%, rgba(200,255,77,.1), transparent 60%), #08090a;
+}
+
+/* .theme-unify (ledger.html, invention.html): redirect the entire violet and blue ramps onto the
+   lime accent ramp. Per-tool violet/cyan identity (purple logo badge, "Copy Multibuy", cyan
+   checkboxes, etc.) was a deliberate leftover from the pre-Foxstock design, kept on purpose the
+   first time this got ported here - but it's exactly what read as "two designs mixed together"
+   once seen next to the calculator's all-lime language. index.html is NOT in this selector: it
+   still needs real --blue/--violet for buy-mode vs. reaction-mode node accents and the parent-
+   highlight glow, which are functional distinctions, not tool branding. */
+body.page-calc.theme-unify {
+  --violet: var(--accent); --violet-rgb: var(--accent-rgb);
+  --violet-100: var(--copper-100); --violet-300: var(--copper-300); --violet-400: var(--copper-400);
+  --violet-500: var(--copper-500); --violet-600: var(--copper-600); --violet-700: var(--copper-700);
+  --violet-800: var(--copper-800);
+  --blue: var(--accent); --blue-rgb: var(--accent-rgb); --buy: var(--accent); --buy-rgb: var(--accent-rgb);
+  --blue-300: var(--copper-300); --blue-400: var(--copper-400); --blue-500: var(--copper-500);
+  --blue-600: var(--copper-600); --blue-700: var(--copper-700); --blue-800: var(--copper-800);
+  --blue-900: var(--copper-900);
 }
 
 /* --accent and --green are the same lime hex on this page (Foxstock treats one hero color as
@@ -783,8 +801,8 @@ body.page-calc #viewport,
 body.page-calc #journal-main-area,
 body.page-calc #invention-main-area {
   background:
-    radial-gradient(ellipse 1000px 560px at 50% 100%, rgba(200,255,77,.08), transparent 70%),
-    radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px) 0 0/20px 20px,
+    radial-gradient(ellipse 1100px 620px at 50% 100%, rgba(200,255,77,.14), transparent 72%),
+    radial-gradient(rgba(200,255,77,.07) 1px, transparent 1.5px) 0 0/20px 20px,
     #0a0b0a !important;
   border: none !important;
   box-shadow: none !important;
