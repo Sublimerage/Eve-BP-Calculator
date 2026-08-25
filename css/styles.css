@@ -260,13 +260,13 @@ header { height: 56px; flex-shrink: 0; }
 .icon-btn {
   width: 30px; height: 30px; border-radius: var(--radius-btn);
   display: flex; align-items: center; justify-content: center;
-  color: var(--accent); border: 1px solid rgba(var(--accent-rgb),0.2);
-  background: rgba(var(--accent-rgb),0.1);
+  color: var(--accent); border: 1px solid rgba(var(--accent-rgb),0.35);
+  background: rgba(var(--accent-rgb),0.16);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 .icon-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
-.icon-btn:hover { color: var(--accent); background: rgba(var(--accent-rgb),0.2); border-color: rgba(var(--accent-rgb),0.4); }
+.icon-btn:hover { color: var(--accent); background: rgba(var(--accent-rgb),0.28); border-color: rgba(var(--accent-rgb),0.55); }
 
 /* ===== Header global search (index.html) ===== */
 /* Fixed width regardless of title text length ("DEEP-INDUSTRY" vs "EVE INDUSTRY LEDGER" vs
@@ -493,6 +493,79 @@ svg[viewBox] { stroke: currentColor; }
 
 select option { background-color: #191411; color: var(--text); padding: 6px 10px; }
 select option:checked, select option:hover { background-color: var(--accent); color: #201206; }
+
+/* Custom dropdown (js/custom-select.js): the native <option> popup only lets CSS touch background-
+   color/color/padding - the popup frame (border, radius, shadow) is OS chrome and can't be themed,
+   which is why the rules above alone can never make it "fit the design". js/custom-select.js hides
+   the real <select> (kept for value/onchange wiring) and stands up this fully-themed replacement
+   next to it - one component, so every dropdown across all three pages looks the same. */
+.csel-native-hidden {
+  position: absolute !important;
+  width: 1px !important; height: 1px !important;
+  opacity: 0 !important; pointer-events: none !important;
+  overflow: hidden !important;
+}
+.csel-trigger {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(255,255,255,0.035) !important;
+  border: none !important;
+  border-bottom: 1.5px solid rgba(255,255,255,0.08) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 6px 10px !important;
+  color: var(--text) !important;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.csel-trigger:hover { background: rgba(255,255,255,0.06) !important; }
+.csel-trigger.is-open, .csel-trigger:focus-visible {
+  border-bottom-color: var(--accent) !important;
+  background: rgba(255,255,255,0.06) !important;
+}
+.csel-trigger[disabled] { opacity: 0.5; cursor: not-allowed; }
+.csel-trigger-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.csel-trigger-chevron {
+  flex-shrink: 0; width: 13px; height: 13px;
+  stroke: var(--text-soft);
+  transition: transform 0.15s ease, stroke 0.15s ease;
+}
+.csel-trigger.is-open .csel-trigger-chevron { transform: rotate(180deg); stroke: var(--accent); }
+
+.csel-panel {
+  position: fixed;
+  z-index: 9999;
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--glass-shadow);
+  padding: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.csel-panel.is-open { opacity: 1; transform: translateY(0); }
+.csel-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.csel-option:hover { background: rgba(var(--accent-rgb),0.14); color: var(--accent); }
+.csel-option.is-selected { color: var(--accent); font-weight: 600; }
+.csel-option[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
 /* Same custom chevron the ledger/invention selects use, generalized so index.html's differently-
    styled selects (bg-black/*+border, not .field-line) get the same "obviously a dropdown" cue -
    :not([size]) excludes true multi-row listboxes like the blueprint location filter, which are
