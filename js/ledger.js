@@ -346,7 +346,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
           <input type="number" id="start-runs-${job.id}" value="${job.runsNeeded}" min="1" max="${job.runsNeeded}"
             onmousedown="event.stopPropagation()" onfocus="this.select()"
             class="w-16 bg-[#0d1922] border border-[#1e3348] text-center text-amber-300 font-bold rounded p-1 outline-none text-sm">
-          <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-1 px-2.5 rounded text-xs mono transition flex-shrink-0">▶ Start Job</button>
+          <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-black font-bold py-1 px-2.5 rounded text-xs mono transition flex-shrink-0">▶ Start Job</button>
         </div>
       ` : ''}
     </div>
@@ -374,7 +374,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
         <span class="text-xs font-bold text-cyan-400 mono flex-shrink-0 w-24 text-right">${Math.round(job.calculatedCost || 0).toLocaleString()} ISK</span>
         <span class="text-xs font-bold ${p !== undefined ? (p >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-600'} mono flex-shrink-0 w-24 text-right">${p !== undefined ? Math.round(p).toLocaleString() + ' ISK' : '—'}</span>
         <div class="flex items-center gap-1.5 flex-shrink-0" onclick="event.stopPropagation()">
-          <button onclick="markJobAsBuilt(${job.id})" class="py-1 px-2 bg-green-800/80 hover:bg-green-700 text-white font-bold rounded text-xs mono transition">✔</button>
+          <button onclick="markJobAsBuilt(${job.id})" class="py-1 px-2 bg-green-800/80 hover:bg-green-700 text-black font-bold rounded text-xs mono transition">✔</button>
           <button onclick="deleteJobFromQueue(${job.id})" class="py-1 px-2 bg-red-950/60 hover:bg-red-800 text-red-300 font-bold rounded text-xs mono transition">❌</button>
         </div>
       </div>
@@ -542,7 +542,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
         <input type="number" id="start-runs-${job.id}" value="${job.runsNeeded}" min="1" max="${job.runsNeeded}"
           onmousedown="event.stopPropagation()" onfocus="this.select()"
           class="w-16 bg-[#0d1922] border border-[#1e3348] text-center text-amber-300 font-bold rounded p-1 outline-none text-sm">
-        <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-1 px-2.5 rounded text-xs mono transition flex-shrink-0">▶ Start Job</button>
+        <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-black font-bold py-1 px-2.5 rounded text-xs mono transition flex-shrink-0">▶ Start Job</button>
       </div>
     ` : '';
 
@@ -585,7 +585,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
         ${startJobRowHTML}
 
         <div class="flex items-center space-x-2 pt-1">
-          <button onclick="markJobAsBuilt(${job.id})" class="flex-1 py-1.5 bg-green-800/80 hover:bg-green-700 text-white font-bold rounded text-sm mono transition border border-green-600/30 flex items-center justify-center gap-1">
+          <button onclick="markJobAsBuilt(${job.id})" class="flex-1 py-1.5 bg-green-800/80 hover:bg-green-700 text-black font-bold rounded text-sm mono transition border border-green-600/30 flex items-center justify-center gap-1">
             ✔ Built
           </button>
           <button onclick="deleteJobFromQueue(${job.id})" class="py-1.5 px-3 bg-red-950/60 hover:bg-red-800 text-red-300 font-bold rounded text-sm mono transition border border-red-800/30 flex items-center justify-center">
@@ -607,7 +607,7 @@ function setJobStatusFilter(status) {
   activeJobStatusFilter = status;
   ['all', 'started', 'pending'].forEach(s => {
     const btn = document.getElementById(`btn-status-${s}`);
-    if (btn) btn.className = `px-2.5 py-1.5 rounded-md font-bold transition text-xs mono ${s === status ? 'bg-purple-800 text-white border border-purple-600/30' : 'bg-[#1e3348] text-slate-400 hover:text-white'}`;
+    if (btn) btn.className = `px-2.5 py-1.5 rounded-md font-bold transition text-xs mono ${s === status ? 'bg-purple-800 text-black border border-purple-600/30' : 'bg-[#1e3348] text-slate-400 hover:text-white'}`;
   });
   renderJournalPage();
 }
@@ -773,7 +773,7 @@ function copyIndividualJobMultibuy(e, jobId) {
     if (btn) {
       const origText = btn.innerHTML;
       btn.innerHTML = 'Copied!';
-      btn.className = 'text-xs bg-green-600 text-white font-bold px-1.5 py-0.5 rounded mono transition';
+      btn.className = 'text-xs bg-green-600 text-black font-bold px-1.5 py-0.5 rounded mono transition';
       setTimeout(() => {
         btn.innerHTML = origText;
         btn.className = 'text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-1.5 py-0.5 rounded mono transition';
@@ -803,14 +803,14 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
 
   container.innerHTML = bomItems.map(item => {
     const isCompleted = item.netMissingQty === 0;
-    const rowBg = isCompleted ? 'bg-[#0a0f14]/50 border-green-950 opacity-60' : 'bg-[#0c1318] border-[#1e3348] hover:border-purple-500/40';
+    const rowBg = isCompleted ? 'bg-[#0a0f14]/50 opacity-60' : 'bg-[#0c1318]';
     const statusBadge = isCompleted
-      ? `<span class="bg-green-950 text-green-300 text-xs px-1.5 py-0.5 rounded font-bold uppercase flex-shrink-0">Acquired</span>`
-      : `<span class="bg-amber-950 text-amber-300 text-xs px-1.5 py-0.5 rounded font-bold uppercase flex-shrink-0">Missing</span>`;
+      ? `<span class="text-xs px-1.5 py-0.5 rounded font-bold uppercase flex-shrink-0" style="background:rgba(var(--accent-rgb),0.15); color:var(--accent);">Acquired</span>`
+      : `<span class="bg-white/10 text-slate-300 text-xs px-1.5 py-0.5 rounded font-bold uppercase flex-shrink-0">Missing</span>`;
 
     const strategyBadge = item.strategy === 'sell'
-      ? `<span class="bg-amber-900/60 text-amber-300 text-xs px-1.5 py-0.5 rounded font-bold uppercase flex-shrink-0">SELL</span>`
-      : `<span class="bg-cyan-900/60 text-cyan-300 text-xs px-1.5 py-0.5 rounded font-bold uppercase flex-shrink-0">BUY</span>`;
+      ? `<span class="text-xs px-1.5 py-0.5 rounded font-bold uppercase flex-shrink-0" style="background:rgba(var(--accent-rgb),0.15); color:var(--accent);">SELL</span>`
+      : `<span class="text-xs px-1.5 py-0.5 rounded font-bold uppercase flex-shrink-0" style="background:rgba(var(--accent-rgb),0.15); color:var(--accent);">BUY</span>`;
 
     // CORRECTION: Direct blueprint path safety check inside the consolidated BOM prevents any imageservers 400 errors [1.1.1, 1.1.4]
     const itemNameLower = (window.TYPE_ID_TO_NAME[item.typeId] || item.name || '').toLowerCase();
@@ -820,7 +820,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
       : `https://images.evetech.net/types/${item.typeId}/icon?size=32`;
 
     return `
-      <div class="rounded-lg border p-2.5 transition shadow-sm ${rowBg}">
+      <div class="rounded-lg p-2.5 transition shadow-sm ${rowBg}">
         <div class="flex items-start gap-2.5">
           <img src="${itemIconUrl}" class="w-8 h-8 rounded-md border border-white/10 bg-[#070b0f] flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           <div class="min-w-0 flex-1">
@@ -856,10 +856,10 @@ function copyJournalMultibuy() {
     if (btn) {
       const origText = btn.textContent;
       btn.textContent = 'Copied!';
-      btn.className = 'px-3.5 py-1.5 bg-green-600 text-white font-bold text-xs rounded mono transition';
+      btn.className = 'px-3.5 py-1.5 bg-green-600 text-black font-bold text-xs rounded mono transition';
       setTimeout(() => {
         btn.textContent = origText;
-        btn.className = 'px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded mono transition shadow';
+        btn.className = 'px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-black font-bold text-xs rounded mono transition shadow';
       }, 1500);
     }
   });

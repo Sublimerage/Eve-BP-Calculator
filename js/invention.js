@@ -81,7 +81,7 @@ function renderInventionSearchResults(hits, profitById) {
   const sortBtn = hits.length > 1 ? `
     <div class="px-3 py-1.5 bg-[#0a0f14] border-b border-[#1e3348] flex items-center justify-between">
       <span class="text-xs text-slate-500">${hits.length} match${hits.length > 1 ? 'es' : ''}</span>
-      <button onmousedown="sortInventionSearchResultsByProfit()" class="text-xs px-2 py-0.5 bg-purple-800 hover:bg-purple-700 text-purple-100 font-bold rounded transition">📊 Sort by Profit</button>
+      <button onmousedown="sortInventionSearchResultsByProfit()" class="text-xs px-2 py-0.5 bg-purple-800 hover:bg-purple-700 text-black font-bold rounded transition">📊 Sort by Profit</button>
     </div>
   ` : '';
   resultsEl.innerHTML = sortBtn + hits.map(h => {
@@ -633,7 +633,7 @@ function renderInventionComparisonTable(rows) {
             <td class="p-2 text-right ${r.iskPerHour !== null ? (r.iskPerHour >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-500'} font-bold">${r.iskPerHour !== null ? Math.round(r.iskPerHour).toLocaleString() + ' ISK' : '—'}</td>
             <td class="p-2 text-right font-bold ${isFinite(r.profitPerRun) && r.profitPerRun >= 0 ? 'text-green-400' : 'text-red-400'}">${isFinite(r.profitPerRun) ? Math.round(r.profitPerRun).toLocaleString() + ' ISK' : '—'}</td>
             <td class="p-2 text-right">
-              <button id="invention-multibuy-btn-${rowIndex}" onclick="copyInventionMultibuy(${rowIndex})" class="px-2 py-1 bg-purple-700 hover:bg-purple-600 text-white font-bold rounded text-xs transition" title="Copy datacores + decryptor needed for this decryptor's Attempts Needed, minus whatever stock you already own">📋 Copy</button>
+              <button id="invention-multibuy-btn-${rowIndex}" onclick="copyInventionMultibuy(${rowIndex})" class="px-2 py-1 bg-purple-700 hover:bg-purple-600 text-black font-bold rounded text-xs transition" title="Copy datacores + decryptor needed for this decryptor's Attempts Needed, minus whatever stock you already own">📋 Copy</button>
             </td>
           </tr>
         `; }).join('')}
