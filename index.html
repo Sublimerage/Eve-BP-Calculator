@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Deep-Industry Engine</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=23.2.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=23.3.0">
 </head>
 <body class="page-calc flex flex-col min-h-screen text-slate-200">
 
@@ -131,7 +131,7 @@
         <div class="relative mb-2">
           <input type="text" id="item-search" autocomplete="off" placeholder="Search item to build..."
             class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-2 text-white font-bold focus:border-orange-500 outline-none mono text-sm shadow-inner">
-          <div id="search-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
+          <div id="search-results" class="fixed bg-black/25 border border-orange-500 max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
         </div>
         <div class="flex gap-2">
           <select id="input-price-mode" onchange="recalculate()" class="flex-1 bg-black/35 border border-orange-500/20 px-2 py-1.5 text-white font-bold text-[11px] outline-none">
@@ -216,7 +216,7 @@
           <div class="relative">
             <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="System..."
               class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-2 text-orange-300 font-bold mono uppercase focus:border-orange-500 outline-none text-sm">
-            <div id="system-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
+            <div id="system-results" class="fixed bg-black/25 border border-orange-500 max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
           </div>
           <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); recalculate();" class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-2 text-white font-semibold text-xs outline-none" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
             <option value="npc">NPC Station (0% ME / 0% TE / 0% Fee)</option>
@@ -396,8 +396,8 @@
             </label>
           </div>
           <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterLocationDropdownOptions()"
-            class="w-full bg-black/40 border border-orange-500/20 px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-orange-500">
-          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full bg-black/40 border border-orange-500/20 px-2.5 py-1.5 text-orange-300 font-bold text-[11px] outline-none truncate">
+            class="w-full rounded bg-black/40 border border-orange-500/20 px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-orange-500">
+          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="w-full rounded bg-black/40 border border-orange-500/20 px-2.5 py-1.5 text-orange-300 font-bold text-[11px] outline-none truncate">
             <option value="all" selected>All Locations (Combined Assets)</option>
             <option value="industry_system">Current System Only (JITA)</option>
           </select>
@@ -498,8 +498,8 @@
         <div class="flex-1 flex flex-col min-h-0 p-3.5">
           <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1 flex-shrink-0">Location</div>
           <input type="text" id="blueprint-location-search" autocomplete="off" placeholder="Filter locations..." oninput="filterBlueprintLocationDropdownOptions()"
-            class="w-full bg-[#030405] border border-orange-500/20 px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-orange-500 mb-1.5 flex-shrink-0">
-          <select id="blueprint-location-filter" onchange="filterBlueprintBrowser()" size="20" class="flex-1 w-full bg-[#030405] border border-orange-500/20 px-2 py-1.5 text-orange-300 font-bold text-[10px] outline-none">
+            class="w-full rounded bg-[#030405] border border-orange-500/20 px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-orange-500 mb-1.5 flex-shrink-0">
+          <select id="blueprint-location-filter" onchange="filterBlueprintBrowser()" size="20" class="flex-1 w-full rounded bg-[#030405] border border-orange-500/20 px-2 py-1.5 text-orange-300 font-bold text-[10px] outline-none">
             <option value="all" selected>All Locations</option>
           </select>
         </div>
@@ -542,9 +542,9 @@
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
   <script src="eve_db.js?v=15.1.0"></script>
   <script src="js/config.js?v=15.1.0"></script>
-  <script src="js/esi.js?v=15.1.0"></script>
+  <script src="js/esi.js?v=15.2.0"></script>
   <script src="js/tree.js?v=15.1.0"></script>
   <script src="js/optimizers.js?v=15.1.0"></script>
-  <script src="js/app.js?v=15.6.0"></script>
+  <script src="js/app.js?v=15.7.0"></script>
 </body>
 </html>
