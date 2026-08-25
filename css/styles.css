@@ -266,6 +266,10 @@ header { height: 56px; flex-shrink: 0; }
 .icon-btn:hover { color: var(--accent); background: rgba(var(--accent-rgb),0.1); border-color: rgba(var(--accent-rgb),0.2); }
 
 /* ===== Header global search (index.html) ===== */
+/* Fixed width regardless of title text length ("DEEP-INDUSTRY" vs "EVE INDUSTRY LEDGER" vs
+   "INVENTION CALCULATOR") so nav-tabs, glued directly after this block, lands at the identical X
+   position on all three pages. */
+.header-brand { width: 232px; }
 .header-search-wrap { position: relative; flex: 1 1 auto; min-width: 140px; max-width: 460px; }
 .header-search-input {
   width: 100%;
