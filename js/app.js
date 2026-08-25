@@ -438,7 +438,7 @@ async function scanSingleBlueprintProfit(typeId, me, te, runs, quantity, product
   const key = getBlueprintProfitCacheKey(bp);
   const cache = getBlueprintProfitCache();
 
-  const origContent = btnEl ? btnEl.textContent : null;
+  const origHTML = btnEl ? btnEl.innerHTML : null;
   if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳'; }
   try {
     cache[key] = await computeBlueprintManufacturingProfit(bp);
@@ -447,7 +447,7 @@ async function scanSingleBlueprintProfit(typeId, me, te, runs, quantity, product
     cache[key] = null;
   }
   saveBlueprintProfitCache();
-  if (btnEl) { btnEl.disabled = false; btnEl.textContent = origContent; }
+  if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = origHTML; }
   filterBlueprintBrowser();
 }
 window.scanSingleBlueprintProfit = scanSingleBlueprintProfit;
@@ -534,7 +534,7 @@ async function scanBlueprintReadiness() {
   if (_readinessFilterActive) {
     _readinessFilterActive = false;
     btn.textContent = '🧰 What Can I Build Right Now?';
-    btn.className = 'w-full px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] transition';
+    btn.className = 'btn-glass w-full px-2.5 py-1.5 text-[10px]';
     filterBlueprintBrowser();
     return;
   }
@@ -572,7 +572,7 @@ async function scanBlueprintReadiness() {
 
   _readinessFilterActive = true;
   btn.textContent = `👁 Show All (${buildableCount} Buildable)`;
-  btn.className = 'w-full px-2.5 py-1.5 bg-orange-700 hover:bg-orange-600 text-white font-bold text-[10px] transition';
+  btn.className = 'btn-glass btn-glass-muted w-full px-2.5 py-1.5 text-[10px]';
   btn.title = `Showing only the ${buildableCount} of ${checkedCount} checked blueprints you can build right now with current stock - click to show everything again`;
   filterBlueprintBrowser();
 }
@@ -671,8 +671,10 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
             ${profitBadge}
             <span class="text-[11px] font-bold text-orange-300 bg-orange-950/50 border border-orange-700/40 rounded-full px-1.5 py-0.5 whitespace-nowrap">ME ${bp.material_efficiency}%</span>
             <span class="text-[11px] font-bold text-orange-300 bg-orange-950/50 border border-orange-700/40 rounded-full px-1.5 py-0.5 whitespace-nowrap">TE ${bp.time_efficiency}%</span>
-            <button onclick="scanSingleBlueprintProfit(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs}, ${bp.quantity}, ${bp.productTypeId || 'null'}, this)" class="rounded px-2 py-1 bg-orange-700 hover:bg-orange-600 text-white font-bold text-[10px] transition" title="Scan just this blueprint's profit">📊</button>
-            <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs})" class="rounded px-2.5 py-1 bg-orange-700 hover:bg-orange-600 text-white font-bold text-[10px] transition">Load</button>
+            <button onclick="scanSingleBlueprintProfit(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs}, ${bp.quantity}, ${bp.productTypeId || 'null'}, this)" class="btn-glass px-2 py-1 flex items-center justify-center" title="Scan just this blueprint's profit">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><line x1="4" y1="20" x2="4" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="20" y1="20" x2="20" y2="14"/></svg>
+            </button>
+            <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs})" class="btn-glass px-2.5 py-1 text-[10px]">Load</button>
           </div>
         </div>
       </div>
@@ -1983,12 +1985,8 @@ function addCurrentJobToLedger(e) {
   if (btn) {
     const originalText = btn.innerHTML;
     btn.innerHTML = subBuildJobs.length > 0 ? `✔ ADDED ${subBuildJobs.length + 1} JOBS` : '✔ ADDED TO QUEUE';
-    btn.classList.remove('bg-orange-800', 'hover:bg-orange-700', 'text-orange-100');
-    btn.classList.add('bg-green-700', 'text-white');
     setTimeout(() => {
       btn.innerHTML = originalText;
-      btn.classList.remove('bg-green-700', 'text-white');
-      btn.classList.add('bg-orange-800', 'hover:bg-orange-700', 'text-orange-100');
     }, 1500);
   }
 }
@@ -2567,12 +2565,8 @@ function copyMultibuyText() {
     const btn = document.querySelector('button[onclick="copyMultibuyText()"]');
     if (btn) {
       const orig = btn.textContent;
-      btn.textContent = 'Copied!';
-      btn.className = 'px-3.5 py-1.5 bg-green-600 text-white font-bold text-xs mono transition';
-      setTimeout(() => {
-        btn.textContent = orig;
-        btn.className = 'px-3.5 py-1.5 bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs mono transition shadow';
-      }, 1500);
+      btn.textContent = '✔ Copied!';
+      setTimeout(() => { btn.textContent = orig; }, 1500);
     }
   });
 }

@@ -81,7 +81,7 @@ function renderInventionSearchResults(hits, profitById) {
   const sortBtn = hits.length > 1 ? `
     <div class="lp-list-item" style="justify-content:space-between;">
       <span class="text-xs" style="color:var(--text-mute);">${hits.length} match${hits.length > 1 ? 'es' : ''}</span>
-      <button onmousedown="sortInventionSearchResultsByProfit()" class="lp-chip-btn">📊 Sort by Profit</button>
+      <button onmousedown="sortInventionSearchResultsByProfit()" class="lp-chip-btn"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="4" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="20" y1="20" x2="20" y2="14"/></svg>Sort by Profit</button>
     </div>
   ` : '';
   resultsEl.innerHTML = sortBtn + hits.map(h => {
@@ -311,7 +311,7 @@ async function renderInventionDatacoreList(materials) {
     return `
       <div class="lp-list-item" style="justify-content:space-between; padding-left:0; padding-right:0;">
         <span style="color:var(--text-soft);">${window.esc(m.name)} x${m.qty}</span>
-        <span class="font-bold" style="color:var(--accent);">${Math.round(price * m.qty).toLocaleString()} ISK</span>
+        <span class="font-bold" style="color:var(--cost);">${Math.round(price * m.qty).toLocaleString()} ISK</span>
       </div>
     `;
   }).join('');
@@ -532,7 +532,7 @@ function renderInventionSummaryTiles(rows) {
     </div>
     <div class="lp-tile">
       <div class="lp-label truncate">Total Cost (Invention + Mfg)</div>
-      <div class="text-lg font-bold mono leading-tight" style="color:var(--text);">${isFinite(best.totalInventionCost) ? Math.round(best.totalInventionCost + best.totalManufacturingCost).toLocaleString() : '—'} ISK</div>
+      <div class="text-lg font-bold mono leading-tight" style="color:var(--cost);">${isFinite(best.totalInventionCost) ? Math.round(best.totalInventionCost + best.totalManufacturingCost).toLocaleString() : '—'} ISK</div>
       <div class="text-xs mt-0.5" style="color:var(--text-mute);">${isFinite(best.totalInventionCost) ? Math.round(best.totalInventionCost).toLocaleString() + ' invention + ' + Math.round(best.totalManufacturingCost).toLocaleString() + ' mfg' : ''}</div>
     </div>
     <div class="lp-tile">
@@ -574,9 +574,9 @@ function copyInventionMultibuy(rowIndex) {
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.getElementById(`invention-multibuy-btn-${rowIndex}`);
     if (btn) {
-      const orig = btn.textContent;
+      const orig = btn.innerHTML;
       btn.textContent = '✔ Copied!';
-      setTimeout(() => { btn.textContent = orig; }, 1500);
+      setTimeout(() => { btn.innerHTML = orig; }, 1500);
     }
   });
 }
@@ -627,13 +627,13 @@ function renderInventionComparisonTable(rows) {
             <td class="text-right font-bold" style="color:var(--text);">${r.successChance.toFixed(1)}%</td>
             <td class="text-right" style="color:var(--text-mute);">${r.resultRuns} run${r.resultRuns > 1 ? 's' : ''}, ME${r.resultME >= 0 ? '+' : ''}${r.resultME}, TE${r.resultTE >= 0 ? '+' : ''}${r.resultTE}</td>
             <td class="text-right font-bold" style="color:var(--accent);">${isFinite(r.requiredAttempts) ? r.requiredAttempts.toLocaleString() : '—'}</td>
-            <td class="text-right" style="color:var(--accent);">${isFinite(r.totalInventionCost) ? Math.round(r.totalInventionCost).toLocaleString() + ' ISK' : '—'}</td>
-            <td class="text-right" style="color:var(--text-soft);">${Math.round(r.totalManufacturingCost).toLocaleString()} ISK</td>
+            <td class="text-right" style="color:var(--cost);">${isFinite(r.totalInventionCost) ? Math.round(r.totalInventionCost).toLocaleString() + ' ISK' : '—'}</td>
+            <td class="text-right" style="color:var(--cost);">${Math.round(r.totalManufacturingCost).toLocaleString()} ISK</td>
             <td class="text-right font-bold" style="color:${isFinite(r.totalProfit) && r.totalProfit >= 0 ? 'var(--green)' : 'var(--red)'};">${isFinite(r.totalProfit) ? Math.round(r.totalProfit).toLocaleString() + ' ISK' : '—'}</td>
             <td class="text-right font-bold" style="color:${r.iskPerHour !== null ? (r.iskPerHour >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-mute)'};">${r.iskPerHour !== null ? Math.round(r.iskPerHour).toLocaleString() + ' ISK' : '—'}</td>
             <td class="text-right font-bold" style="color:${isFinite(r.profitPerRun) && r.profitPerRun >= 0 ? 'var(--green)' : 'var(--red)'};">${isFinite(r.profitPerRun) ? Math.round(r.profitPerRun).toLocaleString() + ' ISK' : '—'}</td>
             <td class="text-right">
-              <button id="invention-multibuy-btn-${rowIndex}" onclick="copyInventionMultibuy(${rowIndex})" class="lp-chip-btn" title="Copy datacores + decryptor needed for this decryptor's Attempts Needed, minus whatever stock you already own">📋 Copy</button>
+              <button id="invention-multibuy-btn-${rowIndex}" onclick="copyInventionMultibuy(${rowIndex})" class="lp-chip-btn" title="Copy datacores + decryptor needed for this decryptor's Attempts Needed, minus whatever stock you already own"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy</button>
             </td>
           </tr>
         `; }).join('')}
