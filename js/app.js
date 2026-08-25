@@ -1618,9 +1618,9 @@ function createNodeCard(node) {
 
     sellStrategyUI = `
       <div class="mb-2 pt-2 border-t border-white/10 space-y-1.5" onclick="event.stopPropagation()">
-        <div class="flex justify-between items-center text-xs mono">
-          <span class="text-slate-300 font-bold">Sell Channel:</span>
-          <select id="card-sell-strategy" onchange="syncSellStrategy(event)" class="bg-black/30 text-white p-1 rounded border border-white/10 text-xs outline-none">
+        <div class="flex justify-between items-center text-xs mono gap-2">
+          <span class="text-slate-300 font-bold flex-shrink-0">Sell Channel:</span>
+          <select id="card-sell-strategy" onchange="syncSellStrategy(event)" class="bg-black/30 text-white px-2.5 py-1.5 text-xs outline-none min-w-0" style="border-radius:var(--radius-input); border:1px solid rgba(255,255,255,0.1);">
             <option value="market-sell" ${curStrategy === 'market-sell' ? 'selected' : ''}>Auto</option>
             <option value="custom-market-sell" ${curStrategy === 'custom-market-sell' ? 'selected' : ''}>Custom Market Sell</option>
             <option value="custom-contract" ${curStrategy === 'custom-contract' ? 'selected' : ''}>Custom Contract</option>
@@ -1631,7 +1631,7 @@ function createNodeCard(node) {
             <div class="flex justify-between items-center">
               <span class="text-slate-300 font-bold">Custom Sell Price:</span>
               <div class="flex items-center space-x-1">
-                <input type="number" id="card-custom-price" value="${curCustomPrice}" placeholder="Unit Price" onchange="syncCustomPrice(event)" class="w-24 bg-black/30 rounded border border-white/10 text-center text-green-400 font-bold p-1 outline-none text-xs">
+                <input type="number" id="card-custom-price" value="${curCustomPrice}" placeholder="Unit Price" onchange="syncCustomPrice(event)" class="w-24 bg-black/30 text-center text-green-400 font-bold px-2 py-1.5 outline-none text-xs" style="border-radius:var(--radius-input); border:1px solid rgba(255,255,255,0.1);">
                 <span class="text-slate-500 text-xs">ISK</span>
               </div>
             </div>
@@ -1678,12 +1678,12 @@ function createNodeCard(node) {
   card.className = `diagram-node glass-card p-3 shadow-lg transition-all relative ${cardStyle}`;
   if (borderAccent) card.setAttribute('style', borderAccent);
   card.innerHTML = `
-    <div class="flex items-center space-x-3 border-b border-[#3a3025] pb-2.5 mb-2.5">
-      <img src="${iconUrl}" class="w-10 h-10 rounded border border-slate-700 bg-black/40 flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
+    <div class="flex items-start space-x-3 border-b border-[#3a3025] pb-2.5 mb-2.5">
+      <img src="${iconUrl}" class="w-10 h-10 rounded-md border border-white/10 bg-black/40 flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
       <div class="min-w-0 flex-1">
-        <div class="font-bold text-sm text-white truncate flex items-center justify-between">
-          <span class="truncate cursor-pointer hover:text-orange-300 hover:underline transition" onclick="copyMaterialNameToClipboard(event, this, '${window.esc(node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()).replace(/'/g, "\\'")}')" title="Click to copy this item's exact name to your clipboard, ready to paste into EVE's search/market">${node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()}</span>
-          <div class="flex items-center space-x-1 flex-shrink-0 ml-1">
+        <div class="flex items-center justify-between gap-1.5">
+          <span class="font-bold text-sm text-white truncate min-w-0 cursor-pointer hover:text-orange-300 hover:underline transition" onclick="copyMaterialNameToClipboard(event, this, '${window.esc(node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()).replace(/'/g, "\\'")}')" title="Click to copy this item's exact name to your clipboard, ready to paste into EVE's search/market">${node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()}</span>
+          <div class="flex items-center space-x-1 flex-shrink-0">
             ${isRoot ? `
               <div class="relative group inline-block" onclick="event.stopPropagation()">
                 <span class="toggle-btn cursor-help" title="Unit EIV: ${formattedUnitEIV} | Total Job EIV: ${formattedTotalEIV}">
@@ -1705,20 +1705,18 @@ function createNodeCard(node) {
               </button>
             ` : ''}
             ${isIsolated ? `
-              <button onclick="exitIsolation(event)" class="toggle-btn toggle-btn-active-accent">
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                Exit
+              <button onclick="exitIsolation(event)" class="icon-btn" style="width:22px;height:22px;" title="Exit isolation view">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             ` : `
-              <button onclick="isolateComponent(event, ${node.instanceId})" class="toggle-btn">
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.5" y2="15.5"/></svg>
-                Isolate
+              <button onclick="isolateComponent(event, ${node.instanceId})" class="icon-btn" style="width:22px;height:22px;" title="Isolate: show only this card and its direct connections">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M4 9V5a1 1 0 011-1h4"/><path d="M20 9V5a1 1 0 00-1-1h-4"/><path d="M4 15v4a1 1 0 001 1h4"/><path d="M20 15v4a1 1 0 01-1 1h-4"/></svg>
               </button>
             `}
           </div>
         </div>
         <div class="text-sm text-orange-400 mono flex items-center justify-between mt-0.5">
-          <span>${isRoot ? 'Output Qty:' : 'Req Qty:'} ${node.qtyNeeded.toLocaleString()} ${node.productName}</span>
+          <span>${isRoot ? `Output Qty: ${node.qtyNeeded.toLocaleString()} ${node.productName}` : `Req Qty: ${node.qtyNeeded.toLocaleString()}`}</span>
           ${stockQty > 0 ? `<span class="text-slate-400 text-xs" title="In Stock in Hangar">Stock: ${stockQty.toLocaleString()}</span>` : ''}
         </div>
         ${stockQty > 0 ? (() => {
