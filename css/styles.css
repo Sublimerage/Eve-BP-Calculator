@@ -775,8 +775,13 @@ body.page-calc .glass-card {
    it had before: a near-black surface with a soft lime ambient glow rising from the bottom
    (echoes the Foxstock hero chart's backdrop) plus a faint dot-grid texture. This is the app's
    REAL tree diagram getting the hero treatment, not an invented chart - Foxstock's hero is a
-   historical price line and this app has no genuine price history to plot honestly. */
-body.page-calc #viewport {
+   historical price line and this app has no genuine price history to plot honestly.
+   Ledger's job queue and Invention's comparison table are each their own page's biggest/main
+   content area, same role #viewport plays on the calculator - they get the identical treatment
+   so the signature dot-grid + glow backdrop reads as "this site's look", not "one page's look". */
+body.page-calc #viewport,
+body.page-calc #journal-main-area,
+body.page-calc #invention-main-area {
   background:
     radial-gradient(ellipse 1000px 560px at 50% 100%, rgba(200,255,77,.08), transparent 70%),
     radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px) 0 0/20px 20px,
@@ -785,6 +790,15 @@ body.page-calc #viewport {
   box-shadow: none !important;
 }
 body.page-calc #viewport::before { content: none; }
+
+/* The ledger's Stock & Location toolbar predates the "floating rounded card" layout language -
+   it was a flat, square-cornered, edge-to-edge bar with a divider border, sitting between the
+   header and stat-strip which are both rounded floating cards, reading like a leftover strip from
+   the old UI. Rounding it and dropping the divider makes it a card like everything around it. */
+body.page-calc #ledger-toolbar {
+  border-radius: var(--radius-panel) !important;
+  border: none !important;
+}
 
 body.page-calc #viewport-hint {
   background: rgba(0,0,0,0.45) !important;
