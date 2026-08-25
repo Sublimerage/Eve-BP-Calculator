@@ -271,10 +271,10 @@ function renderInventionSkillInputs(skills) {
     const isEncryption = (sk.name || '').toLowerCase().includes('encryption');
     const trainedLevel = (charSkills.allSkills && charSkills.allSkills[sk.skillId] !== undefined) ? charSkills.allSkills[sk.skillId] : 0;
     return `
-      <div class="flex items-center justify-between bg-[#070b0f] rounded-lg px-2 py-1.5">
+      <div class="flex items-center justify-between px-2 py-1.5">
         <span class="text-sm ${isEncryption ? 'text-amber-300' : 'text-cyan-300'} font-semibold truncate pr-2" title="${isEncryption ? 'Encryption skill (affects chance /40)' : 'Science skill (affects chance /30, combined with the other science skill)'}">${window.esc(sk.name || `Skill ${sk.skillId}`)}</span>
         <input type="number" min="0" max="5" value="${trainedLevel}" data-skill-id="${sk.skillId}" data-is-encryption="${isEncryption}"
-          oninput="recalculateInvention()" class="invention-skill-input w-12 bg-[#0d1922] border border-[#1e3348] rounded text-center text-white font-bold text-sm outline-none p-1">
+          oninput="recalculateInvention()" class="invention-skill-input field-line w-12 text-center text-white font-bold text-sm p-1">
       </div>
     `;
   }).join('');

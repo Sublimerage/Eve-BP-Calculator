@@ -345,7 +345,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
           <span class="text-xs text-slate-400 font-bold flex-shrink-0">Runs to start:</span>
           <input type="number" id="start-runs-${job.id}" value="${job.runsNeeded}" min="1" max="${job.runsNeeded}"
             onmousedown="event.stopPropagation()" onfocus="this.select()"
-            class="w-16 bg-[#0d1922] text-center text-amber-300 font-bold rounded p-1 outline-none text-sm">
+            class="field-line w-16 text-center text-amber-300 font-bold p-1 text-sm">
           <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-black font-bold py-1 px-2.5 rounded text-xs mono transition flex-shrink-0">▶ Start Job</button>
         </div>
       ` : ''}
@@ -541,7 +541,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
         <span class="text-xs text-slate-400 font-bold flex-shrink-0" title="Starting fewer than all runs splits this into a started job plus a still-queued job for the rest, matching how EVE actually queues manufacturing jobs.">Runs to start:</span>
         <input type="number" id="start-runs-${job.id}" value="${job.runsNeeded}" min="1" max="${job.runsNeeded}"
           onmousedown="event.stopPropagation()" onfocus="this.select()"
-          class="w-16 bg-[#0d1922] text-center text-amber-300 font-bold rounded p-1 outline-none text-sm">
+          class="field-line w-16 text-center text-amber-300 font-bold p-1 text-sm">
         <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-black font-bold py-1 px-2.5 rounded text-xs mono transition flex-shrink-0">▶ Start Job</button>
       </div>
     ` : '';
