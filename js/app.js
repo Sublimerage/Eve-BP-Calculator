@@ -1804,9 +1804,9 @@ function createNodeCard(node) {
         ${node.jobFee > 0 && node.isBuildingSelf ? `<div class="flex justify-between text-[#e85555] font-semibold border-t border-[#3a3025] pt-1"><span>Job Inst. Fee:</span><span>+${Math.round(node.jobFee).toLocaleString()} ISK</span></div>` : ''}
         <div class="flex justify-between font-bold border-t border-[#3a3025] pt-1 mt-1"><span class="text-slate-300">${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span><span class="font-bold" style="color:var(--accent);">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span></div>
         ${isRoot ? `
-          <div class="flex justify-between font-bold border-t border-green-500/40 pt-1.5 mt-1">
-            <span class="text-slate-300">${window.rootSellStrategy === 'custom-contract' ? 'Net Profit (Contract Output):' : 'Net Profit (Sell Output):'}</span>
-            <span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${Math.round(node.netProfitSell || 0).toLocaleString()} ISK</span>
+          <div class="border-t border-green-500/40 pt-2 mt-1">
+            <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">${window.rootSellStrategy === 'custom-contract' ? 'Net Profit, Contract Output' : 'Net Profit, Sell Output'}</div>
+            <div class="hero-num ${(node.netProfitSell || 0) >= 0 ? 'profit' : 'loss'}">${Math.round(node.netProfitSell || 0).toLocaleString()} ISK</div>
           </div>
         ` : ''}
       </div>
