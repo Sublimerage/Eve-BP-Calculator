@@ -524,6 +524,14 @@ select option:checked, select option:hover { background-color: var(--accent); co
 [class*="ring-orange-400"] { --tw-ring-color: rgba(var(--accent-rgb),0.7) !important; }
 .accent-purple-500 { accent-color: var(--violet) !important; }
 .accent-cyan-500 { accent-color: var(--blue) !important; }
+/* focus:border-* variants aren't caught by the static class selectors above (Tailwind's CDN
+   engine generates its own raw-color :focus rule for these, injected after this stylesheet, so
+   it was winning and showing a literal un-migrated orange/cyan/purple/amber border on focus
+   regardless of page or accent color). */
+[class*="focus:border-orange-500"]:focus { border-color: var(--accent) !important; }
+[class*="focus:border-amber-500"]:focus { border-color: var(--accent) !important; }
+[class*="focus:border-cyan-500"]:focus { border-color: var(--blue) !important; }
+[class*="focus:border-purple-500"]:focus { border-color: var(--violet) !important; }
 
 /* ---- blue (cyan) ---- */
 .text-cyan-100 { color: #dbe8fb !important; }
@@ -692,7 +700,11 @@ body.page-calc #status-badge {
   box-shadow: none !important;
 }
 
-body.page-calc .btn-glass { color: #0a1002; }
+/* Dark text only on the solid-lime fill variant - .btn-glass-muted is a transparent/outline
+   button (e.g. "Buy All" next to "Build All") that keeps its own light .text-soft color, since
+   this rule would otherwise win on specificity and leave its text unreadably dark against its
+   near-transparent background. */
+body.page-calc .btn-glass:not(.btn-glass-muted) { color: #0a1002; }
 
 /* Stat strip: the strip itself is just a flex row now - each stat is its own gradient card
    (the Foxstock mini-card treatment) instead of one long bar cut up with divider lines. */
@@ -717,6 +729,16 @@ body.page-calc #bom-sidebar,
 body.page-calc .flyout-panel,
 body.page-calc #paste-modal > div {
   border: none !important;
+}
+
+/* Search/system/rig/market dropdown result lists: solid opaque fill instead of the ~25%-opacity
+   black they had (the busy hero viewport behind them was showing straight through, making results
+   hard to read), plus a higher z-index than .flyout-panel so they never render underneath one. */
+body.page-calc [id$="-results"] {
+  background: linear-gradient(155deg, #17191d, #0d0e10) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  border-radius: var(--radius-input);
+  z-index: 500 !important;
 }
 
 /* Tree node cards keep a top-only border whose WIDTH lives here and whose COLOR is set inline
