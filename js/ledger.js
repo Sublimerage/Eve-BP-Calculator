@@ -7,8 +7,28 @@ let activeOrderFilter = 'all';
 let activeCategoryFilter = 'all'; 
 let activeJobSearchQuery = '';
 let activeJobStatusFilter = 'all'; // 'all' | 'started' | 'pending'
-let collapsedJobCardIds = new Set(); // job IDs with the BOM/details section minimized
+// job IDs with the BOM/details section minimized - persisted so a reload doesn't silently re-expand
+// every card back to its default state.
+let collapsedJobCardIds = new Set(window.safeParseJSON(localStorage.getItem('eve_collapsed_job_cards'), []));
 let activeQueueViewMode = localStorage.getItem('eve_queue_view_mode') || 'grid'; // 'grid' | 'list'
+// Which status groups ("started"/"pending") are collapsed - persisted the same way as card state.
+let collapsedJobGroups = new Set(window.safeParseJSON(localStorage.getItem('eve_collapsed_job_groups'), []));
+
+function saveCollapsedJobCardIds() {
+  localStorage.setItem('eve_collapsed_job_cards', JSON.stringify([...collapsedJobCardIds]));
+}
+
+function saveCollapsedJobGroups() {
+  localStorage.setItem('eve_collapsed_job_groups', JSON.stringify([...collapsedJobGroups]));
+}
+
+function toggleJobGroupCollapse(groupKey) {
+  if (collapsedJobGroups.has(groupKey)) collapsedJobGroups.delete(groupKey);
+  else collapsedJobGroups.add(groupKey);
+  saveCollapsedJobGroups();
+  renderJournalPage();
+}
+window.toggleJobGroupCollapse = toggleJobGroupCollapse;
 
 function loadJournalState() {
   try {
@@ -134,7 +154,7 @@ function renderJournalPage() {
 
   const activeJobsCountEl = document.getElementById('journal-active-jobs');
   const totalCostEl = document.getElementById('journal-total-cost');
-  const uniqueMaterialsEl = document.getElementById('journal-unique-materials');
+  const materialsVolumeEl = document.getElementById('journal-materials-volume');
   const materialsCostEl = document.getElementById('journal-materials-cost');
   const totalProfitEl = document.getElementById('journal-total-profit');
 
@@ -204,6 +224,7 @@ function renderJournalPage() {
 
   const bomItems = Object.values(consolidatedBOM);
   let aggregatedMissingCost = 0;
+  let totalMaterialsVolume = 0;
 
   const deductModeInput = document.getElementById('deduct-stock-mode');
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
@@ -215,11 +236,13 @@ function renderJournalPage() {
     item.netMissingQty = netMissing;
     item.lineCost = item.unitPrice * netMissing;
     aggregatedMissingCost += item.lineCost;
+    const unitVolume = (window.EVE_VOLUMES && window.EVE_VOLUMES[item.typeId]) || 0;
+    totalMaterialsVolume += unitVolume * item.totalQtyNeeded;
   });
 
   bomItems.sort((a, b) => b.lineCost - a.lineCost);
 
-  if (uniqueMaterialsEl) uniqueMaterialsEl.textContent = bomItems.length.toLocaleString() + ' types';
+  if (materialsVolumeEl) materialsVolumeEl.textContent = totalMaterialsVolume.toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' m3';
   if (materialsCostEl) materialsCostEl.textContent = Math.round(aggregatedMissingCost).toLocaleString() + ' ISK';
 
   const allocatedStock = { ...userStockMap };
@@ -275,35 +298,43 @@ function renderActiveJobsList(allocatedStock) {
 
   let html = '';
   if (activeJobStatusFilter !== 'pending' && startedJobs.length > 0) {
+    const isCollapsed = collapsedJobGroups.has('started');
     html += `
       <div class="mb-2">
-        <div class="lp-group-header is-active mb-2.5">
+        <div class="lp-group-header is-active mb-2.5 cursor-pointer select-none" onclick="toggleJobGroupCollapse('started')">
+          <span class="flex-shrink-0" style="color:var(--accent);">${isCollapsed ? '▸' : '▾'}</span>
           <span class="font-extrabold text-base rajdhani uppercase tracking-wider" style="color:var(--accent);">🟢 In Progress</span>
           <span class="font-bold text-sm mono" style="color:var(--accent);">(${startedJobs.length})</span>
         </div>
-        <div class="${groupWrapClass}">${renderGroup(startedJobs)}</div>
+        ${isCollapsed ? '' : `<div class="${groupWrapClass}">${renderGroup(startedJobs)}</div>`}
       </div>
     `;
   }
   if (activeJobStatusFilter !== 'started' && pendingJobs.length > 0) {
+    const isCollapsed = collapsedJobGroups.has('pending');
     html += `
       <div>
-        <div class="lp-group-header mb-2.5">
+        <div class="lp-group-header mb-2.5 cursor-pointer select-none" onclick="toggleJobGroupCollapse('pending')">
+          <span class="flex-shrink-0" style="color:var(--text-mute);">${isCollapsed ? '▸' : '▾'}</span>
           <span class="font-extrabold text-base rajdhani uppercase tracking-wider" style="color:var(--text);">⏳ Pending</span>
           <span class="font-bold text-sm mono" style="color:var(--text-mute);">(${pendingJobs.length})</span>
         </div>
-        <div class="${groupWrapClass}">${renderGroup(pendingJobs)}</div>
+        ${isCollapsed ? '' : `<div class="${groupWrapClass}">${renderGroup(pendingJobs)}</div>`}
       </div>
     `;
   }
   container.innerHTML = html;
 }
 
+function updateViewModeButtonLabel() {
+  const btn = document.getElementById('btn-view-mode');
+  if (btn) btn.textContent = activeQueueViewMode === 'list' ? '▦ Grid View' : '☰ List View';
+}
+
 function toggleQueueViewMode() {
   activeQueueViewMode = activeQueueViewMode === 'list' ? 'grid' : 'list';
   localStorage.setItem('eve_queue_view_mode', activeQueueViewMode);
-  const btn = document.getElementById('btn-view-mode');
-  if (btn) btn.textContent = activeQueueViewMode === 'list' ? '▦ Grid View' : '☰ List View';
+  updateViewModeButtonLabel();
   renderJournalPage();
 }
 window.toggleQueueViewMode = toggleQueueViewMode;
@@ -371,8 +402,14 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
         ${isTimerBacked
           ? `<span class="job-timer flex-shrink-0 w-28 text-center" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}"><span class="timer-display text-xs font-extrabold mono" style="color:${statusColor};">${statusText}</span></span>`
           : `<span class="text-xs font-extrabold mono flex-shrink-0 w-28 text-center" style="color:${statusColor};">${statusText}</span>`}
-        <span class="text-xs font-bold mono flex-shrink-0 w-24 text-right" style="color:var(--accent);">${Math.round(job.calculatedCost || 0).toLocaleString()} ISK</span>
-        <span class="text-xs font-bold mono flex-shrink-0 w-24 text-right" style="color:${p !== undefined ? (p >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-mute)'};">${p !== undefined ? Math.round(p).toLocaleString() + ' ISK' : '—'}</span>
+        <div class="flex flex-col items-end flex-shrink-0 w-28" title="Total manufacturing cost for this job">
+          <span class="text-[8px] uppercase tracking-wide font-bold" style="color:var(--text-mute);">Cost</span>
+          <span class="text-xs font-bold mono whitespace-nowrap" style="color:var(--accent);">${Math.round(job.calculatedCost || 0).toLocaleString()} ISK</span>
+        </div>
+        <div class="flex flex-col items-end flex-shrink-0 w-28" title="Net sell profit for this job">
+          <span class="text-[8px] uppercase tracking-wide font-bold" style="color:var(--text-mute);">Profit</span>
+          <span class="text-xs font-bold mono whitespace-nowrap" style="color:${p !== undefined ? (p >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-mute)'};">${p !== undefined ? Math.round(p).toLocaleString() + ' ISK' : '—'}</span>
+        </div>
         <div class="flex items-center gap-1.5 flex-shrink-0" onclick="event.stopPropagation()">
           <button onclick="markJobAsBuilt(${job.id})" class="lp-chip-btn">✔</button>
           <button onclick="deleteJobFromQueue(${job.id})" class="lp-badge lp-badge-danger" style="cursor:pointer;">❌</button>
@@ -620,18 +657,21 @@ window.setJobStatusFilter = setJobStatusFilter;
 function toggleJobCardCollapse(jobId) {
   if (collapsedJobCardIds.has(jobId)) collapsedJobCardIds.delete(jobId);
   else collapsedJobCardIds.add(jobId);
+  saveCollapsedJobCardIds();
   renderJournalPage();
 }
 window.toggleJobCardCollapse = toggleJobCardCollapse;
 
 function collapseAllJobCards() {
   activeJobs.forEach(j => { if (j) collapsedJobCardIds.add(j.id); });
+  saveCollapsedJobCardIds();
   renderJournalPage();
 }
 window.collapseAllJobCards = collapseAllJobCards;
 
 function expandAllJobCards() {
   collapsedJobCardIds.clear();
+  saveCollapsedJobCardIds();
   renderJournalPage();
 }
 window.expandAllJobCards = expandAllJobCards;
@@ -1654,20 +1694,29 @@ function getHistoryDrawerState() {
 
 function applyHistoryDrawerState(state) {
   const drawer = document.getElementById('history-drawer');
+  const header = document.getElementById('history-drawer-header');
   const chevron = document.getElementById('history-drawer-chevron');
+  const pulltab = document.getElementById('history-drawer-pulltab');
   const sizeBtn = document.getElementById('history-drawer-size-btn');
   if (!drawer) return;
+  // Collapsed height is measured from the header's own real rendered height rather than a hardcoded
+  // guess - a hardcoded px value smaller than the header's actual content height (badges/buttons at
+  // this font size) made the header overflow its own box, which both broke vertical centering and let
+  // the row's own bottom edge (and the table underneath) peek out past the drawer's painted background.
   if (state === 'collapsed') {
-    drawer.style.height = '44px';
+    drawer.style.height = (header ? header.getBoundingClientRect().height : 48) + 'px';
     if (chevron) chevron.textContent = '▲';
+    if (pulltab) pulltab.textContent = '▲▲▲';
     if (sizeBtn) sizeBtn.classList.add('hidden');
   } else if (state === 'tall') {
     drawer.style.height = '70vh';
     if (chevron) chevron.textContent = '▼';
+    if (pulltab) pulltab.textContent = '▼▼▼';
     if (sizeBtn) { sizeBtn.classList.remove('hidden'); sizeBtn.textContent = '⤡ Shorter'; }
   } else {
     drawer.style.height = '24rem';
     if (chevron) chevron.textContent = '▼';
+    if (pulltab) pulltab.textContent = '▼▼▼';
     if (sizeBtn) { sizeBtn.classList.remove('hidden'); sizeBtn.textContent = '⤢ Taller'; }
   }
   localStorage.setItem('eve_history_drawer_state', state);
@@ -1690,6 +1739,7 @@ window.onload = async () => {
 
   try {
     loadJournalState();
+    updateViewModeButtonLabel();
     populateJournalLocationDropdown();
     updateJournalStockCountBadge();
     renderJournalPage();
