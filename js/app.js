@@ -1835,7 +1835,7 @@ function createNodeCard(node) {
         </div>` : ''}
         <div class="border-t border-[#3a3025] pt-2">
           <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">${isRoot ? 'Total Production Cost' : node.isBuildingSelf ? 'Calculated Build Cost' : 'Market Buy Cost'}</div>
-          <div class="font-bold" style="color:var(--accent);">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</div>
+          <div class="font-bold" style="color:var(--cost);">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</div>
         </div>
         ${isRoot ? `
           <div class="border-t border-green-500/40 pt-2 mt-1">
