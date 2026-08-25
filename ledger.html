@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Industry Ledger</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.2.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.3.0">
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
 
@@ -47,12 +47,12 @@
 
     <div class="stat">
       <div class="stat-label">Total calculated cost</div>
-      <div id="journal-total-cost" class="stat-value mono">0 ISK</div>
+      <div id="journal-total-cost" class="stat-value mono" style="color:var(--cost);">0 ISK</div>
     </div>
 
     <div class="stat">
       <div class="stat-label">Total materials cost</div>
-      <div id="journal-materials-cost" class="stat-value mono" style="color:var(--green);">0 ISK</div>
+      <div id="journal-materials-cost" class="stat-value mono" style="color:var(--cost);">0 ISK</div>
     </div>
 
     <div class="stat" title="Total net sell profit across every job currently in the queue, at full market cost. * means one or more queued jobs predate profit tracking and are excluded.">
@@ -198,7 +198,7 @@
         </div>
         <div class="mt-2">
           <div class="text-[10.5px] uppercase tracking-wide" style="color:var(--text-mute);">Aggregated Materials ISK</div>
-          <div id="journal-bom-total" class="font-bold text-base" style="color:var(--accent);">0 ISK</div>
+          <div id="journal-bom-total" class="font-bold text-base" style="color:var(--cost);">0 ISK</div>
         </div>
       </div>
     </aside>
@@ -253,6 +253,6 @@
   <script src="js/esi.js?v=8.0.2"></script>
   <script src="js/tree.js?v=8.0.1"></script>
   <script src="js/optimizers.js?v=8.0.1"></script>
-  <script src="js/ledger.js?v=9.2.0"></script>
+  <script src="js/ledger.js?v=9.3.0"></script>
 </body>
 </html>

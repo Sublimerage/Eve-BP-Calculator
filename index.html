@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Deep-Industry Engine</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.2.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.3.0">
 </head>
 <body class="page-calc flex flex-col min-h-screen text-slate-200">
 
@@ -161,7 +161,7 @@
           <input type="number" id="build-profit-threshold" value="5.0" step="0.5" min="0" max="100"
             class="w-14 bg-black/25 border border-orange-500/40 text-center text-orange-300 font-bold p-1 outline-none text-xs">
           <span class="text-slate-500 text-xs flex-shrink-0">%</span>
-          <button onclick="applyBuildProfitOptimizer()" class="ml-auto rounded bg-orange-800 hover:bg-orange-700 text-white font-semibold py-1 px-2 text-[10px] transition shadow mono flex-shrink-0">
+          <button onclick="applyBuildProfitOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] mono flex-shrink-0">
             Optimize
           </button>
         </div>
@@ -176,7 +176,7 @@
             <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100"
               class="w-14 bg-black/25 border border-orange-500/40 text-center text-orange-300 font-bold p-1 outline-none text-xs">
             <span class="text-slate-500 text-xs flex-shrink-0">%</span>
-            <button onclick="applyComponentSpreadOptimizer()" class="ml-auto rounded bg-orange-700 hover:bg-orange-600 text-white font-semibold py-1 px-2 text-[10px] transition flex-shrink-0">
+            <button onclick="applyComponentSpreadOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] flex-shrink-0">
               Optimize
             </button>
           </div>
@@ -185,7 +185,7 @@
             <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100"
               class="w-14 bg-black/25 border border-orange-500/40 text-center text-orange-300 font-bold p-1 outline-none text-xs">
             <span class="text-slate-500 text-xs flex-shrink-0">%</span>
-            <button onclick="applyBudgetImpactOptimizer()" class="ml-auto rounded bg-orange-700 hover:bg-orange-600 text-white font-semibold py-1 px-2 text-[10px] transition flex-shrink-0">
+            <button onclick="applyBudgetImpactOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] flex-shrink-0">
               Optimize
             </button>
           </div>
@@ -474,7 +474,7 @@
             </label>
           </div>
           <div>
-            <button id="blueprint-readiness-btn" onclick="scanBlueprintReadiness()" class="w-full rounded px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] transition" title="Checks each visible blueprint's direct materials against your current stock - shows which ones you could build right now with zero shopping">What Can I Build Right Now?</button>
+            <button id="blueprint-readiness-btn" onclick="scanBlueprintReadiness()" class="btn-glass w-full px-2.5 py-1.5 text-[10px]" title="Checks each visible blueprint's direct materials against your current stock - shows which ones you could build right now with zero shopping">What Can I Build Right Now?</button>
           </div>
 
           <div>
@@ -550,6 +550,6 @@
   <script src="js/esi.js?v=15.2.0"></script>
   <script src="js/tree.js?v=15.1.0"></script>
   <script src="js/optimizers.js?v=15.1.0"></script>
-  <script src="js/app.js?v=15.10.0"></script>
+  <script src="js/app.js?v=15.11.0"></script>
 </body>
 </html>
