@@ -38,6 +38,11 @@ html {
   --red: #dd6b64;
   --red-rgb: 221,107,100;
 
+  /* Cost - a distinct warm gold, separate from --accent/--green, so "this is money going out" never
+     reads the same as "this is profit/positive" at a glance. */
+  --cost: #d9b84a;
+  --cost-rgb: 217,184,74;
+
   /* Copper ramp (replaces Tailwind's orange/amber) */
   --copper-100: #f3ddc7;
   --copper-200: #ecc9a3;
@@ -835,6 +840,9 @@ body.page-calc.theme-unify div.lp-list-item[onmousedown],
 body.page-calc.theme-unify div.lp-list-item[onclick] { cursor: pointer; }
 body.page-calc.theme-unify .lp-list-item:hover { background: rgba(255,255,255,0.05); }
 body.page-calc.theme-unify .lp-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 4px 10px;
   font-size: 10.5px;
   font-weight: 700;
@@ -845,6 +853,7 @@ body.page-calc.theme-unify .lp-chip-btn {
   transition: background 0.15s ease;
   white-space: nowrap;
 }
+body.page-calc.theme-unify .lp-chip-btn svg { width: 11px; height: 11px; stroke: currentColor; fill: none; flex-shrink: 0; }
 body.page-calc.theme-unify .lp-chip-btn:hover { background: rgba(var(--accent-rgb),0.28); }
 body.page-calc.theme-unify .lp-table { width: 100%; border-collapse: collapse; text-align: left; }
 body.page-calc.theme-unify .lp-table th {
