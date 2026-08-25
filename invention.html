@@ -8,7 +8,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Invention Calculator</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=25.0.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=25.1.0">
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
@@ -89,7 +89,7 @@
               <input type="checkbox" id="invention-deduct-stock" checked class="w-3.5 h-3.5 accent-cyan-500" onchange="recalculateInvention()">
               Deduct Owned Stock
             </label>
-            <button onclick="refreshLiveAssets()" class="text-[9px] px-2 py-1 bg-cyan-800 hover:bg-cyan-700 text-cyan-100 font-bold rounded transition">Refresh Assets</button>
+            <button onclick="refreshLiveAssets()" class="text-[9px] px-2 py-1 bg-cyan-800 hover:bg-cyan-700 text-black font-bold rounded transition">Refresh Assets</button>
           </div>
           <div class="flex items-center gap-2">
             <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
@@ -172,6 +172,6 @@
   <script src="js/esi.js?v=8.0.2"></script>
   <script src="js/tree.js?v=8.0.1"></script>
   <script src="js/optimizers.js?v=8.0.1"></script>
-  <script src="js/invention.js?v=8.0.1"></script>
+  <script src="js/invention.js?v=8.0.3"></script>
 </body>
 </html>
