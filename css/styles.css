@@ -329,16 +329,21 @@ header { height: 56px; flex-shrink: 0; }
   box-shadow: 0 8px 22px rgba(var(--accent-rgb),0.4);
 }
 .btn-glass:active { transform: translateY(1px); }
+/* Soft-tint secondary button - a translucent wash of the accent color instead of either the fully
+   transparent/gray treatment (too invisible against a dark background to register as clickable) or
+   the solid gradient fill (too loud to use on more than one or two true primary actions per view).
+   Same visual weight as .lp-badge-accent ("Built" on job cards) so secondary actions still read as
+   on-brand and clickable without competing with the actual primary action for attention. */
 .btn-glass-muted {
-  background: transparent;
-  border: 1px solid var(--glass-border);
+  background: rgba(var(--accent-rgb),0.14);
+  border: 1px solid rgba(var(--accent-rgb),0.25);
   box-shadow: none;
-  color: var(--text-soft);
+  color: var(--accent);
 }
 .btn-glass-muted:hover {
-  background: rgba(255,255,255,0.04);
-  border-color: var(--glass-border-top);
-  color: var(--text);
+  background: rgba(var(--accent-rgb),0.22);
+  border-color: rgba(var(--accent-rgb),0.4);
+  color: var(--accent);
 }
 
 /* ===== Header nav tabs (Calculator / Ledger / Invention cross-links) ===== */
@@ -686,22 +691,26 @@ body.page-calc {
   --text-soft: #9ba0a8;
   --text-mute: #6b7078;
 
-  --accent: #c8ff4d;
-  --accent-2: #8fce1f;
-  --accent-rgb: 200,255,77;
+  /* Lime ramp dimmed from the original neon peak (was #c8ff4d, 100% saturation/65% lightness) to a
+     calmer #9de137 (74%/55%) - same hue, still unmistakably "lime", but no longer bright enough to
+     read as a highlighter under low ambient light. One ramp, referenced by --accent/--green/--copper
+     alike so dimming it here re-dims the whole app. */
+  --accent: #9de137;
+  --accent-2: #6fa919;
+  --accent-rgb: 157,225,55;
 
-  --green: #c8ff4d;
-  --green-rgb: 200,255,77;
-  --green-300: #ddffa0; --green-400: #c8ff4d; --green-500: #a8db3d;
-  --green-600: #8fce1f; --green-700: #6fa816; --green-800: #4d7a0f;
+  --green: #9de137;
+  --green-rgb: 157,225,55;
+  --green-300: #c2ec83; --green-400: #9de137; --green-500: #87cc1e;
+  --green-600: #6fa919; --green-700: #588514; --green-800: #43660f;
 
   --red: #e8845a;
   --red-rgb: 232,132,90;
   --red-300: #f3c0a8; --red-400: #e8845a; --red-500: #d9713f;
 
-  --copper-100: #eaffc4; --copper-200: #dcff9e; --copper-300: #cdff78;
-  --copper-400: #c8ff4d; --copper-500: #c8ff4d; --copper-600: #a8db3d;
-  --copper-700: #8fce1f; --copper-800: #6fa816; --copper-900: #4d7a0f; --copper-950: #2c4708;
+  --copper-100: #e9f8d3; --copper-200: #d8f3af; --copper-300: #c2ec83;
+  --copper-400: #9de137; --copper-500: #9de137; --copper-600: #87cc1e;
+  --copper-700: #6fa919; --copper-800: #588514; --copper-900: #43660f; --copper-950: #2f470b;
 
   --glass-fill: linear-gradient(155deg, #14161a, #0b0c0d);
   --glass-border: rgba(255,255,255,0.06);
@@ -716,7 +725,7 @@ body.page-calc {
 }
 
 body.page-calc {
-  background: radial-gradient(ellipse 1000px 560px at 50% -10%, rgba(200,255,77,.1), transparent 60%), #08090a;
+  background: radial-gradient(ellipse 1000px 560px at 50% -10%, rgba(157,225,55,.1), transparent 60%), #08090a;
 }
 
 /* .theme-unify (ledger.html, invention.html): redirect the entire violet and blue ramps onto the
@@ -972,10 +981,9 @@ body.page-calc #status-badge {
   box-shadow: none !important;
 }
 
-/* Dark text only on the solid-lime fill variant - .btn-glass-muted is a transparent/outline
-   button (e.g. "Buy All" next to "Build All") that keeps its own light .text-soft color, since
-   this rule would otherwise win on specificity and leave its text unreadably dark against its
-   near-transparent background. */
+/* Dark text only on the solid-lime fill variant - .btn-glass-muted keeps its own lime-on-tint
+   color (set above), since this rule would otherwise win on specificity and force dark text onto
+   a background that's mostly transparent, which would be unreadable. */
 body.page-calc .btn-glass:not(.btn-glass-muted) { color: #0a1002; }
 
 /* Stat strip: the strip itself is just a flex row now - each stat is its own gradient card
@@ -1052,8 +1060,8 @@ body.page-calc #viewport,
 body.page-calc #journal-main-area,
 body.page-calc #invention-main-area {
   background:
-    radial-gradient(ellipse 1100px 620px at 50% 100%, rgba(200,255,77,.14), transparent 72%),
-    radial-gradient(rgba(200,255,77,.07) 1px, transparent 1.5px) 0 0/20px 20px,
+    radial-gradient(ellipse 1100px 620px at 50% 100%, rgba(157,225,55,.14), transparent 72%),
+    radial-gradient(rgba(157,225,55,.07) 1px, transparent 1.5px) 0 0/20px 20px,
     #0a0b0a !important;
   border: none !important;
   box-shadow: none !important;
