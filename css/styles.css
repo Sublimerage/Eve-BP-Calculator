@@ -871,7 +871,7 @@ body.page-calc.theme-unify .lp-table td { padding: 8px; border-bottom: 1px solid
 body.page-calc.theme-unify .lp-table tbody tr { transition: background 0.15s ease; }
 body.page-calc.theme-unify .lp-table tbody tr:hover { background: rgba(255,255,255,0.03); }
 body.page-calc.theme-unify .lp-table tr.lp-table-best { background: rgba(var(--accent-rgb),0.08); }
-body.page-calc.theme-unify .lp-divider-col { padding-left: 16px; border-left: 1px solid rgba(255,255,255,0.08); }
+body.page-calc.theme-unify .lp-divider-col { padding-left: 24px; margin-left: 4px; border-left: 1px solid rgba(255,255,255,0.08); }
 body.page-calc.theme-unify .lp-job-card {
   background: var(--glass-fill);
   border-radius: var(--radius-card);
