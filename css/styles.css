@@ -716,18 +716,45 @@ body.page-calc.theme-unify [class*="border-[#1e3348]"] {
    paint, there is no rectangle to perceive - organization comes from spacing and text color only,
    exactly like the card-level "no border, gradient fill only" treatment used everywhere else, just
    taken one level further for elements this small. */
-body.page-calc.theme-unify input[class*="bg-[#0d1922]"],
-body.page-calc.theme-unify input[class*="bg-[#070b0f]"],
-body.page-calc.theme-unify select[class*="bg-[#0d1922]"],
-body.page-calc.theme-unify select[class*="bg-[#070b0f]"],
 body.page-calc.theme-unify div[class*="bg-[#070b0f]"] {
   background: transparent !important;
 }
-/* bg-[#0d1922] div is NOT included above - unlike bg-[#070b0f], it's also the class the real
-   top-level summary tiles and status banners use (they need to keep their gradient card fill,
-   confirmed clean in the previous round), not just nested sub-rows. Those two use-cases aren't
-   distinguishable by class alone, so the nested-only instances (job-card status banner divs are
-   handled separately below) are fixed at the source in ledger.js/invention.js instead of here. */
+
+/* ============================================================
+   Ledger/Invention form fields - REBUILT, not patched. Every input/select on these two pages now
+   uses one of exactly two deliberate component classes instead of ad-hoc per-instance Tailwind
+   combos (bg-[#0d1922]/bg-[#070b0f] + border + border-[#1e3348] + rounded), which is what made
+   every previous round of fixes miss instances - there was no single pattern to fix, just dozens
+   of near-identical but not-quite-identical class strings.
+
+   .field-line: dense/secondary fields (tax %, skill level, target BPCs, filter/dropdown selects).
+   No box at all - just a bottom underline, invisible at rest apart from the line, lime on focus.
+   A line has no corners and no fill to read as "a box", so this is structurally immune to the
+   "still boxy/still square corners" complaints - there's no rectangle for the eye to detect.
+
+   .field-box: the ONE prominent field per page (the item search box) - it's the primary action,
+   so it keeps a soft fill, matching how the calculator treats its own primary search field. */
+body.page-calc.theme-unify .field-line {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1.5px solid rgba(255,255,255,0.12) !important;
+  border-radius: 0 !important;
+  transition: border-color 0.15s ease;
+}
+body.page-calc.theme-unify .field-line:focus {
+  border-bottom-color: var(--accent) !important;
+  outline: none;
+}
+body.page-calc.theme-unify .field-box {
+  background: rgba(0,0,0,0.25) !important;
+  border: none !important;
+  border-radius: var(--radius-btn) !important;
+  transition: box-shadow 0.15s ease;
+}
+body.page-calc.theme-unify .field-box:focus {
+  box-shadow: 0 0 0 1.5px rgba(var(--accent-rgb),0.55);
+  outline: none;
+}
 
 /* --accent and --green are the same lime hex on this page (Foxstock treats one hero color as
    both brand accent and "up"/profit), which would otherwise make node-parent-highlight and
