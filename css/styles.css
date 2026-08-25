@@ -728,16 +728,18 @@ body.page-calc.theme-unify div[class*="bg-[#070b0f]"] {
    of near-identical but not-quite-identical class strings.
 
    .field-line: dense/secondary fields (tax %, skill level, target BPCs, filter/dropdown selects).
-   No box at all - just a bottom underline, invisible at rest apart from the line, lime on focus.
-   A line has no corners and no fill to read as "a box", so this is structurally immune to the
-   "still boxy/still square corners" complaints - there's no rectangle for the eye to detect.
+   A persistent underline, even with no box shape, still read as "a line I didn't ask for" -
+   so now there is NOTHING painted at rest at all: no fill, no border, zero visual difference from
+   plain text. The underline only appears the moment a field is actually focused, as feedback that
+   you're now editing it - not as permanent decoration on every field whether you're using it or
+   not. This is the only way left to guarantee nothing is visible until you interact with it.
 
    .field-box: the ONE prominent field per page (the item search box) - it's the primary action,
    so it keeps a soft fill, matching how the calculator treats its own primary search field. */
 body.page-calc.theme-unify .field-line {
   background: transparent !important;
   border: none !important;
-  border-bottom: 1.5px solid rgba(255,255,255,0.12) !important;
+  border-bottom: 1.5px solid transparent !important;
   border-radius: 0 !important;
   transition: border-color 0.15s ease;
 }
@@ -755,6 +757,143 @@ body.page-calc.theme-unify .field-box:focus {
   box-shadow: 0 0 0 1.5px rgba(var(--accent-rgb),0.55);
   outline: none;
 }
+
+/* ============================================================
+   Ledger + Invention rebuild - small component vocabulary reused everywhere on both pages instead
+   of one-off Tailwind combinations. This is the actual fix for "still boxy/still has lines":
+   every card is .glass-card or .lp-card (same gradient-fill, zero-border treatment proven on the
+   calculator), every pill/badge/label pulls from here, so there is exactly one visual definition
+   of each component instead of dozens of near-identical hand-written variants to keep in sync. */
+body.page-calc.theme-unify .lp-card {
+  background: var(--glass-fill);
+  border-radius: var(--radius-card);
+  box-shadow: var(--glass-shadow);
+}
+body.page-calc.theme-unify .lp-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+body.page-calc.theme-unify .lp-badge {
+  display: inline-block;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-soft);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 9px;
+  line-height: 1.6;
+}
+body.page-calc.theme-unify .lp-badge-accent { background: rgba(var(--accent-rgb),0.18); color: var(--accent); }
+body.page-calc.theme-unify .lp-badge-danger { background: rgba(var(--red-rgb),0.18); color: var(--red); }
+body.page-calc.theme-unify .lp-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+body.page-calc.theme-unify .lp-pill:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+body.page-calc.theme-unify .lp-pill.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #0a1002;
+}
+body.page-calc.theme-unify .lp-row {
+  padding-top: 14px;
+  margin-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+body.page-calc.theme-unify .lp-row:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+body.page-calc.theme-unify .lp-tile {
+  background: var(--glass-fill);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+body.page-calc.theme-unify .lp-list-item {
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  transition: background 0.15s ease;
+}
+body.page-calc.theme-unify .lp-list-item:first-child { border-top: none; }
+body.page-calc.theme-unify a.lp-list-item,
+body.page-calc.theme-unify div.lp-list-item[onmousedown],
+body.page-calc.theme-unify div.lp-list-item[onclick] { cursor: pointer; }
+body.page-calc.theme-unify .lp-list-item:hover { background: rgba(255,255,255,0.05); }
+body.page-calc.theme-unify .lp-chip-btn {
+  padding: 4px 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb),0.16);
+  color: var(--accent);
+  border: none;
+  transition: background 0.15s ease;
+  white-space: nowrap;
+}
+body.page-calc.theme-unify .lp-chip-btn:hover { background: rgba(var(--accent-rgb),0.28); }
+body.page-calc.theme-unify .lp-table { width: 100%; border-collapse: collapse; text-align: left; }
+body.page-calc.theme-unify .lp-table th {
+  padding: 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+body.page-calc.theme-unify .lp-table th.sortable { cursor: pointer; user-select: none; }
+body.page-calc.theme-unify .lp-table th.sortable:hover { color: var(--accent); }
+body.page-calc.theme-unify .lp-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+body.page-calc.theme-unify .lp-table tbody tr { transition: background 0.15s ease; }
+body.page-calc.theme-unify .lp-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+body.page-calc.theme-unify .lp-table tr.lp-table-best { background: rgba(var(--accent-rgb),0.08); }
+body.page-calc.theme-unify .lp-job-card {
+  background: var(--glass-fill);
+  border-radius: var(--radius-card);
+  border-left: 3px solid transparent;
+  transition: border-color 0.15s ease, background 0.2s ease;
+}
+body.page-calc.theme-unify .lp-job-card.job-ready { border-left-color: var(--accent); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),0.18), 0 0 20px rgba(var(--accent-rgb),0.10); }
+body.page-calc.theme-unify .lp-job-card.job-started { border-left-color: rgba(var(--accent-rgb),0.45); }
+body.page-calc.theme-unify .lp-job-card.job-subbuild { border-left-color: var(--text-mute); }
+body.page-calc.theme-unify .lp-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-btn);
+  background: rgba(255,255,255,0.04);
+}
+body.page-calc.theme-unify .lp-group-header.is-active { background: rgba(var(--accent-rgb),0.12); }
+body.page-calc.theme-unify .lp-inset {
+  background: rgba(0,0,0,0.18);
+  border-radius: var(--radius-btn);
+  padding: 8px 10px;
+}
+body.page-calc.theme-unify .lp-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: var(--radius-btn);
+  background: rgba(255,255,255,0.04);
+}
+body.page-calc.theme-unify .lp-status-row.is-ready { background: rgba(var(--accent-rgb),0.14); }
 
 /* --accent and --green are the same lime hex on this page (Foxstock treats one hero color as
    both brand accent and "up"/profit), which would otherwise make node-parent-highlight and
