@@ -630,11 +630,11 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
 
         ${startJobRowHTML}
 
-        <div class="flex items-center space-x-2 pt-1">
-          <button onclick="markJobAsBuilt(${job.id})" class="btn-glass flex-1 py-1.5 text-sm flex items-center justify-center gap-1">
+        <div class="flex items-center gap-2 pt-1">
+          <button onclick="markJobAsBuilt(${job.id})" class="lp-badge lp-badge-accent py-1.5 px-3 text-sm flex items-center justify-center gap-1" style="cursor:pointer;">
             ✔ Built
           </button>
-          <button onclick="deleteJobFromQueue(${job.id})" class="lp-badge lp-badge-danger py-1.5 px-3 text-sm flex items-center justify-center" style="cursor:pointer;">
+          <button onclick="deleteJobFromQueue(${job.id})" class="lp-badge lp-badge-danger py-1.5 px-3 text-sm flex items-center justify-center gap-1" style="cursor:pointer;">
             ❌ Delete
           </button>
         </div>
