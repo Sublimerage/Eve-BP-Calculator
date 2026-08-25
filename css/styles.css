@@ -189,22 +189,27 @@ img {
   transform: translateY(-2px);
 }
 
-.node-selected {
+/* Prefixed with .diagram-node (always present alongside these on tree cards) so specificity
+   (0,0,2,0) reliably beats the .shadow-lg/.shadow-2xl compat-layer mapping the same cards also
+   carry - both were single-class selectors of equal specificity before, so source order alone
+   decided the tie and the compat layer (declared later in the file) was silently winning,
+   flattening this glow back to a plain shadow no matter which node was selected. */
+.diagram-node.node-selected {
   border-color: var(--green) !important;
   box-shadow: var(--glass-shadow), 0 0 0 1px rgba(var(--green-rgb),0.4), 0 0 22px rgba(var(--green-rgb),0.35) !important;
   opacity: 1 !important;
 }
-.node-child-highlight {
+.diagram-node.node-child-highlight {
   border-color: var(--green) !important;
   box-shadow: var(--glass-shadow), 0 0 14px rgba(var(--green-rgb),0.25) !important;
   opacity: 1 !important;
 }
-.node-parent-highlight {
+.diagram-node.node-parent-highlight {
   border-color: var(--accent) !important;
   box-shadow: var(--glass-shadow), 0 0 16px rgba(var(--accent-rgb),0.35) !important;
   opacity: 1 !important;
 }
-.node-dimmed {
+.diagram-node.node-dimmed {
   opacity: 0.25 !important;
 }
 
@@ -657,6 +662,16 @@ body.page-calc {
 
 body.page-calc {
   background: radial-gradient(ellipse 1000px 560px at 50% -10%, rgba(200,255,77,.06), transparent 60%), #08090a;
+}
+
+/* --accent and --green are the same lime hex on this page (Foxstock treats one hero color as
+   both brand accent and "up"/profit), which would otherwise make node-parent-highlight and
+   node-child-highlight glow identically here - reintroducing the two-color distinction the base
+   theme has (copper vs teal) using blue instead, paired with the matching connector-line color
+   app.js draws for "output" connections. */
+body.page-calc .diagram-node.node-parent-highlight {
+  border-color: var(--blue) !important;
+  box-shadow: var(--glass-shadow), 0 0 16px rgba(var(--blue-rgb),0.35) !important;
 }
 
 /* Header + icon rail carry no card chrome of their own - bare wordmark/icons sitting straight on
