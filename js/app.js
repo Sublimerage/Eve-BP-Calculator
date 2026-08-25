@@ -1788,14 +1788,13 @@ function createNodeCard(node) {
         </div>
       ` : ''}
 
-      <div class="text-sm mono space-y-1 border-t border-[#3a3025] pt-2.5">
-        <div class="flex justify-between items-center font-semibold">
-          <span class="text-slate-400">Lowest Sell:</span>
-          <div class="flex items-center gap-1.5">
-            <span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK</span>
-            <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="toggle-btn" title="Compare price and trade volume across your tracked markets">
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17,1 21,5 17,9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7,23 3,19 7,15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
-              Compare
+      <div class="text-sm mono space-y-1.5 border-t border-[#3a3025] pt-2.5">
+        <div class="flex justify-between items-center font-semibold gap-2">
+          <span class="text-slate-400 flex-shrink-0">Lowest Sell:</span>
+          <div class="flex items-center gap-1 min-w-0">
+            <span class="text-green-400 font-bold truncate">${prices.sell.toLocaleString()} ISK</span>
+            <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="icon-btn flex-shrink-0" style="width:20px;height:20px;" title="Compare price and trade volume across your tracked markets">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><polyline points="17,1 21,5 17,9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7,23 3,19 7,15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
             </button>
           </div>
         </div>
@@ -2214,7 +2213,7 @@ function drawConnectingLines() {
 
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.setAttribute('d', `M ${startX} ${startY} C ${startX + 40} ${startY}, ${isoLeftX - 40} ${isoCenterY}, ${isoLeftX} ${isoCenterY}`);
-            path.setAttribute('stroke', '#4caf6f');
+            path.setAttribute('stroke', '#c8ff4d');
             path.setAttribute('stroke-width', '3.5');
             path.setAttribute('stroke-opacity', '1.0');
             path.setAttribute('fill', 'none');
@@ -2235,7 +2234,7 @@ function drawConnectingLines() {
 
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           path.setAttribute('d', `M ${isoRightX} ${isoCenterY} C ${isoRightX + 40} ${isoCenterY}, ${endX - 40} ${endY}, ${endX} ${endY}`);
-          path.setAttribute('stroke', '#e8c96a');
+          path.setAttribute('stroke', '#6a98de');
           path.setAttribute('stroke-width', '3.5');
           path.setAttribute('stroke-opacity', '1.0');
           path.setAttribute('fill', 'none');
@@ -2297,15 +2296,15 @@ function drawConnectingLinesForTree(root) {
           path.setAttribute('d', `M ${startX} ${startY} C ${controlX1} ${startY}, ${controlX2} ${endY}, ${endX} ${endY}`);
           
           if (isHighlightedConnection) {
-            path.setAttribute('stroke', isOutputConnection ? '#e8c96a' : '#4caf6f');
+            path.setAttribute('stroke', isOutputConnection ? '#6a98de' : '#c8ff4d');
             path.setAttribute('stroke-width', '3.5');
             path.setAttribute('stroke-opacity', '1.0');
           } else if (isDimmedConnection) {
-            path.setAttribute('stroke', '#b34414');
+            path.setAttribute('stroke', '#6b7078');
             path.setAttribute('stroke-width', '1.5');
             path.setAttribute('stroke-opacity', '0.12');
           } else {
-            path.setAttribute('stroke', '#b34414');
+            path.setAttribute('stroke', '#6b7078');
             path.setAttribute('stroke-width', '2');
             path.setAttribute('stroke-opacity', '0.75');
           }
