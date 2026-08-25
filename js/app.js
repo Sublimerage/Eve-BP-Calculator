@@ -211,8 +211,8 @@ function populateBlueprintLocationDropdown() {
   const currentSystemName = (document.getElementById('system-search')?.value || 'JITA').toUpperCase();
   const currentValue = filterSelect.value || 'all';
   filterSelect.innerHTML = `
-    <option value="all" style="color: #38bdf8; background-color: #0a0d0e; font-weight: bold;">All Locations</option>
-    <option value="industry_system" style="color: #38bdf8; background-color: #0a0d0e; font-weight: bold;">Current System Only (${currentSystemName})</option>
+    <option value="all" style="color: var(--accent); background-color: #0a0d0e; font-weight: bold;">All Locations</option>
+    <option value="industry_system" style="color: var(--accent); background-color: #0a0d0e; font-weight: bold;">Current System Only (${currentSystemName})</option>
   `;
   const sagNameMap = {
     'CorpSAG1': window.corpDivisionNames[1] || 'DIVISION 1',
@@ -253,7 +253,7 @@ function populateBlueprintLocationDropdown() {
     mainOpt.value = `loc_${locId}`;
     const numericLocId = parseInt(locId);
     const isUpwellStructure = numericLocId > 1000000000000;
-    mainOpt.style.color = isUpwellStructure ? '#f97316' : '#4caf6f';
+    mainOpt.style.color = isUpwellStructure ? 'var(--accent)' : '#4caf6f';
     mainOpt.style.backgroundColor = '#0a0d0e';
     mainOpt.style.fontWeight = 'bold';
     mainOpt.textContent = `${isUpwellStructure ? '🟧' : '🟩'} ${data.name} (${data.count})`;
@@ -630,10 +630,10 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     const isOriginal = bp.quantity === -1;
     const bpImageVariant = isOriginal ? 'bp' : 'bpc';
     const stackBadge = (bp.stackCount && bp.stackCount > 1)
-      ? `<span class="text-[9px] font-bold text-orange-300 bg-orange-950/40 border border-orange-700/40 px-1.5 py-0.5 flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
+      ? `<span class="text-[9px] font-bold text-orange-300 bg-orange-950/40 border border-orange-700/40 rounded-full px-1.5 py-0.5 flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
       : '';
     const containerBadge = bp.containerName
-      ? `<span class="text-[9px] font-bold text-orange-400 bg-orange-950/40 border border-orange-700/40 px-1.5 py-0.5 flex-shrink-0" title="Inside container: ${window.esc(bp.containerName)}">📦 ${window.esc(bp.containerName)}</span>`
+      ? `<span class="text-[9px] font-bold text-orange-400 bg-orange-950/40 border border-orange-700/40 rounded-full px-1.5 py-0.5 flex-shrink-0" title="Inside container: ${window.esc(bp.containerName)}">📦 ${window.esc(bp.containerName)}</span>`
       : '';
     const stationBadge = showStationLabel
       ? `<span class="text-[9px] text-slate-500 flex-shrink-0" title="${window.esc(bp.stationName)}">📍 ${window.esc(bp.stationName)}</span>`
@@ -652,13 +652,13 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     } else if (bp._readinessResult) {
       const r = bp._readinessResult;
       readinessBadge = r.buildableRuns > 0
-        ? `<span class="text-xs font-bold text-emerald-300 bg-emerald-950/50 border border-emerald-600/50 px-1.5 py-0.5 flex-shrink-0" title="Current stock covers ${r.buildableRuns.toLocaleString()} full run${r.buildableRuns > 1 ? 's' : ''}">✔ ${r.buildableRuns.toLocaleString()} run${r.buildableRuns > 1 ? 's' : ''}</span>`
-        : `<span class="text-xs font-bold text-orange-300 bg-orange-950/50 border border-orange-600/50 px-1.5 py-0.5 flex-shrink-0" title="Not enough stock for even 1 run right now">⚠ 0 runs</span>`;
+        ? `<span class="text-xs font-bold text-emerald-300 bg-emerald-950/50 border border-emerald-600/50 rounded-full px-1.5 py-0.5 flex-shrink-0" title="Current stock covers ${r.buildableRuns.toLocaleString()} full run${r.buildableRuns > 1 ? 's' : ''}">✔ ${r.buildableRuns.toLocaleString()} run${r.buildableRuns > 1 ? 's' : ''}</span>`
+        : `<span class="text-xs font-bold text-orange-300 bg-orange-950/50 border border-orange-600/50 rounded-full px-1.5 py-0.5 flex-shrink-0" title="Not enough stock for even 1 run right now">⚠ 0 runs</span>`;
     }
     return `
-      <div class="bg-[#202a2e] border border-orange-500/20 hover:border-orange-500 p-2.5 transition space-y-2">
+      <div class="rounded-lg bg-black/20 border border-orange-500/20 hover:border-orange-500 p-2.5 transition space-y-2">
         <div class="flex items-center gap-2 min-w-0">
-          <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded-md border border-white/10 bg-[#030405] flex-shrink-0" loading="lazy" title="${isOriginal ? 'Blueprint Original (BPO)' : 'Blueprint Copy (BPC)'}">
+          <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded-md border border-white/10 bg-black/40 flex-shrink-0" loading="lazy" title="${isOriginal ? 'Blueprint Original (BPO)' : 'Blueprint Copy (BPC)'}">
           <span class="font-bold text-slate-200 min-w-0">${window.esc(name)}</span>
           ${stackBadge}${readinessBadge}
         </div>
@@ -669,10 +669,10 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
             ${profitBadge}
-            <span class="text-[11px] font-bold text-orange-300 bg-orange-950/50 border border-orange-700/40 px-1.5 py-0.5 whitespace-nowrap">ME ${bp.material_efficiency}%</span>
-            <span class="text-[11px] font-bold text-orange-300 bg-orange-950/50 border border-orange-700/40 px-1.5 py-0.5 whitespace-nowrap">TE ${bp.time_efficiency}%</span>
-            <button onclick="scanSingleBlueprintProfit(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs}, ${bp.quantity}, ${bp.productTypeId || 'null'}, this)" class="px-2 py-1 bg-orange-700 hover:bg-orange-600 text-white font-bold text-[10px] transition" title="Scan just this blueprint's profit">📊</button>
-            <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs})" class="px-2.5 py-1 bg-orange-700 hover:bg-orange-600 text-white font-bold text-[10px] transition">Load</button>
+            <span class="text-[11px] font-bold text-orange-300 bg-orange-950/50 border border-orange-700/40 rounded-full px-1.5 py-0.5 whitespace-nowrap">ME ${bp.material_efficiency}%</span>
+            <span class="text-[11px] font-bold text-orange-300 bg-orange-950/50 border border-orange-700/40 rounded-full px-1.5 py-0.5 whitespace-nowrap">TE ${bp.time_efficiency}%</span>
+            <button onclick="scanSingleBlueprintProfit(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs}, ${bp.quantity}, ${bp.productTypeId || 'null'}, this)" class="rounded px-2 py-1 bg-orange-700 hover:bg-orange-600 text-white font-bold text-[10px] transition" title="Scan just this blueprint's profit">📊</button>
+            <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs})" class="rounded px-2.5 py-1 bg-orange-700 hover:bg-orange-600 text-white font-bold text-[10px] transition">Load</button>
           </div>
         </div>
       </div>
@@ -2344,6 +2344,21 @@ function drawConnectingLinesForTree(root) {
   drawLinesForNode(root);
 }
 
+let bomViewMode = localStorage.getItem('eve_bom_view_mode') || 'card'; // 'card' | 'compact'
+
+function updateBomViewModeButtonLabel() {
+  const btn = document.getElementById('btn-bom-view-mode');
+  if (btn) btn.textContent = bomViewMode === 'compact' ? '▦ Detailed' : '☰ Compact';
+}
+
+function toggleBomViewMode() {
+  bomViewMode = bomViewMode === 'compact' ? 'card' : 'compact';
+  localStorage.setItem('eve_bom_view_mode', bomViewMode);
+  updateBomViewModeButtonLabel();
+  if (typeof window.recalculate === 'function') window.recalculate();
+}
+window.toggleBomViewMode = toggleBomViewMode;
+
 function renderBillOfMaterials(rootNode, brokerFee = 0) {
   const listContainer = document.getElementById('bom-items-list');
   if (!listContainer) return;
@@ -2423,29 +2438,43 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
 
   bomItems.sort((a, b) => b.lineCost - a.lineCost);
 
+  updateBomViewModeButtonLabel();
+  const isCompact = bomViewMode === 'compact';
+
   bomItems.forEach(item => {
     const row = document.createElement('div');
-    row.className = 'bg-black/25 rounded border border-orange-500/20 hover:border-orange-500 hover:bg-orange-500/10 p-2 flex items-center justify-between cursor-pointer transition shadow-sm';
     row.title = 'Click to find and focus this material in the build diagram';
     row.onclick = () => highlightNodeByTypeId(item.typeId);
 
-    row.innerHTML = `
-      <div class="flex items-center space-x-2.5 min-w-0">
-        <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-7 h-7 rounded-md border border-white/10 bg-black/40 flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
-        <div class="min-w-0 flex-1">
-          <div class="font-semibold text-slate-200 truncate flex items-center gap-1.5">
-            <span class="truncate">${item.name}</span>
-            <span class="text-[9px] px-1 font-bold mono ${item.strategy === 'sell' ? 'bg-orange-900/60 text-orange-300' : 'bg-[rgba(79,168,224,0.15)] text-[#a8d4f0]'}">
-              ${item.strategy === 'sell' ? 'SELL' : 'BUY'}
-            </span>
+    if (isCompact) {
+      row.className = 'flex items-center gap-2 py-1.5 border-b border-orange-500/10 hover:bg-orange-500/10 cursor-pointer transition';
+      row.innerHTML = `
+        <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
+        <span class="text-[9px] px-1 font-bold mono flex-shrink-0 ${item.strategy === 'sell' ? 'bg-orange-900/60 text-orange-300' : 'bg-[rgba(79,168,224,0.15)] text-[#a8d4f0]'}">${item.strategy === 'sell' ? 'SELL' : 'BUY'}</span>
+        <span class="text-xs font-semibold text-slate-200 truncate flex-1">${item.name}</span>
+        <span class="text-xs mono text-slate-400 flex-shrink-0">&times;${item.qty.toLocaleString()}</span>
+        <span class="text-xs font-bold mono text-orange-400 flex-shrink-0 w-24 text-right">${Math.round(item.lineCost).toLocaleString()} ISK</span>
+      `;
+    } else {
+      row.className = 'bg-black/25 rounded border border-orange-500/20 hover:border-orange-500 hover:bg-orange-500/10 p-2 flex items-center justify-between cursor-pointer transition shadow-sm';
+      row.innerHTML = `
+        <div class="flex items-center space-x-2.5 min-w-0">
+          <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-7 h-7 rounded-md border border-white/10 bg-black/40 flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold text-slate-200 truncate flex items-center gap-1.5">
+              <span class="truncate">${item.name}</span>
+              <span class="text-[9px] px-1 font-bold mono ${item.strategy === 'sell' ? 'bg-orange-900/60 text-orange-300' : 'bg-[rgba(79,168,224,0.15)] text-[#a8d4f0]'}">
+                ${item.strategy === 'sell' ? 'SELL' : 'BUY'}
+              </span>
+            </div>
+            <div class="text-[10px] text-slate-400 mono font-semibold">Qty: ${item.qty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK${item.lineVolume > 0 ? ` &bull; ${item.lineVolume.toLocaleString(undefined, {maximumFractionDigits: 1})} m3` : ''}</div>
           </div>
-          <div class="text-[10px] text-slate-400 mono font-semibold">Qty: ${item.qty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK${item.lineVolume > 0 ? ` &bull; ${item.lineVolume.toLocaleString(undefined, {maximumFractionDigits: 1})} m3` : ''}</div>
         </div>
-      </div>
-      <div class="text-right mono font-bold text-orange-400 flex-shrink-0 ml-2">
-        ${Math.round(item.lineCost).toLocaleString()} ISK
-      </div>
-    `;
+        <div class="text-right mono font-bold text-orange-400 flex-shrink-0 ml-2">
+          ${Math.round(item.lineCost).toLocaleString()} ISK
+        </div>
+      `;
+    }
 
     listContainer.appendChild(row);
   });

@@ -397,22 +397,28 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
           ${job.isSubBuild ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);">⚙ Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
           ${job.autoImported ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--accent);" title="No matching plan existed - imported from your active EVE job.">📥 Auto-imported ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
         </div>
-        <span class="text-lg font-extrabold mono flex-shrink-0 cursor-pointer" style="color:var(--accent);" onclick="event.stopPropagation(); copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">${job.runsNeeded.toLocaleString()}</span>
-        <span class="text-xs mono flex-shrink-0 w-14" style="color:var(--text-mute);">runs</span>
-        ${isTimerBacked
-          ? `<span class="job-timer flex-shrink-0 w-28 text-center" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}"><span class="timer-display text-xs font-extrabold mono" style="color:${statusColor};">${statusText}</span></span>`
-          : `<span class="text-xs font-extrabold mono flex-shrink-0 w-28 text-center" style="color:${statusColor};">${statusText}</span>`}
-        <div class="flex flex-col items-end flex-shrink-0 w-28" title="Total manufacturing cost for this job">
-          <span class="text-[8px] uppercase tracking-wide font-bold" style="color:var(--text-mute);">Cost</span>
-          <span class="text-xs font-bold mono whitespace-nowrap" style="color:var(--accent);">${Math.round(job.calculatedCost || 0).toLocaleString()} ISK</span>
-        </div>
-        <div class="flex flex-col items-end flex-shrink-0 w-28" title="Net sell profit for this job">
-          <span class="text-[8px] uppercase tracking-wide font-bold" style="color:var(--text-mute);">Profit</span>
-          <span class="text-xs font-bold mono whitespace-nowrap" style="color:${p !== undefined ? (p >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-mute)'};">${p !== undefined ? Math.round(p).toLocaleString() + ' ISK' : '—'}</span>
-        </div>
-        <div class="flex items-center gap-1.5 flex-shrink-0" onclick="event.stopPropagation()">
+        <div class="flex items-center gap-4 flex-shrink-0">
+          <div class="flex items-baseline gap-1.5 cursor-pointer" onclick="event.stopPropagation(); copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">
+            <span class="text-lg font-extrabold mono whitespace-nowrap" style="color:var(--accent);">${job.runsNeeded.toLocaleString()}</span>
+            <span class="text-xs mono whitespace-nowrap" style="color:var(--text-mute);">runs</span>
+          </div>
+          <div class="lp-divider-col" title="Job status">
+            ${isTimerBacked
+              ? `<span class="job-timer" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}"><span class="timer-display text-xs font-extrabold mono whitespace-nowrap" style="color:${statusColor};">${statusText}</span></span>`
+              : `<span class="text-xs font-extrabold mono whitespace-nowrap" style="color:${statusColor};">${statusText}</span>`}
+          </div>
+          <div class="flex flex-col items-end lp-divider-col" title="Total manufacturing cost for this job">
+            <span class="text-[8px] uppercase tracking-wide font-bold" style="color:var(--text-mute);">Cost</span>
+            <span class="text-xs font-bold mono whitespace-nowrap" style="color:var(--accent);">${Math.round(job.calculatedCost || 0).toLocaleString()} ISK</span>
+          </div>
+          <div class="flex flex-col items-end lp-divider-col" title="Net sell profit for this job">
+            <span class="text-[8px] uppercase tracking-wide font-bold" style="color:var(--text-mute);">Profit</span>
+            <span class="text-xs font-bold mono whitespace-nowrap" style="color:${p !== undefined ? (p >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-mute)'};">${p !== undefined ? Math.round(p).toLocaleString() + ' ISK' : '—'}</span>
+          </div>
+          <div class="flex items-center gap-1.5 lp-divider-col" onclick="event.stopPropagation()">
           <button onclick="markJobAsBuilt(${job.id})" class="lp-chip-btn">✔</button>
           <button onclick="deleteJobFromQueue(${job.id})" class="lp-badge lp-badge-danger" style="cursor:pointer;">❌</button>
+          </div>
         </div>
       </div>
       ${expandedDetailHTML}
@@ -821,6 +827,21 @@ function copyIndividualJobMultibuy(e, jobId) {
   });
 }
 
+let bomViewMode = localStorage.getItem('eve_bom_view_mode') || 'card'; // 'card' | 'compact' - shared with the calculator page
+
+function updateBomViewModeButtonLabel() {
+  const btn = document.getElementById('btn-bom-view-mode');
+  if (btn) btn.textContent = bomViewMode === 'compact' ? '▦ Detailed' : '☰ Compact';
+}
+
+function toggleBomViewMode() {
+  bomViewMode = bomViewMode === 'compact' ? 'card' : 'compact';
+  localStorage.setItem('eve_bom_view_mode', bomViewMode);
+  updateBomViewModeButtonLabel();
+  renderJournalPage();
+}
+window.toggleBomViewMode = toggleBomViewMode;
+
 function renderConsolidatedBOMList(bomItems, totalMissingISK) {
   const container = document.getElementById('journal-bom-items');
   const bomTypesEl = document.getElementById('journal-bom-types');
@@ -830,6 +851,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
   if (bomTotalEl) bomTotalEl.textContent = Math.round(totalMissingISK).toLocaleString() + ' ISK';
 
   if (!container) return;
+  updateBomViewModeButtonLabel();
 
   if (bomItems.length === 0) {
     container.innerHTML = `
@@ -839,6 +861,8 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
     `;
     return;
   }
+
+  const isCompact = bomViewMode === 'compact';
 
   container.innerHTML = bomItems.map(item => {
     const isCompleted = item.netMissingQty === 0;
@@ -854,6 +878,18 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
     const itemIconUrl = isItemBp
       ? `https://images.evetech.net/types/${item.typeId}/bp?size=32`
       : `https://images.evetech.net/types/${item.typeId}/icon?size=32`;
+
+    if (isCompact) {
+      return `
+        <div class="lp-list-item" style="padding-left:0; padding-right:0; ${isCompleted ? 'opacity:0.55;' : ''}">
+          <img src="${itemIconUrl}" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
+          <span style="color:${isCompleted ? 'var(--accent)' : 'var(--text-mute)'};" title="${isCompleted ? 'Acquired' : 'Missing'}">${isCompleted ? '✔' : '✖'}</span>
+          <span class="font-semibold truncate flex-1" style="color:var(--text-soft);">${window.esc(item.name)}</span>
+          <span class="text-xs mono flex-shrink-0" style="color:var(--text-mute);">&times;${item.totalQtyNeeded.toLocaleString()}</span>
+          <span class="font-bold mono flex-shrink-0 w-24 text-right" style="color:var(--accent);">${Math.round(item.lineCost).toLocaleString()} ISK</span>
+        </div>
+      `;
+    }
 
     return `
       <div class="lp-card p-2.5 transition" style="${isCompleted ? 'opacity:0.55;' : ''}">

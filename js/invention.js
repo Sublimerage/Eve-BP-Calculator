@@ -727,31 +727,34 @@ window.onload = async () => {
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
+  loadSharedTaxSettings();
+  // Restore the last-viewed item's search box/icon/name/skill inputs FIRST, before any network
+  // calls - these all come from local data (recipeMap, localStorage), so there's no reason to make
+  // the user stare at a blank page for a second or two while SSO callback handling, system cost
+  // index load, and adjusted-price fetch resolve below. This first pass may compute job fees as zero
+  // if EIV/SCI data isn't cached yet - the forced recalculation after those loads (below) corrects
+  // that, so the final numbers shown are still always accurate; only the empty-state wait goes away.
+  try {
+    await restoreInventionState();
+  } catch (e) {
+    console.warn('[Invention] Failed to restore previous session state:', e);
+  }
+
   if (typeof window.handleEsiSSOCallback === 'function') {
     try { await window.handleEsiSSOCallback(); } catch (e) { console.error('SSO callback error:', e); }
   }
-  loadSharedTaxSettings();
   // System cost index (needed for job fees) and adjusted prices (needed for EIV) - the calculator
   // and ledger both fetch these on load already; this page needs them too now that job fees are
-  // calculated here. Both are AWAITED before restoreInventionState() runs the first calculation -
-  // firing fetchAdjustedPrices() in the background here previously meant the first calculation (and
-  // often every calculation after it) ran against an empty EIV cache, making job fees silently
-  // compute to zero regardless of any tax/fee input, since nothing multiplied by zero stays zero.
+  // calculated here.
   if (typeof window.loadSavedSystem === 'function') {
     try { await window.loadSavedSystem(); } catch (e) { console.warn('[Invention] SCI load failed:', e); }
   }
   if (typeof window.fetchAdjustedPrices === 'function') {
     try { await window.fetchAdjustedPrices(); } catch (e) { console.warn('[Invention] Adjusted prices fetch error:', e); }
   }
-  // Page rendering and input aren't blocked while the awaits above are in flight, so it's possible
-  // the user already selected an item before EIV/SCI data was ready - force one more recalculation
-  // now that it actually is, rather than leaving a stale zero-fee calculation on screen.
+  // Force one more recalculation now that EIV/SCI data is actually ready, rather than leaving the
+  // first pass's possibly-zero-fee numbers on screen.
   if (_inventionCurrentBlueprint) {
     recalculateInventionImpl();
-  }
-  try {
-    await restoreInventionState();
-  } catch (e) {
-    console.warn('[Invention] Failed to restore previous session state:', e);
   }
 };
