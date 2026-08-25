@@ -40,7 +40,7 @@
 
   <!-- Toolbar: Stock & Location Filters -->
   <section id="ledger-toolbar" class="bg-[#0d1922] border-b border-[#1e3348] p-3 flex flex-wrap items-center gap-3 text-xs relative z-40">
-    <div class="flex flex-col bg-[#0c1318] p-2.5 rounded-lg border border-[#1e3348] shadow flex-grow max-w-[520px]">
+    <div class="flex flex-col bg-[#0c1318] p-2.5 rounded-lg shadow flex-grow max-w-[520px]">
       <div class="flex items-center justify-between mb-1.5">
         <span class="text-cyan-400 text-[11px] font-bold uppercase rajdhani tracking-wide">Stock &amp; Location Filters</span>
         <span id="location-search-feedback" class="text-[9px] text-amber-300 font-mono font-bold hidden"></span>
@@ -68,7 +68,7 @@
     </div>
 
     <!-- Live stats indicator -->
-    <div class="ml-auto text-xs mono flex items-center gap-2 bg-[#0c1318] px-4 py-2.5 rounded-lg border border-[#1e3348] shadow text-slate-400">
+    <div class="ml-auto text-xs mono flex items-center gap-2 bg-[#0c1318] px-4 py-2.5 rounded-lg shadow text-slate-400">
       <span>Filtered Stock:</span>
       <span id="stock-count-display" class="text-cyan-400 font-bold text-sm">0 items</span>
     </div>
@@ -135,7 +135,7 @@
         <input type="text" id="job-search-input" placeholder="Search queue by name..." autocomplete="off" oninput="filterJobsBySearch(this.value)"
           class="flex-1 min-w-[180px] bg-[#0c1318] border border-[#1e3348] rounded-md px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-purple-500">
         <div class="flex gap-1">
-          <button onclick="setJobStatusFilter('all')" id="btn-status-all" class="px-2.5 py-1.5 rounded-md font-bold transition text-[10px] mono bg-purple-800 text-black border border-purple-600/30">All</button>
+          <button onclick="setJobStatusFilter('all')" id="btn-status-all" class="px-2.5 py-1.5 rounded-md font-bold transition text-[10px] mono bg-purple-800 text-black">All</button>
           <button onclick="setJobStatusFilter('started')" id="btn-status-started" class="px-2.5 py-1.5 rounded-md font-bold transition text-[10px] mono bg-[#1e3348] text-slate-400 hover:text-white">In Progress</button>
           <button onclick="setJobStatusFilter('pending')" id="btn-status-pending" class="px-2.5 py-1.5 rounded-md font-bold transition text-[10px] mono bg-[#1e3348] text-slate-400 hover:text-white">⏳ Pending</button>
         </div>
@@ -161,12 +161,12 @@
 
       <!-- Sidebar BOM Filter controls -->
       <div class="px-4 py-3 border-b border-[#1e3348] bg-[#0d1922] space-y-2 flex flex-col">
-        <button id="deduct-stock-mode" value="true" onclick="toggleDeductStockButton(this, 'recalculateJournalStock')" class="w-full px-3 py-1.5 rounded-md font-bold text-xs transition flex items-center justify-center gap-1.5 bg-cyan-700 hover:bg-cyan-600 text-black border border-cyan-400 shadow shadow-cyan-900/40" title="Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead">✔ Deducting Stock</button>
+        <button id="deduct-stock-mode" value="true" onclick="toggleDeductStockButton(this, 'recalculateJournalStock')" class="w-full px-3 py-1.5 rounded-md font-bold text-xs transition flex items-center justify-center gap-1.5 bg-cyan-700 hover:bg-cyan-600 text-black shadow shadow-cyan-900/40" title="Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead">✔ Deducting Stock</button>
         <!-- Order Type Strategy Filter -->
         <div class="flex items-center justify-between text-[11px] mono">
           <span class="text-slate-400 font-bold">Order Type:</span>
           <div class="flex gap-1">
-            <button onclick="setBOMOrderFilter('all')" id="btn-order-all" class="px-2.5 py-1 rounded-md font-bold transition bg-purple-800 text-black border border-purple-600/30">
+            <button onclick="setBOMOrderFilter('all')" id="btn-order-all" class="px-2.5 py-1 rounded-md font-bold transition bg-purple-800 text-black">
               All
             </button>
             <button onclick="setBOMOrderFilter('buy')" id="btn-order-buy" class="px-2.5 py-1 rounded-md font-bold transition bg-[#1e3348] text-slate-400 hover:text-white">
@@ -258,6 +258,6 @@
   <script src="js/esi.js?v=8.0.2"></script>
   <script src="js/tree.js?v=8.0.1"></script>
   <script src="js/optimizers.js?v=8.0.1"></script>
-  <script src="js/ledger.js?v=8.0.5"></script>
+  <script src="js/ledger.js?v=8.0.6"></script>
 </body>
 </html>
