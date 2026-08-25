@@ -804,13 +804,13 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
   container.innerHTML = bomItems.map(item => {
     const isCompleted = item.netMissingQty === 0;
     const rowBg = isCompleted ? 'bg-[#0a0f14]/50 border-green-950 opacity-60' : 'bg-[#0c1318] border-[#1e3348] hover:border-purple-500/40';
-    const statusBadge = isCompleted 
-      ? `<span class="bg-green-950 text-green-300 text-xs px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">Acquired</span>` 
-      : `<span class="bg-amber-950 text-amber-300 text-xs px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">Missing</span>`;
+    const statusBadge = isCompleted
+      ? `<span class="bg-green-950 text-green-300 text-xs px-1.5 py-0.5 rounded font-bold uppercase flex-shrink-0">Acquired</span>`
+      : `<span class="bg-amber-950 text-amber-300 text-xs px-1.5 py-0.5 rounded font-bold uppercase flex-shrink-0">Missing</span>`;
 
-    const strategyBadge = item.strategy === 'sell' 
-      ? `<span class="bg-amber-900/60 text-amber-300 text-xs px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">SELL</span>` 
-      : `<span class="bg-cyan-900/60 text-cyan-300 text-xs px-1 rounded font-bold uppercase ml-1.5 flex-shrink-0">BUY</span>`;
+    const strategyBadge = item.strategy === 'sell'
+      ? `<span class="bg-amber-900/60 text-amber-300 text-xs px-1.5 py-0.5 rounded font-bold uppercase flex-shrink-0">SELL</span>`
+      : `<span class="bg-cyan-900/60 text-cyan-300 text-xs px-1.5 py-0.5 rounded font-bold uppercase flex-shrink-0">BUY</span>`;
 
     // CORRECTION: Direct blueprint path safety check inside the consolidated BOM prevents any imageservers 400 errors [1.1.1, 1.1.4]
     const itemNameLower = (window.TYPE_ID_TO_NAME[item.typeId] || item.name || '').toLowerCase();
@@ -820,23 +820,23 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
       : `https://images.evetech.net/types/${item.typeId}/icon?size=32`;
 
     return `
-      <div class="rounded border p-2 flex items-center justify-between transition shadow-sm ${rowBg}">
-        <div class="flex items-center space-x-2.5 min-w-0">
-          <img src="${itemIconUrl}" class="w-7 h-7 rounded-md border border-white/10 bg-[#070b0f] flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
+      <div class="rounded-lg border p-2.5 transition shadow-sm ${rowBg}">
+        <div class="flex items-start gap-2.5">
+          <img src="${itemIconUrl}" class="w-8 h-8 rounded-md border border-white/10 bg-[#070b0f] flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           <div class="min-w-0 flex-1">
-            <div class="font-semibold text-slate-200 truncate flex items-center">
-              <span class="truncate">${window.esc(item.name)}</span>
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-semibold text-slate-200 truncate">${window.esc(item.name)}</span>
+              <span class="font-bold mono flex-shrink-0" style="color:var(--accent);">${Math.round(item.lineCost).toLocaleString()} ISK</span>
+            </div>
+            <div class="flex items-center gap-1 mt-1">
               ${statusBadge}
               ${strategyBadge}
             </div>
-            <div class="text-xs text-slate-400 mono mt-0.5">
+            <div class="text-xs text-slate-400 mono mt-1">
               Needed: ${item.totalQtyNeeded.toLocaleString()} | Stock: ${item.stockQty.toLocaleString()}
             </div>
             ${item.netMissingQty > 0 ? `<div class="text-xs text-amber-300 mono mt-0.5 font-bold">Deficit: &times;${item.netMissingQty.toLocaleString()}</div>` : ''}
           </div>
-        </div>
-        <div class="text-right mono font-bold text-cyan-400 flex-shrink-0 ml-2">
-          ${Math.round(item.lineCost).toLocaleString()} ISK
         </div>
       </div>
     `;
