@@ -1122,6 +1122,18 @@ async function resolveProductIdFromBlueprintNameAsync(blueprintName) {
   return null;
 }
 
+// Search dropdowns are rendered position:fixed instead of absolute so they escape the flyout
+// panel's own overflow-y:auto - an absolutely-positioned dropdown still gets clipped by an
+// ancestor's scroll box even though it's outside that ancestor's normal layout flow, which was
+// cutting long result lists off at the flyout's border. position:fixed has no such ancestor, so
+// this just needs the input's real screen position computed once, right before showing it.
+function positionFixedDropdown(inputEl, resultsEl) {
+  const rect = inputEl.getBoundingClientRect();
+  resultsEl.style.top = (rect.bottom + 4) + 'px';
+  resultsEl.style.left = rect.left + 'px';
+  resultsEl.style.width = rect.width + 'px';
+}
+
 const searchInput = document.getElementById('item-search');
 const searchResults = document.getElementById('search-results');
 
@@ -1144,6 +1156,7 @@ if (searchInput) {
     if (!hits.length) {
       if (searchResults) {
         searchResults.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">No matching items found for "${safeQ}"</div>`;
+        positionFixedDropdown(searchInput, searchResults);
         searchResults.classList.remove('hidden');
       }
       return;
@@ -1164,6 +1177,7 @@ if (searchInput) {
         </div>
       `;
       }).join('');
+      positionFixedDropdown(searchInput, searchResults);
       searchResults.classList.remove('hidden');
     }
   });
@@ -1196,6 +1210,7 @@ if (systemSearchInput) {
     if (!hits.length) {
       if (systemSearchResults) {
         systemSearchResults.innerHTML = `<div class="p-2 text-slate-400 text-xs italic">No matching system found</div>`;
+        positionFixedDropdown(systemSearchInput, systemSearchResults);
         systemSearchResults.classList.remove('hidden');
       }
       return;
@@ -1207,6 +1222,7 @@ if (systemSearchInput) {
           ${window.esc(sys.name)}
         </div>
       `).join('');
+      positionFixedDropdown(systemSearchInput, systemSearchResults);
       systemSearchResults.classList.remove('hidden');
     }
   });
@@ -1705,12 +1721,12 @@ function createNodeCard(node) {
               </button>
             ` : ''}
             ${isIsolated ? `
-              <button onclick="exitIsolation(event)" class="icon-btn" style="width:22px;height:22px;" title="Exit isolation view">
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <button onclick="exitIsolation(event)" class="icon-btn" style="width:26px;height:26px;" title="Exit isolation view">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             ` : `
-              <button onclick="isolateComponent(event, ${node.instanceId})" class="icon-btn" style="width:22px;height:22px;" title="Isolate: show only this card and its direct connections">
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M4 9V5a1 1 0 011-1h4"/><path d="M20 9V5a1 1 0 00-1-1h-4"/><path d="M4 15v4a1 1 0 001 1h4"/><path d="M20 15v4a1 1 0 01-1 1h-4"/></svg>
+              <button onclick="isolateComponent(event, ${node.instanceId})" class="icon-btn" style="width:26px;height:26px;" title="Isolate: show only this card and its direct connections">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M4 9V5a1 1 0 011-1h4"/><path d="M20 9V5a1 1 0 00-1-1h-4"/><path d="M4 15v4a1 1 0 001 1h4"/><path d="M20 15v4a1 1 0 01-1 1h-4"/></svg>
               </button>
             `}
           </div>
@@ -1791,8 +1807,8 @@ function createNodeCard(node) {
           <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">Lowest Sell</div>
           <div class="flex items-center justify-between gap-2">
             <span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK</span>
-            <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="icon-btn flex-shrink-0" style="width:20px;height:20px;" title="Compare price and trade volume across your tracked markets">
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><polyline points="17,1 21,5 17,9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7,23 3,19 7,15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+            <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="icon-btn flex-shrink-0" style="width:26px;height:26px;" title="Compare price and trade volume across your tracked markets">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="17,1 21,5 17,9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7,23 3,19 7,15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
             </button>
           </div>
         </div>
@@ -2415,7 +2431,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
 
     row.innerHTML = `
       <div class="flex items-center space-x-2.5 min-w-0">
-        <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-7 h-7 border border-slate-700 bg-[#030405] flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
+        <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-7 h-7 rounded-md border border-white/10 bg-black/40 flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
         <div class="min-w-0 flex-1">
           <div class="font-semibold text-slate-200 truncate flex items-center gap-1.5">
             <span class="truncate">${item.name}</span>

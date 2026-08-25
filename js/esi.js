@@ -507,7 +507,11 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           data.forEach(ast => {
-            if (ast.type_id && ast.quantity) {
+            // is_blueprint_copy is present (true OR false) only on blueprint-type assets, absent
+            // on everything else - excluding it here stops a BPO/BPC from ever being counted as
+            // stock of the item it produces (they're always distinct type_ids, but a blueprint
+            // sitting in a hangar is never "stock" of the manufactured item either way).
+            if (ast.type_id && ast.quantity && ast.is_blueprint_copy === undefined) {
               window.rawAssetItems.push({
                 item_id: ast.item_id,
                 type_id: ast.type_id,
@@ -535,7 +539,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
             data.forEach(ast => {
-              if (ast.type_id && ast.quantity) {
+              if (ast.type_id && ast.quantity && ast.is_blueprint_copy === undefined) {
                 window.rawAssetItems.push({
                   item_id: ast.item_id,
                   type_id: ast.type_id,
