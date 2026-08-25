@@ -703,26 +703,31 @@ body.page-calc.theme-unify {
 body.page-calc.theme-unify [class*="border-[#1e3348]"] {
   border-color: transparent !important;
 }
-/* Inputs/selects: a WHITE overlay (lightening an already near-black field) reads as a raised box
-   with a visible edge, which is exactly the "still looks boxy" complaint - switched to a BLACK
-   overlay instead, same recessed/inset treatment the calculator's own .flyout-panel input already
-   uses successfully (rgba(0,0,0,0.28) - never flagged as boxy). Darkening a dark field is far
-   less perceptible than lightening one, so this reads as "a quiet inset field", not "a box". */
+/* Giving every nested input/select/sub-row div its OWN subtle background (previous attempt: a
+   dark rgba overlay) does not actually reduce visible "boxiness" enough, for two compounding
+   reasons: (1) a rounded rectangle is a geometrically regular shape, and human vision detects its
+   edge readily even at very low color contrast - subtlety alone doesn't stop it reading as "a
+   box"; (2) inputs nested INSIDE an already-darkened row apply their own overlay on top of the
+   row's already-darkened result, so two "identical, subtle" rgba(0,0,0,0.25) values compound into
+   a visibly darker inner rectangle instead of cancelling out - same declared value, different
+   rendered result, because backgrounds composite against whatever is already behind them, not
+   against each other's source values.
+   The actual fix: give these nested elements NO background of their own at all. With nothing to
+   paint, there is no rectangle to perceive - organization comes from spacing and text color only,
+   exactly like the card-level "no border, gradient fill only" treatment used everywhere else, just
+   taken one level further for elements this small. */
 body.page-calc.theme-unify input[class*="bg-[#0d1922]"],
 body.page-calc.theme-unify input[class*="bg-[#070b0f]"],
 body.page-calc.theme-unify select[class*="bg-[#0d1922]"],
-body.page-calc.theme-unify select[class*="bg-[#070b0f]"] {
-  background: rgba(0,0,0,0.25) !important;
-  border-radius: var(--radius-btn) !important;
-}
-/* Same fix, same reason, for the small nested "sub-row" wrapper <div>s (skill-level rows, the
-   "Runs to start" box, the collapsed-BOM placeholder, "Job Materials" box) - bg-[#070b0f] maps to
-   the flat page background color, correct for <body> but a hard-edged flat rectangle when used on
-   a small element sitting on top of a card's own gradient fill. img icons are deliberately left
-   out of this selector - a flat dark tile behind an item icon is the right look, not a bug. */
+body.page-calc.theme-unify select[class*="bg-[#070b0f]"],
 body.page-calc.theme-unify div[class*="bg-[#070b0f]"] {
-  background: rgba(0,0,0,0.25) !important;
+  background: transparent !important;
 }
+/* bg-[#0d1922] div is NOT included above - unlike bg-[#070b0f], it's also the class the real
+   top-level summary tiles and status banners use (they need to keep their gradient card fill,
+   confirmed clean in the previous round), not just nested sub-rows. Those two use-cases aren't
+   distinguishable by class alone, so the nested-only instances (job-card status banner divs are
+   handled separately below) are fixed at the source in ledger.js/invention.js instead of here. */
 
 /* --accent and --green are the same lime hex on this page (Foxstock treats one hero color as
    both brand accent and "up"/profit), which would otherwise make node-parent-highlight and
