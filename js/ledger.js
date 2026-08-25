@@ -388,7 +388,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
          draggable="true" data-job-id="${job.id}"
          ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
          ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
-      <div class="flex items-center gap-2 p-2 cursor-pointer" onclick="toggleJobCardCollapse(${job.id})">
+      <div class="flex items-center gap-2 p-2 cursor-pointer overflow-x-auto scrollbar-thin" onclick="toggleJobCardCollapse(${job.id})">
         <span class="drag-handle cursor-grab active:cursor-grabbing px-1 text-sm select-none flex-shrink-0" style="color:var(--text-mute);" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>
         <span class="text-xs flex-shrink-0" style="color:var(--text-mute);">${isExpanded ? '▾' : '▸'}</span>
         <img src="${jobIconUrl}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
@@ -397,25 +397,25 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
           ${job.isSubBuild ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);">⚙ Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
           ${job.autoImported ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--accent);" title="No matching plan existed - imported from your active EVE job.">📥 Auto-imported ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
         </div>
-        <div class="flex items-center flex-shrink-0">
-          <div class="flex items-baseline justify-end gap-1.5 cursor-pointer flex-shrink-0" style="width:78px;" onclick="event.stopPropagation(); copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">
+        <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
+          <div class="flex items-baseline justify-end gap-1.5 cursor-pointer flex-shrink-0" style="width:96px;" onclick="event.stopPropagation(); copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">
             <span class="text-lg font-extrabold mono whitespace-nowrap" style="color:var(--accent);">${job.runsNeeded.toLocaleString()}</span>
             <span class="text-xs mono whitespace-nowrap" style="color:var(--text-mute);">runs</span>
           </div>
-          <div class="lp-divider-col text-right flex-shrink-0" style="width:190px;" title="Job status">
+          <div class="lp-divider-col text-right flex-shrink-0" style="width:260px;" title="Job status">
             ${isTimerBacked
               ? `<span class="job-timer" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}"><span class="timer-display text-xs font-extrabold mono whitespace-nowrap" style="color:${statusColor};">${statusText}</span></span>`
               : `<span class="text-xs font-extrabold mono whitespace-nowrap" style="color:${statusColor};">${statusText}</span>`}
           </div>
-          <div class="flex flex-col items-end lp-divider-col flex-shrink-0" style="width:150px;" title="Total manufacturing cost for this job">
+          <div class="flex flex-col items-end lp-divider-col flex-shrink-0" style="width:190px;" title="Total manufacturing cost for this job">
             <span class="text-[8px] uppercase tracking-wide font-bold" style="color:var(--text-mute);">Cost</span>
             <span class="text-xs font-bold mono whitespace-nowrap" style="color:var(--cost);">${Math.round(job.calculatedCost || 0).toLocaleString()} ISK</span>
           </div>
-          <div class="flex flex-col items-end lp-divider-col flex-shrink-0" style="width:150px;" title="Net sell profit for this job">
+          <div class="flex flex-col items-end lp-divider-col flex-shrink-0" style="width:190px;" title="Net sell profit for this job">
             <span class="text-[8px] uppercase tracking-wide font-bold" style="color:var(--text-mute);">Profit</span>
             <span class="text-xs font-bold mono whitespace-nowrap" style="color:${p !== undefined ? (p >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-mute)'};">${p !== undefined ? Math.round(p).toLocaleString() + ' ISK' : '—'}</span>
           </div>
-          <div class="flex items-center gap-1.5 lp-divider-col flex-shrink-0" onclick="event.stopPropagation()">
+          <div class="flex items-center gap-2 lp-divider-col flex-shrink-0" onclick="event.stopPropagation()">
           <button onclick="markJobAsBuilt(${job.id})" class="lp-chip-btn">✔</button>
           <button onclick="deleteJobFromQueue(${job.id})" class="lp-badge lp-badge-danger" style="cursor:pointer;">❌</button>
           </div>
@@ -1017,9 +1017,12 @@ function updateJobTimers() {
     if (!display || !startedAt) return;
     const elapsedSeconds = (Date.now() - startedAt) / 1000;
     const remaining = totalSeconds - elapsedSeconds;
+    // Only text content and color update on each tick - the class list (size/weight/nowrap) was
+    // already set correctly at render time for whichever context this timer lives in (compact list
+    // row vs. grid card banner) and must not be clobbered here, or a live tick would silently strip
+    // e.g. whitespace-nowrap and cause the text to re-wrap mid-countdown.
     if (remaining <= 0) {
       display.textContent = '✓ Ready to Collect!';
-      display.className = 'timer-display text-sm font-bold mono';
       display.style.color = 'var(--accent)';
       el.classList.add('is-ready');
       // The parent card only shows the bold "ready" color once actually ready - update it live here
@@ -1031,7 +1034,6 @@ function updateJobTimers() {
       }
     } else {
       display.textContent = `⏱ ${window.formatDuration(Math.ceil(remaining))} remaining`;
-      display.className = 'timer-display text-sm font-bold mono';
       display.style.color = 'var(--blue-300)';
     }
   });
