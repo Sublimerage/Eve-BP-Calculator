@@ -1049,7 +1049,8 @@ if (!window._jobTimerIntervalStarted) {
 // running, and means you don't have to manually click Start for jobs you already started in-game.
 async function syncWithEveIndustryJobs(silent) {
   const btn = document.getElementById('btn-sync-eve-jobs');
-  if (btn && !silent) { btn.disabled = true; btn.textContent = '🔄 Syncing...'; }
+  const btnLabel = document.getElementById('btn-sync-eve-jobs-label');
+  if (btn && !silent) { btn.disabled = true; if (btnLabel) btnLabel.textContent = 'Syncing...'; }
 
   const [charJobs, corpJobs, charBps, corpBps] = await Promise.all([
     typeof window.fetchActiveIndustryJobs === 'function' ? window.fetchActiveIndustryJobs() : null,
@@ -1058,7 +1059,7 @@ async function syncWithEveIndustryJobs(silent) {
     typeof window.fetchCorpBlueprints === 'function' ? window.fetchCorpBlueprints() : []
   ]);
 
-  if (btn) { btn.disabled = false; btn.textContent = '🔄 Sync EVE Jobs'; }
+  if (btn) { btn.disabled = false; if (btnLabel) btnLabel.textContent = 'Sync EVE Jobs'; }
 
   console.info(`[JobSync] Fetched ${charJobs ? charJobs.length : 'null (fetch failed)'} character job(s), ${corpJobs ? corpJobs.length : 0} corp job(s), ${(charBps||[]).length} char blueprint(s), ${(corpBps||[]).length} corp blueprint(s).`);
 
