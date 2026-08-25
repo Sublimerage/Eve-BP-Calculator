@@ -8,9 +8,9 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Invention Calculator</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=26.0.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.1.0">
 </head>
-<body class="page-calc theme-unify flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
+<body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
 
   <!-- Header -->
   <header class="px-5 flex flex-wrap justify-between items-center gap-2 z-30">
@@ -39,21 +39,23 @@
   <div class="content-row flex-1 flex overflow-hidden relative">
 
     <!-- Left: Search + Config -->
-    <aside id="invention-sidebar" class="w-full md:w-[380px] flex flex-col overflow-y-auto flex-shrink-0">
-      <div class="p-3.5 border-b border-[#1e3348]">
-        <h2 class="text-purple-400 font-bold uppercase text-xs rajdhani tracking-wider mb-2">Search T2 Item to Produce</h2>
+    <aside id="invention-sidebar" class="lp-card w-full md:w-[380px] flex flex-col overflow-y-auto flex-shrink-0 p-4">
+
+      <div class="lp-row">
+        <div class="lp-label mb-2">Search T2 Item to Produce</div>
         <div class="relative">
           <input type="text" id="invention-item-search" placeholder="Search item name (e.g. Wolf)..." autocomplete="off"
             oninput="searchInventionItem(this.value)" onfocus="searchInventionItem(this.value)"
             onblur="setTimeout(() => { const el = document.getElementById('invention-search-results'); if (el) el.classList.add('hidden'); }, 200)"
             class="field-box w-full px-3 py-2.5 text-white font-bold mono text-sm">
-          <div id="invention-search-results" class="absolute top-full left-0 right-0 bg-[#0d1922] border border-purple-500 rounded-b-md max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
+          <div id="invention-search-results" class="fixed bg-[#0d1922] rounded-lg max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
         </div>
-        <p class="text-[10px] text-slate-500 mt-1.5">Search for the <b>Tech 2</b> item you want to produce (e.g. "Wolf"), not the T1 item it's invented from - the T1 source and its ME/TE requirements are resolved automatically.</p>
+        <p class="text-[10px] text-slate-500 mt-2 leading-relaxed">Search for the <b>Tech 2</b> item you want to produce (e.g. "Wolf"), not the T1 item it's invented from - the T1 source and its ME/TE requirements are resolved automatically.</p>
       </div>
 
       <div id="invention-config-panel" class="hidden">
-        <div class="p-3.5 border-b border-[#1e3348] flex items-center gap-3">
+
+        <div class="lp-row flex items-center gap-3">
           <img id="invention-item-icon" src="" class="w-12 h-12 rounded-md border border-white/10 bg-[#070b0f] flex-shrink-0">
           <div class="min-w-0 flex-1">
             <div id="invention-item-name" class="font-bold text-white truncate"></div>
@@ -61,91 +63,92 @@
           </div>
         </div>
 
-        <div class="p-3.5 border-b border-[#1e3348] space-y-2">
-          <div class="flex items-center justify-between">
-            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Base Success Chance</span>
+        <div class="lp-row">
+          <div class="flex items-center justify-between mb-2">
+            <span class="lp-label">Base Success Chance</span>
             <span class="text-[9px] text-slate-500" title="Auto-classified from item type. Override if you know the exact value from the in-game invention window.">auto-detected</span>
           </div>
-          <div class="flex items-center gap-2">
-            <input type="number" id="invention-base-chance" min="0" max="100" step="0.1" class="field-line w-20 px-2 py-1.5 text-cyan-300 font-bold text-sm" oninput="recalculateInvention()">
-            <span class="text-slate-400 text-sm">%</span>
+          <div class="flex items-end gap-2">
+            <input type="number" id="invention-base-chance" min="0" max="100" step="0.1" class="field-line w-20 text-lg text-cyan-300 font-bold" oninput="recalculateInvention()">
+            <span class="text-slate-400 text-sm pb-0.5">%</span>
           </div>
         </div>
 
-        <div class="p-3.5 border-b border-[#1e3348] space-y-2">
-          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Skill Levels</div>
-          <div id="invention-skill-inputs" class="space-y-1.5"></div>
-          <p class="text-[9px] text-slate-500">Auto-filled from your ESI skill sheet if logged in. Edit manually otherwise.</p>
+        <div class="lp-row">
+          <div class="lp-label mb-2">Skill Levels</div>
+          <div id="invention-skill-inputs" class="space-y-2.5"></div>
+          <p class="text-[9px] text-slate-500 mt-2">Auto-filled from your ESI skill sheet if logged in. Edit manually otherwise.</p>
         </div>
 
-        <div class="p-3.5 border-b border-[#1e3348] space-y-2">
-          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Datacores Required</div>
-          <div id="invention-datacore-list" class="space-y-1 text-[11px] mono"></div>
+        <div class="lp-row">
+          <div class="lp-label mb-2">Datacores Required</div>
+          <div id="invention-datacore-list" class="space-y-1.5 text-[11px] mono"></div>
         </div>
 
-        <div class="p-3.5 border-b border-[#1e3348] space-y-2">
-          <div class="flex items-center justify-between">
-            <label class="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-400 font-bold uppercase tracking-wide">
+        <div class="lp-row">
+          <div class="flex items-center justify-between mb-2.5">
+            <label class="flex items-center gap-1.5 cursor-pointer lp-label">
               <input type="checkbox" id="invention-deduct-stock" checked class="w-3.5 h-3.5 accent-cyan-500" onchange="recalculateInvention()">
               Deduct Owned Stock
             </label>
-            <button onclick="refreshLiveAssets()" class="text-[9px] px-2 py-1 bg-cyan-800 hover:bg-cyan-700 text-black font-bold rounded transition">Refresh Assets</button>
+            <button onclick="refreshLiveAssets()" class="btn-glass px-2.5 py-1 text-[10px]">Refresh Assets</button>
           </div>
-          <div class="flex items-center gap-2">
-            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+          <div class="flex items-center gap-3 mb-2.5">
+            <label class="flex items-center gap-1.5 cursor-pointer text-slate-200 font-bold text-[11px] mono">
               <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
               <span>Pers</span>
             </label>
-            <label class="flex items-center gap-1 cursor-pointer text-[#c8d8e8] font-bold text-[11px] mono">
+            <label class="flex items-center gap-1.5 cursor-pointer text-slate-200 font-bold text-[11px] mono">
               <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5 accent-cyan-500">
               <span>Corp</span>
             </label>
           </div>
           <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterLocationDropdownOptions()"
-            class="field-line w-full px-2.5 py-1.5 text-slate-200 text-[11px] mono">
-          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="field-line w-full px-2.5 py-1.5 text-amber-300 font-bold text-[11px] truncate">
+            class="field-line w-full mb-2 text-slate-200 text-[11px] mono">
+          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="field-line w-full text-amber-300 font-bold text-[11px] truncate">
             <option value="all" selected>All Locations (Combined Assets)</option>
             <option value="industry_system">Current System Only (JITA)</option>
           </select>
         </div>
 
-        <div class="p-3.5 border-b border-[#1e3348] space-y-2">
-          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide" title="How input materials for manufacturing the resulting BPC are priced.">Material Pricing</div>
-          <select id="input-price-mode" onchange="recalculateInvention()" class="field-line w-full px-2 py-1.5 text-white font-bold text-xs">
+        <div class="lp-row">
+          <div class="lp-label mb-2" title="How input materials for manufacturing the resulting BPC are priced.">Material Pricing</div>
+          <select id="input-price-mode" onchange="recalculateInvention()" class="field-line w-full text-white font-bold text-xs">
             <option value="sell" selected>Jita Sell (Instant Buy)</option>
             <option value="buy">Jita Buy Order</option>
           </select>
         </div>
 
-        <div class="p-3.5 border-b border-[#1e3348] space-y-2">
-          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1.5" title="Shared with the main calculator - editing here updates it there too.">Taxes &amp; Fees</div>
-          <div class="grid grid-cols-2 gap-2">
+        <div class="lp-row" title="Shared with the main calculator - editing here updates it there too.">
+          <div class="lp-label mb-2">Taxes &amp; Fees</div>
+          <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
             <div>
-              <label class="text-[9px] text-slate-500 font-bold uppercase block mb-0.5" title="Facility/structure tax applied to every manufacturing AND invention job's installation cost.">Facility Tax %</label>
-              <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line w-full text-center text-cyan-400 font-bold p-1 text-[11px]">
+              <label class="text-[9px] text-slate-500 font-bold uppercase block mb-1" title="Facility/structure tax applied to every manufacturing AND invention job's installation cost.">Facility Tax %</label>
+              <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line w-full text-cyan-400 font-bold text-[13px]">
             </div>
             <div>
-              <label class="text-[9px] text-slate-500 font-bold uppercase block mb-0.5" title="SCC surcharge applied to every manufacturing AND invention job's installation cost.">SCC Surcharge %</label>
-              <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line w-full text-center text-amber-400 font-bold p-1 text-[11px]">
+              <label class="text-[9px] text-slate-500 font-bold uppercase block mb-1" title="SCC surcharge applied to every manufacturing AND invention job's installation cost.">SCC Surcharge %</label>
+              <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line w-full text-amber-400 font-bold text-[13px]">
             </div>
             <div>
-              <label class="text-[9px] text-slate-500 font-bold uppercase block mb-0.5" title="Sales tax deducted when selling the manufactured output.">Sales Tax %</label>
-              <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line w-full text-center text-amber-300 font-bold p-1 text-[11px]">
+              <label class="text-[9px] text-slate-500 font-bold uppercase block mb-1" title="Sales tax deducted when selling the manufactured output.">Sales Tax %</label>
+              <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line w-full text-amber-300 font-bold text-[13px]">
             </div>
             <div>
-              <label class="text-[9px] text-slate-500 font-bold uppercase block mb-0.5" title="Broker fee, applied when selling AND when buying materials via buy orders.">Broker Fee %</label>
-              <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line w-full text-center text-amber-300 font-bold p-1 text-[11px]">
+              <label class="text-[9px] text-slate-500 font-bold uppercase block mb-1" title="Broker fee, applied when selling AND when buying materials via buy orders.">Broker Fee %</label>
+              <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line w-full text-amber-300 font-bold text-[13px]">
             </div>
           </div>
         </div>
 
-        <div class="p-3.5 border-b border-[#1e3348] space-y-2">
-          <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1" title="How many successful T2 BPCs you want to end up with. For each decryptor, the tool works out how many invention attempts that requires on average given its success chance, then totals the cost of all those attempts (successes AND failures) plus the manufacturing cost for your target BPCs.">Target: T2 BPCs Wanted</div>
-          <div class="flex items-center gap-2">
-            <input type="number" id="invention-target-bpcs" min="1" value="1" class="field-line w-20 px-2 py-1.5 text-amber-300 font-bold text-sm" oninput="recalculateInvention()">
-            <span class="text-slate-500 text-[10px]">successful T2 BPCs</span>
+        <div class="lp-row" title="How many successful T2 BPCs you want to end up with. For each decryptor, the tool works out how many invention attempts that requires on average given its success chance, then totals the cost of all those attempts (successes AND failures) plus the manufacturing cost for your target BPCs.">
+          <div class="lp-label mb-2">Target: T2 BPCs Wanted</div>
+          <div class="flex items-end gap-2">
+            <input type="number" id="invention-target-bpcs" min="1" value="1" class="field-line w-20 text-lg text-amber-300 font-bold" oninput="recalculateInvention()">
+            <span class="text-slate-500 text-[10px] pb-1">successful T2 BPCs</span>
           </div>
         </div>
+
       </div>
     </aside>
 
@@ -156,9 +159,9 @@
       </div>
       <div id="invention-results-area" class="hidden space-y-4">
         <div id="invention-summary-tiles" class="grid grid-cols-2 md:grid-cols-4 gap-2.5"></div>
-        <div>
+        <div class="lp-card p-4">
           <h2 class="text-sm font-bold uppercase tracking-wider text-purple-300 rajdhani mb-2">Decryptor Profit Comparison</h2>
-          <p class="text-[11px] text-slate-400 mb-3">
+          <p class="text-[11px] text-slate-400 mb-3 leading-relaxed">
             Set your target number of successful T2 BPCs on the left. For each decryptor, this works out how many invention attempts that actually takes given its success chance - the risk is visible directly in <b>Attempts Needed</b>, not hidden inside a single averaged number.
           </p>
           <div id="invention-comparison-table" class="overflow-x-auto"></div>
@@ -172,6 +175,6 @@
   <script src="js/esi.js?v=8.0.2"></script>
   <script src="js/tree.js?v=8.0.1"></script>
   <script src="js/optimizers.js?v=8.0.1"></script>
-  <script src="js/invention.js?v=8.0.5"></script>
+  <script src="js/invention.js?v=9.1.0"></script>
 </body>
 </html>
