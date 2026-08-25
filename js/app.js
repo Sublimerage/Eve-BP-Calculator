@@ -1585,12 +1585,12 @@ function createNodeCard(node) {
   // node-parent-highlight already use), not the old design's hardcoded-hex left-border stripe,
   // which didn't reference the current palette at all and looked like a leftover from another
   // theme entirely.
-  let cardStyle = 'w-64';
+  let cardStyle = 'w-72';
   let borderAccent = '';
-  if (isRoot) { cardStyle = 'w-80'; }
-  else if (!node.isBuildingSelf) { cardStyle = 'w-64'; borderAccent = 'border-top-color:var(--blue);'; }
-  else if (node.isReaction) { cardStyle = 'w-64'; borderAccent = 'border-top-color:var(--violet);'; }
-  else if (node.batchYield > 1) { cardStyle = 'w-64'; borderAccent = 'border-top-color:var(--accent);'; }
+  if (isRoot) { cardStyle = 'w-96'; }
+  else if (!node.isBuildingSelf) { cardStyle = 'w-72'; borderAccent = 'border-top-color:var(--blue);'; }
+  else if (node.isReaction) { cardStyle = 'w-72'; borderAccent = 'border-top-color:var(--violet);'; }
+  else if (node.batchYield > 1) { cardStyle = 'w-72'; borderAccent = 'border-top-color:var(--accent);'; }
 
   const totalProduced = node.runsNeeded * node.batchYield;
   const surplus = totalProduced - node.qtyNeeded;
@@ -1788,20 +1788,30 @@ function createNodeCard(node) {
         </div>
       ` : ''}
 
-      <div class="text-sm mono space-y-1.5 border-t border-[#3a3025] pt-2.5">
-        <div class="flex justify-between items-center font-semibold gap-2">
-          <span class="text-slate-400 flex-shrink-0">Lowest Sell:</span>
-          <div class="flex items-center gap-1 min-w-0">
-            <span class="text-green-400 font-bold truncate">${prices.sell.toLocaleString()} ISK</span>
+      <div class="text-sm mono space-y-2 border-t border-[#3a3025] pt-2.5">
+        <div>
+          <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">Lowest Sell</div>
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK</span>
             <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="icon-btn flex-shrink-0" style="width:20px;height:20px;" title="Compare price and trade volume across your tracked markets">
               <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><polyline points="17,1 21,5 17,9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7,23 3,19 7,15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
             </button>
           </div>
         </div>
-        <div class="flex justify-between text-slate-400"><span>Highest Buy:</span><span class="text-slate-300">${prices.buy.toLocaleString()} ISK</span></div>
+        <div>
+          <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">Highest Buy</div>
+          <div class="text-slate-300">${prices.buy.toLocaleString()} ISK</div>
+        </div>
         ${!isRoot && savingsPct !== null ? `<div class="flex justify-between text-green-400 font-semibold text-xs"><span>Order Savings:</span><span>${savingsPct}%</span></div>` : ''}
-        ${node.jobFee > 0 && node.isBuildingSelf ? `<div class="flex justify-between text-[#e85555] font-semibold border-t border-[#3a3025] pt-1"><span>Job Inst. Fee:</span><span>+${Math.round(node.jobFee).toLocaleString()} ISK</span></div>` : ''}
-        <div class="flex justify-between font-bold border-t border-[#3a3025] pt-1 mt-1"><span class="text-slate-300">${isRoot ? 'Total Production Cost:' : node.isBuildingSelf ? 'Calculated Build Cost:' : 'Market Buy Cost:'}</span><span class="font-bold" style="color:var(--accent);">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</span></div>
+        ${node.jobFee > 0 && node.isBuildingSelf ? `
+        <div class="border-t border-[#3a3025] pt-2">
+          <div class="text-[#e85555] text-xs uppercase tracking-wide" style="font-size:10.5px;">Job Inst. Fee</div>
+          <div class="text-[#e85555] font-semibold">+${Math.round(node.jobFee).toLocaleString()} ISK</div>
+        </div>` : ''}
+        <div class="border-t border-[#3a3025] pt-2">
+          <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">${isRoot ? 'Total Production Cost' : node.isBuildingSelf ? 'Calculated Build Cost' : 'Market Buy Cost'}</div>
+          <div class="font-bold" style="color:var(--accent);">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</div>
+        </div>
         ${isRoot ? `
           <div class="border-t border-green-500/40 pt-2 mt-1">
             <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">${window.rootSellStrategy === 'custom-contract' ? 'Net Profit, Contract Output' : 'Net Profit, Sell Output'}</div>
