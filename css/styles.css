@@ -724,11 +724,27 @@ body.page-calc .stat {
 }
 
 /* BOM sidebar, flyout panels, and the paste modal: drop the translucent-glass border for pure
-   gradient fill - "treatment B" applied to every floating panel, not just the tree cards. */
+   gradient fill - "treatment B" applied to every floating panel, not just the tree cards. Also
+   kill backdrop-filter outright rather than leaving it at blur(var(--blur)) with --blur:0px -
+   blur(0px) is still a non-"none" filter value, and per spec ANY non-none filter/backdrop-filter
+   establishes a new containing block for position:fixed descendants. That silently turned
+   .flyout-panel into the fixed-positioning origin for the search dropdown instead of the
+   viewport, so JS-computed viewport coordinates landed wildly offset (rendered relative to the
+   flyout's own box, not the page) - the dropdown then fell into the panel's own overflow-y:auto
+   scroll area, which read as "the whole UI became a tiny scrollable page". */
 body.page-calc #bom-sidebar,
 body.page-calc .flyout-panel,
 body.page-calc #paste-modal > div {
   border: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* Same containing-block fix, without touching border (blueprint-browser-drawer keeps its real
+   left-edge divider; .glass-card keeps its own dedicated border-width rule further down). */
+body.page-calc #blueprint-browser-drawer,
+body.page-calc .glass-card {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* Search/system/rig/market dropdown result lists: solid opaque fill instead of the ~25%-opacity
