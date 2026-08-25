@@ -619,8 +619,11 @@ select option:checked, select option:hover { background-color: var(--accent); co
 [class*="text-[#a8d4f0]"] { color: var(--blue-300) !important; }
 
 /* ============================================================
-   INDEX PAGE ONLY - Foxstock-derived "gradient bento" system, scoped to body.page-calc so
-   ledger.html and invention.html are untouched and keep the coal-neutral glass system above.
+   Foxstock-derived "gradient bento" system, scoped to body.page-calc - applied to all three pages
+   (the class name is a holdover from when this started as an index.html-only experiment; it now
+   just means "the current site theme", not "calculator page"). The coal-neutral rules above this
+   block are effectively the pre-Foxstock default and stay in the cascade as a fallback for any
+   page/element that doesn't carry .page-calc.
    Palette: near-black canvas + one lime-green accent used the way Foxstock uses it - brand mark,
    primary actions, "up"/profit, and node highlight all read off the same color - plus coral for
    "down"/loss. Cards drop the translucent blur+border in favor of a subtle diagonal gradient fill
