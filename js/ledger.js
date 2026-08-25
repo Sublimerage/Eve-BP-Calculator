@@ -235,7 +235,7 @@ function renderActiveJobsList(allocatedStock) {
 
   if (activeJobs.length === 0) {
     container.innerHTML = `
-      <div class="bg-[#0c1318] border border-[#1e3348] p-8 rounded text-center text-slate-400 mono">
+      <div class="bg-[#0c1318] p-8 rounded-lg text-center text-slate-400 mono">
         No active manufacturing jobs queued in ledger. Go back to the calculator and click "Add to Job Queue" on any root item card to add jobs here.
       </div>
     `;
@@ -256,7 +256,7 @@ function renderActiveJobsList(allocatedStock) {
 
   if (visibleJobs.length === 0) {
     container.innerHTML = `
-      <div class="bg-[#0c1318] border border-[#1e3348] p-8 rounded text-center text-slate-400 mono">
+      <div class="bg-[#0c1318] p-8 rounded-lg text-center text-slate-400 mono">
         No jobs match your current search/filter.
       </div>
     `;
@@ -277,7 +277,7 @@ function renderActiveJobsList(allocatedStock) {
   if (activeJobStatusFilter !== 'pending' && startedJobs.length > 0) {
     html += `
       <div class="mb-2">
-        <div class="flex items-center gap-2 mb-2.5 px-3 py-2 rounded-md bg-green-950/40 border-2 border-green-600/50">
+        <div class="flex items-center gap-2 mb-2.5 px-3 py-2 rounded-lg bg-green-950/40">
           <span class="text-green-400 font-extrabold text-base rajdhani uppercase tracking-wider">🟢 In Progress</span>
           <span class="text-green-400 font-bold text-sm mono">(${startedJobs.length})</span>
         </div>
@@ -288,7 +288,7 @@ function renderActiveJobsList(allocatedStock) {
   if (activeJobStatusFilter !== 'started' && pendingJobs.length > 0) {
     html += `
       <div>
-        <div class="flex items-center gap-2 mb-2.5 px-3 py-2 rounded-md bg-[#0d1922] border-2 border-[#1e3348]">
+        <div class="flex items-center gap-2 mb-2.5 px-3 py-2 rounded-lg bg-[#0d1922]">
           <span class="text-slate-200 font-extrabold text-base rajdhani uppercase tracking-wider">⏳ Pending</span>
           <span class="text-slate-400 font-bold text-sm mono">(${pendingJobs.length})</span>
         </div>
@@ -341,11 +341,11 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
     <div class="px-3 pb-3 pt-1 border-t border-[#1e3348]/40" onclick="event.stopPropagation()">
       ${renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled)}
       ${!job.isStarted ? `
-        <div class="flex items-center gap-1.5 px-2 py-1.5 mt-2 bg-[#070b0f] rounded border border-[#1e3348]">
+        <div class="flex items-center gap-1.5 px-2 py-1.5 mt-2 bg-[#070b0f] rounded-lg">
           <span class="text-xs text-slate-400 font-bold flex-shrink-0">Runs to start:</span>
           <input type="number" id="start-runs-${job.id}" value="${job.runsNeeded}" min="1" max="${job.runsNeeded}"
             onmousedown="event.stopPropagation()" onfocus="this.select()"
-            class="w-16 bg-[#0d1922] border border-[#1e3348] text-center text-amber-300 font-bold rounded p-1 outline-none text-sm">
+            class="w-16 bg-[#0d1922] text-center text-amber-300 font-bold rounded p-1 outline-none text-sm">
           <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-black font-bold py-1 px-2.5 rounded text-xs mono transition flex-shrink-0">▶ Start Job</button>
         </div>
       ` : ''}
@@ -353,7 +353,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
   ` : '';
 
   return `
-    <div class="job-card ${isJobReady ? 'bg-[#0d2818]' : (job.isStarted ? 'bg-green-950/20' : 'bg-[#0c1318]')} border${isJobReady ? '-2' : ''} ${job.isSubBuild ? 'border-amber-500' : (isJobReady ? 'border-green-500' : (job.isStarted ? 'border-green-700/50' : 'border-[#1e3348]'))} rounded shadow-md transition"
+    <div class="job-card ${isJobReady ? 'bg-[#0d2818]' : (job.isStarted ? 'bg-green-950/20' : 'bg-[#0c1318]')} border-l-4 ${job.isSubBuild ? 'border-amber-500' : (isJobReady ? 'border-green-500' : (job.isStarted ? 'border-green-700/50' : 'border-transparent'))} rounded-lg shadow-md transition"
          draggable="true" data-job-id="${job.id}"
          ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
          ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
@@ -458,7 +458,7 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) {
     }
 
     return `
-      <div class="p-2 bg-[#070b0f] rounded border border-[#1e3348]/40">
+      <div class="p-2 bg-[#070b0f] rounded-lg">
         <div class="flex justify-between items-center mb-1.5 pb-1 border-b border-[#1e3348]/40">
           <span class="text-xs text-cyan-400 font-bold uppercase tracking-wider rajdhani">Job Materials (BOM)</span>
           <button onclick="copyIndividualJobMultibuy(event, ${job.id})" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-1.5 py-0.5 rounded mono transition">
@@ -522,14 +522,14 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
       const ready = remaining <= 0;
       const text = ready ? '✓ READY TO COLLECT!' : `⏱ ${window.formatDuration(Math.ceil(remaining))} remaining`;
       statusBannerHTML = `
-        <div class="job-timer flex items-center justify-between px-2.5 py-2 rounded border-2 ${ready ? 'bg-green-950/40 border-green-500/70' : 'bg-cyan-950/30 border-cyan-500/50'}" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}">
+        <div class="job-timer flex items-center justify-between px-2.5 py-2 rounded-lg ${ready ? 'bg-green-950/40' : 'bg-cyan-950/30'}" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}">
           <span class="text-xs text-slate-300 font-bold uppercase tracking-wide flex-shrink-0">Status:</span>
           <span class="timer-display text-sm font-extrabold ${ready ? 'text-green-400' : 'text-cyan-300'} mono">${text}</span>
         </div>
       `;
     } else {
       statusBannerHTML = `
-        <div class="flex items-center justify-between px-2.5 py-2 rounded border-2 bg-[#0d1922] border-slate-600/50">
+        <div class="flex items-center justify-between px-2.5 py-2 rounded-lg bg-[#0d1922]">
           <span class="text-xs text-slate-300 font-bold uppercase tracking-wide flex-shrink-0">Status:</span>
           <span class="text-sm font-extrabold text-slate-400 mono">⏳ PENDING</span>
         </div>
@@ -537,17 +537,17 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
     }
 
     const startJobRowHTML = (!job.isStarted) ? `
-      <div class="flex items-center gap-1.5 px-2 py-1.5 bg-[#070b0f] rounded border border-[#1e3348]" onclick="event.stopPropagation()">
+      <div class="flex items-center gap-1.5 px-2 py-1.5 bg-[#070b0f] rounded-lg" onclick="event.stopPropagation()">
         <span class="text-xs text-slate-400 font-bold flex-shrink-0" title="Starting fewer than all runs splits this into a started job plus a still-queued job for the rest, matching how EVE actually queues manufacturing jobs.">Runs to start:</span>
         <input type="number" id="start-runs-${job.id}" value="${job.runsNeeded}" min="1" max="${job.runsNeeded}"
           onmousedown="event.stopPropagation()" onfocus="this.select()"
-          class="w-16 bg-[#0d1922] border border-[#1e3348] text-center text-amber-300 font-bold rounded p-1 outline-none text-sm">
+          class="w-16 bg-[#0d1922] text-center text-amber-300 font-bold rounded p-1 outline-none text-sm">
         <button onclick="startJobRuns(${job.id})" class="ml-auto bg-cyan-700 hover:bg-cyan-600 text-black font-bold py-1 px-2.5 rounded text-xs mono transition flex-shrink-0">▶ Start Job</button>
       </div>
     ` : '';
 
     return `
-      <div class="job-card ${isJobReady ? 'bg-[#0d2818]' : (job.isStarted ? 'bg-green-950/20' : 'bg-[#0c1318]')} border${isJobReady ? '-2' : ''} ${job.isSubBuild ? 'border-amber-500 hover:border-amber-400' : (isJobReady ? 'border-green-500 hover:border-green-400' : (job.isStarted ? 'border-green-700/50 hover:border-green-500/70' : 'border-[#1e3348] hover:border-purple-500/40'))} rounded p-3 flex flex-col justify-between shadow-md transition space-y-2"
+      <div class="job-card ${isJobReady ? 'bg-[#0d2818]' : (job.isStarted ? 'bg-green-950/20' : 'bg-[#0c1318]')} border-l-4 ${job.isSubBuild ? 'border-amber-500' : (isJobReady ? 'border-green-500' : (job.isStarted ? 'border-green-700/50' : 'border-transparent'))} rounded-lg p-3 flex flex-col justify-between shadow-md transition space-y-2"
            draggable="true" data-job-id="${job.id}"
            ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
            ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
@@ -577,7 +577,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
         </div>
 
         ${!isCollapsed ? renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) : `
-          <div class="px-2 py-1 text-xs text-slate-500 italic text-center border border-[#1e3348]/40 rounded">
+          <div class="px-2 py-1 text-xs text-slate-500 italic text-center bg-[#070b0f] rounded-lg">
             Details minimized - click ▸ above to expand
           </div>
         `}
@@ -585,10 +585,10 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
         ${startJobRowHTML}
 
         <div class="flex items-center space-x-2 pt-1">
-          <button onclick="markJobAsBuilt(${job.id})" class="flex-1 py-1.5 bg-green-800/80 hover:bg-green-700 text-black font-bold rounded text-sm mono transition border border-green-600/30 flex items-center justify-center gap-1">
+          <button onclick="markJobAsBuilt(${job.id})" class="flex-1 py-1.5 bg-green-800/80 hover:bg-green-700 text-black font-bold rounded-lg text-sm mono transition flex items-center justify-center gap-1">
             ✔ Built
           </button>
-          <button onclick="deleteJobFromQueue(${job.id})" class="py-1.5 px-3 bg-red-950/60 hover:bg-red-800 text-red-300 font-bold rounded text-sm mono transition border border-red-800/30 flex items-center justify-center">
+          <button onclick="deleteJobFromQueue(${job.id})" class="py-1.5 px-3 bg-red-950/60 hover:bg-red-800 text-red-300 font-bold rounded-lg text-sm mono transition flex items-center justify-center">
             ❌ Delete
           </button>
         </div>
@@ -607,7 +607,7 @@ function setJobStatusFilter(status) {
   activeJobStatusFilter = status;
   ['all', 'started', 'pending'].forEach(s => {
     const btn = document.getElementById(`btn-status-${s}`);
-    if (btn) btn.className = `px-2.5 py-1.5 rounded-md font-bold transition text-xs mono ${s === status ? 'bg-purple-800 text-black border border-purple-600/30' : 'bg-[#1e3348] text-slate-400 hover:text-white'}`;
+    if (btn) btn.className = `px-2.5 py-1.5 rounded-md font-bold transition text-xs mono ${s === status ? 'bg-purple-800 text-black' : 'bg-[#1e3348] text-slate-400 hover:text-white'}`;
   });
   renderJournalPage();
 }
@@ -1627,9 +1627,9 @@ function setBOMOrderFilter(type) {
   const btnBuy = document.getElementById('btn-order-buy');
   const btnSell = document.getElementById('btn-order-sell');
 
-  if (btnAll) btnAll.className = 'px-1.5 py-0.5 rounded font-bold transition ' + (type === 'all' ? 'bg-purple-800 text-white border border-purple-600/30' : 'bg-[#1e3348] text-slate-400 hover:text-white');
-  if (btnBuy) btnBuy.className = 'px-1.5 py-0.5 rounded font-bold transition ' + (type === 'buy' ? 'bg-purple-800 text-white border border-purple-600/30' : 'bg-[#1e3348] text-slate-400 hover:text-white');
-  if (btnSell) btnSell.className = 'px-1.5 py-0.5 rounded font-bold transition ' + (type === 'sell' ? 'bg-purple-800 text-white border border-purple-600/30' : 'bg-[#1e3348] text-slate-400 hover:text-white');
+  if (btnAll) btnAll.className = 'px-1.5 py-0.5 rounded font-bold transition ' + (type === 'all' ? 'bg-purple-800 text-black' : 'bg-[#1e3348] text-slate-400 hover:text-white');
+  if (btnBuy) btnBuy.className = 'px-1.5 py-0.5 rounded font-bold transition ' + (type === 'buy' ? 'bg-purple-800 text-black' : 'bg-[#1e3348] text-slate-400 hover:text-white');
+  if (btnSell) btnSell.className = 'px-1.5 py-0.5 rounded font-bold transition ' + (type === 'sell' ? 'bg-purple-800 text-black' : 'bg-[#1e3348] text-slate-400 hover:text-white');
 
   renderJournalPage();
 }

@@ -271,7 +271,7 @@ function renderInventionSkillInputs(skills) {
     const isEncryption = (sk.name || '').toLowerCase().includes('encryption');
     const trainedLevel = (charSkills.allSkills && charSkills.allSkills[sk.skillId] !== undefined) ? charSkills.allSkills[sk.skillId] : 0;
     return `
-      <div class="flex items-center justify-between bg-[#070b0f] border border-[#1e3348] rounded px-2 py-1.5">
+      <div class="flex items-center justify-between bg-[#070b0f] rounded-lg px-2 py-1.5">
         <span class="text-sm ${isEncryption ? 'text-amber-300' : 'text-cyan-300'} font-semibold truncate pr-2" title="${isEncryption ? 'Encryption skill (affects chance /40)' : 'Science skill (affects chance /30, combined with the other science skill)'}">${window.esc(sk.name || `Skill ${sk.skillId}`)}</span>
         <input type="number" min="0" max="5" value="${trainedLevel}" data-skill-id="${sk.skillId}" data-is-encryption="${isEncryption}"
           oninput="recalculateInvention()" class="invention-skill-input w-12 bg-[#0d1922] border border-[#1e3348] rounded text-center text-white font-bold text-sm outline-none p-1">
@@ -520,27 +520,27 @@ function renderInventionSummaryTiles(rows) {
   const targetBPCs = Math.max(1, parseInt(document.getElementById('invention-target-bpcs').value) || 1);
 
   container.innerHTML = `
-    <div class="bg-[#0d1922] border border-[#1e3348] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+    <div class="bg-[#0d1922] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
       <div class="text-xs text-slate-400 uppercase font-bold mono tracking-wide truncate">Best Option</div>
       <div class="text-base font-bold text-green-300 mono leading-tight truncate">${window.esc(best.dec.name)}</div>
       <div class="text-xs text-slate-500 mt-0.5">${best.successChance.toFixed(1)}% success chance</div>
     </div>
-    <div class="bg-[#0d1922] border border-amber-600/40 px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+    <div class="bg-[#0d1922] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
       <div class="text-xs text-slate-400 uppercase font-bold mono tracking-wide truncate">Attempts Needed</div>
       <div class="text-lg font-bold text-amber-300 mono leading-tight">${isFinite(best.requiredAttempts) ? best.requiredAttempts.toLocaleString() : '—'}</div>
       <div class="text-xs text-slate-500 mt-0.5">to get ${targetBPCs} successful BPC${targetBPCs > 1 ? 's' : ''}</div>
     </div>
-    <div class="bg-[#0d1922] border border-[#1e3348] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+    <div class="bg-[#0d1922] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
       <div class="text-xs text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Cost (Invention + Mfg)</div>
       <div class="text-lg font-bold text-cyan-400 mono leading-tight">${isFinite(best.totalInventionCost) ? Math.round(best.totalInventionCost + best.totalManufacturingCost).toLocaleString() : '—'} ISK</div>
       <div class="text-xs text-slate-500 mt-0.5">${isFinite(best.totalInventionCost) ? Math.round(best.totalInventionCost).toLocaleString() + ' invention + ' + Math.round(best.totalManufacturingCost).toLocaleString() + ' mfg' : ''}</div>
     </div>
-    <div class="bg-[#0d1922] border border-green-600/40 px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+    <div class="bg-[#0d1922] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
       <div class="text-xs text-slate-400 uppercase font-bold mono tracking-wide truncate">Total Profit</div>
       <div class="text-lg font-bold ${isFinite(best.totalProfit) && best.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'} mono leading-tight">${isFinite(best.totalProfit) ? Math.round(best.totalProfit).toLocaleString() + ' ISK' : '—'}</div>
       <div class="text-xs text-slate-500 mt-0.5">for ${targetBPCs} successful BPC${targetBPCs > 1 ? 's' : ''}</div>
     </div>
-    <div class="bg-[#0d1922] border border-[#1e3348] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
+    <div class="bg-[#0d1922] px-3.5 py-2.5 rounded-lg shadow flex flex-col justify-center">
       <div class="text-xs text-slate-400 uppercase font-bold mono tracking-wide truncate">ISK/Hour</div>
       <div class="text-lg font-bold ${best.iskPerHour !== null ? (best.iskPerHour >= 0 ? 'text-green-400' : 'text-red-400') : 'text-slate-500'} mono leading-tight">${best.iskPerHour !== null ? Math.round(best.iskPerHour).toLocaleString() + ' ISK' : 'No time data'}</div>
       <div class="text-xs text-slate-500 mt-0.5">${best.totalBuildSeconds > 0 ? window.formatDuration(best.totalBuildSeconds) + ' total manufacturing' : 'build time unavailable'}</div>
