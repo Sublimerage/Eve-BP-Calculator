@@ -38,42 +38,6 @@
     </div>
   </header>
 
-  <!-- Toolbar: Stock & Location Filters -->
-  <section id="ledger-toolbar" class="px-5 py-3 flex flex-wrap items-center gap-3 text-xs relative z-40">
-    <div class="lp-card flex flex-col p-3 flex-grow max-w-[520px]">
-      <div class="flex items-center justify-between mb-2">
-        <span class="lp-label">Stock &amp; Location Filters</span>
-        <span id="location-search-feedback" class="text-[9px] font-mono font-bold hidden" style="color:var(--accent);"></span>
-      </div>
-
-      <div class="flex items-center gap-2 flex-wrap">
-
-        <label class="flex items-center gap-1 cursor-pointer font-bold text-[11px] mono" style="color:var(--text-soft);">
-          <input type="checkbox" id="use-char-assets" checked onchange="applyJournalStockFilter()" class="w-3.5 h-3.5 accent-cyan-500">
-          <span>Pers</span>
-        </label>
-
-        <label class="flex items-center gap-1 cursor-pointer font-bold text-[11px] mono" style="color:var(--text-soft);">
-          <input type="checkbox" id="use-corp-assets" checked onchange="applyJournalStockFilter()" class="w-3.5 h-3.5 accent-cyan-500">
-          <span>Corp</span>
-        </label>
-
-        <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterJournalLocationOptions()"
-          class="field-line w-28 px-2 py-1.5 text-[11px] mono" style="color:var(--text);">
-
-        <select id="stock-location-filter" onchange="applyJournalStockFilter()" class="field-line flex-1 px-2 py-1.5 font-bold text-[11px] truncate min-w-[140px]" style="color:var(--accent);">
-          <option value="all" selected>All Locations (Combined Assets)</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Live stats indicator -->
-    <div class="lp-card ml-auto text-xs mono flex items-center gap-2 px-4 py-3" style="color:var(--text-mute);">
-      <span>Filtered Stock:</span>
-      <span id="stock-count-display" class="font-bold text-sm" style="color:var(--accent);">0 items</span>
-    </div>
-  </section>
-
   <!-- Overview Dashboard Bar: single-row ticker strip, matching the calculator page -->
   <section class="stat-strip relative z-10">
     <div class="stat">
@@ -87,11 +51,6 @@
     </div>
 
     <div class="stat">
-      <div class="stat-label">Total materials volume</div>
-      <div id="journal-materials-volume" class="stat-value mono" style="color:var(--accent);">0 m3</div>
-    </div>
-
-    <div class="stat">
       <div class="stat-label">Total materials cost</div>
       <div id="journal-materials-cost" class="stat-value mono" style="color:var(--green);">0 ISK</div>
     </div>
@@ -99,6 +58,11 @@
     <div class="stat" title="Total net sell profit across every job currently in the queue, at full market cost. * means one or more queued jobs predate profit tracking and are excluded.">
       <div class="stat-label">Total potential profit</div>
       <div id="journal-total-profit" class="stat-value mono" style="color:var(--green);">0 ISK</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">Total materials volume</div>
+      <div id="journal-materials-volume" class="stat-value mono" style="color:var(--accent);">0 m3</div>
     </div>
   </section>
 
@@ -158,6 +122,37 @@
           Copy Multibuy
         </button>
       </div>
+
+      <!-- Stock & Location Filters - collapsible, same placement/pattern as the main calculator's BOM sidebar -->
+      <details open class="lp-row group">
+        <summary class="cursor-pointer flex items-center justify-between list-none" style="color:var(--text-mute);">
+          <span class="lp-label flex items-center gap-1.5">
+            Stock &amp; Location
+            <span id="location-search-feedback" class="text-[9px] font-mono font-bold normal-case hidden" style="color:var(--accent);"></span>
+          </span>
+          <span class="group-open:rotate-90 transition-transform" style="color:var(--text-mute);">▶</span>
+        </summary>
+        <div class="pt-2.5 space-y-2.5">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+              <label class="flex items-center gap-1 cursor-pointer font-bold text-[11px] mono" style="color:var(--text-soft);">
+                <input type="checkbox" id="use-char-assets" checked onchange="applyJournalStockFilter()" class="w-3.5 h-3.5 accent-cyan-500">
+                <span>Pers</span>
+              </label>
+              <label class="flex items-center gap-1 cursor-pointer font-bold text-[11px] mono" style="color:var(--text-soft);">
+                <input type="checkbox" id="use-corp-assets" checked onchange="applyJournalStockFilter()" class="w-3.5 h-3.5 accent-cyan-500">
+                <span>Corp</span>
+              </label>
+            </div>
+            <span class="text-[10.5px] mono" style="color:var(--text-mute);">Filtered: <span id="stock-count-display" class="font-bold" style="color:var(--accent);">0 items</span></span>
+          </div>
+          <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterJournalLocationOptions()"
+            class="field-line w-full text-[11px] mono" style="color:var(--text);">
+          <select id="stock-location-filter" onchange="applyJournalStockFilter()" class="field-line w-full font-bold text-[11px] truncate" style="color:var(--accent);">
+            <option value="all" selected>All Locations (Combined Assets)</option>
+          </select>
+        </div>
+      </details>
 
       <!-- Sidebar BOM Filter controls -->
       <div class="lp-row space-y-2.5 flex flex-col">
