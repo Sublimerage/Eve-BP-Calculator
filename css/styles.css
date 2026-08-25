@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 /* Readability fix for high-DPI/4K displays: Tailwind's default text-* utility classes (text-xs,
    text-sm, text-base, etc.) are rem-based, so scaling the root font-size scales all of them
@@ -604,3 +604,148 @@ select option:checked, select option:hover { background-color: var(--accent); co
 [class*="bg-[#0d2818]"] { background: rgba(45,110,80,0.24) !important; }
 [class*="text-[#e85555]"] { color: var(--red) !important; }
 [class*="text-[#a8d4f0]"] { color: var(--blue-300) !important; }
+
+/* ============================================================
+   INDEX PAGE ONLY - Foxstock-derived "gradient bento" system, scoped to body.page-calc so
+   ledger.html and invention.html are untouched and keep the coal-neutral glass system above.
+   Palette: near-black canvas + one lime-green accent used the way Foxstock uses it - brand mark,
+   primary actions, "up"/profit, and node highlight all read off the same color - plus coral for
+   "down"/loss. Cards drop the translucent blur+border in favor of a subtle diagonal gradient fill
+   and zero border ("treatment B", chosen from a 9-way card-frame comparison) - depth comes from
+   the fill plus a soft drop shadow only, no glass sheen. Because nearly everything below (tree
+   node cards, BOM sidebar, flyouts, stat tiles, and the compat layer's orange/green/red remaps)
+   reads its colors and shape off the custom-property tokens set here, redefining the tokens
+   re-skins almost the whole page for free - only the genuinely structural differences (stat tiles
+   as separate cards instead of one divided strip, header/icon-rail going chrome-less, the tree
+   diagram's own canvas becoming the hero surface instead of a flat tile with a watermark) need
+   their own rules below.
+   ============================================================ */
+body.page-calc {
+  --bg-0: #08090a;
+  --text: #f2f3f5;
+  --text-soft: #9ba0a8;
+  --text-mute: #6b7078;
+
+  --accent: #c8ff4d;
+  --accent-2: #8fce1f;
+  --accent-rgb: 200,255,77;
+
+  --green: #c8ff4d;
+  --green-rgb: 200,255,77;
+  --green-300: #ddffa0; --green-400: #c8ff4d; --green-500: #a8db3d;
+  --green-600: #8fce1f; --green-700: #6fa816; --green-800: #4d7a0f;
+
+  --red: #e8845a;
+  --red-rgb: 232,132,90;
+  --red-300: #f3c0a8; --red-400: #e8845a; --red-500: #d9713f;
+
+  --copper-100: #eaffc4; --copper-200: #dcff9e; --copper-300: #cdff78;
+  --copper-400: #c8ff4d; --copper-500: #c8ff4d; --copper-600: #a8db3d;
+  --copper-700: #8fce1f; --copper-800: #6fa816; --copper-900: #4d7a0f; --copper-950: #2c4708;
+
+  --glass-fill: linear-gradient(155deg, #14161a, #0b0c0d);
+  --glass-border: rgba(255,255,255,0.06);
+  --glass-border-top: rgba(255,255,255,0.06);
+  --glass-shadow: 0 14px 32px rgba(0,0,0,0.4);
+  --blur: 0px;
+
+  --radius-sm: 8px;
+  --radius-btn: 10px;
+  --radius-panel: 18px;
+  --radius-card: 20px;
+}
+
+body.page-calc {
+  background: radial-gradient(ellipse 1000px 560px at 50% -10%, rgba(200,255,77,.06), transparent 60%), #08090a;
+}
+
+/* Header + icon rail carry no card chrome of their own - bare wordmark/icons sitting straight on
+   the page canvas, matching Foxstock's minimal top nav rather than another floating panel. */
+body.page-calc header,
+body.page-calc .icon-rail {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Connection status stays a small flat pill, not a full gradient card - it's a one-line badge. */
+body.page-calc #status-badge {
+  background: rgba(255,255,255,0.05) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+body.page-calc .btn-glass { color: #0a1002; }
+
+/* Stat strip: the strip itself is just a flex row now - each stat is its own gradient card
+   (the Foxstock mini-card treatment) instead of one long bar cut up with divider lines. */
+body.page-calc .stat-strip {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  gap: 12px;
+}
+body.page-calc .stat {
+  background: var(--glass-fill);
+  border: none;
+  border-right: none;
+  border-radius: var(--radius-card);
+  box-shadow: var(--glass-shadow);
+  padding: 14px 20px;
+}
+
+/* BOM sidebar, flyout panels, and the paste modal: drop the translucent-glass border for pure
+   gradient fill - "treatment B" applied to every floating panel, not just the tree cards. */
+body.page-calc #bom-sidebar,
+body.page-calc .flyout-panel,
+body.page-calc #paste-modal > div {
+  border: none !important;
+}
+
+/* Tree node cards keep a top-only border whose WIDTH lives here and whose COLOR is set inline
+   per node type in app.js (blue = buy-mode, violet = reaction, accent = batch yield, transparent
+   = default/root) - a colored cap instead of a full outline, so the category cue survives without
+   reintroducing a bordered-card look. */
+body.page-calc .glass-card {
+  border-style: solid !important;
+  border-width: 3px 0 0 0 !important;
+  border-color: transparent !important;
+  border-radius: var(--radius-card) !important;
+}
+
+/* Diagram viewport becomes the hero visualization instead of the flat tile + giant "E" watermark
+   it had before: a near-black surface with a soft lime ambient glow rising from the bottom
+   (echoes the Foxstock hero chart's backdrop) plus a faint dot-grid texture. This is the app's
+   REAL tree diagram getting the hero treatment, not an invented chart - Foxstock's hero is a
+   historical price line and this app has no genuine price history to plot honestly. */
+body.page-calc #viewport {
+  background:
+    radial-gradient(ellipse 1000px 560px at 50% 100%, rgba(200,255,77,.08), transparent 70%),
+    radial-gradient(rgba(255,255,255,.05) 1px, transparent 1.5px) 0 0/20px 20px,
+    #0a0b0a !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+body.page-calc #viewport::before { content: none; }
+
+body.page-calc #viewport-hint {
+  background: rgba(0,0,0,0.45) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* The root card's Net Profit figure - gradient-fill text so it reads as "the number that
+   matters", same treatment Foxstock gives its balance card's revenue figure. */
+body.page-calc .hero-num {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, #fff, #999);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  line-height: 1.15;
+  display: inline-block;
+}
+body.page-calc .hero-num.profit { background: linear-gradient(135deg, #ddffa0, var(--accent)); -webkit-background-clip: text; background-clip: text; }
+body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var(--red)); -webkit-background-clip: text; background-clip: text; }
