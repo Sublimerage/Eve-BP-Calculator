@@ -693,6 +693,26 @@ body.page-calc.theme-unify {
   --blue-900: var(--copper-900);
 }
 
+/* FINAL PASS: border-[#1e3348] (and its /NN opacity variants) is the single class ledger.js and
+   invention.js reach for on nearly every input, select, dropdown, and small nested box - 41
+   occurrences across the two pages' markup, none of them removed by the card-level fixes above
+   because those targeted specific wrapper elements, not this one pervasive class. Individually
+   each border was faint, but 41 of them stacked across a form-heavy sidebar is exactly what reads
+   as "still boxy/outlined" - dropping it entirely (border-radius stays wherever already set) is
+   more reliable than continuing to special-case wrappers one at a time. */
+body.page-calc.theme-unify [class*="border-[#1e3348]"] {
+  border-color: transparent !important;
+}
+/* Inputs/selects still need a hint of depth without a hard edge - a slightly lighter fill than
+   their surrounding card reads as "a field" on its own, no border required. */
+body.page-calc.theme-unify input[class*="bg-[#0d1922]"],
+body.page-calc.theme-unify input[class*="bg-[#070b0f]"],
+body.page-calc.theme-unify select[class*="bg-[#0d1922]"],
+body.page-calc.theme-unify select[class*="bg-[#070b0f]"] {
+  background: rgba(255,255,255,0.05) !important;
+  border-radius: var(--radius-btn) !important;
+}
+
 /* --accent and --green are the same lime hex on this page (Foxstock treats one hero color as
    both brand accent and "up"/profit), which would otherwise make node-parent-highlight and
    node-child-highlight glow identically here - reintroducing the two-color distinction the base
