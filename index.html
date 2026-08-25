@@ -8,20 +8,39 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>EVE Deep-Industry Engine</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d3915a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='5' r='2.6'/%3E%3Ccircle cx='6' cy='18.5' r='2.6'/%3E%3Ccircle cx='12' cy='18.5' r='2.6'/%3E%3Ccircle cx='18' cy='18.5' r='2.6'/%3E%3Cpath d='M12 7.6v2.6M12 10.2L6 15.9M12 10.2v5.7M12 10.2l6 5.7'/%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.4.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.5.0">
 </head>
 <body class="page-calc flex flex-col min-h-screen text-slate-200">
 
 
-  <!-- Header: branding + primary account/nav actions only -->
-  <header class="px-5 flex flex-wrap justify-between items-center gap-3 z-30">
-    <div class="flex items-center space-x-3">
-      <div class="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center font-bold text-black text-lg rajdhani">E</div>
-      <h1 class="text-[13px] font-semibold tracking-wide text-white rajdhani leading-none">DEEP-INDUSTRY</h1>
+  <!-- Header: branding + global search + primary account/nav actions -->
+  <header class="px-5 flex flex-wrap items-center gap-3 z-30">
+    <div class="flex items-center space-x-3 flex-shrink-0">
+      <div class="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center text-black flex-shrink-0" title="EVE Deep-Industry Engine">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:21px;height:21px;">
+          <circle cx="12" cy="5" r="2.2"/>
+          <circle cx="6" cy="18.5" r="2.2"/>
+          <circle cx="12" cy="18.5" r="2.2"/>
+          <circle cx="18" cy="18.5" r="2.2"/>
+          <path d="M12 7.2v3M12 10.2L6 16.3M12 10.2v6.1M12 10.2l6 6.1"/>
+        </svg>
+      </div>
+      <h1 class="text-[13px] font-semibold tracking-wide text-white rajdhani leading-none hidden lg:block">DEEP-INDUSTRY</h1>
     </div>
 
-    <div class="flex items-center gap-3 mono flex-wrap">
+    <!-- Global item search - reachable from anywhere in the header instead of only inside the
+         Pricing flyout. Same #item-search/#search-results ids app.js already binds to, just
+         relocated - the dropdown positions itself via getBoundingClientRect() so it works from
+         any parent. -->
+    <div class="header-search-wrap">
+      <svg class="header-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.5" y2="15.5"/></svg>
+      <input type="text" id="item-search" autocomplete="off" placeholder="Search item to build..." class="header-search-input">
+      <div id="search-results" class="fixed bg-black/25 border border-orange-500 max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
+    </div>
+
+    <div class="flex items-center gap-3 mono flex-wrap flex-shrink-0">
 
       <!-- Primary destinations: the app's three workspaces, styled as a quiet tab switcher rather
            than three equal-weight buttons competing for attention. -->
@@ -104,7 +123,7 @@
          System, Stock) are open by default; set-once sections (Taxes, Contracts) start collapsed. -->
     <aside id="control-sidebar" class="icon-rail">
       <div id="icon-btn-search" class="icon-rail-btn icon-rail-btn-active" onclick="toggleFlyout('search')">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.5" y2="15.5"/></svg><span class="icon-label">Search</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 3H19a2 2 0 012 2v6.5a2 2 0 01-.6 1.4l-8 8a2 2 0 01-2.8 0l-6.5-6.5a2 2 0 010-2.8l8-8a2 2 0 011.4-.6z"/><circle cx="16.5" cy="7.5" r="1.3"/></svg><span class="icon-label">Pricing</span>
       </div>
       <div id="icon-btn-build" class="icon-rail-btn" onclick="toggleFlyout('build')">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l4 4-8.5 8.5a2 2 0 01-2.8 0v0a2 2 0 010-2.8L15.2 7.2"/><path d="M12 8l4-4 4 4-4 4"/></svg><span class="icon-label">Build</span>
@@ -125,14 +144,9 @@
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,17 9,11 13,15 21,6"/><polyline points="15,6 21,6 21,12"/></svg><span class="icon-label">Markets</span>
       </div>
 
-      <!-- Search and Pricing -->
+      <!-- Pricing (search lives in the header now, reachable from any page state) -->
       <div id="flyout-search" class="flyout-panel open">
-        <h2 class="section-label text-orange-400 text-xs mb-1.5">Search and Pricing</h2>
-        <div class="relative mb-2">
-          <input type="text" id="item-search" autocomplete="off" placeholder="Search item to build..."
-            class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-2 text-white font-bold focus:border-orange-500 outline-none mono text-sm shadow-inner">
-          <div id="search-results" class="fixed bg-black/25 border border-orange-500 max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
-        </div>
+        <h2 class="section-label text-orange-400 text-xs mb-1.5">Pricing</h2>
         <div class="flex gap-2">
           <select id="input-price-mode" onchange="recalculate()" class="flex-1 bg-black/35 border border-orange-500/20 px-2 py-1.5 text-white font-bold text-[11px] outline-none">
             <option value="sell" selected>Sell (Instant)</option>
@@ -547,7 +561,7 @@
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
   <script src="eve_db.js?v=15.1.0"></script>
   <script src="js/config.js?v=15.1.0"></script>
-  <script src="js/esi.js?v=15.2.0"></script>
+  <script src="js/esi.js?v=15.3.0"></script>
   <script src="js/tree.js?v=15.1.0"></script>
   <script src="js/optimizers.js?v=15.1.0"></script>
   <script src="js/app.js?v=15.11.0"></script>

@@ -7,15 +7,22 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>EVE Invention Calculator</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8ff4d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 3h4'/%3E%3Cpath d='M10.5 3v5.3L5.9 16.8A2 2 0 007.6 20h8.8a2 2 0 001.7-3.2L13.5 8.3V3'/%3E%3Cpath d='M8.2 14.5h7.6'/%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.4.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.5.0">
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
 
   <!-- Header -->
   <header class="px-5 flex flex-wrap justify-between items-center gap-2 z-30">
     <div class="flex items-center space-x-3">
-      <div class="w-9 h-9 bg-purple-500 rounded-xl flex items-center justify-center font-bold text-black text-lg rajdhani">I</div>
+      <div class="w-9 h-9 bg-purple-500 rounded-xl flex items-center justify-center text-black flex-shrink-0" title="EVE Invention Calculator">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:19px;height:19px;">
+          <path d="M10 3h4"/>
+          <path d="M10.5 3v5.3L5.9 16.8A2 2 0 007.6 20h8.8a2 2 0 001.7-3.2L13.5 8.3V3"/>
+          <path d="M8.2 14.5h7.6"/>
+        </svg>
+      </div>
       <h1 class="text-[13px] font-semibold tracking-wide text-white rajdhani leading-none">INVENTION CALCULATOR</h1>
     </div>
     <div class="flex items-center gap-3 mono flex-wrap">
@@ -172,7 +179,7 @@
 
   <script src="eve_db.js?v=8.0.1"></script>
   <script src="js/config.js?v=8.0.1"></script>
-  <script src="js/esi.js?v=8.0.2"></script>
+  <script src="js/esi.js?v=8.0.3"></script>
   <script src="js/tree.js?v=8.0.1"></script>
   <script src="js/optimizers.js?v=8.0.1"></script>
   <script src="js/invention.js?v=9.3.0"></script>

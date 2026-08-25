@@ -8,15 +8,23 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Industry Ledger</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8ff4d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='4.5' width='14' height='16' rx='2'/%3E%3Cpath d='M9 3.5h6a1 1 0 011 1V6H8V4.5a1 1 0 011-1z'/%3E%3Cpath d='M8.5 12.5l2 2 4.5-4.5'/%3E%3Cline x1='8' y1='17' x2='16' y2='17'/%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.4.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.5.0">
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
 
   <!-- Header navbar -->
   <header class="px-5 flex flex-wrap justify-between items-center gap-2 z-30">
     <div class="flex items-center space-x-3">
-      <div class="w-9 h-9 bg-purple-600 rounded-xl flex items-center justify-center font-bold text-black text-lg rajdhani">L</div>
+      <div class="w-9 h-9 bg-purple-600 rounded-xl flex items-center justify-center text-black flex-shrink-0" title="EVE Industry Ledger">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
+          <rect x="5" y="4.5" width="14" height="16" rx="2"/>
+          <path d="M9 3.5h6a1 1 0 011 1V6H8V4.5a1 1 0 011-1z"/>
+          <path d="M8.5 12.5l2 2 4.5-4.5"/>
+          <line x1="8" y1="17" x2="16" y2="17"/>
+        </svg>
+      </div>
       <h1 class="text-[13px] font-semibold tracking-wide text-white rajdhani leading-none">EVE INDUSTRY LEDGER</h1>
     </div>
 
@@ -250,7 +258,7 @@
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
   <script src="eve_db.js?v=8.0.1"></script>
   <script src="js/config.js?v=8.0.1"></script>
-  <script src="js/esi.js?v=8.0.2"></script>
+  <script src="js/esi.js?v=8.0.3"></script>
   <script src="js/tree.js?v=8.0.1"></script>
   <script src="js/optimizers.js?v=8.0.1"></script>
   <script src="js/ledger.js?v=9.6.0"></script>
