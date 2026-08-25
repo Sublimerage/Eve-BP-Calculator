@@ -658,7 +658,7 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     return `
       <div class="bg-[#202a2e] border border-orange-500/20 hover:border-orange-500 p-2.5 transition space-y-2">
         <div class="flex items-center gap-2 min-w-0">
-          <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 border border-slate-700 bg-[#030405] flex-shrink-0" loading="lazy" title="${isOriginal ? 'Blueprint Original (BPO)' : 'Blueprint Copy (BPC)'}">
+          <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded-md border border-white/10 bg-[#030405] flex-shrink-0" loading="lazy" title="${isOriginal ? 'Blueprint Original (BPO)' : 'Blueprint Copy (BPC)'}">
           <span class="font-bold text-slate-200 min-w-0">${window.esc(name)}</span>
           ${stackBadge}${readinessBadge}
         </div>

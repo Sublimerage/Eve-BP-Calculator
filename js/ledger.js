@@ -360,7 +360,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
       <div class="flex items-center gap-2 p-2 cursor-pointer" onclick="toggleJobCardCollapse(${job.id})">
         <span class="drag-handle cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-300 px-1 text-sm select-none flex-shrink-0" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>
         <span class="text-slate-500 text-xs flex-shrink-0">${isExpanded ? '▾' : '▸'}</span>
-        <img src="${jobIconUrl}" class="w-8 h-8 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
+        <img src="${jobIconUrl}" class="w-8 h-8 rounded-md border border-white/10 bg-[#070b0f] flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
         <div class="min-w-0 flex-1">
           <div class="font-bold text-sm text-white truncate">${window.esc(jobDisplayName)}</div>
           ${job.isSubBuild ? `<div class="text-xs mono text-amber-400 font-bold uppercase truncate">⚙ Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
@@ -553,7 +553,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
            ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
         <div class="flex items-start justify-between">
           <div class="flex items-start space-x-3 min-w-0 flex-1">
-            <img src="${jobIconUrl}" class="w-12 h-12 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
+            <img src="${jobIconUrl}" class="w-12 h-12 rounded-md border border-white/10 bg-[#070b0f] flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
               <h3 class="font-bold text-base text-white truncate">${window.esc(jobDisplayName)}</h3>
               ${job.isSubBuild ? `<div class="text-xs mono text-amber-400 font-bold uppercase tracking-wide mt-0.5" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
@@ -822,7 +822,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
     return `
       <div class="rounded border p-2 flex items-center justify-between transition shadow-sm ${rowBg}">
         <div class="flex items-center space-x-2.5 min-w-0">
-          <img src="${itemIconUrl}" class="w-7 h-7 rounded border border-slate-700 bg-[#070b0f] flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
+          <img src="${itemIconUrl}" class="w-7 h-7 rounded-md border border-white/10 bg-[#070b0f] flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           <div class="min-w-0 flex-1">
             <div class="font-semibold text-slate-200 truncate flex items-center">
               <span class="truncate">${window.esc(item.name)}</span>
