@@ -542,10 +542,10 @@ select option:checked, select option:hover { background-color: var(--accent); co
 [class*="hover:bg-cyan-600"]:hover { background: var(--blue-500) !important; }
 [class*="hover:bg-cyan-700"]:hover { background: var(--blue-600) !important; }
 .bg-cyan-800 { background: var(--blue-700) !important; }
-.bg-cyan-900, [class^="bg-cyan-900/"], [class*=" bg-cyan-900/"] { background: rgba(42,70,112,0.6) !important; }
-.bg-cyan-950, [class^="bg-cyan-950/"], [class*=" bg-cyan-950/"] { background: rgba(42,70,112,0.32) !important; }
+.bg-cyan-900, [class^="bg-cyan-900/"], [class*=" bg-cyan-900/"] { background: rgba(var(--blue-rgb),0.6) !important; }
+.bg-cyan-950, [class^="bg-cyan-950/"], [class*=" bg-cyan-950/"] { background: rgba(var(--blue-rgb),0.32) !important; }
 .border-cyan-400, .border-cyan-500, [class^="border-cyan-400/"], [class*=" border-cyan-400/"], [class^="border-cyan-500/"], [class*=" border-cyan-500/"] { border-color: rgba(var(--blue-rgb),0.5) !important; }
-.border-cyan-600, [class^="border-cyan-600/"], [class*=" border-cyan-600/"] { border-color: rgba(84,131,201,0.4) !important; }
+.border-cyan-600, [class^="border-cyan-600/"], [class*=" border-cyan-600/"] { border-color: rgba(var(--blue-rgb),0.4) !important; }
 [class*="ring-cyan-400"] { --tw-ring-color: rgba(var(--blue-rgb),0.7) !important; }
 
 /* ---- violet (purple) ---- */
@@ -560,10 +560,10 @@ select option:checked, select option:hover { background-color: var(--accent); co
 [class*="hover:bg-purple-700"]:hover { background: var(--violet-500) !important; }
 .bg-purple-800, [class^="bg-purple-800/"], [class*=" bg-purple-800/"] { background: var(--violet-700) !important; }
 [class*="hover:bg-purple-800"]:hover { background: var(--violet-600) !important; }
-.bg-purple-950, [class^="bg-purple-950/"], [class*=" bg-purple-950/"] { background: rgba(90,70,140,0.42) !important; }
+.bg-purple-950, [class^="bg-purple-950/"], [class*=" bg-purple-950/"] { background: rgba(var(--violet-rgb),0.42) !important; }
 .border-purple-500, [class^="border-purple-500/"], [class*=" border-purple-500/"] { border-color: rgba(var(--violet-rgb),0.45) !important; }
-.border-purple-600, [class^="border-purple-600/"], [class*=" border-purple-600/"] { border-color: rgba(138,114,201,0.35) !important; }
-.border-purple-800, [class^="border-purple-800/"], [class*=" border-purple-800/"] { border-color: rgba(106,79,163,0.4) !important; }
+.border-purple-600, [class^="border-purple-600/"], [class*=" border-purple-600/"] { border-color: rgba(var(--violet-rgb),0.35) !important; }
+.border-purple-800, [class^="border-purple-800/"], [class*=" border-purple-800/"] { border-color: rgba(var(--violet-rgb),0.4) !important; }
 [class*="hover:border-purple-500"]:hover { border-color: rgba(var(--violet-rgb),0.5) !important; }
 
 /* ---- green (profit) ---- */
@@ -574,10 +574,10 @@ select option:checked, select option:hover { background-color: var(--accent); co
 .bg-green-700, [class^="bg-green-700/"], [class*=" bg-green-700/"] { background: var(--green-700) !important; }
 .bg-green-800, [class^="bg-green-800/"], [class*=" bg-green-800/"] { background: var(--green-700) !important; }
 [class*="hover:bg-green-700"]:hover { background: var(--green-600) !important; }
-.bg-green-950, [class^="bg-green-950/"], [class*=" bg-green-950/"] { background: rgba(45,110,80,0.28) !important; }
+.bg-green-950, [class^="bg-green-950/"], [class*=" bg-green-950/"] { background: rgba(var(--green-rgb),0.28) !important; }
 .border-green-500, [class^="border-green-500/"], [class*=" border-green-500/"] { border-color: rgba(var(--green-rgb),0.5) !important; }
-.border-green-600, [class^="border-green-600/"], [class*=" border-green-600/"] { border-color: rgba(52,154,108,0.4) !important; }
-.border-green-700, [class^="border-green-700/"], [class*=" border-green-700/"] { border-color: rgba(43,127,89,0.4) !important; }
+.border-green-600, [class^="border-green-600/"], [class*=" border-green-600/"] { border-color: rgba(var(--green-rgb),0.4) !important; }
+.border-green-700, [class^="border-green-700/"], [class*=" border-green-700/"] { border-color: rgba(var(--green-rgb),0.4) !important; }
 [class*="hover:border-green-400"]:hover, [class*="hover:border-green-500"]:hover { border-color: var(--green-400) !important; }
 
 /* ---- red (loss / destructive) ---- */
@@ -587,16 +587,16 @@ select option:checked, select option:hover { background-color: var(--accent); co
 [class*="hover:text-red-300"]:hover, [class*="hover:text-red-400"]:hover { color: var(--red-400) !important; }
 .bg-red-500 { background: var(--red-500) !important; }
 .bg-red-800, [class^="bg-red-800/"], [class*=" bg-red-800/"] { background: #8f3a35 !important; }
-.bg-red-950, [class^="bg-red-950/"], [class*=" bg-red-950/"] { background: rgba(140,50,45,0.32) !important; }
+.bg-red-950, [class^="bg-red-950/"], [class*=" bg-red-950/"] { background: rgba(var(--red-rgb),0.32) !important; }
 [class*="hover:bg-red-800"]:hover { background: #a3423c !important; }
-.border-red-800, [class^="border-red-800/"], [class*=" border-red-800/"] { border-color: rgba(140,50,45,0.45) !important; }
+.border-red-800, [class^="border-red-800/"], [class*=" border-red-800/"] { border-color: rgba(var(--red-rgb),0.45) !important; }
 
 /* ---- emerald (aliased to the green ramp) ---- */
 .text-emerald-300 { color: var(--green-300) !important; }
 .bg-emerald-700, [class^="bg-emerald-700/"], [class*=" bg-emerald-700/"] { background: var(--green-700) !important; }
 [class*="hover:bg-emerald-600"]:hover { background: var(--green-600) !important; }
-.bg-emerald-950, [class^="bg-emerald-950/"], [class*=" bg-emerald-950/"] { background: rgba(45,110,80,0.35) !important; }
-.border-emerald-600, [class^="border-emerald-600/"], [class*=" border-emerald-600/"] { border-color: rgba(52,154,108,0.4) !important; }
+.bg-emerald-950, [class^="bg-emerald-950/"], [class*=" bg-emerald-950/"] { background: rgba(var(--green-rgb),0.35) !important; }
+.border-emerald-600, [class^="border-emerald-600/"], [class*=" border-emerald-600/"] { border-color: rgba(var(--green-rgb),0.4) !important; }
 
 /* ---- literal bg-[#hex]/border-[#hex] classes from the pre-redesign palette (index.html /
    ledger.html / invention.html static shells) ---- */
@@ -614,7 +614,7 @@ select option:checked, select option:hover { background-color: var(--accent); co
 [class*="divide-[#1e3348]"] > :not([hidden]) ~ :not([hidden]) { border-color: var(--glass-border) !important; }
 [class*="text-[#c8d8e8]"] { color: var(--text-soft) !important; }
 [class*="border-[#3a3025]"] { border-color: var(--glass-border) !important; }
-[class*="bg-[#0d2818]"] { background: rgba(45,110,80,0.24) !important; }
+[class*="bg-[#0d2818]"] { background: rgba(var(--green-rgb),0.24) !important; }
 [class*="text-[#e85555]"] { color: var(--red) !important; }
 [class*="text-[#a8d4f0]"] { color: var(--blue-300) !important; }
 
