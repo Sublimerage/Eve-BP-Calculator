@@ -384,20 +384,26 @@ async function handleEsiSSOCallback() {
   }
 }
 
-function updateEsiUserUI(charName, charId) {
+function updateEsiUserUI(charName, charId, corpName, corpTicker) {
   const container = document.getElementById('esi-login-container');
+  if (!container) return;
   const safeName = window.esc(charName);
-  if (container) {
-    container.innerHTML = `
-      <div class="flex items-center space-x-2 text-xs mono bg-black/40 px-3 py-1.5 rounded border border-orange-500/30" style="backdrop-filter:blur(8px);">
-        <img src="https://images.evetech.net/characters/${charId}/portrait?size=128" class="w-6 h-6 rounded-full border border-orange-400" onerror="this.onerror=null; this.src='https://images.evetech.net/characters/1/portrait?size=128';">
-        <span class="text-orange-300 font-bold">${safeName}</span>
-        <button onclick="logoutEsiSSO()" class="text-slate-400 hover:text-red-400 ml-1.5 flex items-center" title="Log out ESI Character">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+  const ticker = corpTicker || localStorage.getItem('esi_corp_ticker') || '';
+  const safeTicker = window.esc(ticker);
+  const safeCorpName = window.esc(corpName || localStorage.getItem('esi_corp_name') || '');
+  container.innerHTML = `
+    <div class="pilot-badge mono" title="${safeName}${safeCorpName ? ' — ' + safeCorpName : ''}">
+      <img src="https://images.evetech.net/characters/${charId}/portrait?size=128" class="pilot-portrait" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/characters/1/portrait?size=128';">
+      <div class="pilot-meta">
+        <span class="pilot-name">${safeName}</span>
+        ${ticker ? `<span class="pilot-corp">[${safeTicker}]</span>` : ''}
       </div>
-    `;
-  }
+      <span class="pilot-dot"></span>
+      <button onclick="logoutEsiSSO()" class="pilot-logout" title="Log out ESI Character">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" style="width:12px;height:12px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  `;
 }
 
 function logoutEsiSSO() {
@@ -406,6 +412,9 @@ function logoutEsiSSO() {
   localStorage.removeItem('esi_token_expiry');
   localStorage.removeItem('esi_char_id');
   localStorage.removeItem('esi_char_name');
+  localStorage.removeItem('esi_corp_id');
+  localStorage.removeItem('esi_corp_name');
+  localStorage.removeItem('esi_corp_ticker');
   localStorage.removeItem('esi_code_verifier');
   localStorage.removeItem('esi_auth_state');
   window.rawAssetItems = [];
@@ -458,6 +467,20 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       const charData = await charRes.json();
       corpId = charData.corporation_id;
       if (corpId) localStorage.setItem('esi_corp_id', String(corpId));
+      // Public endpoint, no auth needed - just the corp name/ticker for the header's pilot badge.
+      // Fired off without blocking the asset fetch below; updates the badge in place once it lands.
+      if (corpId) {
+        fetch(`https://esi.evetech.net/latest/corporations/${corpId}/?datasource=tranquility`)
+          .then(r => r.ok ? r.json() : null)
+          .then(corpData => {
+            if (!corpData || !corpData.ticker) return;
+            localStorage.setItem('esi_corp_name', corpData.name || '');
+            localStorage.setItem('esi_corp_ticker', corpData.ticker);
+            const charName = localStorage.getItem('esi_char_name');
+            if (charName) updateEsiUserUI(charName, charId, corpData.name, corpData.ticker);
+          })
+          .catch(e => console.warn('[ESI] Corp info fetch failed:', e));
+      }
     }
     if (corpId && accessToken) {
       try {
