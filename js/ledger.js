@@ -529,7 +529,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
       `;
     } else {
       statusBannerHTML = `
-        <div class="flex items-center justify-between px-2.5 py-2 rounded-lg bg-[#0d1922]">
+        <div class="flex items-center justify-between px-2.5 py-2">
           <span class="text-xs text-slate-300 font-bold uppercase tracking-wide flex-shrink-0">Status:</span>
           <span class="text-sm font-extrabold text-slate-400 mono">⏳ PENDING</span>
         </div>
