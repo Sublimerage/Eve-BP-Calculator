@@ -10,33 +10,35 @@
 <title>EVE Online Industry Ledger</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8ff4d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='4.5' width='14' height='16' rx='2'/%3E%3Cpath d='M9 3.5h6a1 1 0 011 1V6H8V4.5a1 1 0 011-1z'/%3E%3Cpath d='M8.5 12.5l2 2 4.5-4.5'/%3E%3Cline x1='8' y1='17' x2='16' y2='17'/%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.6.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.8.0">
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
 
   <!-- Header navbar -->
   <header class="px-5 flex flex-wrap justify-between items-center gap-2 z-30">
-    <div class="flex items-center space-x-3">
-      <div class="w-9 h-9 bg-purple-600 rounded-xl flex items-center justify-center text-black flex-shrink-0" title="EVE Industry Ledger">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
-          <rect x="5" y="4.5" width="14" height="16" rx="2"/>
-          <path d="M9 3.5h6a1 1 0 011 1V6H8V4.5a1 1 0 011-1z"/>
-          <path d="M8.5 12.5l2 2 4.5-4.5"/>
-          <line x1="8" y1="17" x2="16" y2="17"/>
-        </svg>
+    <!-- Logo+title+nav-tabs glued into one left-anchored group, same as the other two pages, so
+         the tabs land at the same X regardless of what's on the right (login button vs pilot badge). -->
+    <div class="flex items-center gap-3 flex-shrink-0">
+      <div class="flex items-center space-x-3 flex-shrink-0 header-brand">
+        <div class="w-9 h-9 bg-purple-600 rounded-xl flex items-center justify-center text-black flex-shrink-0" title="EVE Industry Ledger">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
+            <rect x="5" y="4.5" width="14" height="16" rx="2"/>
+            <path d="M9 3.5h6a1 1 0 011 1V6H8V4.5a1 1 0 011-1z"/>
+            <path d="M8.5 12.5l2 2 4.5-4.5"/>
+            <line x1="8" y1="17" x2="16" y2="17"/>
+          </svg>
+        </div>
+        <h1 class="text-[13px] font-semibold tracking-wide text-white rajdhani leading-none hidden lg:block">EVE INDUSTRY LEDGER</h1>
       </div>
-      <h1 class="text-[13px] font-semibold tracking-wide text-white rajdhani leading-none">EVE INDUSTRY LEDGER</h1>
-    </div>
 
-    <div class="flex items-center gap-3 mono flex-wrap">
       <nav class="primary-tabs">
         <a href="index.html" class="nav-tab"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.2"/><circle cx="6" cy="18.5" r="2.2"/><circle cx="12" cy="18.5" r="2.2"/><circle cx="18" cy="18.5" r="2.2"/><path d="M12 7.2v3M12 10.2L6 16.3M12 10.2v6.1M12 10.2l6 6.1"/></svg>Calculator</a>
         <div class="nav-tab nav-tab-active-violet"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4.5" width="14" height="16" rx="2"/><path d="M9 3.5h6a1 1 0 011 1V6H8V4.5a1 1 0 011-1z"/><path d="M8.5 12.5l2 2 4.5-4.5"/><line x1="8" y1="17" x2="16" y2="17"/></svg>Ledger</div>
         <a href="invention.html" class="nav-tab"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3h4"/><path d="M10.5 3v5.3L5.9 16.8A2 2 0 007.6 20h8.8a2 2 0 001.7-3.2L13.5 8.3V3"/><path d="M8.2 14.5h7.6"/></svg>Invention</a>
       </nav>
+    </div>
 
-      <div class="w-px h-6 bg-[#1e3348] hidden md:block"></div>
-
+    <div class="flex items-center gap-3 mono flex-wrap flex-shrink-0">
       <div id="esi-login-container">
         <button onclick="startEsiSSOLogin()" class="btn-glass btn-glass-muted px-3.5 py-2 text-xs flex items-center gap-1.5" title="Login with EVE Online to import your character assets">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
@@ -261,7 +263,7 @@
   <script src="js/config.js?v=8.0.1"></script>
   <script src="js/esi.js?v=8.0.3"></script>
   <script src="js/tree.js?v=8.0.1"></script>
-  <script src="js/optimizers.js?v=8.0.1"></script>
+  <script src="js/optimizers.js?v=8.0.2"></script>
   <script src="js/ledger.js?v=9.7.0"></script>
 </body>
 </html>
