@@ -46,6 +46,13 @@ function onCardTEChange(e, typeId, instanceId) {
 }
 
 // --- Action: Build All Sub-Components ---
+// Re-syncs the EXISTING tree's isBuildingSelf flags and re-renders in place, rather than calling
+// selectItem() to rebuild the whole tree from scratch - a rebuild hands every node a fresh
+// instanceId (see tree.js's ++instanceCounter), which silently invalidates whatever card the user
+// had selected/centered on and made the camera appear to jump to an arbitrary spot after clicking
+// these buttons. The tree already holds full child data regardless of build/buy state (that's what
+// lets the profit optimizer below simulate every combination without rebuilding), so a flag sync is
+// all that's needed here.
 async function buildAllComponents() {
   function markAllBuild(node) {
     if (!node) return;
@@ -60,18 +67,15 @@ async function buildAllComponents() {
 
   if (window.recipeTreeRoot) {
     markAllBuild(window.recipeTreeRoot);
-    if (window.currentProduct) {
-      await window.selectItem(window.currentProduct.id, window.currentProduct.name, true);
-    }
+    syncTreeBuildStates(window.recipeTreeRoot);
+    if (typeof window.recalculate === 'function') window.recalculate();
   }
 }
 
 // --- Action: Buy All Sub-Components ---
 async function buyAllSubComponents() {
   window.buildSelfOverrides = {};
-  if (window.currentProduct) {
-    await window.selectItem(window.currentProduct.id, window.currentProduct.name, true);
-  }
+  syncTreeBuildStates(window.recipeTreeRoot);
   window.applyComponentSpreadOptimizer();
 }
 
@@ -180,10 +184,10 @@ async function applyBuildProfitOptimizer() {
     }
   }
 
-  // Re-apply final optimal tree state
-  if (window.currentProduct) {
-    await window.selectItem(window.currentProduct.id, window.currentProduct.name, true);
-  }
+  // Re-apply final optimal tree state - see buildAllComponents() above for why this stays a flag
+  // sync + recalculate instead of a full selectItem() rebuild.
+  syncTreeBuildStates(window.recipeTreeRoot);
+  if (typeof window.recalculate === 'function') window.recalculate();
 }
 
 // Optimizer 2: Component Market Spread Threshold

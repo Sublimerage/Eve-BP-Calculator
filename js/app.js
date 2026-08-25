@@ -1148,7 +1148,16 @@ if (searchInput) {
     }
     let hits = searchItems(q);
     if (q.length >= 2) {
-      const onlineHits = await fetchEsiSearchResults(q);
+      // fetchEsiSearchResults hits EVE's general item-name search - it has no idea what's actually
+      // buildable, so it'll happily return skins, boosters, or any other named item that matches the
+      // query. Apply the exact same buildability filter searchItems() already uses locally (a real
+      // blueprint/formula/reaction name AND a recipe genuinely present in recipeMap) before merging.
+      const onlineHitsRaw = await fetchEsiSearchResults(q);
+      const onlineHits = onlineHitsRaw.filter(h => {
+        const lower = (h.name || '').toLowerCase();
+        const isBlueprint = lower.includes('blueprint') || lower.includes('formula') || lower.includes('reaction');
+        return isBlueprint && window.recipeMap && window.recipeMap[h.id];
+      });
       const map = new Map();
       hits.forEach(h => map.set(h.id, h));
       onlineHits.forEach(h => map.set(h.id, h));
@@ -1779,11 +1788,11 @@ function createNodeCard(node) {
             <div class="flex items-center justify-between text-xs mono">
               <span class="text-slate-400 font-semibold">Buy via:</span>
               <div class="flex space-x-1">
-                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'sell')" class="toggle-btn ${currentBuyStrategy === 'sell' ? 'toggle-btn-active-accent' : ''}" title="Instant Buy off Sell Orders">
+                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'sell')" class="toggle-btn ${currentBuyStrategy === 'sell' ? 'toggle-btn-active-buy' : ''}" title="Instant Buy off Sell Orders">
                   <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13,2 3,14 11,14 9,22 21,10 13,10"/></svg>
                   Sell
                 </button>
-                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'buy')" class="toggle-btn ${currentBuyStrategy === 'buy' ? 'toggle-btn-active-buy' : ''}" title="Order Placing via Buy Orders">
+                <button onclick="setComponentBuyMode(event, ${node.typeId}, 'buy')" class="toggle-btn ${currentBuyStrategy === 'buy' ? 'toggle-btn-active-accent' : ''}" title="Order Placing via Buy Orders - usually the more profitable option, since you set the price instead of paying the instant sell-order premium">
                   <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l3 3v15H6z"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/></svg>
                   Buy
                 </button>
