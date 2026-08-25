@@ -87,8 +87,8 @@
     </div>
 
     <div class="stat">
-      <div class="stat-label">Unique required materials</div>
-      <div id="journal-unique-materials" class="stat-value mono" style="color:var(--accent);">0 types</div>
+      <div class="stat-label">Total materials volume</div>
+      <div id="journal-materials-volume" class="stat-value mono" style="color:var(--accent);">0 m3</div>
     </div>
 
     <div class="stat">
@@ -207,13 +207,14 @@
 
   <!-- Completed Build History Drawer: a thin, always-visible strip by default so history is never
        hidden behind scrolling, with a separate control to expand it taller once opened. -->
-  <div id="history-drawer" class="fixed bottom-0 left-0 right-0 z-50 lp-card flex flex-col" style="height: 44px; transition: height 0.2s ease;">
-    <div class="flex justify-between items-center px-4 h-11 flex-shrink-0 cursor-pointer select-none" onclick="toggleHistoryDrawer()">
+  <div id="history-drawer" class="fixed bottom-0 left-0 right-0 z-50 lp-card flex flex-col" style="height: 48px; overflow: hidden; transition: height 0.2s ease;">
+    <div id="history-drawer-header" class="flex justify-between items-center px-4 py-2.5 flex-shrink-0 cursor-pointer select-none relative" onclick="toggleHistoryDrawer()">
       <div class="flex items-center gap-3 min-w-0">
         <span id="history-drawer-chevron" class="flex-shrink-0" style="color:var(--text-mute);">▲</span>
         <h2 class="text-xs font-bold uppercase tracking-wider rajdhani truncate" style="color:var(--green);">Completed Builds Ledger (History)</h2>
         <span class="text-[10px] mono flex-shrink-0" style="color:var(--text-mute);">(<span id="journal-history-count">0</span> builds)</span>
       </div>
+      <span id="history-drawer-pulltab" class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-0.5 pointer-events-none" style="color:var(--text-mute); opacity:0.55; font-size:8px; letter-spacing:1px;" title="Click to expand">▲▲▲</span>
       <div class="flex items-center gap-3 flex-shrink-0" onclick="event.stopPropagation()">
         <span class="text-[10px] mono" style="color:var(--text-mute);" title="Total net sell profit across every completed build. * means one or more completed builds predate profit tracking and are excluded.">
           Total Profit: <span id="journal-history-total-profit" class="font-bold text-xs" style="color:var(--green);">0 ISK</span>
@@ -252,6 +253,6 @@
   <script src="js/esi.js?v=8.0.2"></script>
   <script src="js/tree.js?v=8.0.1"></script>
   <script src="js/optimizers.js?v=8.0.1"></script>
-  <script src="js/ledger.js?v=9.0.0"></script>
+  <script src="js/ledger.js?v=9.1.0"></script>
 </body>
 </html>
