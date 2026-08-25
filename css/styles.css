@@ -804,6 +804,27 @@ body.page-calc.theme-unify .field-line:focus {
   border-bottom-color: var(--accent) !important;
   outline: none;
 }
+/* Selects are a different case from text inputs: there's no cursor, no typing affordance, nothing
+   self-evident about them being interactive - the "nothing painted until you interact" rule that's
+   right for text fields just makes a <select> look like inert text. A persistent chevron plus a
+   faint resting fill is the minimum needed to read as "click me to choose", without going back to
+   the old bordered-box look. */
+body.page-calc.theme-unify select.field-line {
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255,255,255,0.035) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ba0a8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") right 6px center / 13px no-repeat !important;
+  border-bottom: 1.5px solid rgba(255,255,255,0.08) !important;
+  border-radius: var(--radius-sm) !important;
+  padding-right: 24px !important;
+  cursor: pointer;
+}
+body.page-calc.theme-unify select.field-line:hover {
+  background-color: rgba(255,255,255,0.06) !important;
+}
+body.page-calc.theme-unify select.field-line:focus {
+  background-color: rgba(255,255,255,0.06) !important;
+  border-bottom-color: var(--accent) !important;
+}
 body.page-calc.theme-unify .field-box {
   background: rgba(0,0,0,0.25) !important;
   border: none !important;
