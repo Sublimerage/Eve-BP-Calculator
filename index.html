@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Deep-Industry Engine</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.1.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.2.0">
 </head>
 <body class="page-calc flex flex-col min-h-screen text-slate-200">
 
@@ -369,9 +369,14 @@
           <h2 class="font-bold text-white rajdhani tracking-wide text-base">Bill of materials</h2>
           <div class="text-[10px] mono text-slate-400">Click row to focus card in diagram</div>
         </div>
-        <button onclick="copyMultibuyText()" class="btn-glass px-3.5 py-1.5 text-xs">
-          Copy Multibuy
-        </button>
+        <div class="flex items-center gap-1.5">
+          <button id="btn-bom-view-mode" onclick="toggleBomViewMode()" class="btn-glass btn-glass-muted px-2.5 py-1.5 text-[10px]" title="Switch between detailed and compact list view">
+            ☰ Compact
+          </button>
+          <button onclick="copyMultibuyText()" class="btn-glass px-3.5 py-1.5 text-xs">
+            Copy Multibuy
+          </button>
+        </div>
       </div>
 
       <details open class="border-b border-orange-500/20 group">
@@ -442,10 +447,10 @@
         <div class="p-3.5 space-y-3 flex-shrink-0 border-b border-orange-500/20 overflow-y-auto">
           <div>
             <input type="text" id="blueprint-browser-search" placeholder="Search blueprint name..." autocomplete="off" oninput="filterBlueprintBrowser()"
-              class="w-full bg-[#030405] border border-orange-500/20 px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-orange-500">
+              class="w-full rounded bg-black/35 border border-orange-500/20 px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-orange-500">
           </div>
           <div class="flex items-center justify-between">
-            <button onclick="loadBlueprintBrowserData(true)" class="px-2.5 py-1.5 bg-orange-800 hover:bg-orange-700 text-orange-100 font-semibold text-[10px] transition">Refresh</button>
+            <button onclick="loadBlueprintBrowserData(true)" class="btn-glass btn-glass-muted px-2.5 py-1.5 text-[10px]">Refresh</button>
             <label class="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-400 font-bold">
               <input type="checkbox" id="blueprint-stack-toggle" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
               Stack identical
@@ -462,19 +467,19 @@
             </label>
           </div>
           <div class="flex items-center gap-2">
-            <button id="blueprint-scan-btn" onclick="scanBlueprintProfits()" class="flex-1 px-2.5 py-1.5 bg-orange-700 hover:bg-orange-600 text-white font-bold text-[10px] transition" title="Computes manufacturing profit for every visible blueprint using its real owned ME/TE/runs - can take a while for large collections">Scan Profit</button>
+            <button id="blueprint-scan-btn" onclick="scanBlueprintProfits()" class="btn-glass flex-1 px-2.5 py-1.5 text-[10px]" title="Computes manufacturing profit for every visible blueprint using its real owned ME/TE/runs - can take a while for large collections">Scan Profit</button>
             <label class="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-400 font-bold flex-shrink-0">
               <input type="checkbox" id="blueprint-sort-by-profit" onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-purple-500">
               Sort
             </label>
           </div>
           <div>
-            <button id="blueprint-readiness-btn" onclick="scanBlueprintReadiness()" class="w-full px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] transition" title="Checks each visible blueprint's direct materials against your current stock - shows which ones you could build right now with zero shopping">What Can I Build Right Now?</button>
+            <button id="blueprint-readiness-btn" onclick="scanBlueprintReadiness()" class="w-full rounded px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] transition" title="Checks each visible blueprint's direct materials against your current stock - shows which ones you could build right now with zero shopping">What Can I Build Right Now?</button>
           </div>
 
           <div>
             <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Type</div>
-            <select id="blueprint-type-filter" onchange="filterBlueprintBrowser()" class="w-full bg-[#030405] border border-orange-500/20 px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
+            <select id="blueprint-type-filter" onchange="filterBlueprintBrowser()" class="w-full rounded bg-black/35 border border-orange-500/20 px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
               <option value="all" selected>All (BPO + BPC)</option>
               <option value="bpo">BPO Only</option>
               <option value="bpc">BPC Only</option>
@@ -482,7 +487,7 @@
           </div>
           <div>
             <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Category</div>
-            <select id="blueprint-category-filter" onchange="filterBlueprintBrowser()" class="w-full bg-[#030405] border border-orange-500/20 px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
+            <select id="blueprint-category-filter" onchange="filterBlueprintBrowser()" class="w-full rounded bg-black/35 border border-orange-500/20 px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
               <option value="all" selected>All Categories</option>
               <option value="6">Ships</option>
               <option value="7">Modules</option>
@@ -498,8 +503,8 @@
         <div class="flex-1 flex flex-col min-h-0 p-3.5">
           <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1 flex-shrink-0">Location</div>
           <input type="text" id="blueprint-location-search" autocomplete="off" placeholder="Filter locations..." oninput="filterBlueprintLocationDropdownOptions()"
-            class="w-full rounded bg-[#030405] border border-orange-500/20 px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-orange-500 mb-1.5 flex-shrink-0">
-          <select id="blueprint-location-filter" onchange="filterBlueprintBrowser()" size="20" class="flex-1 w-full rounded bg-[#030405] border border-orange-500/20 px-2 py-1.5 text-orange-300 font-bold text-[10px] outline-none">
+            class="w-full rounded bg-black/35 border border-orange-500/20 px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-orange-500 mb-1.5 flex-shrink-0">
+          <select id="blueprint-location-filter" onchange="filterBlueprintBrowser()" size="20" class="flex-1 w-full rounded bg-black/35 border border-orange-500/20 px-2 py-1.5 text-orange-300 font-bold text-[10px] outline-none">
             <option value="all" selected>All Locations</option>
           </select>
         </div>
@@ -520,18 +525,18 @@
         <button onclick="closePasteModal()" class="text-slate-400 hover:text-white font-bold text-base">✖</button>
       </div>
       <p class="text-slate-300 leading-relaxed">
-        Select items in your in-game hangar or container, press <kbd class="bg-[#3a4a4c] px-1 py-0.5 text-orange-300">Ctrl + C</kbd> to copy, then paste (<kbd class="bg-[#3a4a4c] px-1 py-0.5 text-orange-300">Ctrl + V</kbd>) into the box below:
+        Select items in your in-game hangar or container, press <kbd class="bg-black/35 rounded px-1 py-0.5 text-orange-300">Ctrl + C</kbd> to copy, then paste (<kbd class="bg-black/35 rounded px-1 py-0.5 text-orange-300">Ctrl + V</kbd>) into the box below:
       </p>
-      <textarea id="paste-stock-input" rows="8" placeholder="Paste in-game inventory text here (e.g. Tritanium 500,000 Mineral...)" class="w-full bg-[#030405] border border-orange-500/20 p-3 text-slate-200 focus:border-orange-500 outline-none mono text-xs"></textarea>
+      <textarea id="paste-stock-input" rows="8" placeholder="Paste in-game inventory text here (e.g. Tritanium 500,000 Mineral...)" class="w-full rounded bg-black/35 border border-orange-500/20 p-3 text-slate-200 focus:border-orange-500 outline-none mono text-xs"></textarea>
       <div class="flex justify-between items-center pt-2">
-        <button onclick="clearUserStock()" class="px-3 py-1.5 bg-red-900/60 hover:bg-red-800 text-red-300 font-bold transition">
+        <button onclick="clearUserStock()" class="rounded px-3 py-1.5 font-bold transition" style="background:rgba(var(--red-rgb),0.18); color:var(--red);">
           Clear All Stock
         </button>
         <div class="flex space-x-2">
-          <button onclick="closePasteModal()" class="px-4 py-1.5 bg-[#3a4a4c] hover:bg-slate-600 text-slate-300 font-bold transition">
+          <button onclick="closePasteModal()" class="btn-glass btn-glass-muted px-4 py-1.5">
             Cancel
           </button>
-          <button onclick="processPastedStock()" class="px-5 py-1.5 bg-orange-600 hover:bg-orange-500 text-white font-bold transition shadow">
+          <button onclick="processPastedStock()" class="btn-glass px-5 py-1.5">
             Import &amp; Deduct Stock
           </button>
         </div>
@@ -545,6 +550,6 @@
   <script src="js/esi.js?v=15.2.0"></script>
   <script src="js/tree.js?v=15.1.0"></script>
   <script src="js/optimizers.js?v=15.1.0"></script>
-  <script src="js/app.js?v=15.8.0"></script>
+  <script src="js/app.js?v=15.10.0"></script>
 </body>
 </html>

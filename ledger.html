@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Industry Ledger</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.1.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.2.0">
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
 
@@ -118,9 +118,14 @@
           <h2 class="font-bold rajdhani tracking-wider text-lg" style="color:var(--text);">CONSOLIDATED BOM</h2>
           <div class="text-[10px] mono" style="color:var(--text-mute);">COMBINED MISSING ITEMS ACROSS QUEUE</div>
         </div>
-        <button onclick="copyJournalMultibuy()" class="btn-glass px-3.5 py-1.5 text-xs" title="Copy aggregated missing items list to clipboard">
-          Copy Multibuy
-        </button>
+        <div class="flex items-center gap-1.5">
+          <button id="btn-bom-view-mode" onclick="toggleBomViewMode()" class="btn-glass btn-glass-muted px-2.5 py-1.5 text-[10px]" title="Switch between detailed and compact list view">
+            ☰ Compact
+          </button>
+          <button onclick="copyJournalMultibuy()" class="btn-glass px-3.5 py-1.5 text-xs" title="Copy aggregated missing items list to clipboard">
+            Copy Multibuy
+          </button>
+        </div>
       </div>
 
       <!-- Stock & Location Filters - collapsible, same placement/pattern as the main calculator's BOM sidebar -->
@@ -248,6 +253,6 @@
   <script src="js/esi.js?v=8.0.2"></script>
   <script src="js/tree.js?v=8.0.1"></script>
   <script src="js/optimizers.js?v=8.0.1"></script>
-  <script src="js/ledger.js?v=9.1.0"></script>
+  <script src="js/ledger.js?v=9.2.0"></script>
 </body>
 </html>
