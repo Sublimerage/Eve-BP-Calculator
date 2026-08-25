@@ -264,6 +264,45 @@ header { height: 56px; flex-shrink: 0; }
 }
 .icon-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
 .icon-btn:hover { color: var(--accent); background: rgba(var(--accent-rgb),0.1); border-color: rgba(var(--accent-rgb),0.2); }
+
+/* ===== Header global search (index.html) ===== */
+.header-search-wrap { position: relative; flex: 1 1 auto; min-width: 140px; max-width: 460px; }
+.header-search-input {
+  width: 100%;
+  background: rgba(0,0,0,0.28);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-btn);
+  padding: 8px 12px 8px 34px;
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: 'IBM Plex Mono', monospace;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.header-search-input::placeholder { color: var(--text-mute); }
+.header-search-input:focus { border-color: rgba(var(--accent-rgb),0.5); box-shadow: 0 0 0 2px rgba(var(--accent-rgb),0.15); }
+.header-search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-mute); pointer-events: none; }
+
+/* ===== Pilot identity badge (replaces the SSO login button once authenticated - shared by all
+   three pages via esi.js's updateEsiUserUI()) ===== */
+.pilot-badge {
+  display: flex; align-items: center; gap: 9px;
+  padding: 5px 10px 5px 5px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--glass-border);
+}
+.pilot-portrait { width: 28px; height: 28px; border-radius: 50%; border: 1px solid rgba(var(--accent-rgb),0.4); flex-shrink: 0; display: block; }
+.pilot-meta { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.pilot-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+.pilot-corp { font-size: 10.5px; color: var(--accent); font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
+.pilot-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px rgba(var(--accent-rgb),0.7); flex-shrink: 0; }
+.pilot-logout {
+  color: var(--text-mute); display: flex; align-items: center; justify-content: center;
+  margin-left: 2px; flex-shrink: 0; background: none; border: none; cursor: pointer;
+  padding: 2px; transition: color 0.15s ease;
+}
+.pilot-logout:hover { color: var(--red); }
 /* The blueprint browser is a full-height edge-attached drawer (native-panel pattern), so it
    stays flush and square against the right edge rather than floating with rounded corners. */
 #blueprint-browser-drawer { border-radius: 0; border-right: none; border-top: none; border-bottom: none; }
