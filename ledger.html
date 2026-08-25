@@ -9,9 +9,9 @@
 <meta http-equiv="Expires" content="0">
 <title>EVE Online Industry Ledger</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=24.1.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=25.0.0">
 </head>
-<body class="page-calc flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
+<body class="page-calc theme-unify flex flex-col min-h-screen bg-[#070b0f] text-slate-200">
 
   <!-- Header navbar -->
   <header class="px-5 flex flex-wrap justify-between items-center gap-2 z-30">
@@ -202,9 +202,9 @@
           <span>Consolidated Types:</span>
           <span id="journal-bom-types" class="text-white font-bold">0</span>
         </div>
-        <div class="flex justify-between text-slate-200 text-sm font-bold mt-1">
-          <span>Aggregated Materials ISK:</span>
-          <span id="journal-bom-total" class="text-cyan-400">0 ISK</span>
+        <div class="mt-2">
+          <div class="text-slate-400 text-[10.5px] uppercase tracking-wide">Aggregated Materials ISK</div>
+          <div id="journal-bom-total" class="font-bold text-base" style="color:var(--accent);">0 ISK</div>
         </div>
       </div>
     </aside>
@@ -258,6 +258,6 @@
   <script src="js/esi.js?v=8.0.2"></script>
   <script src="js/tree.js?v=8.0.1"></script>
   <script src="js/optimizers.js?v=8.0.1"></script>
-  <script src="js/ledger.js?v=8.0.2"></script>
+  <script src="js/ledger.js?v=8.0.3"></script>
 </body>
 </html>
