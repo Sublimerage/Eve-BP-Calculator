@@ -254,16 +254,19 @@ img {
 .glass-card { border-radius: var(--radius-card); }
 header { height: 56px; flex-shrink: 0; }
 
+/* Same soft-tint treatment as .btn-glass-muted - a fully transparent resting state (the original
+   design here) is too easy to miss against the dark background, same problem those toolbar buttons
+   had. A faint permanent lime wash makes them read as clickable controls at a glance. */
 .icon-btn {
   width: 30px; height: 30px; border-radius: var(--radius-btn);
   display: flex; align-items: center; justify-content: center;
-  color: var(--text-mute); border: 1px solid transparent;
-  background: transparent;
+  color: var(--accent); border: 1px solid rgba(var(--accent-rgb),0.2);
+  background: rgba(var(--accent-rgb),0.1);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 .icon-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
-.icon-btn:hover { color: var(--accent); background: rgba(var(--accent-rgb),0.1); border-color: rgba(var(--accent-rgb),0.2); }
+.icon-btn:hover { color: var(--accent); background: rgba(var(--accent-rgb),0.2); border-color: rgba(var(--accent-rgb),0.4); }
 
 /* ===== Header global search (index.html) ===== */
 /* Fixed width regardless of title text length ("DEEP-INDUSTRY" vs "EVE INDUSTRY LEDGER" vs
@@ -488,8 +491,33 @@ svg[viewBox] { stroke: currentColor; }
   box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.18);
 }
 
-select option { background-color: #191411; color: var(--text); }
+select option { background-color: #191411; color: var(--text); padding: 6px 10px; }
 select option:checked, select option:hover { background-color: var(--accent); color: #201206; }
+/* Same custom chevron the ledger/invention selects use, generalized so index.html's differently-
+   styled selects (bg-black/*+border, not .field-line) get the same "obviously a dropdown" cue -
+   :not([size]) excludes true multi-row listboxes like the blueprint location filter, which are
+   always fully expanded already and don't need a "click to open" affordance. This rule is
+   deliberately lower-specificity than the theme-unify select.field-line rules, so it only fills
+   the gap on pages/selects that don't already have the fuller treatment. */
+body.page-calc select:not([size]) {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ba0a8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 13px;
+  padding-right: 28px !important;
+  cursor: pointer;
+}
+/* .flyout-panel select's own background rule uses the shorthand with !important, which resets
+   background-image back to none and wins over the rule above on specificity - restate the chevron
+   as !important here (higher specificity than that rule too) so flyout selects keep it. */
+body.page-calc .flyout-panel select:not([size]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ba0a8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 8px center !important;
+  background-size: 13px !important;
+}
 
 .seg-bar { display: flex; gap: 2px; height: 5px; }
 .seg-bar > div { flex: 1; background: var(--glass-border-top); border-radius: 1px; }
@@ -815,7 +843,7 @@ body.page-calc.theme-unify select.field-line {
   background: rgba(255,255,255,0.035) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ba0a8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") right 6px center / 13px no-repeat !important;
   border-bottom: 1.5px solid rgba(255,255,255,0.08) !important;
   border-radius: var(--radius-sm) !important;
-  padding-right: 24px !important;
+  padding: 6px 24px 6px 10px !important;
   cursor: pointer;
 }
 body.page-calc.theme-unify select.field-line:hover {
