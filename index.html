@@ -10,7 +10,7 @@
 <title>EVE Deep-Industry Engine</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d3915a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='5' r='2.6'/%3E%3Ccircle cx='6' cy='18.5' r='2.6'/%3E%3Ccircle cx='12' cy='18.5' r='2.6'/%3E%3Ccircle cx='18' cy='18.5' r='2.6'/%3E%3Cpath d='M12 7.6v2.6M12 10.2L6 15.9M12 10.2v5.7M12 10.2l6 5.7'/%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.15.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.16.0">
 </head>
 <body class="page-calc flex flex-col min-h-screen text-slate-200">
 
@@ -23,7 +23,7 @@
          page-specific utility buttons), which is what made it feel inconsistent page to page. -->
     <div class="flex items-center gap-3 flex-shrink-0">
       <div class="flex items-center space-x-3 flex-shrink-0 header-brand">
-        <div class="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center text-black flex-shrink-0" title="EVE Deep-Industry Engine">
+        <div class="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center flex-shrink-0" style="color:#0a1002;" title="EVE Deep-Industry Engine">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:21px;height:21px;">
             <circle cx="12" cy="5" r="2.2"/>
             <circle cx="6" cy="18.5" r="2.2"/>
@@ -152,11 +152,11 @@
       <div id="flyout-search" class="flyout-panel open">
         <h2 class="section-label text-orange-400 text-xs mb-1.5">Pricing</h2>
         <div class="flex gap-2">
-          <select id="input-price-mode" onchange="recalculate()" class="flex-1 bg-black/35 border border-orange-500/20 px-2 py-1.5 text-white font-bold text-[11px] outline-none">
+          <select id="input-price-mode" onchange="recalculate()" class="field-line flex-1 text-white font-bold text-[11px]">
             <option value="sell" selected>Sell (Instant)</option>
             <option value="buy">Buy Order</option>
           </select>
-          <select id="include-reactions" onchange="if(currentProduct) selectItem(currentProduct.id, currentProduct.name, true)" class="flex-1 bg-black/35 border border-orange-500/20 px-2 py-1.5 text-orange-300 font-bold text-[11px] outline-none">
+          <select id="include-reactions" onchange="if(currentProduct) selectItem(currentProduct.id, currentProduct.name, true)" class="field-line flex-1 text-orange-300 font-bold text-[11px]">
             <option value="true" selected>Reactions ON</option>
             <option value="false">Reactions OFF</option>
           </select>
@@ -189,19 +189,19 @@
       <div id="flyout-optimize" class="flyout-panel">
         <h2 class="section-label text-orange-300 text-xs mb-2">Smart Optimizers</h2>
         <div class="space-y-1.5">
-          <div class="rounded bg-black/35 p-1.5 border border-orange-500/20 flex items-center gap-1.5" title="Component Market Spread Threshold">
+          <div class="lp-inset flex items-center gap-1.5" title="Component Market Spread Threshold">
             <span class="text-slate-400 text-[10px] flex-shrink-0">Spread:</span>
             <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100"
-              class="w-14 bg-black/25 border border-orange-500/40 text-center text-orange-300 font-bold p-1 outline-none text-xs">
+              class="field-line w-14 text-center text-orange-300 font-bold p-1 text-xs">
             <span class="text-slate-500 text-xs flex-shrink-0">%</span>
             <button onclick="applyComponentSpreadOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] flex-shrink-0">
               Optimize
             </button>
           </div>
-          <div class="rounded bg-black/35 p-1.5 border border-orange-500/20 flex items-center gap-1.5" title="Build Cost Savings Impact Threshold">
+          <div class="lp-inset flex items-center gap-1.5" title="Build Cost Savings Impact Threshold">
             <span class="text-slate-400 text-[10px] flex-shrink-0">Budget:</span>
             <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100"
-              class="w-14 bg-black/25 border border-orange-500/40 text-center text-orange-300 font-bold p-1 outline-none text-xs">
+              class="field-line w-14 text-center text-orange-300 font-bold p-1 text-xs">
             <span class="text-slate-500 text-xs flex-shrink-0">%</span>
             <button onclick="applyBudgetImpactOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] flex-shrink-0">
               Optimize
@@ -219,7 +219,7 @@
         <div class="space-y-1.5">
           <div class="p-2 rounded" style="background:rgba(0,0,0,0.3); border:1px solid rgba(var(--accent-rgb),0.2);">
             <div class="flex items-center gap-1.5 mb-1.5">
-              <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="flex-1 min-w-0 bg-black/40 border border-orange-500/20 px-2 py-1.5 text-orange-300 font-bold text-xs outline-none rounded">
+              <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="field-line flex-1 min-w-0 text-orange-300 font-bold text-xs">
                 <option value="">— Load a saved production station —</option>
               </select>
               <button onclick="deleteProductionPreset()" class="toggle-btn" title="Delete the currently-selected preset">
@@ -233,10 +233,10 @@
           </div>
           <div class="relative">
             <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="System..."
-              class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-2 text-orange-300 font-bold mono uppercase focus:border-orange-500 outline-none text-sm">
+              class="field-line w-full text-orange-300 font-bold mono uppercase text-sm">
             <div id="system-results" class="fixed bg-black/25 border border-orange-500 max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
           </div>
-          <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); recalculate();" class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-2 text-white font-semibold text-xs outline-none" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
+          <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); recalculate();" class="field-line w-full text-white font-semibold text-xs" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
             <option value="npc">NPC Station (0% ME / 0% TE / 0% Fee)</option>
             <option value="raitaru">Raitaru - M EC (1% ME / 15% TE / 3% Fee)</option>
             <option value="azbel">Azbel - L EC (1% ME / 20% TE / 4% Fee)</option>
@@ -248,24 +248,24 @@
               <div class="relative">
                 <input type="text" id="rig-slot-1-input" placeholder="Rig Slot 1: None" autocomplete="off"
                   oninput="searchRigSlot(1, this.value)" onfocus="searchRigSlot(1, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-1-results'); if (el) el.classList.add('hidden'); }, 200)"
-                  class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-1.5 text-orange-300 font-semibold text-[11px] outline-none focus:border-orange-500">
+                  class="field-line w-full text-orange-300 font-semibold text-[11px]">
                 <div id="rig-slot-1-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
               </div>
               <div class="relative">
                 <input type="text" id="rig-slot-2-input" placeholder="Rig Slot 2: None" autocomplete="off"
                   oninput="searchRigSlot(2, this.value)" onfocus="searchRigSlot(2, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-2-results'); if (el) el.classList.add('hidden'); }, 200)"
-                  class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-1.5 text-orange-300 font-semibold text-[11px] outline-none focus:border-orange-500">
+                  class="field-line w-full text-orange-300 font-semibold text-[11px]">
                 <div id="rig-slot-2-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
               </div>
               <div class="relative">
                 <input type="text" id="rig-slot-3-input" placeholder="Rig Slot 3: None" autocomplete="off"
                   oninput="searchRigSlot(3, this.value)" onfocus="searchRigSlot(3, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-3-results'); if (el) el.classList.add('hidden'); }, 200)"
-                  class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-1.5 text-orange-300 font-semibold text-[11px] outline-none focus:border-orange-500">
+                  class="field-line w-full text-orange-300 font-semibold text-[11px]">
                 <div id="rig-slot-3-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
               </div>
             </div>
           </div>
-          <div class="bg-black/35 p-1.5 border border-orange-500/20 space-y-1 text-[10px] mono">
+          <div class="lp-inset space-y-1 text-[10px] mono">
             <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">SCI:</span><span id="sci-badge" class="text-orange-300 font-bold text-right truncate">SCI: 4.25% (Mfg) / 1.10% (React)</span></div>
             <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">Stock:</span><span id="stock-status-text" class="text-orange-400 font-bold text-right truncate"><span id="stock-count-display">0 items</span> in Stock</span></div>
             <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">EIV:</span><span id="eiv-status-text" class="text-orange-400 font-bold text-right truncate">Fetching...</span></div>
@@ -277,24 +277,24 @@
       <div id="flyout-taxes" class="flyout-panel">
         <h2 class="section-label text-orange-400 text-xs mb-1.5">Taxes and Fees</h2>
         <div class="grid grid-cols-2 gap-1.5 text-[11px] mono">
-          <div class="flex items-center gap-1.5 bg-black/35 p-1.5 border border-orange-500/20" title="Facility Structure Tax %">
+          <div class="lp-inset flex items-center gap-1.5" title="Facility Structure Tax %">
             <span class="text-slate-400 font-semibold flex-shrink-0">Fac:</span>
-            <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-black/25 border border-orange-500/20 text-center text-orange-400 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center text-orange-400 font-bold p-1 text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
-          <div class="flex items-center gap-1.5 bg-black/35 p-1.5 border border-orange-500/20" title="SCC Surcharge %">
+          <div class="lp-inset flex items-center gap-1.5" title="SCC Surcharge %">
             <span class="text-slate-400 font-semibold flex-shrink-0">SCC:</span>
-            <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-black/25 border border-orange-500/20 text-center text-orange-400 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center text-orange-400 font-bold p-1 text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
-          <div class="flex items-center gap-1.5 bg-black/35 p-1.5 border border-orange-500/20" title="Sales Tax %">
+          <div class="lp-inset flex items-center gap-1.5" title="Sales Tax %">
             <span class="text-slate-400 font-semibold flex-shrink-0">Sales:</span>
-            <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-black/25 border border-orange-500/20 text-center text-orange-300 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center text-orange-300 font-bold p-1 text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
-          <div class="flex items-center gap-1.5 bg-black/35 p-1.5 border border-orange-500/20" title="Broker Fee %">
+          <div class="lp-inset flex items-center gap-1.5" title="Broker Fee %">
             <span class="text-slate-400 font-semibold flex-shrink-0">Broker:</span>
-            <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="w-full bg-black/25 border border-orange-500/20 text-center text-orange-300 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center text-orange-300 font-bold p-1 text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
         </div>
@@ -304,14 +304,14 @@
       <div id="flyout-contract" class="flyout-panel">
         <h2 class="section-label text-orange-400 text-xs mb-1.5">Contract Settings</h2>
         <div class="grid grid-cols-2 gap-1.5 text-[11px] mono">
-          <div class="flex items-center gap-1.5 bg-black/35 p-1.5 border border-orange-500/20" title="Contract Sales Tax %">
+          <div class="lp-inset flex items-center gap-1.5" title="Contract Sales Tax %">
             <span class="text-slate-400 font-semibold flex-shrink-0">C.Tax:</span>
-            <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-black/25 border border-orange-500/20 text-center text-orange-400 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center text-orange-400 font-bold p-1 text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
-          <div class="flex items-center gap-1.5 bg-black/35 p-1.5 border border-orange-500/20" title="Contract Broker Fee %">
+          <div class="lp-inset flex items-center gap-1.5" title="Contract Broker Fee %">
             <span class="text-slate-400 font-semibold flex-shrink-0">C.Brk:</span>
-            <input type="number" id="contract-broker" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="w-full bg-black/25 border border-orange-500/20 text-center text-orange-400 font-bold p-1 outline-none text-[11px]">
+            <input type="number" id="contract-broker" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center text-orange-400 font-bold p-1 text-[11px]">
             <span class="text-slate-500 flex-shrink-0">%</span>
           </div>
         </div>
@@ -327,7 +327,7 @@
               <input type="text" id="home-market-input" placeholder="Search station name..." autocomplete="off"
                 oninput="searchHomeMarket(this.value)" onfocus="searchHomeMarket(this.value)"
                 onblur="setTimeout(() => { const el = document.getElementById('home-market-results'); if (el) el.classList.add('hidden'); }, 200)"
-                class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-2 text-orange-300 font-bold mono text-xs outline-none focus:border-orange-500">
+                class="field-line w-full text-orange-300 font-bold mono text-xs">
               <div id="home-market-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-52 overflow-y-auto hidden z-50 shadow-2xl text-xs"></div>
             </div>
           </div>
@@ -338,7 +338,7 @@
               <input type="text" id="add-market-input" placeholder="Add a market (search station)..." autocomplete="off"
                 oninput="searchAddMarket(this.value)" onfocus="searchAddMarket(this.value)"
                 onblur="setTimeout(() => { const el = document.getElementById('add-market-results'); if (el) el.classList.add('hidden'); }, 200)"
-                class="w-full bg-black/35 border border-orange-500/20 px-2.5 py-1.5 text-slate-200 text-[11px] outline-none focus:border-orange-500">
+                class="field-line w-full text-slate-200 text-[11px]">
               <div id="add-market-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[11px]"></div>
             </div>
           </div>
@@ -488,7 +488,7 @@
         <div class="p-3.5 space-y-3 flex-shrink-0 border-b border-orange-500/20 overflow-y-auto">
           <div>
             <input type="text" id="blueprint-browser-search" placeholder="Search blueprint name..." autocomplete="off" oninput="filterBlueprintBrowser()"
-              class="w-full rounded bg-black/35 border border-orange-500/20 px-3 py-1.5 text-slate-200 text-xs mono outline-none focus:border-orange-500">
+              class="field-line w-full text-slate-200 text-xs mono">
           </div>
           <div class="flex items-center justify-between">
             <button onclick="loadBlueprintBrowserData(true)" class="btn-glass btn-glass-muted px-2.5 py-1.5 text-[10px]">Refresh</button>
@@ -515,12 +515,15 @@
             </label>
           </div>
           <div>
-            <button id="blueprint-readiness-btn" onclick="scanBlueprintReadiness()" class="btn-glass w-full px-2.5 py-1.5 text-[10px]" title="Checks each visible blueprint's direct materials against your current stock - shows which ones you could build right now with zero shopping">What Can I Build Right Now?</button>
+            <button id="blueprint-readiness-btn" onclick="scanBlueprintReadiness()" class="btn-glass w-full px-2.5 py-1.5 text-[10px] flex items-center justify-center gap-1.5" title="Checks each visible blueprint's direct materials against your current stock - shows which ones you could build right now with zero shopping">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;flex-shrink:0;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              What Can I Build Right Now?
+            </button>
           </div>
 
           <div>
             <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Type</div>
-            <select id="blueprint-type-filter" onchange="filterBlueprintBrowser()" class="w-full rounded bg-black/35 border border-orange-500/20 px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
+            <select id="blueprint-type-filter" onchange="filterBlueprintBrowser()" class="field-line w-full text-slate-200 font-bold text-[11px]">
               <option value="all" selected>All (BPO + BPC)</option>
               <option value="bpo">BPO Only</option>
               <option value="bpc">BPC Only</option>
@@ -528,7 +531,7 @@
           </div>
           <div>
             <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1">Category</div>
-            <select id="blueprint-category-filter" onchange="filterBlueprintBrowser()" class="w-full rounded bg-black/35 border border-orange-500/20 px-2.5 py-1.5 text-slate-200 font-bold text-[11px] outline-none">
+            <select id="blueprint-category-filter" onchange="filterBlueprintBrowser()" class="field-line w-full text-slate-200 font-bold text-[11px]">
               <option value="all" selected>All Categories</option>
               <option value="6">Ships</option>
               <option value="7">Modules</option>
@@ -544,7 +547,7 @@
         <div class="flex-1 flex flex-col min-h-0 p-3.5">
           <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mb-1 flex-shrink-0">Location</div>
           <input type="text" id="blueprint-location-search" autocomplete="off" placeholder="Filter locations..." oninput="filterBlueprintLocationDropdownOptions()"
-            class="w-full rounded bg-black/35 border border-orange-500/20 px-2.5 py-1.5 text-slate-200 text-[11px] mono outline-none focus:border-orange-500 mb-1.5 flex-shrink-0">
+            class="field-line w-full text-slate-200 text-[11px] mono mb-1.5 flex-shrink-0">
           <select id="blueprint-location-filter" onchange="filterBlueprintBrowser()" size="20" class="flex-1 w-full rounded bg-black/35 border border-orange-500/20 px-2 py-1.5 text-orange-300 font-bold text-[10px] outline-none">
             <option value="all" selected>All Locations</option>
           </select>
@@ -568,7 +571,7 @@
       <p class="text-slate-300 leading-relaxed">
         Select items in your in-game hangar or container, press <kbd class="bg-black/35 rounded px-1 py-0.5 text-orange-300">Ctrl + C</kbd> to copy, then paste (<kbd class="bg-black/35 rounded px-1 py-0.5 text-orange-300">Ctrl + V</kbd>) into the box below:
       </p>
-      <textarea id="paste-stock-input" rows="8" placeholder="Paste in-game inventory text here (e.g. Tritanium 500,000 Mineral...)" class="w-full rounded bg-black/35 border border-orange-500/20 p-3 text-slate-200 focus:border-orange-500 outline-none mono text-xs"></textarea>
+      <textarea id="paste-stock-input" rows="8" placeholder="Paste in-game inventory text here (e.g. Tritanium 500,000 Mineral...)" class="field-line w-full p-3 text-slate-200 mono text-xs"></textarea>
       <div class="flex justify-between items-center pt-2">
         <button onclick="clearUserStock()" class="rounded px-3 py-1.5 font-bold transition" style="background:rgba(var(--red-rgb),0.18); color:var(--red);">
           Clear All Stock
@@ -590,11 +593,11 @@
        serially blocking each download on the previous script finishing, while still guaranteeing
        they execute in this exact order once parsing completes - same behavior, faster to get there. -->
   <script src="eve_db.js?v=16.0.0" defer></script>
-  <script src="js/config.js?v=15.2.0" defer></script>
-  <script src="js/esi.js?v=15.4.0" defer></script>
+  <script src="js/config.js?v=15.3.0" defer></script>
+  <script src="js/esi.js?v=15.5.0" defer></script>
   <script src="js/tree.js?v=15.1.0" defer></script>
-  <script src="js/optimizers.js?v=15.2.0" defer></script>
-  <script src="js/app.js?v=15.17.0" defer></script>
+  <script src="js/optimizers.js?v=15.3.0" defer></script>
+  <script src="js/app.js?v=15.18.0" defer></script>
   <script src="js/custom-select.js?v=1.2.0" defer></script>
 </body>
 </html>
