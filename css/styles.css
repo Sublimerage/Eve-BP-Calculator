@@ -957,8 +957,101 @@ body.page-calc {
 }
 
 body.page-calc {
-  background: radial-gradient(ellipse 1000px 560px at 50% -10%, rgba(157,225,55,.1), transparent 60%), #08090a;
+  background: radial-gradient(ellipse 1000px 560px at 50% -10%, rgba(var(--accent-rgb),.1), transparent 60%), #08090a;
 }
+
+/* ============================================================
+   Selectable color themes - swap ONLY --accent/--accent-2/--accent-rgb and the --copper-* ramp
+   (which the entire orange/amber Tailwind-utility compat layer above already reads from), so this
+   list stays short by design: everything that currently renders in copper/lime already re-skins
+   for free through that existing chain (including the header brand chips and, via .theme-unify,
+   the ledger/invention pages' purple badges - both already resolve through these same tokens).
+   --green/--red/--blue intentionally do NOT vary by theme - they're semantic (profit/loss, buy vs
+   build), not brand color, and staying constant is what makes them readable as "always means the
+   same thing" regardless of which theme is active. Selector is [data-theme] on <html> (not a class
+   on <body>) so a tiny inline script in <head> can set it before first paint, avoiding a flash of
+   the default theme while the deferred scripts are still loading.
+   ============================================================ */
+/* Every non-default theme also resets --green/--red back to a genuine green/red (the base :root's
+   values) - the default Lime theme deliberately unifies --green with --accent since lime IS a shade
+   of green (see the comment on body.page-calc above), but that unification doesn't hold for these
+   themes' accent hues, so left alone it would leak through as "profit is always lime-green" no
+   matter which accent color is picked - exactly the kind of stray meaning drift these three-var
+   overrides exist to prevent. */
+html[data-theme="copper"] body.page-calc {
+  --accent: #d3915a; --accent-2: #a86336; --accent-rgb: 211,145,90;
+  --copper-100: #f3ddc7; --copper-200: #ecc9a3; --copper-300: #e3b17d; --copper-400: #d3915a;
+  --copper-500: #d3915a; --copper-600: #b97847; --copper-700: #a86336; --copper-800: #855231;
+  --copper-900: #5f3a22; --copper-950: #3d2515;
+  --green: #4cc491; --green-rgb: 76,196,145;
+  --green-300: #a3e8cb; --green-400: #4cc491; --green-500: #3fae7c; --green-600: #349a6c; --green-700: #2b7f59; --green-800: #235f45;
+  --red: #dd6b64; --red-rgb: 221,107,100;
+  --red-300: #f0b3ae; --red-400: #dd6b64; --red-500: #cf5a53;
+}
+/* A genuine cyan/teal, deliberately NOT reusing --blue's exact periwinkle value - index.html reads
+   --blue directly (not through theme-unify) as the functional "buy mode" node color, so an accent
+   that exactly matched it would flatten that distinction into the general UI chrome on this theme. */
+html[data-theme="cyan"] body.page-calc {
+  --accent: #22c3d4; --accent-2: #1a96a3; --accent-rgb: 34,195,212;
+  --copper-100: #c9f2f5; --copper-200: #a3e8ec; --copper-300: #6dd8e0; --copper-400: #3cc7d1;
+  --copper-500: #22c3d4; --copper-600: #1aa3b2; --copper-700: #158490; --copper-800: #106670;
+  --copper-900: #0b474e; --copper-950: #072e33;
+  --green: #4cc491; --green-rgb: 76,196,145;
+  --green-300: #a3e8cb; --green-400: #4cc491; --green-500: #3fae7c; --green-600: #349a6c; --green-700: #2b7f59; --green-800: #235f45;
+  --red: #dd6b64; --red-rgb: 221,107,100;
+  --red-300: #f0b3ae; --red-400: #dd6b64; --red-500: #cf5a53;
+}
+/* Same reasoning as Cyan above, applied to --violet (index.html's "reaction mode" node color) - a
+   more saturated blue-violet instead of reusing --violet's exact softer tone. */
+html[data-theme="violet"] body.page-calc {
+  --accent: #a374e0; --accent-2: #7c4fc4; --accent-rgb: 163,116,224;
+  --copper-100: #ede3fa; --copper-200: #ddc9f5; --copper-300: #c9a8ee; --copper-400: #b58ce5;
+  --copper-500: #a374e0; --copper-600: #8f5cd0; --copper-700: #7c4fc4; --copper-800: #603a9e;
+  --copper-900: #452a73; --copper-950: #2e1c4d;
+  --green: #4cc491; --green-rgb: 76,196,145;
+  --green-300: #a3e8cb; --green-400: #4cc491; --green-500: #3fae7c; --green-600: #349a6c; --green-700: #2b7f59; --green-800: #235f45;
+  --red: #dd6b64; --red-rgb: 221,107,100;
+  --red-300: #f0b3ae; --red-400: #dd6b64; --red-500: #cf5a53;
+}
+
+/* Theme picker: a small icon-btn trigger + popover of swatches, same spot in the header on all
+   three pages (right before the SSO login button). */
+.theme-menu-wrap { position: relative; }
+.theme-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  background: #0d0f11;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--glass-shadow);
+  padding: 8px;
+  display: flex;
+  gap: 6px;
+}
+.theme-menu.hidden { display: none; }
+.theme-swatch {
+  width: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 4px;
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+.theme-swatch:hover { background: rgba(255,255,255,0.06); }
+.theme-swatch.is-active { border-color: var(--accent); background: rgba(var(--accent-rgb),0.12); }
+.theme-swatch-dot {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.theme-swatch-label { font-size: 9px; font-weight: 700; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.04em; }
+.theme-swatch.is-active .theme-swatch-label { color: var(--text); }
 
 /* .theme-unify (ledger.html, invention.html): redirect the entire violet and blue ramps onto the
    lime accent ramp. Per-tool violet/cyan identity (purple logo badge, "Copy Multibuy", cyan
