@@ -10,7 +10,7 @@
 <title>EVE Deep-Industry Engine</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d3915a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='5' r='2.6'/%3E%3Ccircle cx='6' cy='18.5' r='2.6'/%3E%3Ccircle cx='12' cy='18.5' r='2.6'/%3E%3Ccircle cx='18' cy='18.5' r='2.6'/%3E%3Cpath d='M12 7.6v2.6M12 10.2L6 15.9M12 10.2v5.7M12 10.2l6 5.7'/%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.12.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.13.0">
 </head>
 <body class="page-calc flex flex-col min-h-screen text-slate-200">
 
@@ -405,8 +405,6 @@
           <span class="group-open:rotate-90 transition-transform" style="color:var(--text-mute);">▶</span>
         </summary>
         <div class="pt-2.5 space-y-2.5">
-          <button id="deduct-stock-mode" value="true" onclick="toggleDeductStockButton(this, 'recalculate')" class="btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5" title="Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead">✔ Deducting Stock</button>
-
           <div class="flex items-center gap-3">
             <label class="flex items-center gap-1 cursor-pointer font-bold text-[11px] mono" style="color:var(--text-soft);">
               <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5" style="accent-color:var(--accent);">
@@ -425,6 +423,20 @@
           </select>
         </div>
       </details>
+
+      <!-- Sidebar BOM Filter controls -->
+      <div class="lp-row space-y-2.5 flex flex-col">
+        <button id="deduct-stock-mode" value="true" onclick="toggleDeductStockButton(this, 'recalculate')" class="btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5" title="Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead">✔ Deducting Stock</button>
+        <!-- Order Type Strategy Filter -->
+        <div class="flex items-center justify-between text-[11px] mono">
+          <span class="font-bold" style="color:var(--text-mute);">Order Type:</span>
+          <div class="flex gap-1">
+            <button onclick="setBOMOrderFilter('all')" id="btn-bom-order-all" class="lp-pill active" style="padding:5px 12px;">All</button>
+            <button onclick="setBOMOrderFilter('buy')" id="btn-bom-order-buy" class="lp-pill" style="padding:5px 12px;">Buy</button>
+            <button onclick="setBOMOrderFilter('sell')" id="btn-bom-order-sell" class="lp-pill" style="padding:5px 12px;">Sell</button>
+          </div>
+        </div>
+      </div>
 
       <!-- BOM Items List -->
       <div id="bom-items-list" class="lp-row flex-1 min-h-0 overflow-y-auto space-y-2 text-xs" style="margin-bottom:0;">
@@ -567,7 +579,7 @@
   <script src="js/esi.js?v=15.3.0"></script>
   <script src="js/tree.js?v=15.1.0"></script>
   <script src="js/optimizers.js?v=15.2.0"></script>
-  <script src="js/app.js?v=15.14.0"></script>
+  <script src="js/app.js?v=15.15.0"></script>
   <script src="js/custom-select.js?v=1.1.0"></script>
 </body>
 </html>
