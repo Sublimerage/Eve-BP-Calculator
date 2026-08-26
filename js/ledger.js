@@ -213,6 +213,7 @@ function renderJournalPage() {
     item.lineCost = item.unitPrice * netMissing;
     aggregatedMissingCost += item.lineCost;
     const unitVolume = (window.EVE_VOLUMES && window.EVE_VOLUMES[item.typeId]) || 0;
+    item.lineVolume = unitVolume * netMissing;
     totalMaterialsVolume += unitVolume * item.totalQtyNeeded;
   });
 
@@ -885,7 +886,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
               ${strategyBadge}
               ${statusBadge}
             </div>
-            ${item.netMissingQty > 0 ? `<div class="text-xs mono mt-1.5" style="color:var(--text-mute);">Qty: ${item.netMissingQty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK</div>` : ''}
+            ${item.netMissingQty > 0 ? `<div class="text-xs mono mt-1.5" style="color:var(--text-mute);">Qty: ${item.netMissingQty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK${item.lineVolume > 0 ? ` &bull; ${item.lineVolume.toLocaleString(undefined, {maximumFractionDigits: 1})} m3` : ''}</div>` : ''}
           </div>
         </div>
       </div>

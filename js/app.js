@@ -655,16 +655,20 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
         ? `<span class="text-xs font-bold text-emerald-300 bg-emerald-950/50 border border-emerald-600/50 rounded-full px-1.5 py-0.5 flex-shrink-0" title="Current stock covers ${r.buildableRuns.toLocaleString()} full run${r.buildableRuns > 1 ? 's' : ''}">✔ ${r.buildableRuns.toLocaleString()} run${r.buildableRuns > 1 ? 's' : ''}</span>`
         : `<span class="text-xs font-bold text-orange-300 bg-orange-950/50 border border-orange-600/50 rounded-full px-1.5 py-0.5 flex-shrink-0" title="Not enough stock for even 1 run right now">⚠ 0 runs</span>`;
     }
+    // Source ("Personal"/"Corp") and run count sit inline with the name now, not on their own
+    // text row below - keeps each card to a slimmer two-line footprint instead of three.
+    const sourceBadge = `<span class="text-[10px] font-semibold text-slate-500 flex-shrink-0">${window.esc(bp.source)}</span>`;
+    const runsBadge = !isOriginal ? `<span class="text-[10px] font-semibold text-slate-500 flex-shrink-0">&bull; Runs: ${bp.runs}</span>` : '';
+
     return `
-      <div class="rounded-lg bg-black/20 border border-orange-500/20 hover:border-orange-500 p-2.5 transition space-y-2">
-        <div class="flex items-center gap-2 min-w-0">
+      <div class="rounded-lg bg-black/20 border border-orange-500/20 hover:border-orange-500 p-2.5 transition space-y-1.5">
+        <div class="flex items-center gap-1.5 min-w-0">
           <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded-md border border-white/10 bg-black/40 flex-shrink-0" loading="lazy" title="${isOriginal ? 'Blueprint Original (BPO)' : 'Blueprint Copy (BPC)'}">
-          <span class="font-bold text-slate-200 min-w-0">${window.esc(name)}</span>
-          ${stackBadge}${readinessBadge}
+          <span class="font-bold text-slate-200 truncate">${window.esc(name)}</span>
+          ${sourceBadge}${runsBadge}${stackBadge}${readinessBadge}
         </div>
         <div class="flex items-center justify-between gap-3">
           <div class="text-[10px] text-slate-500 truncate flex items-center gap-1.5 min-w-0">
-            <span class="flex-shrink-0">${bp.source}${!isOriginal ? ` • Runs: ${bp.runs}` : ''}</span>
             ${containerBadge}${stationBadge}
           </div>
           <div class="flex items-center gap-2 flex-shrink-0">
