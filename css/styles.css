@@ -969,6 +969,13 @@ body.page-calc .lp-badge {
 }
 body.page-calc .lp-badge-accent { background: rgba(var(--accent-rgb),0.18); color: var(--accent); }
 body.page-calc .lp-badge-danger { background: rgba(var(--red-rgb),0.18); color: var(--red); }
+/* Order-type (BUY/SELL) badges need two genuinely different colors, not two shades of the same
+   accent - a hardcoded blue rather than the --blue/--buy tokens, since theme-unify (ledger/
+   invention) redirects both of those onto --accent for the rest of the UI and would make this
+   badge collapse back to solid green there too. Buy stays lime (.lp-badge-accent) to match the
+   existing buy/sell toggle buttons, where buy is already the highlighted "usually more
+   profitable" choice; sell gets this blue so the two are distinguishable at a glance. */
+body.page-calc .lp-badge-blue { background: rgba(106,152,222,0.18); color: #6a98de; }
 body.page-calc .lp-pill {
   display: inline-flex;
   align-items: center;
