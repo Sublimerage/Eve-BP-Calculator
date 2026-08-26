@@ -143,6 +143,11 @@ document.addEventListener('keydown', (e) => {
   const pasteModal = document.getElementById('paste-modal');
   if (pasteModal && !pasteModal.classList.contains('hidden')) {
     if (typeof window.closePasteModal === 'function') window.closePasteModal();
+    return;
+  }
+  const controlFlyout = document.getElementById('control-flyout');
+  if (controlFlyout && controlFlyout.classList.contains('open')) {
+    if (typeof window.closeFlyoutPanel === 'function') window.closeFlyoutPanel();
   }
 });
 

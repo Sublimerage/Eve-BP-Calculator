@@ -2636,52 +2636,48 @@ function getNodeStrategyOnly(node) {
 }
 
 // --- Icon rail flyout navigation ---
-// Fixed order matching the icon rail's own top-to-bottom order - flyouts always stack in this
-// relative order regardless of the sequence they were opened in.
-const FLYOUT_ORDER = ['search', 'build', 'optimize', 'structure', 'taxes', 'contract', 'markets'];
+// Single-panel model: exactly one of these sections is ever shown at a time, inside the one
+// #control-flyout panel, switched by clicking its icon-rail tab. Replaced the old model where each
+// icon opened its OWN independent floating popover (any combination of which could be open at
+// once, JS-stacked top-to-bottom by measuring each one's height every time) - that let the sidebar
+// turn into an unpredictable pile of separately-shaped boxes; this can't, by construction.
+const FLYOUT_TITLES = {
+  pricing: 'Pricing',
+  build: 'Build & Optimize',
+  structure: 'System & Structure',
+  fees: 'Taxes & Fees',
+  markets: 'Markets'
+};
 
-function layoutAllFlyouts() {
-  const gap = 10;
-  const openFlyouts = FLYOUT_ORDER
-    .map(id => document.getElementById(`flyout-${id}`))
-    .filter(f => f && f.classList.contains('open'));
-
-  // Read pass: measure every open flyout's height first, before writing any styles - avoids
-  // forcing a synchronous reflow on every iteration (each flyout has its own backdrop-filter
-  // blur, which makes forced reflows here noticeably more expensive than for plain elements).
-  const heights = openFlyouts.map(f => f.offsetHeight);
-
-  // Write pass: now that every height is already known, apply all position changes without
-  // interleaving any further layout-forcing reads.
-  let currentTop = 12;
-  openFlyouts.forEach((flyout, i) => {
-    flyout.style.transform = 'none';
-    flyout.style.top = `${currentTop}px`;
-    currentTop += heights[i] + gap;
-  });
-}
-window.layoutAllFlyouts = layoutAllFlyouts;
-
-function toggleFlyout(sectionId) {
-  const targetFlyout = document.getElementById(`flyout-${sectionId}`);
+function openFlyoutSection(sectionId) {
+  const panel = document.getElementById('control-flyout');
   const targetBtn = document.getElementById(`icon-btn-${sectionId}`);
-  if (!targetFlyout || !targetBtn) return;
-  const isCurrentlyOpen = targetFlyout.classList.contains('open');
+  const targetSection = document.getElementById(`flyout-${sectionId}`);
+  if (!panel || !targetBtn || !targetSection) return;
 
-  if (isCurrentlyOpen) {
-    targetFlyout.classList.remove('open');
-    targetBtn.classList.remove('icon-rail-btn-active');
-  } else {
-    targetFlyout.classList.add('open');
-    targetBtn.classList.add('icon-rail-btn-active');
+  // Clicking the tab that's already open closes the panel instead of re-opening it - same toggle
+  // behavior the old per-flyout buttons had, just against the one shared panel now.
+  if (panel.classList.contains('open') && targetBtn.classList.contains('icon-rail-btn-active')) {
+    closeFlyoutPanel();
+    return;
   }
 
-  // Re-layout every currently-open flyout together, in fixed order, so opening or closing any
-  // one of them automatically makes room for (or reclaims space from) all the others - nothing
-  // silently refuses to open, and the relative order never changes.
-  layoutAllFlyouts();
+  document.querySelectorAll('#control-sidebar .icon-rail-btn').forEach(b => b.classList.remove('icon-rail-btn-active'));
+  document.querySelectorAll('#control-flyout .flyout-section').forEach(s => s.classList.remove('active'));
+  targetBtn.classList.add('icon-rail-btn-active');
+  targetSection.classList.add('active');
+  const titleEl = document.getElementById('flyout-panel-title');
+  if (titleEl) titleEl.textContent = FLYOUT_TITLES[sectionId] || '';
+  panel.classList.add('open');
 }
-window.toggleFlyout = toggleFlyout;
+window.openFlyoutSection = openFlyoutSection;
+
+function closeFlyoutPanel() {
+  const panel = document.getElementById('control-flyout');
+  if (panel) panel.classList.remove('open');
+  document.querySelectorAll('#control-sidebar .icon-rail-btn').forEach(b => b.classList.remove('icon-rail-btn-active'));
+}
+window.closeFlyoutPanel = closeFlyoutPanel;
 
 function copyMaterialNameToClipboard(event, el, name) {
   if (event) event.stopPropagation();
@@ -2784,7 +2780,6 @@ window.resolveProductIdFromBlueprintNameAsync = resolveProductIdFromBlueprintNam
 // toward the center. A true radial halftone can't be done with repeating CSS patterns alone
 // (they're uniform, not distance-varying), so this computes it directly in JS.
 window.onload = async () => {
-  layoutAllFlyouts();
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
