@@ -1585,12 +1585,14 @@ function collapseAllNodes() {
   }
   walk(window.recipeTreeRoot);
   if (typeof window.recalculate === 'function') window.recalculate();
+  centerOnRootNode();
 }
 window.collapseAllNodes = collapseAllNodes;
 
 function expandAllNodes() {
   window.collapsedInstanceIds.clear();
   if (typeof window.recalculate === 'function') window.recalculate();
+  centerOnRootNode();
 }
 window.expandAllNodes = expandAllNodes;
 
@@ -2167,13 +2169,7 @@ function renderIsolatedDiagram() {
   applyNodeHighlightClasses();
 }
 
-function centerOnSelectedNode() {
-  let targetId = window.isolatedInstanceId || window.selectedInstanceId;
-  
-  if (!targetId && window.recipeTreeRoot) {
-    targetId = window.recipeTreeRoot.instanceId;
-  }
-
+function centerOnInstanceId(targetId) {
   if (!targetId) return;
 
   const card = document.getElementById(`node-card-${targetId}`);
@@ -2206,6 +2202,20 @@ function centerOnSelectedNode() {
 
   card.classList.add('ring-4', 'ring-orange-400');
   setTimeout(() => card.classList.remove('ring-4', 'ring-orange-400'), 800);
+}
+
+function centerOnRootNode() {
+  if (window.recipeTreeRoot) centerOnInstanceId(window.recipeTreeRoot.instanceId);
+}
+
+function centerOnSelectedNode() {
+  let targetId = window.isolatedInstanceId || window.selectedInstanceId;
+
+  if (!targetId && window.recipeTreeRoot) {
+    targetId = window.recipeTreeRoot.instanceId;
+  }
+
+  centerOnInstanceId(targetId);
 }
 
 function drawConnectingLines() {
@@ -2452,33 +2462,35 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
     const row = document.createElement('div');
     row.title = 'Click to find and focus this material in the build diagram';
     row.onclick = () => highlightNodeByTypeId(item.typeId);
+    const strategyBadge = `<span class="lp-badge lp-badge-accent">${item.strategy === 'sell' ? 'SELL' : 'BUY'}</span>`;
 
     if (isCompact) {
-      row.className = 'flex items-center gap-2 py-1.5 border-b border-orange-500/10 hover:bg-orange-500/10 cursor-pointer transition';
+      row.className = 'lp-list-item cursor-pointer';
+      row.style.cssText = 'padding-left:0; padding-right:0;';
       row.innerHTML = `
         <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
-        <span class="text-[9px] px-1 font-bold mono flex-shrink-0 ${item.strategy === 'sell' ? 'bg-orange-900/60 text-orange-300' : 'bg-[rgba(79,168,224,0.15)] text-[#a8d4f0]'}">${item.strategy === 'sell' ? 'SELL' : 'BUY'}</span>
-        <span class="text-xs font-semibold text-slate-200 truncate flex-1">${item.name}</span>
-        <span class="text-xs mono text-slate-400 flex-shrink-0">&times;${item.qty.toLocaleString()}</span>
-        <span class="text-xs font-bold mono text-orange-400 flex-shrink-0 w-24 text-right">${Math.round(item.lineCost).toLocaleString()} ISK</span>
+        ${strategyBadge}
+        <span class="font-semibold truncate flex-1" style="color:var(--text-soft);">${item.name}</span>
+        <span class="text-xs mono flex-shrink-0" style="color:var(--text-mute);">&times;${item.qty.toLocaleString()}</span>
+        <span class="font-bold mono flex-shrink-0 w-24 text-right" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK</span>
       `;
     } else {
-      row.className = 'bg-black/25 rounded border border-orange-500/20 hover:border-orange-500 hover:bg-orange-500/10 p-2 flex items-center justify-between cursor-pointer transition shadow-sm';
+      row.className = 'lp-card p-2.5 cursor-pointer transition';
       row.innerHTML = `
-        <div class="flex items-center space-x-2.5 min-w-0">
-          <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-7 h-7 rounded-md border border-white/10 bg-black/40 flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
+        <div class="flex items-start gap-2.5">
+          <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           <div class="min-w-0 flex-1">
-            <div class="font-semibold text-slate-200 truncate flex items-center gap-1.5">
-              <span class="truncate">${item.name}</span>
-              <span class="text-[9px] px-1 font-bold mono ${item.strategy === 'sell' ? 'bg-orange-900/60 text-orange-300' : 'bg-[rgba(79,168,224,0.15)] text-[#a8d4f0]'}">
-                ${item.strategy === 'sell' ? 'SELL' : 'BUY'}
-              </span>
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-semibold truncate" style="color:var(--text-soft);">${item.name}</span>
+              <span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK</span>
             </div>
-            <div class="text-[10px] text-slate-400 mono font-semibold">Qty: ${item.qty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK${item.lineVolume > 0 ? ` &bull; ${item.lineVolume.toLocaleString(undefined, {maximumFractionDigits: 1})} m3` : ''}</div>
+            <div class="flex items-center gap-1 mt-1.5">
+              ${strategyBadge}
+            </div>
+            <div class="text-xs mono mt-1.5" style="color:var(--text-mute);">
+              Qty: ${item.qty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK${item.lineVolume > 0 ? ` &bull; ${item.lineVolume.toLocaleString(undefined, {maximumFractionDigits: 1})} m3` : ''}
+            </div>
           </div>
-        </div>
-        <div class="text-right mono font-bold text-orange-400 flex-shrink-0 ml-2">
-          ${Math.round(item.lineCost).toLocaleString()} ISK
         </div>
       `;
     }
@@ -2642,6 +2654,7 @@ function resetPanZoom() {
   window.panY = 0;
   updateTransform();
   drawConnectingLines();
+  centerOnRootNode();
 }
 
 window.addCurrentJobToLedger = addCurrentJobToLedger;
@@ -2657,6 +2670,7 @@ window.exitIsolation = exitIsolation;
 window.onNodeClick = onNodeClick;
 window.highlightNodeByTypeId = highlightNodeByTypeId;
 window.centerOnSelectedNode = centerOnSelectedNode;
+window.centerOnRootNode = centerOnRootNode;
 window.resetPanZoom = resetPanZoom;
 window.copyMultibuyText = copyMultibuyText;
 window.resolveProductIdFromBlueprintNameAsync = resolveProductIdFromBlueprintNameAsync;
