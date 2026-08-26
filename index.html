@@ -10,7 +10,7 @@
 <title>EVE Deep-Industry Engine</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d3915a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='5' r='2.6'/%3E%3Ccircle cx='6' cy='18.5' r='2.6'/%3E%3Ccircle cx='12' cy='18.5' r='2.6'/%3E%3Ccircle cx='18' cy='18.5' r='2.6'/%3E%3Cpath d='M12 7.6v2.6M12 10.2L6 15.9M12 10.2v5.7M12 10.2l6 5.7'/%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.14.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.15.0">
 </head>
 <body class="page-calc flex flex-col min-h-screen text-slate-200">
 
@@ -492,26 +492,26 @@
           </div>
           <div class="flex items-center justify-between">
             <button onclick="loadBlueprintBrowserData(true)" class="btn-glass btn-glass-muted px-2.5 py-1.5 text-[10px]">Refresh</button>
-            <label class="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-400 font-bold">
-              <input type="checkbox" id="blueprint-stack-toggle" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
-              Stack identical
+            <label class="pill-check">
+              <input type="checkbox" id="blueprint-stack-toggle" checked onchange="filterBlueprintBrowser()">
+              <span class="pill-check-face">Stack identical</span>
             </label>
           </div>
           <div class="flex items-center gap-2">
-            <label class="flex items-center gap-1 cursor-pointer text-slate-200 font-bold text-[11px] mono">
-              <input type="checkbox" id="blueprint-use-char" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
-              <span>Pers</span>
+            <label class="pill-check">
+              <input type="checkbox" id="blueprint-use-char" checked onchange="filterBlueprintBrowser()">
+              <span class="pill-check-face"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>Personal</span>
             </label>
-            <label class="flex items-center gap-1 cursor-pointer text-slate-200 font-bold text-[11px] mono">
-              <input type="checkbox" id="blueprint-use-corp" checked onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-cyan-500">
-              <span>Corp</span>
+            <label class="pill-check">
+              <input type="checkbox" id="blueprint-use-corp" checked onchange="filterBlueprintBrowser()">
+              <span class="pill-check-face"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V7a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v14"/><path d="M12 11h6a1 1 0 0 1 1 1v9"/><line x1="8" y1="9" x2="8" y2="9.01"/><line x1="8" y1="13" x2="8" y2="13.01"/><line x1="8" y1="17" x2="8" y2="17.01"/><line x1="16" y1="15" x2="16" y2="15.01"/><line x1="16" y1="19" x2="16" y2="19.01"/></svg>Corp</span>
             </label>
           </div>
           <div class="flex items-center gap-2">
             <button id="blueprint-scan-btn" onclick="scanBlueprintProfits()" class="btn-glass flex-1 px-2.5 py-1.5 text-[10px]" title="Computes manufacturing profit for every visible blueprint using its real owned ME/TE/runs - can take a while for large collections">Scan Profit</button>
-            <label class="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-400 font-bold flex-shrink-0">
-              <input type="checkbox" id="blueprint-sort-by-profit" onchange="filterBlueprintBrowser()" class="w-3.5 h-3.5 accent-purple-500">
-              Sort
+            <label class="pill-check flex-shrink-0">
+              <input type="checkbox" id="blueprint-sort-by-profit" onchange="filterBlueprintBrowser()">
+              <span class="pill-check-face">Sort</span>
             </label>
           </div>
           <div>
@@ -591,7 +591,7 @@
   <script src="js/esi.js?v=15.4.0"></script>
   <script src="js/tree.js?v=15.1.0"></script>
   <script src="js/optimizers.js?v=15.2.0"></script>
-  <script src="js/app.js?v=15.16.0"></script>
+  <script src="js/app.js?v=15.17.0"></script>
   <script src="js/custom-select.js?v=1.2.0"></script>
 </body>
 </html>
