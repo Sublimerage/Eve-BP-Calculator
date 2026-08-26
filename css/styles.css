@@ -438,9 +438,13 @@ nav.primary-tabs { display: flex; align-items: center; gap: 4px; height: 100%; }
   background: rgba(var(--accent-rgb),0.08);
   border-color: rgba(var(--accent-rgb),0.18);
 }
+/* Unlike nav-tab-active (coal-neutral by design - see that rule's own comment), the rail's active
+   tab IS accent-tinted: with only one flyout panel able to be open at a time now, this is the one
+   visual link telling you which of the five icons the panel on its right belongs to, not a
+   "you are here" navigation cue - a real functional reason to spend the accent color here. */
 .icon-rail-btn-active {
-  background: rgba(255,255,255,0.08);
-  border-color: rgba(255,255,255,0.14);
+  background: rgba(var(--accent-rgb),0.16);
+  border-color: rgba(var(--accent-rgb),0.4);
 }
 /* Base resting state must come BEFORE the -active overrides below - both are two-class
    descendant selectors of equal specificity, so whichever is later in the file wins regardless
@@ -460,35 +464,84 @@ nav.primary-tabs { display: flex; align-items: center; gap: 4px; height: 100%; }
   color: var(--text-mute);
   font-weight: 600;
 }
-.icon-rail-btn-active svg { stroke: var(--text); }
-.icon-rail-btn-active .icon-label { color: var(--text); }
+.icon-rail-btn-active svg { stroke: var(--accent); }
+.icon-rail-btn-active .icon-label { color: var(--accent); }
 .icon-rail-btn:hover svg { stroke: var(--accent); }
 .icon-rail-btn:hover .icon-label { color: var(--accent); }
 
 svg[viewBox] { stroke: currentColor; }
 
+/* Single inspector panel (see the HTML comment on #control-sidebar for why this replaced the old
+   N-independent-popovers model): one fixed anchor point instead of a runtime-computed stacking
+   position, a real header (icon-rail's active tab name + close button) that stays put while the
+   body scrolls independently, and exactly one .flyout-section visible inside it at a time. */
 .flyout-panel {
   display: none;
   position: absolute;
   left: 88px;
-  /* top is set at runtime by layoutAllFlyouts() in app.js, which stacks multiple simultaneously-
-     open flyouts one under another starting at 12px - do not fight that here with a fixed value,
-     it would just make several open flyouts overlap each other instead. The real conflict this
-     used to have with the viewport's own floating control bar is fixed by moving that control
-     bar to the bottom of the viewport instead (see #viewport > .absolute below). */
-  max-height: 85vh;
-  overflow-y: auto;
+  top: 12px;
+  max-height: min(640px, calc(100vh - 140px));
   width: 340px;
   border-radius: var(--radius-panel);
   z-index: 100;
   padding: 14px 16px;
+  flex-direction: column;
 }
-.flyout-panel.open { display: block; }
+.flyout-panel.open { display: flex; }
+
+.flyout-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.flyout-panel-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+}
+.flyout-panel-close {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-mute);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.flyout-panel-close svg { width: 13px; height: 13px; stroke: currentColor; }
+.flyout-panel-close:hover { color: var(--text); background: rgba(255,255,255,0.08); }
+
+.flyout-panel-body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.flyout-section { display: none; }
+.flyout-section.active { display: block; }
+
+/* One shared vocabulary for every field group across all five sections, replacing what used to be
+   a different one-off spacing/label pattern per flyout (uppercase tracked-wide divs in Structure/
+   Markets, plain unlabeled rows in Pricing, bold colored spans in Taxes/Contract). */
+.fo-group + .fo-group { margin-top: 14px; }
+.fo-group-label { display: block; margin-bottom: 6px; }
+.fo-inline-label { color: var(--text-soft); flex-shrink: 0; }
+.fo-inline-suffix { color: var(--text-mute); flex-shrink: 0; }
 
 .flyout-panel input, .flyout-panel select {
   border-radius: var(--radius-input) !important;
   background: rgba(0,0,0,0.28) !important;
   border-color: var(--glass-border) !important;
+  color: var(--text) !important;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .flyout-panel input:focus, .flyout-panel select:focus {
