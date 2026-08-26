@@ -1,0 +1,1330 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+/* Readability fix for high-DPI/4K displays: Tailwind's default text-* utility classes (text-xs,
+   text-sm, text-base, etc.) are rem-based, so scaling the root font-size scales all of them
+   proportionally in one place. Does NOT affect classes using literal pixel values like
+   text-[10px] - those are intentionally absolute and stay fixed size. */
+html {
+  font-size: 118%;
+}
+
+/* ============================================================
+   Design tokens - "dark luxury glass" language: layered translucent panels over a softly-lit
+   graphite backdrop, one warm copper accent, cool blue/violet reserved for secondary meaning
+   (buy vs build, per-tool identity), green/red for profit/loss. Depth comes from blur + a
+   brighter top edge catching light + a soft shadow, not from clip-path or neon glow brackets.
+   ============================================================ */
+:root {
+  --bg-0: #0a0a0b;
+  --text: #e9e9ea;
+  --text-soft: #a3a3a7;
+  --text-mute: #6b6b70;
+
+  --accent: #d3915a;
+  --accent-2: #a86336;
+  --accent-rgb: 211,145,90;
+
+  --blue: #6a98de;
+  --blue-rgb: 106,152,222;
+  --buy: #6a98de;
+  --buy-rgb: 106,152,222;
+
+  --violet: #9a86d6;
+  --violet-rgb: 154,134,214;
+
+  --green: #4cc491;
+  --green-rgb: 76,196,145;
+
+  --red: #dd6b64;
+  --red-rgb: 221,107,100;
+
+  /* Cost - a distinct warm gold, separate from --accent/--green, so "this is money going out" never
+     reads the same as "this is profit/positive" at a glance. */
+  --cost: #d9b84a;
+  --cost-rgb: 217,184,74;
+
+  /* Copper ramp (replaces Tailwind's orange/amber) */
+  --copper-100: #f3ddc7;
+  --copper-200: #ecc9a3;
+  --copper-300: #e3b17d;
+  --copper-400: #d3915a;
+  --copper-500: #d3915a;
+  --copper-600: #b97847;
+  --copper-700: #a86336;
+  --copper-800: #855231;
+  --copper-900: #5f3a22;
+  --copper-950: #3d2515;
+
+  /* Blue ramp (replaces Tailwind's cyan) */
+  --blue-300: #b7d3f5;
+  --blue-400: #8bb3ea;
+  --blue-500: #6a98de;
+  --blue-600: #5483c9;
+  --blue-700: #3f6cb0;
+  --blue-800: #345a8f;
+  --blue-900: #2a4670;
+
+  /* Violet ramp (replaces Tailwind's purple) */
+  --violet-100: #ded7f7;
+  --violet-300: #c3b4ef;
+  --violet-400: #a98fe4;
+  --violet-500: #9a86d6;
+  --violet-600: #8a72c9;
+  --violet-700: #7a5fb8;
+  --violet-800: #6a4fa3;
+
+  /* Green ramp (profit) */
+  --green-300: #a3e8cb;
+  --green-400: #4cc491;
+  --green-500: #3fae7c;
+  --green-600: #349a6c;
+  --green-700: #2b7f59;
+  --green-800: #235f45;
+
+  /* Red ramp (loss) */
+  --red-300: #f0b3ae;
+  --red-400: #dd6b64;
+  --red-500: #cf5a53;
+
+  /* Glass surface - matches the approved mockup exactly: a near-transparent WHITE sheen (not an
+     opaque brown "surface color") over backdrop blur, so the page's own colorful background
+     shows through tinted. This is the actual glass material - do not reintroduce an opaque
+     backing color here, that defeats the whole effect. */
+  --glass-fill: linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.013) 60%);
+  --glass-border: rgba(255,255,255,0.09);
+  --glass-border-top: rgba(255,255,255,0.18);
+  /* Kept tight on purpose: panels sit only 12-14px apart, and the old 40px blur radius bled
+     well past that gap, smearing a visible shadow seam across the top of the next panel down
+     instead of a clean gap between two independent rounded rectangles. */
+  --glass-shadow: 0 3px 12px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
+  --blur: 22px;
+
+  --radius-sm: 7px;
+  --radius-btn: 9px;
+  --radius-panel: 14px;
+  --radius-card: 16px;
+  --radius-pill: 999px;
+  --radius-input: 7px;
+}
+
+/* Page composition: a padded canvas with floating rounded glass panels and visible gaps between
+   them (header, stat strip, icon rail, viewport, BOM sidebar), not edge-to-edge toolbar chrome -
+   that gap + rounded-corner language is what actually reads as "glass" rather than a flat reskin. */
+body {
+  background:
+    radial-gradient(ellipse 1100px 700px at 10% -10%, rgba(var(--accent-rgb),0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 900px 750px at 95% 12%, rgba(var(--violet-rgb),0.05) 0%, transparent 60%),
+    var(--bg-0);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 28px;
+  gap: 12px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ensure inputs, textareas, and designated text sections are freely highlightable and copyable */
+input, textarea, select, [contenteditable="true"], .mono, aside, .selectable {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+/* .mono is applied throughout the app to every ISK/quantity/percentage value - repointed to a
+   monospace built for data (tabular figures) instead of the old sci-fi display font. .rajdhani
+   is the heading/wordmark hook - repointed to Inter with tight tracking instead of a wide
+   uppercase tech-font look. */
+.mono { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+.rajdhani { font-family: 'Inter', sans-serif; font-weight: 600; letter-spacing: -0.005em; }
+
+.section-label {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+#viewport {
+  cursor: grab;
+  overflow: hidden;
+  position: relative;
+}
+
+#pan-zoom-content {
+  transform-origin: 0 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+#tree-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+img {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+.diagram-node {
+  z-index: 2;
+  position: relative;
+  cursor: pointer;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+.diagram-node:hover {
+  transform: translateY(-2px);
+}
+
+/* Prefixed with .diagram-node (always present alongside these on tree cards) so specificity
+   (0,0,2,0) reliably beats the .shadow-lg/.shadow-2xl compat-layer mapping the same cards also
+   carry - both were single-class selectors of equal specificity before, so source order alone
+   decided the tie and the compat layer (declared later in the file) was silently winning,
+   flattening this glow back to a plain shadow no matter which node was selected. */
+.diagram-node.node-selected {
+  border-color: var(--green) !important;
+  box-shadow: var(--glass-shadow), 0 0 0 1px rgba(var(--green-rgb),0.4), 0 0 22px rgba(var(--green-rgb),0.35) !important;
+  opacity: 1 !important;
+}
+.diagram-node.node-child-highlight {
+  border-color: var(--green) !important;
+  box-shadow: var(--glass-shadow), 0 0 14px rgba(var(--green-rgb),0.25) !important;
+  opacity: 1 !important;
+}
+.diagram-node.node-parent-highlight {
+  border-color: var(--accent) !important;
+  box-shadow: var(--glass-shadow), 0 0 16px rgba(var(--accent-rgb),0.35) !important;
+  opacity: 1 !important;
+}
+.diagram-node.node-dimmed {
+  opacity: 0.25 !important;
+}
+
+.ring-4 { animation: pulse-ring 0.8s ease-out; }
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0px rgba(var(--accent-rgb), 0.8); }
+  100% { box-shadow: 0 0 0 15px rgba(var(--accent-rgb), 0); }
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--glass-border) transparent;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--glass-border-top); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* ============================================================
+   Glass surface - ONE material, applied everywhere (header, icon rail, flyout panels, BOM
+   sidebar, drawers, modals, AND tree node cards), exactly matching the approved mockup's single
+   .glass class: translucent white sheen + real backdrop blur + edge-lit border + soft shadow.
+   Every one of these gets backdrop-filter - do not split cards out onto a blur-less variant,
+   that was the earlier mistake that produced the flat "opaque brown card" look.
+   ============================================================ */
+.glass-card, .glass-panel, header, .icon-rail, .flyout-panel, #status-badge,
+#blueprint-browser-drawer, #paste-modal > div, .stat-strip, #bom-sidebar, #history-drawer,
+#invention-sidebar, #viewport, #journal-main-area, #invention-main-area, #viewport-hint {
+  background: var(--glass-fill);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  border: 1px solid var(--glass-border);
+  border-top-color: var(--glass-border-top);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--glass-shadow);
+}
+.glass-card { border-radius: var(--radius-card); }
+header { height: 56px; flex-shrink: 0; }
+
+/* Same soft-tint treatment as .btn-glass-muted - a fully transparent resting state (the original
+   design here) is too easy to miss against the dark background, same problem those toolbar buttons
+   had. A faint permanent lime wash makes them read as clickable controls at a glance. */
+.icon-btn {
+  width: 30px; height: 30px; border-radius: var(--radius-btn);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--accent); border: 1px solid rgba(var(--accent-rgb),0.35);
+  background: rgba(var(--accent-rgb),0.16);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.icon-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
+.icon-btn:hover { color: var(--accent); background: rgba(var(--accent-rgb),0.28); border-color: rgba(var(--accent-rgb),0.55); }
+
+/* ===== Header global search (index.html) ===== */
+/* Fixed width regardless of title text length ("DEEP-INDUSTRY" vs "EVE INDUSTRY LEDGER" vs
+   "INVENTION CALCULATOR") so nav-tabs, glued directly after this block, lands at the identical X
+   position on all three pages. */
+.header-brand { width: 232px; }
+.header-search-wrap { position: relative; flex: 1 1 auto; min-width: 140px; max-width: 460px; }
+/* This is the primary action of the whole page (search for the item to build), so unlike
+   .field-line's "nothing until you interact" rule, it carries a persistent lime tint at rest -
+   the same soft-tint language as .icon-btn/.btn-glass-muted - so it visibly reads as THE thing to
+   click, not just another quiet field in the header row. */
+.header-search-input {
+  width: 100%;
+  background: rgba(var(--accent-rgb),0.07);
+  border: 1.5px solid rgba(var(--accent-rgb),0.3);
+  border-radius: var(--radius-btn);
+  padding: 8px 12px 8px 34px;
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: 'IBM Plex Mono', monospace;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.header-search-input::placeholder { color: var(--text-soft); }
+.header-search-input:hover { border-color: rgba(var(--accent-rgb),0.45); background: rgba(var(--accent-rgb),0.1); }
+.header-search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.18); background: rgba(var(--accent-rgb),0.11); }
+.header-search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--accent); pointer-events: none; }
+
+/* ===== Pilot identity badge (replaces the SSO login button once authenticated - shared by all
+   three pages via esi.js's updateEsiUserUI()) ===== */
+.pilot-badge {
+  display: flex; align-items: center; gap: 9px;
+  padding: 5px 10px 5px 5px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--glass-border);
+}
+.pilot-portrait { width: 28px; height: 28px; border-radius: 50%; border: 1px solid rgba(var(--accent-rgb),0.4); flex-shrink: 0; display: block; }
+.pilot-meta { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.pilot-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+.pilot-corp { font-size: 10.5px; color: var(--accent); font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
+.pilot-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px rgba(var(--accent-rgb),0.7); flex-shrink: 0; }
+.pilot-logout {
+  color: var(--text-mute); display: flex; align-items: center; justify-content: center;
+  margin-left: 2px; flex-shrink: 0; background: none; border: none; cursor: pointer;
+  padding: 2px; transition: color 0.15s ease;
+}
+.pilot-logout:hover { color: var(--red); }
+/* The blueprint browser is a full-height edge-attached drawer (native-panel pattern), so it
+   stays flush and square against the right edge rather than floating with rounded corners. */
+#blueprint-browser-drawer { border-radius: 0; border-right: none; border-top: none; border-bottom: none; }
+/* Everything else floats with a margin from the viewport edge (see body padding), so it keeps
+   full rounded corners on every side. The history drawer is fixed-positioned, so its inset needs
+   to match the page padding explicitly rather than relying on flow layout. */
+#history-drawer { position: fixed; left: 28px; right: 28px; bottom: 28px; width: auto; }
+
+/* ===== Buttons ===== */
+.btn-glass {
+  border-radius: var(--radius-btn);
+  border: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb),0.3);
+  color: #201206;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+.btn-glass:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 8px 22px rgba(var(--accent-rgb),0.4);
+}
+.btn-glass:active { transform: translateY(1px); }
+/* Soft-tint secondary button - a translucent wash of the accent color instead of either the fully
+   transparent/gray treatment (too invisible against a dark background to register as clickable) or
+   the solid gradient fill (too loud to use on more than one or two true primary actions per view).
+   Same visual weight as .lp-badge-accent ("Built" on job cards) so secondary actions still read as
+   on-brand and clickable without competing with the actual primary action for attention. */
+.btn-glass-muted {
+  background: rgba(var(--accent-rgb),0.14);
+  border: 1px solid rgba(var(--accent-rgb),0.25);
+  box-shadow: none;
+  color: var(--accent);
+}
+.btn-glass-muted:hover {
+  background: rgba(var(--accent-rgb),0.22);
+  border-color: rgba(var(--accent-rgb),0.4);
+  color: var(--accent);
+}
+
+/* ===== Header nav tabs (Calculator / Ledger / Invention cross-links) ===== */
+nav.primary-tabs { display: flex; align-items: center; gap: 4px; height: 100%; }
+.nav-tab {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius-btn);
+  font-size: 12.5px; font-weight: 500;
+  color: var(--text-mute);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+.nav-tab:hover { color: var(--text-soft); }
+.nav-tab svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; flex-shrink: 0; }
+/* Coal-neutral: selection/navigation state reads as plain lifted gray, not tinted with the
+   accent - accent color is reserved for the brand mark and true primary actions (see .btn-glass),
+   not sprinkled onto every "this is selected" state. Same treatment regardless of which page's
+   tab is active - the per-page brand color still shows up in the header's logo mark. */
+.nav-tab-active, .nav-tab-active-violet {
+  color: var(--text) !important;
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.12);
+}
+
+/* ===== Stat strip (replaces the old grid-of-boxed-cards summary bar) ===== */
+.stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+}
+.stat {
+  padding: 11px 20px;
+  border-right: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  min-width: 150px;
+  flex: 1;
+}
+.stat:last-child { border-right: none; }
+.stat-label { font-size: 10.5px; color: var(--text-mute); letter-spacing: 0.03em; text-transform: uppercase; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat-value { font-size: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat-sub { font-size: 10.5px; color: var(--text-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ============================================================
+   Icon rail navigation
+   ============================================================ */
+.content-row { gap: 12px; }
+
+.icon-rail {
+  width: 80px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px 0;
+  flex-shrink: 0;
+  position: relative;
+}
+.icon-rail-btn {
+  width: 58px;
+  height: 58px;
+  border-radius: 11px;
+  background: transparent;
+  border: 1px solid transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+}
+.icon-rail-btn:hover {
+  background: rgba(var(--accent-rgb),0.08);
+  border-color: rgba(var(--accent-rgb),0.18);
+}
+.icon-rail-btn-active {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.14);
+}
+/* Base resting state must come BEFORE the -active overrides below - both are two-class
+   descendant selectors of equal specificity, so whichever is later in the file wins regardless
+   of which one is semantically "more specific". Previously -active was declared first here and
+   silently lost to these, leaving the active rail icon stuck at the resting gray color. */
+.icon-rail-btn svg {
+  width: 19px;
+  height: 19px;
+  stroke: var(--text-mute);
+  transition: stroke 0.2s ease;
+}
+.icon-rail-btn .icon-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 8.5px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  font-weight: 600;
+}
+.icon-rail-btn-active svg { stroke: var(--text); }
+.icon-rail-btn-active .icon-label { color: var(--text); }
+.icon-rail-btn:hover svg { stroke: var(--accent); }
+.icon-rail-btn:hover .icon-label { color: var(--accent); }
+
+svg[viewBox] { stroke: currentColor; }
+
+.flyout-panel {
+  display: none;
+  position: absolute;
+  left: 88px;
+  /* top is set at runtime by layoutAllFlyouts() in app.js, which stacks multiple simultaneously-
+     open flyouts one under another starting at 12px - do not fight that here with a fixed value,
+     it would just make several open flyouts overlap each other instead. The real conflict this
+     used to have with the viewport's own floating control bar is fixed by moving that control
+     bar to the bottom of the viewport instead (see #viewport > .absolute below). */
+  max-height: 85vh;
+  overflow-y: auto;
+  width: 340px;
+  border-radius: var(--radius-panel);
+  z-index: 100;
+  padding: 14px 16px;
+}
+.flyout-panel.open { display: block; }
+
+.flyout-panel input, .flyout-panel select {
+  border-radius: var(--radius-input) !important;
+  background: rgba(0,0,0,0.28) !important;
+  border-color: var(--glass-border) !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.flyout-panel input:focus, .flyout-panel select:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.18);
+}
+
+select option { background-color: #191411; color: var(--text); padding: 6px 10px; }
+select option:checked, select option:hover { background-color: var(--accent); color: #201206; }
+
+/* Custom dropdown (js/custom-select.js): the native <option> popup only lets CSS touch background-
+   color/color/padding - the popup frame (border, radius, shadow) is OS chrome and can't be themed,
+   which is why the rules above alone can never make it "fit the design". js/custom-select.js hides
+   the real <select> (kept for value/onchange wiring) and stands up this fully-themed replacement
+   next to it - one component, so every dropdown across all three pages looks the same. */
+.csel-native-hidden {
+  position: absolute !important;
+  width: 1px !important; height: 1px !important;
+  opacity: 0 !important; pointer-events: none !important;
+  overflow: hidden !important;
+}
+.csel-trigger {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(255,255,255,0.035) !important;
+  border: none !important;
+  border-bottom: 1.5px solid rgba(255,255,255,0.08) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 6px 10px !important;
+  color: var(--text) !important;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.csel-trigger:hover { background: rgba(255,255,255,0.06) !important; }
+.csel-trigger.is-open, .csel-trigger:focus-visible {
+  border-bottom-color: var(--accent) !important;
+  background: rgba(255,255,255,0.06) !important;
+}
+.csel-trigger[disabled] { opacity: 0.5; cursor: not-allowed; }
+.csel-trigger-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.csel-trigger-chevron {
+  flex-shrink: 0; width: 13px; height: 13px;
+  stroke: var(--text-soft);
+  transition: transform 0.15s ease, stroke 0.15s ease;
+}
+.csel-trigger.is-open .csel-trigger-chevron { transform: rotate(180deg); stroke: var(--accent); }
+
+.csel-panel {
+  position: fixed;
+  z-index: 9999;
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--glass-shadow);
+  padding: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.csel-panel.is-open { opacity: 1; transform: translateY(0); }
+.csel-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.csel-option:hover { background: rgba(var(--accent-rgb),0.14); color: var(--accent); }
+.csel-option.is-selected { color: var(--accent); font-weight: 600; }
+.csel-option[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+.csel-empty { padding: 10px; font-size: 12px; font-style: italic; text-align: center; color: var(--text-mute); }
+
+/* Toast notifications (js/config.js showToast()) - a real on-screen signal for failures that
+   previously only hit the console or, worse, got overwritten by a false success message. */
+#toast-stack {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  max-width: 360px;
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-left: 3px solid var(--text-mute);
+  border-radius: var(--radius-card);
+  box-shadow: var(--glass-shadow);
+  padding: 11px 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text);
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  opacity: 0;
+  transform: translateX(16px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.toast.is-visible { opacity: 1; transform: translateX(0); }
+.toast-icon { flex-shrink: 0; width: 15px; height: 15px; margin-top: 1px; stroke: currentColor; fill: none; }
+.toast-error { border-left-color: var(--red); }
+.toast-error .toast-icon { color: var(--red); }
+.toast-success { border-left-color: var(--accent); }
+.toast-success .toast-icon { color: var(--accent); }
+.toast-message { flex: 1; min-width: 0; }
+.toast-close {
+  flex-shrink: 0;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-mute);
+}
+.toast-close:hover { color: var(--text); }
+
+/* Pill-styled checkbox (Personal/Corp asset-source toggles, used site-wide) - a real <input
+   type="checkbox"> drives it so every existing onchange="applyStockLocationFilter()"/checked read
+   keeps working untouched, but it's visually hidden and a sibling face is styled off its :checked
+   state instead of the native square-box look. */
+body.page-calc .pill-check {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+body.page-calc .pill-check input {
+  position: absolute;
+  width: 1px; height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+body.page-calc .pill-check-face {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-mute);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+body.page-calc .pill-check-face svg { width: 12px; height: 12px; stroke: currentColor; fill: none; flex-shrink: 0; }
+body.page-calc .pill-check:hover .pill-check-face { background: rgba(255,255,255,0.1); color: var(--text); }
+body.page-calc .pill-check input:checked + .pill-check-face {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #0a1002;
+}
+body.page-calc .pill-check input:focus-visible + .pill-check-face {
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb),0.4);
+}
+/* Keyboard focus ring for the rest of the interactive vocabulary - .field-line/.csel-trigger/
+   .pill-check already got one when they were built, but the original buttons/pills/nav tabs only
+   ever styled :hover, so tabbing through them fell back to the browser default (or nothing). */
+body.page-calc .btn-glass:focus-visible,
+body.page-calc .icon-btn:focus-visible,
+body.page-calc .icon-rail-btn:focus-visible,
+body.page-calc .nav-tab:focus-visible,
+body.page-calc .lp-pill:focus-visible,
+body.page-calc .lp-chip-btn:focus-visible,
+body.page-calc .toggle-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb),0.45);
+}
+/* Same custom chevron the ledger/invention selects use, generalized so index.html's differently-
+   styled selects (bg-black/*+border, not .field-line) get the same "obviously a dropdown" cue -
+   :not([size]) excludes true multi-row listboxes like the blueprint location filter, which are
+   always fully expanded already and don't need a "click to open" affordance. This rule is
+   deliberately lower-specificity than the theme-unify select.field-line rules, so it only fills
+   the gap on pages/selects that don't already have the fuller treatment. */
+body.page-calc select:not([size]) {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ba0a8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 13px;
+  padding-right: 28px !important;
+  cursor: pointer;
+}
+/* .flyout-panel select's own background rule uses the shorthand with !important, which resets
+   background-image back to none and wins over the rule above on specificity - restate the chevron
+   as !important here (higher specificity than that rule too) so flyout selects keep it. */
+body.page-calc .flyout-panel select:not([size]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ba0a8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 8px center !important;
+  background-size: 13px !important;
+}
+
+.seg-bar { display: flex; gap: 2px; height: 5px; }
+.seg-bar > div { flex: 1; background: var(--glass-border-top); border-radius: 1px; }
+.seg-bar > div.filled { background: var(--accent); }
+
+.toggle-btn {
+  border-radius: var(--radius-pill);
+  padding: 5px 10px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 11px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+  border: 1px solid var(--glass-border);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-soft);
+}
+.toggle-btn svg { width: 13px; height: 13px; stroke: currentColor; flex-shrink: 0; }
+.toggle-btn:hover { background: rgba(255,255,255,0.08); border-color: var(--glass-border-top); color: var(--text); }
+.toggle-btn-active-accent {
+  background: linear-gradient(160deg, rgba(var(--accent-rgb),0.22), rgba(var(--accent-rgb),0.06));
+  border-color: rgba(var(--accent-rgb),0.4);
+  color: var(--copper-200);
+}
+.toggle-btn-active-buy {
+  background: linear-gradient(160deg, rgba(var(--buy-rgb),0.22), rgba(var(--buy-rgb),0.06));
+  border-color: rgba(var(--buy-rgb),0.4);
+  color: var(--blue-300);
+}
+
+/* ============================================================
+   Compatibility layer - JS-generated markup (tree node cards, ledger job cards, invention
+   comparison rows, BOM lists) is built in app.js/ledger.js/invention.js/esi.js as plain Tailwind
+   utility classes, ~400 occurrences across 5 files. Rather than hand-editing every template
+   string, every Tailwind class those templates already use is redirected here onto the design
+   tokens above - colors, corner radius, and shadow all flow through automatically. Attribute
+   "contains" selectors ([class*="..."]) catch every opacity-suffixed variant (e.g. bg-green-600
+   AND bg-green-600/80) in one rule without needing to enumerate each exact alpha used.
+   ============================================================ */
+
+/* ---- shape: radius + shadow utilities used throughout static HTML and JS templates ---- */
+.rounded { border-radius: var(--radius-sm) !important; }
+.rounded-md { border-radius: var(--radius-btn) !important; }
+.rounded-lg { border-radius: var(--radius-panel) !important; }
+.rounded-xl { border-radius: var(--radius-card) !important; }
+.rounded-b-md { border-radius: 0 0 var(--radius-btn) var(--radius-btn) !important; }
+.shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl {
+  box-shadow: var(--glass-shadow) !important;
+}
+
+/* ---- copper (orange/amber) - coal-neutral rule: copper is reserved for actual button fills
+   (bg-orange-*) and nothing else. Text and borders that used to carry a permanent copper tint
+   (section labels, panel borders, badges) go neutral gray instead - that permanent tinting
+   everywhere was exactly the "leftover orange clutter" that needed to go. Hover states keep a
+   light touch of accent since that's transient interaction feedback, not standing chrome. ---- */
+.text-orange-100, .text-amber-100 { color: var(--text) !important; }
+.text-orange-200, .text-amber-200 { color: var(--text) !important; }
+.text-orange-300, .text-amber-300 { color: var(--text-soft) !important; }
+.text-orange-400, .text-amber-400 { color: var(--text-soft) !important; }
+.bg-orange-400, .bg-amber-400 { background: var(--copper-400) !important; }
+.bg-orange-500, [class^="bg-orange-500/"], [class*=" bg-orange-500/"] {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
+}
+[class*="hover:bg-orange-500/"]:hover { background: rgba(var(--accent-rgb),0.16) !important; }
+.border-orange-500, [class^="border-orange-500/"], [class*=" border-orange-500/"] { border-color: var(--glass-border) !important; }
+[class*="hover:border-orange-500"]:hover { border-color: rgba(var(--accent-rgb),0.5) !important; }
+.bg-orange-600 { background: var(--copper-600) !important; }
+[class*="hover:bg-orange-600"]:hover { background: var(--copper-500) !important; }
+.border-orange-600, [class^="border-orange-600/"], [class*=" border-orange-600/"] { border-color: var(--glass-border) !important; }
+.bg-orange-700, .bg-amber-700 { background: var(--copper-700) !important; }
+[class*="hover:bg-orange-700"]:hover, [class*="hover:bg-amber-600"]:hover { background: var(--copper-600) !important; }
+.border-orange-700, [class^="border-orange-700/"], [class*=" border-orange-700/"] { border-color: var(--glass-border) !important; }
+.bg-orange-800 { background: var(--copper-800) !important; }
+[class*="hover:bg-orange-800"]:hover { background: var(--copper-700) !important; }
+.bg-orange-900, [class^="bg-orange-900/"], [class*=" bg-orange-900/"] { background: rgba(255,255,255,0.08) !important; }
+.bg-orange-950, [class^="bg-orange-950/"], [class*=" bg-orange-950/"] { background: rgba(255,255,255,0.06) !important; }
+.border-amber-500, [class^="border-amber-500/"], [class*=" border-amber-500/"] { border-color: var(--glass-border) !important; }
+[class^="border-amber-600/"], [class*=" border-amber-600/"] { border-color: var(--glass-border) !important; }
+[class*="hover:border-amber-400"]:hover { border-color: rgba(var(--accent-rgb),0.5) !important; }
+.bg-amber-900, [class^="bg-amber-900/"], [class*=" bg-amber-900/"] { background: rgba(255,255,255,0.08) !important; }
+.bg-amber-950, [class^="bg-amber-950/"], [class*=" bg-amber-950/"] { background: rgba(255,255,255,0.06) !important; }
+[class*="ring-orange-400"] { --tw-ring-color: rgba(var(--accent-rgb),0.7) !important; }
+.accent-purple-500 { accent-color: var(--violet) !important; }
+.accent-cyan-500 { accent-color: var(--blue) !important; }
+/* focus:border-* variants aren't caught by the static class selectors above (Tailwind's CDN
+   engine generates its own raw-color :focus rule for these, injected after this stylesheet, so
+   it was winning and showing a literal un-migrated orange/cyan/purple/amber border on focus
+   regardless of page or accent color). */
+[class*="focus:border-orange-500"]:focus { border-color: var(--accent) !important; }
+[class*="focus:border-amber-500"]:focus { border-color: var(--accent) !important; }
+[class*="focus:border-cyan-500"]:focus { border-color: var(--blue) !important; }
+[class*="focus:border-purple-500"]:focus { border-color: var(--violet) !important; }
+
+/* ---- blue (cyan) ---- */
+.text-cyan-100 { color: #dbe8fb !important; }
+.text-cyan-200 { color: var(--blue-300) !important; }
+.text-cyan-300 { color: var(--blue-300) !important; }
+.text-cyan-400 { color: var(--blue-400) !important; }
+.bg-cyan-700, [class^="bg-cyan-700/"], [class*=" bg-cyan-700/"] { background: linear-gradient(135deg, var(--blue-500), var(--blue-700)) !important; }
+[class*="hover:bg-cyan-600"]:hover { background: var(--blue-500) !important; }
+[class*="hover:bg-cyan-700"]:hover { background: var(--blue-600) !important; }
+.bg-cyan-800 { background: var(--blue-700) !important; }
+.bg-cyan-900, [class^="bg-cyan-900/"], [class*=" bg-cyan-900/"] { background: rgba(var(--blue-rgb),0.6) !important; }
+.bg-cyan-950, [class^="bg-cyan-950/"], [class*=" bg-cyan-950/"] { background: rgba(var(--blue-rgb),0.32) !important; }
+.border-cyan-400, .border-cyan-500, [class^="border-cyan-400/"], [class*=" border-cyan-400/"], [class^="border-cyan-500/"], [class*=" border-cyan-500/"] { border-color: rgba(var(--blue-rgb),0.5) !important; }
+.border-cyan-600, [class^="border-cyan-600/"], [class*=" border-cyan-600/"] { border-color: rgba(var(--blue-rgb),0.4) !important; }
+[class*="ring-cyan-400"] { --tw-ring-color: rgba(var(--blue-rgb),0.7) !important; }
+
+/* ---- violet (purple) ---- */
+.text-purple-100 { color: var(--violet-100) !important; }
+.text-purple-300 { color: var(--violet-300) !important; }
+.text-purple-400 { color: var(--violet-400) !important; }
+[class*="hover:text-purple-200"]:hover, [class*="hover:text-purple-300"]:hover { color: var(--violet-300) !important; }
+.bg-purple-500, .bg-purple-600, [class^="bg-purple-600/"], [class*=" bg-purple-600/"] { background: linear-gradient(135deg, var(--violet-500), var(--violet-700)) !important; }
+[class*="hover:bg-purple-500"]:hover { background: var(--violet-400) !important; }
+[class*="hover:bg-purple-600"]:hover { background: var(--violet-500) !important; }
+.bg-purple-700, [class^="bg-purple-700/"], [class*=" bg-purple-700/"] { background: var(--violet-600) !important; }
+[class*="hover:bg-purple-700"]:hover { background: var(--violet-500) !important; }
+.bg-purple-800, [class^="bg-purple-800/"], [class*=" bg-purple-800/"] { background: var(--violet-700) !important; }
+[class*="hover:bg-purple-800"]:hover { background: var(--violet-600) !important; }
+.bg-purple-950, [class^="bg-purple-950/"], [class*=" bg-purple-950/"] { background: rgba(var(--violet-rgb),0.42) !important; }
+.border-purple-500, [class^="border-purple-500/"], [class*=" border-purple-500/"] { border-color: rgba(var(--violet-rgb),0.45) !important; }
+.border-purple-600, [class^="border-purple-600/"], [class*=" border-purple-600/"] { border-color: rgba(var(--violet-rgb),0.35) !important; }
+.border-purple-800, [class^="border-purple-800/"], [class*=" border-purple-800/"] { border-color: rgba(var(--violet-rgb),0.4) !important; }
+[class*="hover:border-purple-500"]:hover { border-color: rgba(var(--violet-rgb),0.5) !important; }
+
+/* ---- green (profit) ---- */
+.text-green-300 { color: var(--green-300) !important; }
+.text-green-400 { color: var(--green-400) !important; }
+.bg-green-400 { background: var(--green-400) !important; }
+.bg-green-600 { background: var(--green-600) !important; }
+.bg-green-700, [class^="bg-green-700/"], [class*=" bg-green-700/"] { background: var(--green-700) !important; }
+.bg-green-800, [class^="bg-green-800/"], [class*=" bg-green-800/"] { background: var(--green-700) !important; }
+[class*="hover:bg-green-700"]:hover { background: var(--green-600) !important; }
+.bg-green-950, [class^="bg-green-950/"], [class*=" bg-green-950/"] { background: rgba(var(--green-rgb),0.28) !important; }
+.border-green-500, [class^="border-green-500/"], [class*=" border-green-500/"] { border-color: rgba(var(--green-rgb),0.5) !important; }
+.border-green-600, [class^="border-green-600/"], [class*=" border-green-600/"] { border-color: rgba(var(--green-rgb),0.4) !important; }
+.border-green-700, [class^="border-green-700/"], [class*=" border-green-700/"] { border-color: rgba(var(--green-rgb),0.4) !important; }
+[class*="hover:border-green-400"]:hover, [class*="hover:border-green-500"]:hover { border-color: var(--green-400) !important; }
+
+/* ---- red (loss / destructive) ---- */
+.text-red-300 { color: var(--red-300) !important; }
+.text-red-400 { color: var(--red-400) !important; }
+.text-red-500 { color: var(--red-500) !important; }
+[class*="hover:text-red-300"]:hover, [class*="hover:text-red-400"]:hover { color: var(--red-400) !important; }
+.bg-red-500 { background: var(--red-500) !important; }
+.bg-red-800, [class^="bg-red-800/"], [class*=" bg-red-800/"] { background: #8f3a35 !important; }
+.bg-red-950, [class^="bg-red-950/"], [class*=" bg-red-950/"] { background: rgba(var(--red-rgb),0.32) !important; }
+[class*="hover:bg-red-800"]:hover { background: #a3423c !important; }
+.border-red-800, [class^="border-red-800/"], [class*=" border-red-800/"] { border-color: rgba(var(--red-rgb),0.45) !important; }
+
+/* ---- emerald (aliased to the green ramp) ---- */
+.text-emerald-300 { color: var(--green-300) !important; }
+.bg-emerald-700, [class^="bg-emerald-700/"], [class*=" bg-emerald-700/"] { background: var(--green-700) !important; }
+[class*="hover:bg-emerald-600"]:hover { background: var(--green-600) !important; }
+.bg-emerald-950, [class^="bg-emerald-950/"], [class*=" bg-emerald-950/"] { background: rgba(var(--green-rgb),0.35) !important; }
+.border-emerald-600, [class^="border-emerald-600/"], [class*=" border-emerald-600/"] { border-color: rgba(var(--green-rgb),0.4) !important; }
+
+/* ---- literal bg-[#hex]/border-[#hex] classes from the pre-redesign palette (index.html /
+   ledger.html / invention.html static shells) ---- */
+[class*="bg-[#3a4a4c]"] { background: rgba(255,255,255,0.12) !important; }
+[class*="bg-[#202a2e]"] { background: var(--glass-fill) !important; }
+[class*="bg-[#0a0d0e]"] { background: var(--glass-fill) !important; }
+[class*="bg-[#030405]"] { background: rgba(0,0,0,0.45) !important; }
+[class*="bg-[#070b0f]"] { background: var(--bg-0) !important; }
+[class*="bg-[#0c1318]"] { background: var(--glass-fill) !important; }
+[class*="bg-[#0d1922]"] { background: var(--glass-fill) !important; }
+[class*="bg-[#0a0f14]"] { background: transparent !important; }
+[class*="bg-[#05080c]"] { background: rgba(0,0,0,0.3) !important; }
+[class*="bg-[#1e3348]"] { background: rgba(255,255,255,0.1) !important; }
+[class*="border-[#1e3348]"] { border-color: var(--glass-border) !important; }
+[class*="divide-[#1e3348]"] > :not([hidden]) ~ :not([hidden]) { border-color: var(--glass-border) !important; }
+[class*="text-[#c8d8e8]"] { color: var(--text-soft) !important; }
+[class*="border-[#3a3025]"] { border-color: var(--glass-border) !important; }
+[class*="bg-[#0d2818]"] { background: rgba(var(--green-rgb),0.24) !important; }
+[class*="text-[#e85555]"] { color: var(--red) !important; }
+[class*="text-[#a8d4f0]"] { color: var(--blue-300) !important; }
+
+/* ============================================================
+   Foxstock-derived "gradient bento" system, scoped to body.page-calc - applied to all three pages
+   (the class name is a holdover from when this started as an index.html-only experiment; it now
+   just means "the current site theme", not "calculator page"). The coal-neutral rules above this
+   block are effectively the pre-Foxstock default and stay in the cascade as a fallback for any
+   page/element that doesn't carry .page-calc.
+   Palette: near-black canvas + one lime-green accent used the way Foxstock uses it - brand mark,
+   primary actions, "up"/profit, and node highlight all read off the same color - plus coral for
+   "down"/loss. Cards drop the translucent blur+border in favor of a subtle diagonal gradient fill
+   and zero border ("treatment B", chosen from a 9-way card-frame comparison) - depth comes from
+   the fill plus a soft drop shadow only, no glass sheen. Because nearly everything below (tree
+   node cards, BOM sidebar, flyouts, stat tiles, and the compat layer's orange/green/red remaps)
+   reads its colors and shape off the custom-property tokens set here, redefining the tokens
+   re-skins almost the whole page for free - only the genuinely structural differences (stat tiles
+   as separate cards instead of one divided strip, header/icon-rail going chrome-less, the tree
+   diagram's own canvas becoming the hero surface instead of a flat tile with a watermark) need
+   their own rules below.
+   ============================================================ */
+body.page-calc {
+  --bg-0: #08090a;
+  --text: #f2f3f5;
+  --text-soft: #9ba0a8;
+  --text-mute: #6b7078;
+
+  /* Lime ramp dimmed from the original neon peak (was #c8ff4d, 100% saturation/65% lightness) to a
+     calmer #9de137 (74%/55%) - same hue, still unmistakably "lime", but no longer bright enough to
+     read as a highlighter under low ambient light. One ramp, referenced by --accent/--green/--copper
+     alike so dimming it here re-dims the whole app. */
+  --accent: #9de137;
+  --accent-2: #6fa919;
+  --accent-rgb: 157,225,55;
+
+  --green: #9de137;
+  --green-rgb: 157,225,55;
+  --green-300: #c2ec83; --green-400: #9de137; --green-500: #87cc1e;
+  --green-600: #6fa919; --green-700: #588514; --green-800: #43660f;
+
+  --red: #e8845a;
+  --red-rgb: 232,132,90;
+  --red-300: #f3c0a8; --red-400: #e8845a; --red-500: #d9713f;
+
+  --copper-100: #e9f8d3; --copper-200: #d8f3af; --copper-300: #c2ec83;
+  --copper-400: #9de137; --copper-500: #9de137; --copper-600: #87cc1e;
+  --copper-700: #6fa919; --copper-800: #588514; --copper-900: #43660f; --copper-950: #2f470b;
+
+  --glass-fill: linear-gradient(155deg, #14161a, #0b0c0d);
+  --glass-border: rgba(255,255,255,0.06);
+  --glass-border-top: rgba(255,255,255,0.06);
+  --glass-shadow: 0 14px 32px rgba(0,0,0,0.4);
+  --blur: 0px;
+
+  --radius-sm: 8px;
+  --radius-btn: 10px;
+  --radius-panel: 18px;
+  --radius-card: 20px;
+}
+
+body.page-calc {
+  background: radial-gradient(ellipse 1000px 560px at 50% -10%, rgba(157,225,55,.1), transparent 60%), #08090a;
+}
+
+/* .theme-unify (ledger.html, invention.html): redirect the entire violet and blue ramps onto the
+   lime accent ramp. Per-tool violet/cyan identity (purple logo badge, "Copy Multibuy", cyan
+   checkboxes, etc.) was a deliberate leftover from the pre-Foxstock design, kept on purpose the
+   first time this got ported here - but it's exactly what read as "two designs mixed together"
+   once seen next to the calculator's all-lime language. index.html is NOT in this selector: it
+   still needs real --blue/--violet for buy-mode vs. reaction-mode node accents and the parent-
+   highlight glow, which are functional distinctions, not tool branding. */
+body.page-calc.theme-unify {
+  --violet: var(--accent); --violet-rgb: var(--accent-rgb);
+  --violet-100: var(--copper-100); --violet-300: var(--copper-300); --violet-400: var(--copper-400);
+  --violet-500: var(--copper-500); --violet-600: var(--copper-600); --violet-700: var(--copper-700);
+  --violet-800: var(--copper-800);
+  --blue: var(--accent); --blue-rgb: var(--accent-rgb); --buy: var(--accent); --buy-rgb: var(--accent-rgb);
+  --blue-300: var(--copper-300); --blue-400: var(--copper-400); --blue-500: var(--copper-500);
+  --blue-600: var(--copper-600); --blue-700: var(--copper-700); --blue-800: var(--copper-800);
+  --blue-900: var(--copper-900);
+}
+
+/* FINAL PASS: border-[#1e3348] (and its /NN opacity variants) is the single class ledger.js and
+   invention.js reach for on nearly every input, select, dropdown, and small nested box - 41
+   occurrences across the two pages' markup, none of them removed by the card-level fixes above
+   because those targeted specific wrapper elements, not this one pervasive class. Individually
+   each border was faint, but 41 of them stacked across a form-heavy sidebar is exactly what reads
+   as "still boxy/outlined" - dropping it entirely (border-radius stays wherever already set) is
+   more reliable than continuing to special-case wrappers one at a time. */
+body.page-calc.theme-unify [class*="border-[#1e3348]"] {
+  border-color: transparent !important;
+}
+/* Giving every nested input/select/sub-row div its OWN subtle background (previous attempt: a
+   dark rgba overlay) does not actually reduce visible "boxiness" enough, for two compounding
+   reasons: (1) a rounded rectangle is a geometrically regular shape, and human vision detects its
+   edge readily even at very low color contrast - subtlety alone doesn't stop it reading as "a
+   box"; (2) inputs nested INSIDE an already-darkened row apply their own overlay on top of the
+   row's already-darkened result, so two "identical, subtle" rgba(0,0,0,0.25) values compound into
+   a visibly darker inner rectangle instead of cancelling out - same declared value, different
+   rendered result, because backgrounds composite against whatever is already behind them, not
+   against each other's source values.
+   The actual fix: give these nested elements NO background of their own at all. With nothing to
+   paint, there is no rectangle to perceive - organization comes from spacing and text color only,
+   exactly like the card-level "no border, gradient fill only" treatment used everywhere else, just
+   taken one level further for elements this small. */
+body.page-calc.theme-unify div[class*="bg-[#070b0f]"] {
+  background: transparent !important;
+}
+
+/* ============================================================
+   Ledger/Invention form fields - REBUILT, not patched. Every input/select on these two pages now
+   uses one of exactly two deliberate component classes instead of ad-hoc per-instance Tailwind
+   combos (bg-[#0d1922]/bg-[#070b0f] + border + border-[#1e3348] + rounded), which is what made
+   every previous round of fixes miss instances - there was no single pattern to fix, just dozens
+   of near-identical but not-quite-identical class strings.
+
+   .field-line: dense/secondary fields (tax %, skill level, target BPCs, filter/dropdown selects).
+   A persistent underline, even with no box shape, still read as "a line I didn't ask for" -
+   so now there is NOTHING painted at rest at all: no fill, no border, zero visual difference from
+   plain text. The underline only appears the moment a field is actually focused, as feedback that
+   you're now editing it - not as permanent decoration on every field whether you're using it or
+   not. This is the only way left to guarantee nothing is visible until you interact with it.
+
+   .field-box: the ONE prominent field per page (the item search box) - it's the primary action,
+   so it keeps a soft fill, matching how the calculator treats its own primary search field. */
+body.page-calc .field-line {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1.5px solid transparent !important;
+  border-radius: 0 !important;
+  transition: border-color 0.15s ease;
+}
+body.page-calc .field-line:focus {
+  border-bottom-color: var(--accent) !important;
+  outline: none;
+}
+/* Selects are a different case from text inputs: there's no cursor, no typing affordance, nothing
+   self-evident about them being interactive - the "nothing painted until you interact" rule that's
+   right for text fields just makes a <select> look like inert text. A persistent chevron plus a
+   faint resting fill is the minimum needed to read as "click me to choose", without going back to
+   the old bordered-box look. */
+body.page-calc select.field-line {
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255,255,255,0.035) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ba0a8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") right 6px center / 13px no-repeat !important;
+  border-bottom: 1.5px solid rgba(255,255,255,0.08) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 6px 24px 6px 10px !important;
+  cursor: pointer;
+}
+body.page-calc select.field-line:hover {
+  background-color: rgba(255,255,255,0.06) !important;
+}
+body.page-calc select.field-line:focus {
+  background-color: rgba(255,255,255,0.06) !important;
+  border-bottom-color: var(--accent) !important;
+}
+body.page-calc .field-box {
+  background: rgba(0,0,0,0.25) !important;
+  border: none !important;
+  border-radius: var(--radius-btn) !important;
+  transition: box-shadow 0.15s ease;
+}
+body.page-calc .field-box:focus {
+  box-shadow: 0 0 0 1.5px rgba(var(--accent-rgb),0.55);
+  outline: none;
+}
+
+/* ============================================================
+   Shared component vocabulary (originally built for Ledger + Invention, extended to the whole
+   page-calc family so any page can reuse it) - small set of classes reused everywhere instead of
+   one-off Tailwind combinations. This is the actual fix for "still boxy/still has lines": every
+   card is .glass-card or .lp-card (same gradient-fill, zero-border treatment), every pill/badge/
+   label pulls from here, so there is exactly one visual definition of each component instead of
+   dozens of near-identical hand-written variants to keep in sync across pages. */
+body.page-calc .lp-card {
+  background: var(--glass-fill);
+  border-radius: var(--radius-card);
+  box-shadow: var(--glass-shadow);
+}
+body.page-calc .lp-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+body.page-calc .lp-badge {
+  display: inline-block;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-soft);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 9px;
+  line-height: 1.6;
+}
+body.page-calc .lp-badge-accent { background: rgba(var(--accent-rgb),0.18); color: var(--accent); }
+body.page-calc .lp-badge-danger { background: rgba(var(--red-rgb),0.18); color: var(--red); }
+/* Order-type (BUY/SELL) badges need two genuinely different colors, not two shades of the same
+   accent - a hardcoded blue rather than the --blue/--buy tokens, since theme-unify (ledger/
+   invention) redirects both of those onto --accent for the rest of the UI and would make this
+   badge collapse back to solid green there too. Buy stays lime (.lp-badge-accent) to match the
+   existing buy/sell toggle buttons, where buy is already the highlighted "usually more
+   profitable" choice; sell gets this blue so the two are distinguishable at a glance. */
+body.page-calc .lp-badge-blue { background: rgba(106,152,222,0.18); color: #6a98de; }
+body.page-calc .lp-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+body.page-calc .lp-pill:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+body.page-calc .lp-pill.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #0a1002;
+}
+body.page-calc .lp-row {
+  padding-top: 14px;
+  margin-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+body.page-calc .lp-row:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+body.page-calc .lp-tile {
+  background: var(--glass-fill);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+body.page-calc .lp-list-item {
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  transition: background 0.15s ease;
+}
+body.page-calc .lp-list-item:first-child { border-top: none; }
+body.page-calc a.lp-list-item,
+body.page-calc div.lp-list-item[onmousedown],
+body.page-calc div.lp-list-item[onclick] { cursor: pointer; }
+body.page-calc .lp-list-item:hover { background: rgba(255,255,255,0.05); }
+body.page-calc .lp-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb),0.16);
+  color: var(--accent);
+  border: none;
+  transition: background 0.15s ease;
+  white-space: nowrap;
+}
+body.page-calc .lp-chip-btn svg { width: 11px; height: 11px; stroke: currentColor; fill: none; flex-shrink: 0; }
+body.page-calc .lp-chip-btn:hover { background: rgba(var(--accent-rgb),0.28); }
+body.page-calc .lp-table { width: 100%; border-collapse: collapse; text-align: left; }
+body.page-calc .lp-table th {
+  padding: 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+body.page-calc .lp-table th.sortable { cursor: pointer; user-select: none; }
+body.page-calc .lp-table th.sortable:hover { color: var(--accent); }
+body.page-calc .lp-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+body.page-calc .lp-table tbody tr { transition: background 0.15s ease; }
+body.page-calc .lp-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+body.page-calc .lp-table tr.lp-table-best { background: rgba(var(--accent-rgb),0.08); }
+body.page-calc .lp-divider-col { padding-left: 24px; margin-left: 4px; border-left: 1px solid rgba(255,255,255,0.08); }
+body.page-calc .lp-job-card {
+  background: var(--glass-fill);
+  border-radius: var(--radius-card);
+  border-left: 3px solid transparent;
+  transition: border-color 0.15s ease, background 0.2s ease;
+}
+body.page-calc .lp-job-card.job-ready { border-left-color: var(--accent); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),0.18), 0 0 20px rgba(var(--accent-rgb),0.10); }
+body.page-calc .lp-job-card.job-started { border-left-color: rgba(var(--accent-rgb),0.45); }
+body.page-calc .lp-job-card.job-subbuild { border-left-color: var(--text-mute); }
+body.page-calc .lp-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-btn);
+  background: rgba(255,255,255,0.04);
+}
+body.page-calc .lp-group-header.is-active { background: rgba(var(--accent-rgb),0.12); }
+body.page-calc .lp-inset {
+  background: rgba(0,0,0,0.18);
+  border-radius: var(--radius-btn);
+  padding: 8px 10px;
+}
+body.page-calc .lp-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: var(--radius-btn);
+  background: rgba(255,255,255,0.04);
+}
+body.page-calc .lp-status-row.is-ready { background: rgba(var(--accent-rgb),0.14); }
+
+/* --accent and --green are the same lime hex on this page (Foxstock treats one hero color as
+   both brand accent and "up"/profit), which would otherwise make node-parent-highlight and
+   node-child-highlight glow identically here - reintroducing the two-color distinction the base
+   theme has (copper vs teal) using blue instead, paired with the matching connector-line color
+   app.js draws for "output" connections. */
+body.page-calc .diagram-node.node-parent-highlight {
+  border-color: var(--blue) !important;
+  box-shadow: var(--glass-shadow), 0 0 16px rgba(var(--blue-rgb),0.35) !important;
+}
+
+/* Header + icon rail carry no card chrome of their own - bare wordmark/icons sitting straight on
+   the page canvas, matching Foxstock's minimal top nav rather than another floating panel. */
+body.page-calc header,
+body.page-calc .icon-rail {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Connection status stays a small flat pill, not a full gradient card - it's a one-line badge. */
+body.page-calc #status-badge {
+  background: rgba(255,255,255,0.05) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Dark text only on the solid-lime fill variant - .btn-glass-muted keeps its own lime-on-tint
+   color (set above), since this rule would otherwise win on specificity and force dark text onto
+   a background that's mostly transparent, which would be unreadable. */
+body.page-calc .btn-glass:not(.btn-glass-muted) { color: #0a1002; }
+
+/* Stat strip: the strip itself is just a flex row now - each stat is its own gradient card
+   (the Foxstock mini-card treatment) instead of one long bar cut up with divider lines. */
+body.page-calc .stat-strip {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  gap: 12px;
+}
+body.page-calc .stat {
+  background: var(--glass-fill);
+  border: none;
+  border-right: none;
+  border-radius: var(--radius-card);
+  box-shadow: var(--glass-shadow);
+  padding: 14px 20px;
+}
+
+/* BOM sidebar, flyout panels, and the paste modal: drop the translucent-glass border for pure
+   gradient fill - "treatment B" applied to every floating panel, not just the tree cards. Also
+   kill backdrop-filter outright rather than leaving it at blur(var(--blur)) with --blur:0px -
+   blur(0px) is still a non-"none" filter value, and per spec ANY non-none filter/backdrop-filter
+   establishes a new containing block for position:fixed descendants. That silently turned
+   .flyout-panel into the fixed-positioning origin for the search dropdown instead of the
+   viewport, so JS-computed viewport coordinates landed wildly offset (rendered relative to the
+   flyout's own box, not the page) - the dropdown then fell into the panel's own overflow-y:auto
+   scroll area, which read as "the whole UI became a tiny scrollable page". */
+body.page-calc #bom-sidebar,
+body.page-calc .flyout-panel,
+body.page-calc #paste-modal > div {
+  border: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* Same containing-block fix, without touching border (blueprint-browser-drawer keeps its real
+   left-edge divider; .glass-card keeps its own dedicated border-width rule further down). */
+body.page-calc #blueprint-browser-drawer,
+body.page-calc .glass-card {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Search/system/rig/market dropdown result lists: solid opaque fill instead of the ~25%-opacity
+   black they had (the busy hero viewport behind them was showing straight through, making results
+   hard to read), plus a higher z-index than .flyout-panel so they never render underneath one. */
+body.page-calc [id$="-results"] {
+  background: linear-gradient(155deg, #17191d, #0d0e10) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  border-radius: var(--radius-input);
+  z-index: 500 !important;
+}
+
+/* Tree node cards keep a top-only border whose WIDTH lives here and whose COLOR is set inline
+   per node type in app.js (blue = buy-mode, violet = reaction, accent = batch yield, transparent
+   = default/root) - a colored cap instead of a full outline, so the category cue survives without
+   reintroducing a bordered-card look. */
+body.page-calc .glass-card {
+  border-style: solid !important;
+  border-width: 3px 0 0 0 !important;
+  border-color: transparent !important;
+  border-radius: var(--radius-card) !important;
+}
+
+/* Diagram viewport becomes the hero visualization instead of the flat tile + giant "E" watermark
+   it had before: a near-black surface with a soft lime ambient glow rising from the bottom
+   (echoes the Foxstock hero chart's backdrop) plus a faint dot-grid texture. This is the app's
+   REAL tree diagram getting the hero treatment, not an invented chart - Foxstock's hero is a
+   historical price line and this app has no genuine price history to plot honestly.
+   Ledger's job queue and Invention's comparison table are each their own page's biggest/main
+   content area, same role #viewport plays on the calculator - they get the identical treatment
+   so the signature dot-grid + glow backdrop reads as "this site's look", not "one page's look". */
+body.page-calc #viewport,
+body.page-calc #journal-main-area,
+body.page-calc #invention-main-area {
+  background:
+    radial-gradient(ellipse 1100px 620px at 50% 100%, rgba(157,225,55,.14), transparent 72%),
+    radial-gradient(rgba(157,225,55,.07) 1px, transparent 1.5px) 0 0/20px 20px,
+    #0a0b0a !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+body.page-calc #viewport::before { content: none; }
+
+body.page-calc #viewport-hint {
+  background: rgba(0,0,0,0.45) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* The root card's Net Profit figure - gradient-fill text so it reads as "the number that
+   matters", same treatment Foxstock gives its balance card's revenue figure. */
+body.page-calc .hero-num {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, #fff, #999);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  line-height: 1.15;
+  display: inline-block;
+}
+body.page-calc .hero-num.profit { background: linear-gradient(135deg, #ddffa0, var(--accent)); -webkit-background-clip: text; background-clip: text; }
+body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var(--red)); -webkit-background-clip: text; background-clip: text; }
