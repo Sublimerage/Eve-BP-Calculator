@@ -82,10 +82,16 @@ async function buyAllSubComponents() {
 // --- Action: Reset Smart Buy Override Modes ---
 function resetSmartBuyModes() {
   if (Object.keys(window.customBuyModes || {}).length === 0) return;
-  if (!confirm('Reset every component\'s buy/build override back to default? This can\'t be undone.')) return;
+  const snapshot = { ...window.customBuyModes };
   window.customBuyModes = {};
   if (typeof window.recalculate === 'function') {
     window.recalculate();
+  }
+  if (typeof window.showToast === 'function') {
+    window.showToast('Reset every component\'s buy/build override back to default.', 'info', { action: { label: 'Undo', onClick: () => {
+      window.customBuyModes = snapshot;
+      if (typeof window.recalculate === 'function') window.recalculate();
+    } } });
   }
 }
 

@@ -957,13 +957,23 @@ function closePasteModal() {
 }
 
 function clearUserStock() {
-  if (!confirm('Clear all tracked stock (pasted and fetched)? This can\'t be undone.')) return;
+  const rawAssetItemsSnapshot = window.rawAssetItems.slice();
+  const userStockMapSnapshot = { ...window.userStockMap };
   window.rawAssetItems = window.rawAssetItems.filter(item => item.location_id !== 99999999);
   window.userStockMap = {};
   updateStockDisplayCount();
   populateLocationDropdown();
   if (typeof recalculate === 'function') recalculate();
   closePasteModal();
+  if (typeof window.showToast === 'function') {
+    window.showToast('Cleared all tracked stock.', 'info', { action: { label: 'Undo', onClick: () => {
+      window.rawAssetItems = rawAssetItemsSnapshot;
+      window.userStockMap = userStockMapSnapshot;
+      updateStockDisplayCount();
+      populateLocationDropdown();
+      if (typeof recalculate === 'function') recalculate();
+    } } });
+  }
 }
 
 function processPastedStock() {

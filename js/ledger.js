@@ -375,7 +375,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
           </div>
           <div class="lp-divider-col text-right flex-shrink-0" style="width:260px;" title="Job status">
             ${isTimerBacked
-              ? `<span class="job-timer" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}"><span class="timer-display text-xs font-extrabold mono whitespace-nowrap" style="color:${statusColor};">${statusText}</span></span>`
+              ? `<span class="job-timer" data-job-id="${job.id}" data-job-name="${window.esc(jobDisplayName)}" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}"><span class="timer-display text-xs font-extrabold mono whitespace-nowrap" style="color:${statusColor};">${statusText}</span></span>`
               : `<span class="text-xs font-extrabold mono whitespace-nowrap" style="color:${statusColor};">${statusText}</span>`}
           </div>
           <div class="flex flex-col items-end lp-divider-col flex-shrink-0" style="width:190px;" title="Total manufacturing cost for this job">
@@ -532,7 +532,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
       const ready = remaining <= 0;
       const text = ready ? '✓ READY TO COLLECT!' : `⏱ ${window.formatDuration(Math.ceil(remaining))} remaining`;
       statusBannerHTML = `
-        <div class="job-timer lp-status-row ${ready ? 'is-ready' : ''}" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}">
+        <div class="job-timer lp-status-row ${ready ? 'is-ready' : ''}" data-job-id="${job.id}" data-job-name="${window.esc(job.name)}" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}">
           <span class="text-xs font-bold uppercase tracking-wide flex-shrink-0" style="color:var(--text-soft);">Status:</span>
           <span class="timer-display text-sm font-extrabold mono" style="color:${ready ? 'var(--accent)' : 'var(--blue-300)'};">${text}</span>
         </div>
@@ -952,7 +952,15 @@ window.startJobRuns = startJobRuns;
 // Refreshes only the countdown text on already-rendered timer elements, without a full re-render -
 // keeps started jobs' timers live every second without disturbing anything else on the page (drag
 // state, scroll position, focused inputs, etc).
+// Tracks which jobs a browser notification has already fired for, so a job doesn't notify twice
+// and so a job that was ALREADY ready before this tab was even opened doesn't fire one either -
+// the first tick only seeds this set from whatever's already ready; only jobs that flip to ready
+// on a LATER tick (i.e. actually just finished while this tab was open) trigger a real notification.
+const _notifiedReadyJobIds = new Set();
+let _jobTimerTickCount = 0;
+
 function updateJobTimers() {
+  _jobTimerTickCount++;
   document.querySelectorAll('.job-timer').forEach(el => {
     const startedAt = parseInt(el.dataset.startedAt);
     const totalSeconds = parseFloat(el.dataset.totalSeconds);
@@ -975,6 +983,11 @@ function updateJobTimers() {
         card.classList.remove('job-started');
         card.classList.add('job-ready');
       }
+      const jobId = el.dataset.jobId;
+      if (jobId && !_notifiedReadyJobIds.has(jobId)) {
+        _notifiedReadyJobIds.add(jobId);
+        if (_jobTimerTickCount > 1) notifyJobReady(el.dataset.jobName || 'A job');
+      }
     } else {
       display.textContent = `⏱ ${window.formatDuration(Math.ceil(remaining))} remaining`;
       display.style.color = 'var(--blue-300)';
@@ -985,6 +998,57 @@ if (!window._jobTimerIntervalStarted) {
   window._jobTimerIntervalStarted = true;
   setInterval(updateJobTimers, 1000);
 }
+
+function isJobNotificationsEnabled() {
+  return localStorage.getItem('eve_job_notifications') === 'true' && typeof Notification !== 'undefined' && Notification.permission === 'granted';
+}
+
+function notifyJobReady(jobName) {
+  if (!isJobNotificationsEnabled()) return;
+  try {
+    const n = new Notification('Job Ready to Collect', { body: `${jobName} has finished building.`, tag: 'eve-job-ready-' + jobName });
+    n.onclick = () => { window.focus(); n.close(); };
+  } catch (e) {}
+}
+
+function updateJobNotificationButton() {
+  const btn = document.getElementById('btn-job-notifications');
+  if (!btn) return;
+  const supported = typeof Notification !== 'undefined';
+  const enabled = isJobNotificationsEnabled();
+  btn.className = `btn-glass ${enabled ? '' : 'btn-glass-muted'} px-2.5 py-1 text-[10px] flex items-center gap-1.5`;
+  btn.title = !supported
+    ? 'Your browser does not support notifications'
+    : enabled
+      ? 'Job-ready notifications are on - click to turn off'
+      : 'Get a browser notification when a job finishes building';
+  const label = document.getElementById('btn-job-notifications-label');
+  if (label) label.textContent = enabled ? 'Notify: On' : 'Notify When Ready';
+}
+
+function toggleJobNotifications() {
+  if (typeof Notification === 'undefined') {
+    if (typeof window.showToast === 'function') window.showToast('Your browser does not support notifications.', 'error');
+    return;
+  }
+  if (isJobNotificationsEnabled()) {
+    localStorage.setItem('eve_job_notifications', 'false');
+    updateJobNotificationButton();
+    if (typeof window.showToast === 'function') window.showToast('Job-ready notifications turned off.', 'info');
+    return;
+  }
+  Notification.requestPermission().then(permission => {
+    if (permission === 'granted') {
+      localStorage.setItem('eve_job_notifications', 'true');
+      if (typeof window.showToast === 'function') window.showToast('You\'ll get a notification when a job is ready to collect.', 'success');
+    } else {
+      localStorage.setItem('eve_job_notifications', 'false');
+      if (typeof window.showToast === 'function') window.showToast('Notification permission was not granted.', 'error');
+    }
+    updateJobNotificationButton();
+  });
+}
+window.toggleJobNotifications = toggleJobNotifications;
 
 // Matches real active EVE industry jobs (from ESI) against PENDING ledger jobs, by product + run
 // count, and marks matches as started using the REAL start time and duration EVE calculated - this
@@ -1320,10 +1384,17 @@ function deleteJobFromQueue(jobId) {
   const index = activeJobs.findIndex(j => j && j.id === jobId);
   if (index === -1) return;
   const job = activeJobs[index];
-  if (!confirm(`Remove "${job.name}" from the queue? This can't be undone.`)) return;
   activeJobs.splice(index, 1);
   localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
   renderJournalPage();
+  if (typeof window.showToast === 'function') {
+    window.showToast(`Removed "${job.name}" from the queue.`, 'info', { action: { label: 'Undo', onClick: () => {
+      loadJournalState();
+      activeJobs.splice(index, 0, job);
+      localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
+      renderJournalPage();
+    } } });
+  }
 }
 
 function renderBuildHistoryLedger() {
@@ -1397,18 +1468,32 @@ function deleteHistoryRecord(recordId) {
   const index = buildHistory.findIndex(r => r && r.id === recordId);
   if (index === -1) return;
   const record = buildHistory[index];
-  if (!confirm(`Remove "${record.name}" from build history? This can't be undone.`)) return;
   buildHistory.splice(index, 1);
   localStorage.setItem('eve_ledger_history', JSON.stringify(buildHistory));
   renderJournalPage();
+  if (typeof window.showToast === 'function') {
+    window.showToast(`Removed "${record.name}" from build history.`, 'info', { action: { label: 'Undo', onClick: () => {
+      buildHistory.splice(index, 0, record);
+      localStorage.setItem('eve_ledger_history', JSON.stringify(buildHistory));
+      renderJournalPage();
+    } } });
+  }
 }
 window.deleteHistoryRecord = deleteHistoryRecord;
 
 function clearJournalHistory() {
   if (buildHistory.length === 0) return;
-  if (!confirm(`Clear all ${buildHistory.length.toLocaleString()} completed build history record(s)? This can't be undone.`)) return;
+  const count = buildHistory.length;
+  const snapshot = buildHistory.slice();
   localStorage.removeItem('eve_ledger_history');
   renderJournalPage();
+  if (typeof window.showToast === 'function') {
+    window.showToast(`Cleared ${count.toLocaleString()} build history record(s).`, 'info', { action: { label: 'Undo', onClick: () => {
+      buildHistory = snapshot.slice();
+      localStorage.setItem('eve_ledger_history', JSON.stringify(buildHistory));
+      renderJournalPage();
+    } } });
+  }
 }
 
 let _draggedJobId = null;
@@ -1731,6 +1816,7 @@ window.onload = async () => {
     updateJournalStockCountBadge();
     renderJournalPage();
     applyHistoryDrawerState(getHistoryDrawerState());
+    updateJobNotificationButton();
   } catch (err) {
     console.error("Ledger state load error:", err);
   }

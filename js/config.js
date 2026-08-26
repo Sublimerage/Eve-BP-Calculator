@@ -41,8 +41,12 @@ const TOAST_ICONS = {
   success: '<svg class="toast-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
   info: '<svg class="toast-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
 };
-function showToast(message, type) {
+// options.action = { label, onClick } adds an inline button (e.g. "Undo") - clicking it runs
+// onClick and dismisses the toast; the toast also just times out normally if it's never clicked.
+function showToast(message, type, options) {
   type = (type === 'error' || type === 'success') ? type : 'info';
+  options = options || {};
+  const duration = options.duration || (options.action ? 8000 : 6000);
   let stack = document.getElementById('toast-stack');
   if (!stack) {
     stack = document.createElement('div');
@@ -51,15 +55,22 @@ function showToast(message, type) {
   }
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  toast.innerHTML = `${TOAST_ICONS[type]}<span class="toast-message"></span><button type="button" class="toast-close" aria-label="Dismiss">&#10005;</button>`;
+  const actionHtml = options.action ? `<button type="button" class="toast-action-btn">${window.esc(options.action.label)}</button>` : '';
+  toast.innerHTML = `${TOAST_ICONS[type]}<span class="toast-message"></span>${actionHtml}<button type="button" class="toast-close" aria-label="Dismiss">&#10005;</button>`;
   toast.querySelector('.toast-message').textContent = message;
   toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
+  if (options.action) {
+    toast.querySelector('.toast-action-btn').addEventListener('click', () => {
+      options.action.onClick();
+      toast.remove();
+    });
+  }
   stack.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add('is-visible'));
   setTimeout(() => {
     toast.classList.remove('is-visible');
     setTimeout(() => toast.remove(), 250);
-  }, 6000);
+  }, duration);
 }
 window.showToast = showToast;
 

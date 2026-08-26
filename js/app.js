@@ -831,11 +831,19 @@ function deleteProductionPreset() {
     if (typeof window.showToast === 'function') window.showToast('Select a preset from the dropdown first, then click delete.', 'info');
     return;
   }
-  if (!confirm(`Delete the "${name}" preset? This can't be undone.`)) return;
   const presets = getProductionPresets();
+  const deletedPreset = presets[name];
   delete presets[name];
   localStorage.setItem('eve_production_presets', JSON.stringify(presets));
   renderProductionPresetDropdown();
+  if (typeof window.showToast === 'function') {
+    window.showToast(`Deleted the "${name}" preset.`, 'info', { action: { label: 'Undo', onClick: () => {
+      const currentPresets = getProductionPresets();
+      currentPresets[name] = deletedPreset;
+      localStorage.setItem('eve_production_presets', JSON.stringify(currentPresets));
+      renderProductionPresetDropdown();
+    } } });
+  }
 }
 window.deleteProductionPreset = deleteProductionPreset;
 
@@ -1256,6 +1264,87 @@ document.addEventListener('click', (e) => {
     systemSearchResults.classList.add('hidden');
   }
 });
+
+// Encodes the current build (item, runs, structure, reactions, price mode, system) into a URL so
+// it can be handed to someone else and reopen in the exact same configuration. Deliberately doesn't
+// try to capture per-component ME/TE overrides or individual buy/build choices - just the settings
+// that matter for "here's the build I'm looking at", kept simple enough to fit comfortably in a URL.
+function shareCurrentBuild(event) {
+  if (!window.currentProduct) {
+    if (typeof window.showToast === 'function') window.showToast('Select an item to build first.', 'info');
+    return;
+  }
+  const state = {
+    id: window.currentProduct.id,
+    name: window.currentProduct.name,
+    runs: window.globalRuns || 1,
+    facility: document.getElementById('facility-select')?.value,
+    reactions: document.getElementById('include-reactions')?.value,
+    priceMode: document.getElementById('input-price-mode')?.value,
+    system: document.getElementById('system-search')?.value
+  };
+  const encoded = btoa(encodeURIComponent(JSON.stringify(state)));
+  const url = `${window.location.origin}${window.location.pathname}?build=${encoded}`;
+  const btn = event ? event.currentTarget : null;
+  navigator.clipboard.writeText(url).then(() => {
+    if (typeof window.showToast === 'function') window.showToast('Build link copied to clipboard.', 'success');
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '✔ Copied!';
+      setTimeout(() => { btn.innerHTML = orig; }, 1500);
+    }
+  }).catch(() => {
+    if (typeof window.showToast === 'function') window.showToast('Could not copy the link - your browser may have blocked clipboard access.', 'error');
+  });
+}
+window.shareCurrentBuild = shareCurrentBuild;
+
+// Restores a build shared via shareCurrentBuild() above, if the page loaded with a ?build= param.
+async function applySharedBuildFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const encoded = params.get('build');
+  if (!encoded) return;
+  let state;
+  try {
+    state = JSON.parse(decodeURIComponent(atob(encoded)));
+  } catch (e) {
+    console.warn('Invalid shared build link:', e);
+    return;
+  }
+  if (!state || !state.id || !state.name) return;
+
+  // Settings are applied (and their change events fired) before selectItem() runs, so any handler
+  // that reads them during the build - guarded by "if (currentProduct)" checks - safely no-ops
+  // since currentProduct isn't set yet, instead of firing prematurely against the wrong item.
+  const settingFields = [
+    ['facility-select', state.facility],
+    ['include-reactions', state.reactions],
+    ['input-price-mode', state.priceMode]
+  ];
+  settingFields.forEach(([id, value]) => {
+    if (!value) return;
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = value;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  if (state.system) {
+    const systemInput = document.getElementById('system-search');
+    if (systemInput) systemInput.value = state.system;
+  }
+
+  await window.selectItem(state.id, state.name, false);
+
+  if (state.runs && state.runs > 1) {
+    window.globalRuns = state.runs;
+    if (typeof recalculate === 'function') recalculate();
+  }
+
+  if (typeof window.showToast === 'function') window.showToast(`Loaded shared build: ${state.name}`, 'success');
+  // Strip the param so refreshing doesn't keep re-applying (and re-toasting) the same shared state.
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
+window.applySharedBuildFromUrl = applySharedBuildFromUrl;
 
 async function selectItem(typeId, name, preserveView = false) {
   if (searchInput) searchInput.value = name;
@@ -2714,6 +2803,13 @@ window.onload = async () => {
     updateHeaderLedgerCount(); // Update badge on load!
   } catch (err) {
     console.error("State restoration error:", err);
+  }
+
+  // A shared build link (?build=...) takes priority over whatever was last open locally - applied
+  // after loadSavedState() above so it overrides that restored session instead of the other way
+  // around. No-ops immediately if there's no such param.
+  if (typeof window.applySharedBuildFromUrl === 'function') {
+    window.applySharedBuildFromUrl().catch(err => console.error("Shared build restore error:", err));
   }
 
   // Restore the previously-selected solar system (SCI) - was defined but never called, so the
