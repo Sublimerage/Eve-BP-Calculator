@@ -894,14 +894,14 @@ body.page-calc.theme-unify div[class*="bg-[#070b0f]"] {
 
    .field-box: the ONE prominent field per page (the item search box) - it's the primary action,
    so it keeps a soft fill, matching how the calculator treats its own primary search field. */
-body.page-calc.theme-unify .field-line {
+body.page-calc .field-line {
   background: transparent !important;
   border: none !important;
   border-bottom: 1.5px solid transparent !important;
   border-radius: 0 !important;
   transition: border-color 0.15s ease;
 }
-body.page-calc.theme-unify .field-line:focus {
+body.page-calc .field-line:focus {
   border-bottom-color: var(--accent) !important;
   outline: none;
 }
@@ -910,7 +910,7 @@ body.page-calc.theme-unify .field-line:focus {
    right for text fields just makes a <select> look like inert text. A persistent chevron plus a
    faint resting fill is the minimum needed to read as "click me to choose", without going back to
    the old bordered-box look. */
-body.page-calc.theme-unify select.field-line {
+body.page-calc select.field-line {
   appearance: none;
   -webkit-appearance: none;
   background: rgba(255,255,255,0.035) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ba0a8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") right 6px center / 13px no-repeat !important;
@@ -919,43 +919,44 @@ body.page-calc.theme-unify select.field-line {
   padding: 6px 24px 6px 10px !important;
   cursor: pointer;
 }
-body.page-calc.theme-unify select.field-line:hover {
+body.page-calc select.field-line:hover {
   background-color: rgba(255,255,255,0.06) !important;
 }
-body.page-calc.theme-unify select.field-line:focus {
+body.page-calc select.field-line:focus {
   background-color: rgba(255,255,255,0.06) !important;
   border-bottom-color: var(--accent) !important;
 }
-body.page-calc.theme-unify .field-box {
+body.page-calc .field-box {
   background: rgba(0,0,0,0.25) !important;
   border: none !important;
   border-radius: var(--radius-btn) !important;
   transition: box-shadow 0.15s ease;
 }
-body.page-calc.theme-unify .field-box:focus {
+body.page-calc .field-box:focus {
   box-shadow: 0 0 0 1.5px rgba(var(--accent-rgb),0.55);
   outline: none;
 }
 
 /* ============================================================
-   Ledger + Invention rebuild - small component vocabulary reused everywhere on both pages instead
-   of one-off Tailwind combinations. This is the actual fix for "still boxy/still has lines":
-   every card is .glass-card or .lp-card (same gradient-fill, zero-border treatment proven on the
-   calculator), every pill/badge/label pulls from here, so there is exactly one visual definition
-   of each component instead of dozens of near-identical hand-written variants to keep in sync. */
-body.page-calc.theme-unify .lp-card {
+   Shared component vocabulary (originally built for Ledger + Invention, extended to the whole
+   page-calc family so any page can reuse it) - small set of classes reused everywhere instead of
+   one-off Tailwind combinations. This is the actual fix for "still boxy/still has lines": every
+   card is .glass-card or .lp-card (same gradient-fill, zero-border treatment), every pill/badge/
+   label pulls from here, so there is exactly one visual definition of each component instead of
+   dozens of near-identical hand-written variants to keep in sync across pages. */
+body.page-calc .lp-card {
   background: var(--glass-fill);
   border-radius: var(--radius-card);
   box-shadow: var(--glass-shadow);
 }
-body.page-calc.theme-unify .lp-label {
+body.page-calc .lp-label {
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-mute);
 }
-body.page-calc.theme-unify .lp-badge {
+body.page-calc .lp-badge {
   display: inline-block;
   background: rgba(255,255,255,0.08);
   color: var(--text-soft);
@@ -966,9 +967,9 @@ body.page-calc.theme-unify .lp-badge {
   padding: 2px 9px;
   line-height: 1.6;
 }
-body.page-calc.theme-unify .lp-badge-accent { background: rgba(var(--accent-rgb),0.18); color: var(--accent); }
-body.page-calc.theme-unify .lp-badge-danger { background: rgba(var(--red-rgb),0.18); color: var(--red); }
-body.page-calc.theme-unify .lp-pill {
+body.page-calc .lp-badge-accent { background: rgba(var(--accent-rgb),0.18); color: var(--accent); }
+body.page-calc .lp-badge-danger { background: rgba(var(--red-rgb),0.18); color: var(--red); }
+body.page-calc .lp-pill {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
@@ -980,18 +981,18 @@ body.page-calc.theme-unify .lp-pill {
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
-body.page-calc.theme-unify .lp-pill:hover { background: rgba(255,255,255,0.1); color: var(--text); }
-body.page-calc.theme-unify .lp-pill.active {
+body.page-calc .lp-pill:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+body.page-calc .lp-pill.active {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   color: #0a1002;
 }
-body.page-calc.theme-unify .lp-row {
+body.page-calc .lp-row {
   padding-top: 14px;
   margin-top: 14px;
   border-top: 1px solid rgba(255,255,255,0.05);
 }
-body.page-calc.theme-unify .lp-row:first-child { margin-top: 0; padding-top: 0; border-top: none; }
-body.page-calc.theme-unify .lp-tile {
+body.page-calc .lp-row:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+body.page-calc .lp-tile {
   background: var(--glass-fill);
   border-radius: var(--radius-card);
   padding: 12px 14px;
@@ -999,7 +1000,7 @@ body.page-calc.theme-unify .lp-tile {
   flex-direction: column;
   justify-content: center;
 }
-body.page-calc.theme-unify .lp-list-item {
+body.page-calc .lp-list-item {
   padding: 8px 12px;
   display: flex;
   align-items: center;
@@ -1008,12 +1009,12 @@ body.page-calc.theme-unify .lp-list-item {
   border-top: 1px solid rgba(255,255,255,0.05);
   transition: background 0.15s ease;
 }
-body.page-calc.theme-unify .lp-list-item:first-child { border-top: none; }
-body.page-calc.theme-unify a.lp-list-item,
-body.page-calc.theme-unify div.lp-list-item[onmousedown],
-body.page-calc.theme-unify div.lp-list-item[onclick] { cursor: pointer; }
-body.page-calc.theme-unify .lp-list-item:hover { background: rgba(255,255,255,0.05); }
-body.page-calc.theme-unify .lp-chip-btn {
+body.page-calc .lp-list-item:first-child { border-top: none; }
+body.page-calc a.lp-list-item,
+body.page-calc div.lp-list-item[onmousedown],
+body.page-calc div.lp-list-item[onclick] { cursor: pointer; }
+body.page-calc .lp-list-item:hover { background: rgba(255,255,255,0.05); }
+body.page-calc .lp-chip-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -1027,10 +1028,10 @@ body.page-calc.theme-unify .lp-chip-btn {
   transition: background 0.15s ease;
   white-space: nowrap;
 }
-body.page-calc.theme-unify .lp-chip-btn svg { width: 11px; height: 11px; stroke: currentColor; fill: none; flex-shrink: 0; }
-body.page-calc.theme-unify .lp-chip-btn:hover { background: rgba(var(--accent-rgb),0.28); }
-body.page-calc.theme-unify .lp-table { width: 100%; border-collapse: collapse; text-align: left; }
-body.page-calc.theme-unify .lp-table th {
+body.page-calc .lp-chip-btn svg { width: 11px; height: 11px; stroke: currentColor; fill: none; flex-shrink: 0; }
+body.page-calc .lp-chip-btn:hover { background: rgba(var(--accent-rgb),0.28); }
+body.page-calc .lp-table { width: 100%; border-collapse: collapse; text-align: left; }
+body.page-calc .lp-table th {
   padding: 8px;
   font-size: 10.5px;
   font-weight: 700;
@@ -1039,23 +1040,23 @@ body.page-calc.theme-unify .lp-table th {
   color: var(--text-mute);
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
-body.page-calc.theme-unify .lp-table th.sortable { cursor: pointer; user-select: none; }
-body.page-calc.theme-unify .lp-table th.sortable:hover { color: var(--accent); }
-body.page-calc.theme-unify .lp-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-body.page-calc.theme-unify .lp-table tbody tr { transition: background 0.15s ease; }
-body.page-calc.theme-unify .lp-table tbody tr:hover { background: rgba(255,255,255,0.03); }
-body.page-calc.theme-unify .lp-table tr.lp-table-best { background: rgba(var(--accent-rgb),0.08); }
-body.page-calc.theme-unify .lp-divider-col { padding-left: 24px; margin-left: 4px; border-left: 1px solid rgba(255,255,255,0.08); }
-body.page-calc.theme-unify .lp-job-card {
+body.page-calc .lp-table th.sortable { cursor: pointer; user-select: none; }
+body.page-calc .lp-table th.sortable:hover { color: var(--accent); }
+body.page-calc .lp-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+body.page-calc .lp-table tbody tr { transition: background 0.15s ease; }
+body.page-calc .lp-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+body.page-calc .lp-table tr.lp-table-best { background: rgba(var(--accent-rgb),0.08); }
+body.page-calc .lp-divider-col { padding-left: 24px; margin-left: 4px; border-left: 1px solid rgba(255,255,255,0.08); }
+body.page-calc .lp-job-card {
   background: var(--glass-fill);
   border-radius: var(--radius-card);
   border-left: 3px solid transparent;
   transition: border-color 0.15s ease, background 0.2s ease;
 }
-body.page-calc.theme-unify .lp-job-card.job-ready { border-left-color: var(--accent); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),0.18), 0 0 20px rgba(var(--accent-rgb),0.10); }
-body.page-calc.theme-unify .lp-job-card.job-started { border-left-color: rgba(var(--accent-rgb),0.45); }
-body.page-calc.theme-unify .lp-job-card.job-subbuild { border-left-color: var(--text-mute); }
-body.page-calc.theme-unify .lp-group-header {
+body.page-calc .lp-job-card.job-ready { border-left-color: var(--accent); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),0.18), 0 0 20px rgba(var(--accent-rgb),0.10); }
+body.page-calc .lp-job-card.job-started { border-left-color: rgba(var(--accent-rgb),0.45); }
+body.page-calc .lp-job-card.job-subbuild { border-left-color: var(--text-mute); }
+body.page-calc .lp-group-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1063,13 +1064,13 @@ body.page-calc.theme-unify .lp-group-header {
   border-radius: var(--radius-btn);
   background: rgba(255,255,255,0.04);
 }
-body.page-calc.theme-unify .lp-group-header.is-active { background: rgba(var(--accent-rgb),0.12); }
-body.page-calc.theme-unify .lp-inset {
+body.page-calc .lp-group-header.is-active { background: rgba(var(--accent-rgb),0.12); }
+body.page-calc .lp-inset {
   background: rgba(0,0,0,0.18);
   border-radius: var(--radius-btn);
   padding: 8px 10px;
 }
-body.page-calc.theme-unify .lp-status-row {
+body.page-calc .lp-status-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1077,7 +1078,7 @@ body.page-calc.theme-unify .lp-status-row {
   border-radius: var(--radius-btn);
   background: rgba(255,255,255,0.04);
 }
-body.page-calc.theme-unify .lp-status-row.is-ready { background: rgba(var(--accent-rgb),0.14); }
+body.page-calc .lp-status-row.is-ready { background: rgba(var(--accent-rgb),0.14); }
 
 /* --accent and --green are the same lime hex on this page (Foxstock treats one hero color as
    both brand accent and "up"/profit), which would otherwise make node-parent-highlight and
