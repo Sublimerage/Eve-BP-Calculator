@@ -34,7 +34,7 @@
     const available = Math.max(120, openBelow ? spaceBelow : spaceAbove);
     panel.style.maxHeight = Math.min(available, 640) + 'px';
 
-    document.body.appendChild(panel);
+    if (!panel.isConnected) document.body.appendChild(panel);
     const panelHeight = panel.offsetHeight;
     if (openBelow) {
       panel.style.top = (r.bottom + 4) + 'px';
@@ -47,15 +47,15 @@
     panel.style.left = left + 'px';
   }
 
-  function buildPanel(select, trigger) {
-    const panel = document.createElement('div');
-    panel.className = 'csel-panel';
-    // Without this, a click/mousedown that lands on the panel's own padding (or its scrollbar)
-    // bubbles up to the document-level "click outside closes it" listener below and closes the
-    // panel before the user can act on it.
-    panel.addEventListener('mousedown', (e) => e.stopPropagation());
-    panel.addEventListener('click', (e) => e.stopPropagation());
+  // Options a caller (e.g. a "filter locations..." search box) has hidden via style.display='none'
+  // are skipped here, so that existing filter-as-you-type code keeps working against the real
+  // <select> without needing to know a custom panel sits in front of it.
+  function buildOptionRows(panel, select, trigger) {
+    panel.innerHTML = '';
+    let visibleCount = 0;
     Array.from(select.options).forEach((opt, idx) => {
+      if (opt.style.display === 'none') return;
+      visibleCount++;
       const item = document.createElement('div');
       item.className = 'csel-option' + (idx === select.selectedIndex ? ' is-selected' : '');
       item.textContent = opt.text;
@@ -73,6 +73,23 @@
       });
       panel.appendChild(item);
     });
+    if (visibleCount === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'csel-empty';
+      empty.textContent = 'No matches';
+      panel.appendChild(empty);
+    }
+  }
+
+  function createPanel(select, trigger) {
+    const panel = document.createElement('div');
+    panel.className = 'csel-panel';
+    // Without this, a click/mousedown that lands on the panel's own padding (or its scrollbar)
+    // bubbles up to the document-level "click outside closes it" listener below and closes the
+    // panel before the user can act on it.
+    panel.addEventListener('mousedown', (e) => e.stopPropagation());
+    panel.addEventListener('click', (e) => e.stopPropagation());
+    buildOptionRows(panel, select, trigger);
     return panel;
   }
 
@@ -83,8 +100,16 @@
   }
 
   function openPanelFor(select, trigger) {
+    if (openPanel && openSelect === select) {
+      // Already open for this exact select (e.g. the user is typing in a location search box that
+      // re-filters options live) - refresh content in place instead of remove/re-add, so the
+      // entrance animation doesn't replay on every keystroke.
+      buildOptionRows(openPanel, select, trigger);
+      positionPanel(trigger, openPanel);
+      return;
+    }
     closeOpenPanel();
-    const panel = buildPanel(select, trigger);
+    const panel = createPanel(select, trigger);
     positionPanel(trigger, panel);
     requestAnimationFrame(() => panel.classList.add('is-open'));
     trigger.classList.add('is-open');
@@ -92,6 +117,17 @@
     openTrigger = trigger;
     openSelect = select;
   }
+
+  // Public hook for code that filters a select's <option> list (by toggling style.display) from
+  // outside this component - e.g. a "filter locations..." search box - so typing can pop the
+  // dropdown open and keep it live-updated without that code knowing about .csel-panel internals.
+  window.openCustomSelect = function (selectOrId) {
+    const select = typeof selectOrId === 'string' ? document.getElementById(selectOrId) : selectOrId;
+    if (!select) return;
+    const trigger = select.nextElementSibling;
+    if (!trigger || !trigger.classList || !trigger.classList.contains('csel-trigger')) return;
+    openPanelFor(select, trigger);
+  };
 
   function initSelect(select) {
     if (select.dataset.cselInit || select.hasAttribute('size')) return;
@@ -128,10 +164,12 @@
       if (openSelect === select) closeOpenPanel();
     });
 
+    // subtree+attributeFilter:['style'] catches option.style.display toggles from external filter
+    // code, not just options being added/removed - both should refresh the open panel live.
     new MutationObserver(() => {
       updateTriggerLabel(select, trigger);
       if (openSelect === select) openPanelFor(select, trigger);
-    }).observe(select, { childList: true });
+    }).observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
 
     new MutationObserver(() => { trigger.disabled = select.disabled; })
       .observe(select, { attributes: true, attributeFilter: ['disabled'] });

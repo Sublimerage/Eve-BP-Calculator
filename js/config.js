@@ -5,6 +5,35 @@ function esc(s) {
 }
 window.esc = esc;
 
+// Shared BOM item categorization (calculator + ledger consolidated BOM category filters).
+function getItemCategory(typeId, name) {
+  if (!name) return 'others';
+  const n = name.toLowerCase();
+  const mineralIds = new Set([34, 35, 36, 37, 38, 39, 40, 11399]);
+  if (mineralIds.has(typeId) || n.includes('tritanium') || n.includes('pyerite') || n.includes('mexallon') || n.includes('isogen') || n.includes('nocxium') || n.includes('zydrine') || n.includes('megacyte') || n.includes('morphite')) {
+    return 'minerals';
+  }
+  if (n.includes('fuel block')) {
+    return 'fuel';
+  }
+  if (n.includes('gas') || n.includes('isotope') || n.includes('water') || n.includes('ozone') ||
+      n.includes('plastics') || n.includes('chiral') || n.includes('cultures') || n.includes('viral') || n.includes('fiber') || n.includes('nanites')) {
+    return 'pigas';
+  }
+  // Prefer real category classification (from generate_db.py's EVE Ref data) over name-keyword
+  // matching - the keyword list above only recognizes hull-class words and a curated list of T1
+  // ship names, so faction/pirate/T2 hulls (e.g. "Vargur", "Leshak") that don't contain any of those
+  // words were silently miscategorized as "Others" even though they're genuinely ships.
+  const catId = window.EVE_CATEGORIES ? window.EVE_CATEGORIES[typeId] : undefined;
+  if (catId === 6) return 'ships';
+  if (catId !== undefined && catId !== null) return 'others';
+  if (typeof window.isShipType === 'function' && window.isShipType(typeId)) {
+    return 'ships';
+  }
+  return 'others';
+}
+window.getItemCategory = getItemCategory;
+
 // Shared toggle-button handler for "Deduct Stock" controls across all pages - a clear on/off button
 // instead of a dropdown, but keeps the exact same id="deduct-stock-mode" + .value === 'true' pattern
 // every read site already uses, since <button value="..."> supports .value identically to <select>.

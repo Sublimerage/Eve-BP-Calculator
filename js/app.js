@@ -2363,6 +2363,13 @@ function drawConnectingLinesForTree(root) {
 
 let bomViewMode = localStorage.getItem('eve_bom_view_mode') || 'card'; // 'card' | 'compact'
 let bomOrderFilter = 'all'; // 'all' | 'buy' | 'sell'
+let bomCategoryFilter = 'all'; // 'all' | 'minerals' | 'pigas' | 'fuel' | 'ships' | 'others'
+
+function setBOMCategoryFilter(cat) {
+  bomCategoryFilter = cat;
+  if (typeof window.recalculate === 'function') window.recalculate();
+}
+window.setBOMCategoryFilter = setBOMCategoryFilter;
 
 function updateBomViewModeButtonLabel() {
   const btn = document.getElementById('btn-bom-view-mode');
@@ -2449,7 +2456,12 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
     bomMap[rootTypeId] = { typeId: rootTypeId, name: rootNode.productName || rootNode.name.replace(' Blueprint', ''), qty: netQtyNeeded, strategy: strategy };
   }
 
-  const bomItems = Object.values(bomMap).filter(item => item.qty > 0 && (bomOrderFilter === 'all' || item.strategy === bomOrderFilter));
+  const bomItems = Object.values(bomMap).filter(item => {
+    if (item.qty <= 0) return false;
+    if (bomOrderFilter !== 'all' && item.strategy !== bomOrderFilter) return false;
+    if (bomCategoryFilter !== 'all' && window.getItemCategory(item.typeId, item.name) !== bomCategoryFilter) return false;
+    return true;
+  });
   let totalBOMCost = 0;
   let totalBOMVolume = 0;
 

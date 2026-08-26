@@ -879,6 +879,7 @@ function filterLocationDropdownOptions() {
       feedbackBadge.classList.add('hidden');
     }
   }
+  if (typeof window.openCustomSelect === 'function') window.openCustomSelect('stock-location-filter');
 }
 
 function updateStockDisplayCount() {

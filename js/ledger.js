@@ -98,32 +98,8 @@ function loadJournalState() {
   }
 }
 
-function getItemCategory(typeId, name) {
-  if (!name) return 'others';
-  const n = name.toLowerCase();
-  const mineralIds = new Set([34, 35, 36, 37, 38, 39, 40, 11399]);
-  if (mineralIds.has(typeId) || n.includes('tritanium') || n.includes('pyerite') || n.includes('mexallon') || n.includes('isogen') || n.includes('nocxium') || n.includes('zydrine') || n.includes('megacyte') || n.includes('morphite')) {
-    return 'minerals';
-  }
-  if (n.includes('fuel block')) {
-    return 'fuel';
-  }
-  if (n.includes('gas') || n.includes('isotope') || n.includes('water') || n.includes('ozone') || 
-      n.includes('plastics') || n.includes('chiral') || n.includes('cultures') || n.includes('viral') || n.includes('fiber') || n.includes('nanites')) {
-    return 'pigas';
-  }
-  // Prefer real category classification (from generate_db.py's EVE Ref data) over name-keyword
-  // matching - the keyword list below only recognizes hull-class words and a curated list of T1
-  // ship names, so faction/pirate/T2 hulls (e.g. "Vargur", "Leshak") that don't contain any of those
-  // words were silently miscategorized as "Others" even though they're genuinely ships.
-  const catId = window.EVE_CATEGORIES ? window.EVE_CATEGORIES[typeId] : undefined;
-  if (catId === 6) return 'ships';
-  if (catId !== undefined && catId !== null) return 'others';
-  if (typeof window.isShipType === 'function' && window.isShipType(typeId)) {
-    return 'ships';
-  }
-  return 'others';
-}
+// getItemCategory now lives in js/config.js (shared by app.js too, for the calculator's own BOM
+// category filter) - kept as a window global so this call site didn't need to change.
 
 // --- Profit display (always full cost - stock never affects profit, only the BOM shopping list) ---
 // job.netProfit/job.calculatedCost are ALREADY full market cost from the moment they're calculated
@@ -890,7 +866,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
           <img src="${itemIconUrl}" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           ${strategyBadge}
           <span class="font-semibold truncate flex-1" style="color:var(--text-soft);">${window.esc(item.name)}</span>
-          <span class="text-xs mono flex-shrink-0" style="color:var(--text-mute);">&times;${item.totalQtyNeeded.toLocaleString()}</span>
+          <span class="text-xs mono flex-shrink-0" style="color:var(--text-mute);">&times;${item.netMissingQty.toLocaleString()}</span>
           <span class="font-bold mono flex-shrink-0 w-24 text-right" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK</span>
         </div>
       `;
@@ -909,7 +885,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
               ${strategyBadge}
               ${statusBadge}
             </div>
-            ${item.netMissingQty > 0 ? `<div class="text-xs mono mt-1.5" style="color:var(--text-soft);">Deficit: &times;${item.netMissingQty.toLocaleString()}</div>` : ''}
+            ${item.netMissingQty > 0 ? `<div class="text-xs mono mt-1.5" style="color:var(--text-mute);">Qty: ${item.netMissingQty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK</div>` : ''}
           </div>
         </div>
       </div>
@@ -1641,6 +1617,7 @@ function filterJournalLocationOptions() {
       feedbackBadge.classList.add('hidden');
     }
   }
+  if (typeof window.openCustomSelect === 'function') window.openCustomSelect('stock-location-filter');
 }
 
 function updateJournalStockCountBadge() {
