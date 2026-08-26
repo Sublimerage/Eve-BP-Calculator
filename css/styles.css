@@ -622,6 +622,19 @@ select option:checked, select option:hover { background-color: var(--accent); co
   color: var(--text-mute);
 }
 .toast-close:hover { color: var(--text); }
+.toast-action-btn {
+  flex-shrink: 0;
+  cursor: pointer;
+  background: rgba(var(--accent-rgb),0.16);
+  border: 1px solid rgba(var(--accent-rgb),0.3);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  transition: background 0.15s ease;
+}
+.toast-action-btn:hover { background: rgba(var(--accent-rgb),0.28); }
 
 /* Pill-styled checkbox (Personal/Corp asset-source toggles, used site-wide) - a real <input
    type="checkbox"> drives it so every existing onchange="applyStockLocationFilter()"/checked read
