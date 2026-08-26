@@ -34,6 +34,51 @@ function getItemCategory(typeId, name) {
 }
 window.getItemCategory = getItemCategory;
 
+// Shared toast notification, used site-wide for failures that previously only hit the console (or
+// worse, got silently overwritten by a false "success" status). type is 'error' | 'success' | 'info'.
+const TOAST_ICONS = {
+  error: '<svg class="toast-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12.5"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  success: '<svg class="toast-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+  info: '<svg class="toast-icon" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+};
+function showToast(message, type) {
+  type = (type === 'error' || type === 'success') ? type : 'info';
+  let stack = document.getElementById('toast-stack');
+  if (!stack) {
+    stack = document.createElement('div');
+    stack.id = 'toast-stack';
+    document.body.appendChild(stack);
+  }
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `${TOAST_ICONS[type]}<span class="toast-message"></span><button type="button" class="toast-close" aria-label="Dismiss">&#10005;</button>`;
+  toast.querySelector('.toast-message').textContent = message;
+  toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
+  stack.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('is-visible'));
+  setTimeout(() => {
+    toast.classList.remove('is-visible');
+    setTimeout(() => toast.remove(), 250);
+  }, 6000);
+}
+window.showToast = showToast;
+
+// Escape closes the Blueprint Browser drawer / Paste modal (index.html only - both are absent
+// elsewhere, so the element lookups below just no-op on ledger.html/invention.html). custom-
+// select.js already handles Escape for its own dropdown panels independently.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const drawer = document.getElementById('blueprint-browser-drawer');
+  if (drawer && !drawer.classList.contains('translate-x-full')) {
+    if (typeof window.closeBlueprintBrowser === 'function') window.closeBlueprintBrowser();
+    return;
+  }
+  const pasteModal = document.getElementById('paste-modal');
+  if (pasteModal && !pasteModal.classList.contains('hidden')) {
+    if (typeof window.closePasteModal === 'function') window.closePasteModal();
+  }
+});
+
 // Shared toggle-button handler for "Deduct Stock" controls across all pages - a clear on/off button
 // instead of a dropdown, but keeps the exact same id="deduct-stock-mode" + .value === 'true' pattern
 // every read site already uses, since <button value="..."> supports .value identically to <select>.

@@ -81,6 +81,8 @@ async function buyAllSubComponents() {
 
 // --- Action: Reset Smart Buy Override Modes ---
 function resetSmartBuyModes() {
+  if (Object.keys(window.customBuyModes || {}).length === 0) return;
+  if (!confirm('Reset every component\'s buy/build override back to default? This can\'t be undone.')) return;
   window.customBuyModes = {};
   if (typeof window.recalculate === 'function') {
     window.recalculate();

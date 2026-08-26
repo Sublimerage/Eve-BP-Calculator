@@ -116,7 +116,9 @@ window.selectRigForSlot = selectRigForSlot;
 // --- Blueprint Browser ---
 let _blueprintBrowserData = [];
 
+let _blueprintBrowserOpenerEl = null;
 async function openBlueprintBrowser() {
+  _blueprintBrowserOpenerEl = document.activeElement;
   const backdrop = document.getElementById('blueprint-browser-backdrop');
   const drawer = document.getElementById('blueprint-browser-drawer');
   if (backdrop) backdrop.classList.remove('hidden');
@@ -132,6 +134,8 @@ function closeBlueprintBrowser() {
   const drawer = document.getElementById('blueprint-browser-drawer');
   if (drawer) drawer.classList.add('translate-x-full');
   if (backdrop) setTimeout(() => backdrop.classList.add('hidden'), 300);
+  if (_blueprintBrowserOpenerEl && typeof _blueprintBrowserOpenerEl.focus === 'function') _blueprintBrowserOpenerEl.focus();
+  _blueprintBrowserOpenerEl = null;
 }
 window.closeBlueprintBrowser = closeBlueprintBrowser;
 
@@ -630,10 +634,10 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     const isOriginal = bp.quantity === -1;
     const bpImageVariant = isOriginal ? 'bp' : 'bpc';
     const stackBadge = (bp.stackCount && bp.stackCount > 1)
-      ? `<span class="text-[9px] font-bold text-orange-300 bg-orange-950/40 border border-orange-700/40 rounded-full px-1.5 py-0.5 flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
+      ? `<span class="lp-badge flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
       : '';
     const containerBadge = bp.containerName
-      ? `<span class="text-[9px] font-bold text-orange-400 bg-orange-950/40 border border-orange-700/40 rounded-full px-1.5 py-0.5 flex-shrink-0" title="Inside container: ${window.esc(bp.containerName)}">📦 ${window.esc(bp.containerName)}</span>`
+      ? `<span class="lp-badge flex-shrink-0" title="Inside container: ${window.esc(bp.containerName)}">📦 ${window.esc(bp.containerName)}</span>`
       : '';
     const stationBadge = showStationLabel
       ? `<span class="text-[9px] text-slate-500 flex-shrink-0" title="${window.esc(bp.stationName)}">📍 ${window.esc(bp.stationName)}</span>`
@@ -652,8 +656,8 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     } else if (bp._readinessResult) {
       const r = bp._readinessResult;
       readinessBadge = r.buildableRuns > 0
-        ? `<span class="text-xs font-bold text-emerald-300 bg-emerald-950/50 border border-emerald-600/50 rounded-full px-1.5 py-0.5 flex-shrink-0" title="Current stock covers ${r.buildableRuns.toLocaleString()} full run${r.buildableRuns > 1 ? 's' : ''}">✔ ${r.buildableRuns.toLocaleString()} run${r.buildableRuns > 1 ? 's' : ''}</span>`
-        : `<span class="text-xs font-bold text-orange-300 bg-orange-950/50 border border-orange-600/50 rounded-full px-1.5 py-0.5 flex-shrink-0" title="Not enough stock for even 1 run right now">⚠ 0 runs</span>`;
+        ? `<span class="lp-badge lp-badge-accent flex-shrink-0" title="Current stock covers ${r.buildableRuns.toLocaleString()} full run${r.buildableRuns > 1 ? 's' : ''}">✔ ${r.buildableRuns.toLocaleString()} run${r.buildableRuns > 1 ? 's' : ''}</span>`
+        : `<span class="lp-badge lp-badge-danger flex-shrink-0" title="Not enough stock for even 1 run right now">⚠ 0 runs</span>`;
     }
     // Source ("Personal"/"Corp") and run count sit inline with the name now, not on their own
     // text row below - keeps each card to a slimmer two-line footprint instead of three.

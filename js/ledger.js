@@ -168,13 +168,11 @@ function renderJournalPage() {
   const internallySuppliedTypeIds = new Set(
     activeJobs.filter(j => j && j.productTypeId !== undefined).map(j => j.productTypeId)
   );
-  console.info(`[BOM Debug] Full active job list (${activeJobs.length} jobs):`, activeJobs.map(j => j && ({ id: j.id, name: j.name, isStarted: j.isStarted, isSubBuild: j.isSubBuild, parentJobName: j.parentJobName })));
   activeJobs.forEach(job => {
     // Already-started jobs have already committed their materials - a "what do I still need to
     // buy" list has nothing useful to say about them, so they're excluded entirely rather than
     // showing up as clutter (often at 0 qty needed, which conveys nothing).
     if (job && !job.isStarted && Array.isArray(job.materials)) {
-      console.info(`[BOM Debug] Including job "${job.name}" (id=${job.id}, isStarted=${job.isStarted}, isSubBuild=${job.isSubBuild}, parentJobName=${job.parentJobName || 'n/a'}) in consolidated BOM.`);
       job.materials.forEach(mat => {
         if (!mat || !mat.typeId) return;
         if (internallySuppliedTypeIds.has(mat.typeId)) return;
@@ -1284,7 +1282,7 @@ function collectAllReadyJobs() {
   loadJournalState();
   const readyJobs = activeJobs.filter(j => j && j.isStarted && j.startedAt && ((Date.now() - j.startedAt) / 1000 >= (j.totalBuildSeconds || 0)));
   if (readyJobs.length === 0) {
-    alert('No jobs are ready to collect yet.');
+    if (typeof window.showToast === 'function') window.showToast('No jobs are ready to collect yet.', 'info');
     return;
   }
   readyJobs.forEach(j => markJobAsBuilt(j.id));
@@ -1354,11 +1352,12 @@ function requeueCompletedJob(recordId) {
 function deleteJobFromQueue(jobId) {
   loadJournalState();
   const index = activeJobs.findIndex(j => j && j.id === jobId);
-  if (index !== -1) {
-    activeJobs.splice(index, 1);
-    localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
-    renderJournalPage();
-  }
+  if (index === -1) return;
+  const job = activeJobs[index];
+  if (!confirm(`Remove "${job.name}" from the queue? This can't be undone.`)) return;
+  activeJobs.splice(index, 1);
+  localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
+  renderJournalPage();
 }
 
 function renderBuildHistoryLedger() {
@@ -1430,15 +1429,18 @@ function renderBuildHistoryLedger() {
 
 function deleteHistoryRecord(recordId) {
   const index = buildHistory.findIndex(r => r && r.id === recordId);
-  if (index !== -1) {
-    buildHistory.splice(index, 1);
-    localStorage.setItem('eve_ledger_history', JSON.stringify(buildHistory));
-    renderJournalPage();
-  }
+  if (index === -1) return;
+  const record = buildHistory[index];
+  if (!confirm(`Remove "${record.name}" from build history? This can't be undone.`)) return;
+  buildHistory.splice(index, 1);
+  localStorage.setItem('eve_ledger_history', JSON.stringify(buildHistory));
+  renderJournalPage();
 }
 window.deleteHistoryRecord = deleteHistoryRecord;
 
 function clearJournalHistory() {
+  if (buildHistory.length === 0) return;
+  if (!confirm(`Clear all ${buildHistory.length.toLocaleString()} completed build history record(s)? This can't be undone.`)) return;
   localStorage.removeItem('eve_ledger_history');
   renderJournalPage();
 }

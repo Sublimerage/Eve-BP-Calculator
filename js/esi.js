@@ -378,10 +378,20 @@ async function handleEsiSSOCallback() {
       }
     } else {
       console.error("SSO Code Exchange Failed:", res.status, await res.text());
+      reportSsoLoginFailure(`Login failed (${res.status}). Please try again.`);
     }
   } catch (err) {
     console.error('ESI SSO Token Error:', err);
+    reportSsoLoginFailure('Login failed - check your connection and try again.');
   }
+}
+
+function reportSsoLoginFailure(message) {
+  const statusText = document.getElementById('status-text');
+  const statusDot = document.getElementById('status-dot');
+  if (statusText) statusText.textContent = 'EVE SSO LOGIN FAILED';
+  if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-red-500';
+  if (typeof window.showToast === 'function') window.showToast(message, 'error');
 }
 
 function updateEsiUserUI(charName, charId, corpName, corpTicker) {
@@ -453,12 +463,16 @@ async function refreshLiveAssets() {
   if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
   window.resolvedLocationNames = {};
   window.userStockMap = {};
-  await fetchUserAndCorpAssets(charId, token);
-  if (statusDot) statusDot.className = 'w-2.5 h-2.5 rounded-full bg-green-400';
-  if (statusText) statusText.textContent = 'ASSETS REFRESHED';
+  const ok = await fetchUserAndCorpAssets(charId, token);
+  if (statusDot) statusDot.className = `w-2.5 h-2.5 rounded-full ${ok ? 'bg-green-400' : 'bg-red-400'}`;
+  if (statusText) statusText.textContent = ok ? 'ASSETS REFRESHED' : 'ASSET REFRESH FAILED';
+  if (!ok && typeof window.showToast === 'function') {
+    window.showToast('Failed to refresh assets - check your connection, or your login may have expired.', 'error');
+  }
 }
 
 async function fetchUserAndCorpAssets(charId, accessToken) {
+  let assetsFetchOk = false;
   try {
     window.rawAssetItems = [];
     let corpId = null;
@@ -527,6 +541,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
     while (hasMore) {
       const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/assets/?datasource=tranquility&page=${page}`, {}, accessToken);
       if (res && res.ok) {
+        assetsFetchOk = true;
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           data.forEach(ast => {
@@ -655,8 +670,10 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     }
     await resolveAndPopulateLocationFilter(accessToken);
+    return assetsFetchOk;
   } catch (err) {
     console.warn('Assets fetch error:', err);
+    return false;
   }
 }
 
@@ -925,7 +942,9 @@ function applyStockLocationFilter() {
   if (typeof recalculate === 'function') recalculate();
 }
 
+let _pasteModalOpenerEl = null;
 function openPasteModal() {
+  _pasteModalOpenerEl = document.activeElement;
   const modal = document.getElementById('paste-modal');
   if (modal) modal.classList.remove('hidden');
 }
@@ -933,9 +952,12 @@ function openPasteModal() {
 function closePasteModal() {
   const modal = document.getElementById('paste-modal');
   if (modal) modal.classList.add('hidden');
+  if (_pasteModalOpenerEl && typeof _pasteModalOpenerEl.focus === 'function') _pasteModalOpenerEl.focus();
+  _pasteModalOpenerEl = null;
 }
 
 function clearUserStock() {
+  if (!confirm('Clear all tracked stock (pasted and fetched)? This can\'t be undone.')) return;
   window.rawAssetItems = window.rawAssetItems.filter(item => item.location_id !== 99999999);
   window.userStockMap = {};
   updateStockDisplayCount();
