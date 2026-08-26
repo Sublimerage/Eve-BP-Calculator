@@ -2362,6 +2362,7 @@ function drawConnectingLinesForTree(root) {
 }
 
 let bomViewMode = localStorage.getItem('eve_bom_view_mode') || 'card'; // 'card' | 'compact'
+let bomOrderFilter = 'all'; // 'all' | 'buy' | 'sell'
 
 function updateBomViewModeButtonLabel() {
   const btn = document.getElementById('btn-bom-view-mode');
@@ -2375,6 +2376,19 @@ function toggleBomViewMode() {
   if (typeof window.recalculate === 'function') window.recalculate();
 }
 window.toggleBomViewMode = toggleBomViewMode;
+
+function setBOMOrderFilter(type) {
+  bomOrderFilter = type;
+  const btnAll = document.getElementById('btn-bom-order-all');
+  const btnBuy = document.getElementById('btn-bom-order-buy');
+  const btnSell = document.getElementById('btn-bom-order-sell');
+  const pillStyle = 'padding:5px 12px;';
+  if (btnAll) { btnAll.className = `lp-pill${type === 'all' ? ' active' : ''}`; btnAll.style.cssText = pillStyle; }
+  if (btnBuy) { btnBuy.className = `lp-pill${type === 'buy' ? ' active' : ''}`; btnBuy.style.cssText = pillStyle; }
+  if (btnSell) { btnSell.className = `lp-pill${type === 'sell' ? ' active' : ''}`; btnSell.style.cssText = pillStyle; }
+  if (typeof window.recalculate === 'function') window.recalculate();
+}
+window.setBOMOrderFilter = setBOMOrderFilter;
 
 function renderBillOfMaterials(rootNode, brokerFee = 0) {
   const listContainer = document.getElementById('bom-items-list');
@@ -2435,7 +2449,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
     bomMap[rootTypeId] = { typeId: rootTypeId, name: rootNode.productName || rootNode.name.replace(' Blueprint', ''), qty: netQtyNeeded, strategy: strategy };
   }
 
-  const bomItems = Object.values(bomMap).filter(item => item.qty > 0);
+  const bomItems = Object.values(bomMap).filter(item => item.qty > 0 && (bomOrderFilter === 'all' || item.strategy === bomOrderFilter));
   let totalBOMCost = 0;
   let totalBOMVolume = 0;
 
@@ -2462,7 +2476,11 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
     const row = document.createElement('div');
     row.title = 'Click to find and focus this material in the build diagram';
     row.onclick = () => highlightNodeByTypeId(item.typeId);
-    const strategyBadge = `<span class="lp-badge lp-badge-accent">${item.strategy === 'sell' ? 'SELL' : 'BUY'}</span>`;
+    // Buy stays lime (matches the buy/sell toggle buttons, where buy is highlighted as "usually
+    // more profitable"); sell gets a distinct blue so the two read apart instead of both being green.
+    const strategyBadge = item.strategy === 'sell'
+      ? `<span class="lp-badge lp-badge-blue">SELL</span>`
+      : `<span class="lp-badge lp-badge-accent">BUY</span>`;
 
     if (isCompact) {
       row.className = 'lp-list-item cursor-pointer';

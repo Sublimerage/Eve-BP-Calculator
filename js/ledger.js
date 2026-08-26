@@ -870,7 +870,12 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
       ? `<span class="lp-badge lp-badge-accent">Acquired</span>`
       : `<span class="lp-badge">Missing</span>`;
 
-    const strategyBadge = `<span class="lp-badge lp-badge-accent">${item.strategy === 'sell' ? 'SELL' : 'BUY'}</span>`;
+    // Buy stays lime (matches the buy/sell toggle buttons, where buy is highlighted as "usually
+    // more profitable"); sell gets a distinct blue so the two read apart at a glance instead of
+    // both being the same green.
+    const strategyBadge = item.strategy === 'sell'
+      ? `<span class="lp-badge lp-badge-blue">SELL</span>`
+      : `<span class="lp-badge lp-badge-accent">BUY</span>`;
 
     // CORRECTION: Direct blueprint path safety check inside the consolidated BOM prevents any imageservers 400 errors [1.1.1, 1.1.4]
     const itemNameLower = (window.TYPE_ID_TO_NAME[item.typeId] || item.name || '').toLowerCase();
@@ -883,7 +888,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
       return `
         <div class="lp-list-item" style="padding-left:0; padding-right:0; ${isCompleted ? 'opacity:0.55;' : ''}">
           <img src="${itemIconUrl}" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
-          <span style="color:${isCompleted ? 'var(--accent)' : 'var(--text-mute)'};" title="${isCompleted ? 'Acquired' : 'Missing'}">${isCompleted ? '✔' : '✖'}</span>
+          ${strategyBadge}
           <span class="font-semibold truncate flex-1" style="color:var(--text-soft);">${window.esc(item.name)}</span>
           <span class="text-xs mono flex-shrink-0" style="color:var(--text-mute);">&times;${item.totalQtyNeeded.toLocaleString()}</span>
           <span class="font-bold mono flex-shrink-0 w-24 text-right" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK</span>
@@ -901,13 +906,10 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
               <span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK</span>
             </div>
             <div class="flex items-center gap-1 mt-1.5">
-              ${statusBadge}
               ${strategyBadge}
+              ${statusBadge}
             </div>
-            <div class="text-xs mono mt-1.5" style="color:var(--text-mute);">
-              Needed: ${item.totalQtyNeeded.toLocaleString()} | Stock: ${item.stockQty.toLocaleString()}
-            </div>
-            ${item.netMissingQty > 0 ? `<div class="text-xs mono mt-0.5 font-bold" style="color:var(--accent);">Deficit: &times;${item.netMissingQty.toLocaleString()}</div>` : ''}
+            ${item.netMissingQty > 0 ? `<div class="text-xs mono mt-1.5" style="color:var(--text-soft);">Deficit: &times;${item.netMissingQty.toLocaleString()}</div>` : ''}
           </div>
         </div>
       </div>
