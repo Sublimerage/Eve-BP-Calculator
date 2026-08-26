@@ -274,21 +274,26 @@ header { height: 56px; flex-shrink: 0; }
    position on all three pages. */
 .header-brand { width: 232px; }
 .header-search-wrap { position: relative; flex: 1 1 auto; min-width: 140px; max-width: 460px; }
+/* This is the primary action of the whole page (search for the item to build), so unlike
+   .field-line's "nothing until you interact" rule, it carries a persistent lime tint at rest -
+   the same soft-tint language as .icon-btn/.btn-glass-muted - so it visibly reads as THE thing to
+   click, not just another quiet field in the header row. */
 .header-search-input {
   width: 100%;
-  background: rgba(0,0,0,0.28);
-  border: 1px solid var(--glass-border);
+  background: rgba(var(--accent-rgb),0.07);
+  border: 1.5px solid rgba(var(--accent-rgb),0.3);
   border-radius: var(--radius-btn);
   padding: 8px 12px 8px 34px;
   color: var(--text);
   font-size: 12.5px;
   font-family: 'IBM Plex Mono', monospace;
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
-.header-search-input::placeholder { color: var(--text-mute); }
-.header-search-input:focus { border-color: rgba(var(--accent-rgb),0.5); box-shadow: 0 0 0 2px rgba(var(--accent-rgb),0.15); }
-.header-search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--text-mute); pointer-events: none; }
+.header-search-input::placeholder { color: var(--text-soft); }
+.header-search-input:hover { border-color: rgba(var(--accent-rgb),0.45); background: rgba(var(--accent-rgb),0.1); }
+.header-search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.18); background: rgba(var(--accent-rgb),0.11); }
+.header-search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--accent); pointer-events: none; }
 
 /* ===== Pilot identity badge (replaces the SSO login button once authenticated - shared by all
    three pages via esi.js's updateEsiUserUI()) ===== */
