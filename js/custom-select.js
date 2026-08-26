@@ -21,25 +21,40 @@
   }
 
   function positionPanel(trigger, panel) {
+    const margin = 8;
     const r = trigger.getBoundingClientRect();
     panel.style.minWidth = r.width + 'px';
+
+    // Give the panel as much of whichever side (above/below the trigger) has more room, up to a
+    // generous cap - long lists (station/structure pickers) should show many rows at once instead
+    // of forcing a tiny internal scroll, per explicit feedback that these need to be "much longer".
+    const spaceBelow = window.innerHeight - r.bottom - margin;
+    const spaceAbove = r.top - margin;
+    const openBelow = spaceBelow >= 160 || spaceBelow >= spaceAbove;
+    const available = Math.max(120, openBelow ? spaceBelow : spaceAbove);
+    panel.style.maxHeight = Math.min(available, 640) + 'px';
+
     document.body.appendChild(panel);
     const panelHeight = panel.offsetHeight;
-    const spaceBelow = window.innerHeight - r.bottom;
-    if (spaceBelow < panelHeight + 8 && r.top > spaceBelow) {
-      panel.style.top = Math.max(8, r.top - panelHeight - 4) + 'px';
-    } else {
+    if (openBelow) {
       panel.style.top = (r.bottom + 4) + 'px';
+    } else {
+      panel.style.top = Math.max(margin, r.top - panelHeight - 4) + 'px';
     }
     let left = r.left;
-    const maxLeft = window.innerWidth - panel.offsetWidth - 8;
-    if (left > maxLeft) left = Math.max(8, maxLeft);
+    const maxLeft = window.innerWidth - panel.offsetWidth - margin;
+    if (left > maxLeft) left = Math.max(margin, maxLeft);
     panel.style.left = left + 'px';
   }
 
   function buildPanel(select, trigger) {
     const panel = document.createElement('div');
     panel.className = 'csel-panel';
+    // Without this, a click/mousedown that lands on the panel's own padding (or its scrollbar)
+    // bubbles up to the document-level "click outside closes it" listener below and closes the
+    // panel before the user can act on it.
+    panel.addEventListener('mousedown', (e) => e.stopPropagation());
+    panel.addEventListener('click', (e) => e.stopPropagation());
     Array.from(select.options).forEach((opt, idx) => {
       const item = document.createElement('div');
       item.className = 'csel-option' + (idx === select.selectedIndex ? ' is-selected' : '');
@@ -127,7 +142,12 @@
   }
 
   document.addEventListener('click', closeOpenPanel);
-  window.addEventListener('scroll', closeOpenPanel, true);
+  // Capture-phase so scrolling the page behind the dropdown closes it - but scrolling INSIDE the
+  // panel's own option list (its overflow-y:auto) must not, or a long list becomes unscrollable.
+  window.addEventListener('scroll', (e) => {
+    if (openPanel && (e.target === openPanel || (e.target.nodeType === 1 && openPanel.contains(e.target)))) return;
+    closeOpenPanel();
+  }, true);
   window.addEventListener('resize', closeOpenPanel);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeOpenPanel(); });
 
