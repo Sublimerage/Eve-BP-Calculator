@@ -229,7 +229,7 @@ async function selectInventionItem(typeId, name, skipSave) {
   const t2Map = getInventionT2ToT1Map();
   const t1Recipe = t2Map[typeId];
   if (!t1Recipe) {
-    alert('No invention data found for this item.');
+    if (typeof window.showToast === 'function') window.showToast('No invention data found for this item.', 'info');
     return;
   }
   _inventionCurrentBlueprint = t1Recipe;
@@ -567,18 +567,12 @@ function copyInventionMultibuy(rowIndex) {
   const row = _inventionLastComparisonRows[rowIndex];
   if (!row) return;
   if (row.multibuyItems.length === 0) {
-    alert('Nothing to buy - you already have enough stock for this decryptor\'s requirement.');
+    if (typeof window.showToast === 'function') window.showToast('Nothing to buy - you already have enough stock for this decryptor\'s requirement.', 'info');
     return;
   }
   const text = row.multibuyItems.map(i => `${i.name} x${i.qty}`).join('\n');
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = document.getElementById(`invention-multibuy-btn-${rowIndex}`);
-    if (btn) {
-      const orig = btn.innerHTML;
-      btn.textContent = '✔ Copied!';
-      setTimeout(() => { btn.innerHTML = orig; }, 1500);
-    }
-  });
+  const btn = document.getElementById(`invention-multibuy-btn-${rowIndex}`);
+  window.copyToClipboardWithFeedback(text, btn);
 }
 window.copyInventionMultibuy = copyInventionMultibuy;
 

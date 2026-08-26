@@ -1375,8 +1375,11 @@ async function fetchMarketPrices(typeIds) {
     }
     chunk.forEach(id => {
       if (!window.priceCache[id] || (!window.priceCache[id].sell && !window.priceCache[id].buy)) {
+        // No real market order data available (fetch failed, or the item just has none at this
+        // station) - EIV is a rough estimate, not a real order, so it's flagged as such here and
+        // that flag is surfaced wherever this price gets displayed (see js/config.js formatPriceValue).
         const eivVal = getEIV(id);
-        window.priceCache[id] = { sell: eivVal, buy: eivVal * 0.9 };
+        window.priceCache[id] = { sell: eivVal, buy: eivVal * 0.9, isEstimated: true };
       }
     });
   }));

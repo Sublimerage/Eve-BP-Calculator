@@ -828,7 +828,7 @@ function deleteProductionPreset() {
   const select = document.getElementById('production-preset-select');
   const name = select?.value;
   if (!name) {
-    alert('Select a preset from the dropdown first, then click delete.');
+    if (typeof window.showToast === 'function') window.showToast('Select a preset from the dropdown first, then click delete.', 'info');
     return;
   }
   if (!confirm(`Delete the "${name}" preset? This can't be undone.`)) return;
@@ -1047,7 +1047,7 @@ function searchItems(query) {
     // "Rifter Blueprint" for the exact same recipe). The recipe-existence check catches phantom
     // entries that pass the name pattern but have no real data behind them (e.g. "Synth Drop Booster
     // Reaction" - a different item than the real "...Reaction Formula" that shares part of its name).
-    const isBlueprint = k.includes('blueprint') || k.includes('formula') || k.includes('reaction');
+    const isBlueprint = window.isBlueprintName(k);
     if (!isBlueprint) continue;
     if (!window.recipeMap || !window.recipeMap[v.id]) continue;
 
@@ -1162,9 +1162,7 @@ if (searchInput) {
       // blueprint/formula/reaction name AND a recipe genuinely present in recipeMap) before merging.
       const onlineHitsRaw = await fetchEsiSearchResults(q);
       const onlineHits = onlineHitsRaw.filter(h => {
-        const lower = (h.name || '').toLowerCase();
-        const isBlueprint = lower.includes('blueprint') || lower.includes('formula') || lower.includes('reaction');
-        return isBlueprint && window.recipeMap && window.recipeMap[h.id];
+        return window.isBlueprintName(h.name) && window.recipeMap && window.recipeMap[h.id];
       });
       const map = new Map();
       hits.forEach(h => map.set(h.id, h));
@@ -1182,8 +1180,7 @@ if (searchInput) {
     }
     if (searchResults) {
       searchResults.innerHTML = hits.map(item => {
-        const lowerName = item.name.toLowerCase();
-        const isBp = lowerName.includes('blueprint') || lowerName.includes('formula') || lowerName.includes('reaction');
+        const isBp = window.isBlueprintName(item.name);
         // Blueprints aren't valid /icon items - show the manufactured product's icon instead.
         const displayIconId = isBp
           ? (window.resolveProductIdFromBlueprintName(item.name) || window.BLUEPRINT_TO_PRODUCT_MAP[item.id] || item.id)
@@ -1279,9 +1276,8 @@ async function selectItem(typeId, name, preserveView = false) {
     window.customTEOverrides = {};
   }
 
-  const lowerName = name.toLowerCase();
   window.recipeTreeRootProductTypeId = null;
-  if (lowerName.includes('blueprint') || lowerName.includes('formula') || lowerName.includes('reaction')) {
+  if (window.isBlueprintName(name)) {
     const resolvedProductTypeId = await window.resolveProductIdFromBlueprintNameAsync(name);
     if (resolvedProductTypeId) {
       window.recipeTreeRootProductTypeId = resolvedProductTypeId;
@@ -1633,11 +1629,7 @@ function createNodeCard(node) {
   const surplus = totalProduced - node.qtyNeeded;
 
   // CORRECTION: Strict blueprint path safety check inside the card loop prevents any imageservers 400s
-  const cardNameLower = (window.TYPE_ID_TO_NAME[productTypeId] || node.name || '').toLowerCase();
-  const isBpOriginal = cardNameLower.includes('blueprint') || cardNameLower.includes('formula') || cardNameLower.includes('reaction');
-  const iconUrl = isBpOriginal
-    ? `https://images.evetech.net/types/${productTypeId}/bp?size=128`
-    : `https://images.evetech.net/types/${productTypeId}/icon?size=128`;
+  const iconUrl = window.getItemIconUrl(productTypeId, window.TYPE_ID_TO_NAME[productTypeId] || node.name, 128);
 
   const unitEIV = node.unitEIV || 0;
   const totalEIV = node.jobEIV || (unitEIV * node.qtyNeeded);
@@ -1813,9 +1805,9 @@ function createNodeCard(node) {
             <div class="flex items-center justify-between text-xs mono" onmousedown="event.stopPropagation()">
               <span class="text-slate-400 font-semibold">Job ME/TE:</span>
               <div class="flex items-center space-x-1">
-                <input type="number" id="card-me-${node.instanceId}" min="0" max="10" value="${node.customME}" onchange="onCardMEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-black/40 border border-[#3a3025] rounded text-center text-orange-400 font-bold p-0.5 outline-none focus:border-[var(--accent)]">
+                <input type="number" id="card-me-${node.instanceId}" min="0" max="10" value="${node.customME}" onchange="onCardMEChange(event, ${node.typeId}, ${node.instanceId})" class="field-line w-10 text-center text-orange-400 font-bold p-0.5">
                 <span class="text-slate-500">%</span>
-                <input type="number" id="card-te-${node.instanceId}" min="0" max="20" value="${node.customTE}" onchange="onCardTEChange(event, ${node.typeId}, ${node.instanceId})" class="w-10 bg-black/40 border border-[#3a3025] rounded text-center text-orange-400 font-bold p-0.5 outline-none focus:border-[var(--accent)]">
+                <input type="number" id="card-te-${node.instanceId}" min="0" max="20" value="${node.customTE}" onchange="onCardTEChange(event, ${node.typeId}, ${node.instanceId})" class="field-line w-10 text-center text-orange-400 font-bold p-0.5">
                 <span class="text-slate-500">%</span>
               </div>
             </div>
@@ -1827,7 +1819,7 @@ function createNodeCard(node) {
         <div>
           <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">Lowest Sell</div>
           <div class="flex items-center justify-between gap-2">
-            <span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK</span>
+            <span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(productTypeId) : ''}</span>
             <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="icon-btn flex-shrink-0" style="width:26px;height:26px;" title="Compare price and trade volume across your tracked markets">
               <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="17,1 21,5 17,9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7,23 3,19 7,15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
             </button>
@@ -1835,7 +1827,7 @@ function createNodeCard(node) {
         </div>
         <div>
           <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">Highest Buy</div>
-          <div class="text-slate-300">${prices.buy.toLocaleString()} ISK</div>
+          <div class="text-slate-300">${prices.buy.toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(productTypeId) : ''}</div>
         </div>
         ${!isRoot && savingsPct !== null ? `<div class="flex justify-between text-green-400 font-semibold text-xs"><span>Order Savings:</span><span>${savingsPct}%</span></div>` : ''}
         ${node.jobFee > 0 && node.isBuildingSelf ? `
@@ -2510,7 +2502,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
         ${strategyBadge}
         <span class="font-semibold truncate flex-1" style="color:var(--text-soft);">${item.name}</span>
         <span class="text-xs mono flex-shrink-0" style="color:var(--text-mute);">&times;${item.qty.toLocaleString()}</span>
-        <span class="font-bold mono flex-shrink-0 w-24 text-right" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK</span>
+        <span class="font-bold mono flex-shrink-0 w-24 text-right" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>
       `;
     } else {
       row.className = 'lp-card p-2.5 cursor-pointer transition';
@@ -2520,7 +2512,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-2">
               <span class="font-semibold truncate" style="color:var(--text-soft);">${item.name}</span>
-              <span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK</span>
+              <span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>
             </div>
             <div class="flex items-center gap-1 mt-1.5">
               ${strategyBadge}
@@ -2604,30 +2596,14 @@ window.toggleFlyout = toggleFlyout;
 
 function copyMaterialNameToClipboard(event, el, name) {
   if (event) event.stopPropagation();
-  navigator.clipboard.writeText(name).then(() => {
-    if (!el) return;
-    const orig = el.textContent;
-    const origClass = el.className;
-    el.textContent = '✔ Copied!';
-    el.className = 'truncate text-green-400 font-bold transition';
-    setTimeout(() => {
-      el.textContent = orig;
-      el.className = origClass;
-    }, 1200);
-  }).catch(() => {});
+  window.copyToClipboardWithFeedback(name, el, { duration: 1200, flashClassName: 'truncate text-green-400 font-bold transition' });
 }
 window.copyMaterialNameToClipboard = copyMaterialNameToClipboard;
 
 function copyMultibuyText() {
   if (!window.currentBOMText) return;
-  navigator.clipboard.writeText(window.currentBOMText).then(() => {
-    const btn = document.querySelector('button[onclick="copyMultibuyText()"]');
-    if (btn) {
-      const orig = btn.textContent;
-      btn.textContent = '✔ Copied!';
-      setTimeout(() => { btn.textContent = orig; }, 1500);
-    }
-  });
+  const btn = document.querySelector('button[onclick="copyMultibuyText()"]');
+  window.copyToClipboardWithFeedback(window.currentBOMText, btn);
 }
 
 // Smooth Pan and Zoom Engine

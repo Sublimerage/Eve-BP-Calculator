@@ -63,6 +63,57 @@ function showToast(message, type) {
 }
 window.showToast = showToast;
 
+// A price with no real backing market order (js/esi.js fetchMarketPrices() falls back to EVE's
+// Estimated Item Value when no order data is found) previously rendered identically to a real
+// price - this makes that visible wherever it's called, instead of a silent guess.
+function estimatedPriceMarker(typeId) {
+  const entry = window.priceCache && window.priceCache[typeId];
+  if (!entry || !entry.isEstimated) return '';
+  return ' <span class="text-amber-400 font-bold" style="font-size:0.85em;" title="No real market order data found for this item - showing EVE\'s Estimated Item Value instead of an actual buy/sell order.">(EST)</span>';
+}
+window.estimatedPriceMarker = estimatedPriceMarker;
+
+// Shared blueprint-name detection - was independently reimplemented at 8+ call sites across
+// app.js/ledger.js. A blueprint/formula/reaction item's typeId isn't valid against the /icon
+// image endpoint (it 400s), so every place that renders an item icon or needs to tell "this is a
+// blueprint, not the thing it makes" apart needs this same check.
+function isBlueprintName(name) {
+  const n = (name || '').toLowerCase();
+  return n.includes('blueprint') || n.includes('formula') || n.includes('reaction');
+}
+window.isBlueprintName = isBlueprintName;
+
+// Shared icon URL builder for the same reason - picks the /bp variant for blueprints, /icon
+// otherwise, matching the exact pattern every render site already used by hand.
+function getItemIconUrl(typeId, name, size) {
+  size = size || 32;
+  return isBlueprintName(name)
+    ? `https://images.evetech.net/types/${typeId}/bp?size=${size}`
+    : `https://images.evetech.net/types/${typeId}/icon?size=${size}`;
+}
+window.getItemIconUrl = getItemIconUrl;
+
+// Shared "copy text, flash the button to confirm it worked, restore after a delay" pattern - was
+// independently rewritten 6 times across app.js/ledger.js/invention.js with minor inconsistencies
+// (some used .textContent, some .innerHTML; timeouts ranged 900-1500ms).
+function copyToClipboardWithFeedback(text, btnEl, options) {
+  options = options || {};
+  const duration = options.duration || 1500;
+  const useInnerHTML = !!options.useInnerHTML;
+  navigator.clipboard.writeText(text).then(() => {
+    if (!btnEl) return;
+    const originalContent = useInnerHTML ? btnEl.innerHTML : btnEl.textContent;
+    const originalClass = btnEl.className;
+    if (useInnerHTML) btnEl.innerHTML = '✔ Copied!'; else btnEl.textContent = '✔ Copied!';
+    if (options.flashClassName) btnEl.className = options.flashClassName;
+    setTimeout(() => {
+      if (useInnerHTML) btnEl.innerHTML = originalContent; else btnEl.textContent = originalContent;
+      if (options.flashClassName) btnEl.className = originalClass;
+    }, duration);
+  }).catch(() => {});
+}
+window.copyToClipboardWithFeedback = copyToClipboardWithFeedback;
+
 // Escape closes the Blueprint Browser drawer / Paste modal (index.html only - both are absent
 // elsewhere, so the element lookups below just no-op on ledger.html/invention.html). custom-
 // select.js already handles Escape for its own dropdown panels independently.

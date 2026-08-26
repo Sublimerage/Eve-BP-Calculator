@@ -320,11 +320,7 @@ window.toggleQueueViewMode = toggleQueueViewMode;
 function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
   const iconTypeId = job.productTypeId || job.typeId;
   const isJobReady = job.isStarted && job.startedAt && ((Date.now() - job.startedAt) / 1000 >= (job.totalBuildSeconds || 0));
-  const jobNameLower = (window.TYPE_ID_TO_NAME[iconTypeId] || job.name || '').toLowerCase();
-  const isJobBp = jobNameLower.includes('blueprint') || jobNameLower.includes('formula') || jobNameLower.includes('reaction');
-  const jobIconUrl = isJobBp
-    ? `https://images.evetech.net/types/${iconTypeId}/bp?size=64`
-    : `https://images.evetech.net/types/${iconTypeId}/icon?size=64`;
+  const jobIconUrl = window.getItemIconUrl(iconTypeId, window.TYPE_ID_TO_NAME[iconTypeId] || job.name, 64);
   const jobDisplayName = window.TYPE_ID_TO_NAME[iconTypeId] || (job.name || '')
     .replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
 
@@ -521,11 +517,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
     `;
 
     // CORRECTION: Direct blueprint path safety check inside active jobs loop prevents any imageservers 400 errors [1.1.1, 1.1.4]
-    const jobNameLower = (window.TYPE_ID_TO_NAME[iconTypeId] || job.name || '').toLowerCase();
-    const isJobBp = jobNameLower.includes('blueprint') || jobNameLower.includes('formula') || jobNameLower.includes('reaction');
-    const jobIconUrl = isJobBp
-      ? `https://images.evetech.net/types/${iconTypeId}/bp?size=64`
-      : `https://images.evetech.net/types/${iconTypeId}/icon?size=64`;
+    const jobIconUrl = window.getItemIconUrl(iconTypeId, window.TYPE_ID_TO_NAME[iconTypeId] || job.name, 64);
     // The job may have been saved with the raw searched name (e.g. "Vargur Blueprint") - always show
     // the manufactured product's name on the card instead.
     const jobDisplayName = window.TYPE_ID_TO_NAME[iconTypeId] || (job.name || '')
@@ -660,16 +652,7 @@ window.expandAllJobCards = expandAllJobCards;
 // --- Click-to-copy runs count ---
 function copyRunsToClipboard(e, runs) {
   if (e) e.stopPropagation();
-  const text = String(runs);
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).catch(() => {});
-  }
-  const target = e && e.target;
-  if (target) {
-    const original = target.textContent;
-    target.textContent = '✔ Copied!';
-    setTimeout(() => { target.textContent = original; }, 900);
-  }
+  window.copyToClipboardWithFeedback(String(runs), e && e.target, { duration: 900 });
 }
 window.copyRunsToClipboard = copyRunsToClipboard;
 
@@ -748,7 +731,7 @@ function combineDuplicateJobs() {
   renderJournalPage();
 
   if (combinedCount === 0) {
-    alert('No combinable duplicate jobs found. Jobs only combine when they match on item, build/buy context, and sell strategy, and neither is already started.');
+    if (typeof window.showToast === 'function') window.showToast('No combinable duplicate jobs found. Jobs only combine when they match on item, build/buy context, and sell strategy, and neither is already started.', 'info');
   }
 }
 window.combineDuplicateJobs = combineDuplicateJobs;
@@ -792,14 +775,7 @@ function copyIndividualJobMultibuy(e, jobId) {
 
   if (!textList.trim()) return;
 
-  navigator.clipboard.writeText(textList).then(() => {
-    const btn = e.target;
-    if (btn) {
-      const origText = btn.innerHTML;
-      btn.innerHTML = '✔ Copied!';
-      setTimeout(() => { btn.innerHTML = origText; }, 1500);
-    }
-  });
+  window.copyToClipboardWithFeedback(textList, e.target, { useInnerHTML: true });
 }
 
 let bomViewMode = localStorage.getItem('eve_bom_view_mode') || 'card'; // 'card' | 'compact' - shared with the calculator page
@@ -853,11 +829,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
       : `<span class="lp-badge lp-badge-accent">BUY</span>`;
 
     // CORRECTION: Direct blueprint path safety check inside the consolidated BOM prevents any imageservers 400 errors [1.1.1, 1.1.4]
-    const itemNameLower = (window.TYPE_ID_TO_NAME[item.typeId] || item.name || '').toLowerCase();
-    const isItemBp = itemNameLower.includes('blueprint') || itemNameLower.includes('formula') || itemNameLower.includes('reaction');
-    const itemIconUrl = isItemBp
-      ? `https://images.evetech.net/types/${item.typeId}/bp?size=32`
-      : `https://images.evetech.net/types/${item.typeId}/icon?size=32`;
+    const itemIconUrl = window.getItemIconUrl(item.typeId, window.TYPE_ID_TO_NAME[item.typeId] || item.name, 32);
 
     if (isCompact) {
       return `
@@ -866,7 +838,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
           ${strategyBadge}
           <span class="font-semibold truncate flex-1" style="color:var(--text-soft);">${window.esc(item.name)}</span>
           <span class="text-xs mono flex-shrink-0" style="color:var(--text-mute);">&times;${item.netMissingQty.toLocaleString()}</span>
-          <span class="font-bold mono flex-shrink-0 w-24 text-right" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK</span>
+          <span class="font-bold mono flex-shrink-0 w-24 text-right" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>
         </div>
       `;
     }
@@ -878,7 +850,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-2">
               <span class="font-semibold truncate" style="color:var(--text-soft);">${window.esc(item.name)}</span>
-              <span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK</span>
+              <span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>
             </div>
             <div class="flex items-center gap-1 mt-1.5">
               ${strategyBadge}
@@ -900,14 +872,8 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
 function copyJournalMultibuy() {
   if (!window.journalMultibuyText) return;
   
-  navigator.clipboard.writeText(window.journalMultibuyText).then(() => {
-    const btn = document.querySelector('button[onclick="copyJournalMultibuy()"]');
-    if (btn) {
-      const origText = btn.textContent;
-      btn.textContent = '✔ Copied!';
-      setTimeout(() => { btn.textContent = origText; }, 1500);
-    }
-  });
+  const btn = document.querySelector('button[onclick="copyJournalMultibuy()"]');
+  window.copyToClipboardWithFeedback(window.journalMultibuyText, btn);
 }
 
 // Starts a job (or a portion of it). Starting fewer than all remaining runs splits the job into an
@@ -1041,7 +1007,7 @@ async function syncWithEveIndustryJobs(silent) {
   console.info(`[JobSync] Fetched ${charJobs ? charJobs.length : 'null (fetch failed)'} character job(s), ${corpJobs ? corpJobs.length : 0} corp job(s), ${(charBps||[]).length} char blueprint(s), ${(corpBps||[]).length} corp blueprint(s).`);
 
   if (!charJobs && (!corpJobs || corpJobs.length === 0)) {
-    if (!silent) alert('Could not fetch active industry jobs. Make sure you are logged in via EVE SSO - if you logged in before this feature existed, log out and back in once to grant the new Industry Jobs permissions.');
+    if (!silent && typeof window.showToast === 'function') window.showToast('Could not fetch active industry jobs. Make sure you are logged in via EVE SSO - if you logged in before this feature existed, log out and back in once to grant the new Industry Jobs permissions.', 'error');
     return;
   }
 
@@ -1178,11 +1144,11 @@ async function syncWithEveIndustryJobs(silent) {
   localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
   renderJournalPage();
 
-  if (!silent) {
+  if (!silent && typeof window.showToast === 'function') {
     if (matchedCount === 0 && importedCount === 0) {
-      alert('No active EVE industry jobs found to sync (or none matched/imported). Check the browser console for [JobSync] diagnostic details.');
+      window.showToast('No active EVE industry jobs found to sync (or none matched/imported). Check the browser console for [JobSync] diagnostic details.', 'info');
     } else {
-      alert(`Synced ${matchedCount} job(s) against existing plans, auto-imported ${importedCount} job(s) with no prior plan - using EVE's real start time, duration, and researched ME/TE.`);
+      window.showToast(`Synced ${matchedCount} job(s) against existing plans, auto-imported ${importedCount} job(s) with no prior plan - using EVE's real start time, duration, and researched ME/TE.`, 'success');
     }
   }
 }
