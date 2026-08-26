@@ -130,6 +130,11 @@ window.copyToClipboardWithFeedback = copyToClipboardWithFeedback;
 // select.js already handles Escape for its own dropdown panels independently.
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  const themeMenu = document.getElementById('theme-menu');
+  if (themeMenu && !themeMenu.classList.contains('hidden')) {
+    themeMenu.classList.add('hidden');
+    return;
+  }
   const drawer = document.getElementById('blueprint-browser-drawer');
   if (drawer && !drawer.classList.contains('translate-x-full')) {
     if (typeof window.closeBlueprintBrowser === 'function') window.closeBlueprintBrowser();
@@ -192,6 +197,77 @@ function formatDuration(seconds) {
   return parts.join(' ');
 }
 window.formatDuration = formatDuration;
+
+// --- Selectable color themes ---
+// The actual re-skinning happens purely in CSS (see css/styles.css's html[data-theme="..."] blocks)
+// by swapping --accent/--accent-2/--accent-rgb and the --copper-* ramp - this list is just the menu
+// content plus the localStorage/attribute bookkeeping. A tiny inline script in each page's <head>
+// (not deferred) sets the data-theme attribute before first paint using the same localStorage key,
+// so there's no flash of the default theme while these deferred scripts are still loading.
+const COLOR_THEMES = [
+  { id: 'lime', label: 'Lime', dot: '#9de137' },
+  { id: 'copper', label: 'Copper', dot: '#d3915a' },
+  { id: 'cyan', label: 'Cyan', dot: '#22c3d4' },
+  { id: 'violet', label: 'Violet', dot: '#a374e0' }
+];
+
+function getSavedColorTheme() {
+  try {
+    const saved = localStorage.getItem('eve_color_theme');
+    return COLOR_THEMES.some(t => t.id === saved) ? saved : 'lime';
+  } catch (e) {
+    return 'lime';
+  }
+}
+window.getSavedColorTheme = getSavedColorTheme;
+
+function applyColorTheme(themeId) {
+  if (!COLOR_THEMES.some(t => t.id === themeId)) themeId = 'lime';
+  if (themeId === 'lime') {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', themeId);
+  }
+  try { localStorage.setItem('eve_color_theme', themeId); } catch (e) {}
+  document.querySelectorAll('.theme-swatch').forEach(el => {
+    el.classList.toggle('is-active', el.dataset.themeId === themeId);
+  });
+}
+window.applyColorTheme = applyColorTheme;
+
+function renderThemeMenu() {
+  const menu = document.getElementById('theme-menu');
+  if (!menu) return;
+  const current = getSavedColorTheme();
+  menu.innerHTML = COLOR_THEMES.map(t => `
+    <div class="theme-swatch${t.id === current ? ' is-active' : ''}" data-theme-id="${t.id}" onclick="applyColorTheme('${t.id}')" title="${window.esc(t.label)}">
+      <span class="theme-swatch-dot" style="background:${t.dot};"></span>
+      <span class="theme-swatch-label">${window.esc(t.label)}</span>
+    </div>
+  `).join('');
+}
+window.renderThemeMenu = renderThemeMenu;
+
+function toggleThemeMenu(event) {
+  if (event) event.stopPropagation();
+  const menu = document.getElementById('theme-menu');
+  if (!menu) return;
+  if (menu.classList.contains('hidden')) {
+    renderThemeMenu();
+    menu.classList.remove('hidden');
+  } else {
+    menu.classList.add('hidden');
+  }
+}
+window.toggleThemeMenu = toggleThemeMenu;
+
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('theme-menu');
+  if (!menu || menu.classList.contains('hidden')) return;
+  if (!menu.contains(e.target) && !e.target.closest('#theme-menu-btn')) {
+    menu.classList.add('hidden');
+  }
+});
 
 window.HARDCODED_CLIENT_ID = '20e4087a1f564a3e897aaaa6daebbecd';
 
