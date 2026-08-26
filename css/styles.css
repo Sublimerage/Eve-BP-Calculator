@@ -566,6 +566,45 @@ select option:checked, select option:hover { background-color: var(--accent); co
 .csel-option:hover { background: rgba(var(--accent-rgb),0.14); color: var(--accent); }
 .csel-option.is-selected { color: var(--accent); font-weight: 600; }
 .csel-option[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+.csel-empty { padding: 10px; font-size: 12px; font-style: italic; text-align: center; color: var(--text-mute); }
+
+/* Pill-styled checkbox (Personal/Corp asset-source toggles, used site-wide) - a real <input
+   type="checkbox"> drives it so every existing onchange="applyStockLocationFilter()"/checked read
+   keeps working untouched, but it's visually hidden and a sibling face is styled off its :checked
+   state instead of the native square-box look. */
+body.page-calc .pill-check {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+body.page-calc .pill-check input {
+  position: absolute;
+  width: 1px; height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+body.page-calc .pill-check-face {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-mute);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+body.page-calc .pill-check-face svg { width: 12px; height: 12px; stroke: currentColor; fill: none; flex-shrink: 0; }
+body.page-calc .pill-check:hover .pill-check-face { background: rgba(255,255,255,0.1); color: var(--text); }
+body.page-calc .pill-check input:checked + .pill-check-face {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #0a1002;
+}
+body.page-calc .pill-check input:focus-visible + .pill-check-face {
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb),0.4);
+}
 /* Same custom chevron the ledger/invention selects use, generalized so index.html's differently-
    styled selects (bg-black/*+border, not .field-line) get the same "obviously a dropdown" cue -
    :not([size]) excludes true multi-row listboxes like the blueprint location filter, which are
