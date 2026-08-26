@@ -10,7 +10,7 @@
 <title>EVE Deep-Industry Engine</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d3915a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='5' r='2.6'/%3E%3Ccircle cx='6' cy='18.5' r='2.6'/%3E%3Ccircle cx='12' cy='18.5' r='2.6'/%3E%3Ccircle cx='18' cy='18.5' r='2.6'/%3E%3Cpath d='M12 7.6v2.6M12 10.2L6 15.9M12 10.2v5.7M12 10.2l6 5.7'/%3E%3C/svg%3E">
 <link class="cache-bust" rel="stylesheet" href="css/tailwind-build.css?v=1.0.1">
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.22.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.23.0">
 <script>(function(){try{var t=localStorage.getItem('eve_color_theme');if(t&&t!=='lime')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body class="page-calc flex flex-col min-h-screen text-slate-200">
@@ -129,229 +129,245 @@
   <!-- Main Split Layout: Control Sidebar | Diagram Viewport | Bill of Materials -->
   <div class="content-row flex-1 flex overflow-hidden relative">
 
-    <!-- Control Sidebar: everything that used to be crammed into two toolbar rows, now grouped into
-         clear, spacious, labeled sections. Frequently-used sections (Search, Build, Optimizers,
-         System, Stock) are open by default; set-once sections (Taxes, Contracts) start collapsed. -->
+    <!-- Control Sidebar: a single inspector panel with one icon-rail "tab" per topic (Pricing,
+         Build, Structure, Fees, Markets), instead of the old model where every icon opened its own
+         independent floating popover that could stack in any combination - only one topic is ever
+         shown at once now, in one consistently-styled panel with a real header, so the sidebar
+         reads as one coherent tool instead of a pile of loosely related boxes. -->
     <aside id="control-sidebar" class="icon-rail">
-      <div id="icon-btn-search" class="icon-rail-btn icon-rail-btn-active" onclick="toggleFlyout('search')">
+      <div id="icon-btn-pricing" class="icon-rail-btn icon-rail-btn-active" onclick="openFlyoutSection('pricing')">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 3H19a2 2 0 012 2v6.5a2 2 0 01-.6 1.4l-8 8a2 2 0 01-2.8 0l-6.5-6.5a2 2 0 010-2.8l8-8a2 2 0 011.4-.6z"/><circle cx="16.5" cy="7.5" r="1.3"/></svg><span class="icon-label">Pricing</span>
       </div>
-      <div id="icon-btn-build" class="icon-rail-btn" onclick="toggleFlyout('build')">
+      <div id="icon-btn-build" class="icon-rail-btn" onclick="openFlyoutSection('build')">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l4 4-8.5 8.5a2 2 0 01-2.8 0v0a2 2 0 010-2.8L15.2 7.2"/><path d="M12 8l4-4 4 4-4 4"/></svg><span class="icon-label">Build</span>
       </div>
-      <div id="icon-btn-optimize" class="icon-rail-btn" onclick="toggleFlyout('optimize')">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><circle cx="9" cy="7" r="2"/><line x1="4" y1="14" x2="20" y2="14"/><circle cx="16" cy="14" r="2"/><line x1="4" y1="21" x2="20" y2="21"/><circle cx="12" cy="21" r="2"/></svg><span class="icon-label">Optimize</span>
-      </div>
-      <div id="icon-btn-structure" class="icon-rail-btn" onclick="toggleFlyout('structure')">
+      <div id="icon-btn-structure" class="icon-rail-btn" onclick="openFlyoutSection('structure')">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V10l5-3 5 3v11"/><path d="M14 21v-7l6-3v10"/><line x1="2" y1="21" x2="22" y2="21"/></svg><span class="icon-label">Structure</span>
       </div>
-      <div id="icon-btn-taxes" class="icon-rail-btn" onclick="toggleFlyout('taxes')">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="8" y1="16" x2="16" y2="8"/></svg><span class="icon-label">Taxes</span>
+      <div id="icon-btn-fees" class="icon-rail-btn" onclick="openFlyoutSection('fees')">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="8" y1="16" x2="16" y2="8"/></svg><span class="icon-label">Fees</span>
       </div>
-      <div id="icon-btn-contract" class="icon-rail-btn" onclick="toggleFlyout('contract')">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l3 3v15H6z"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/></svg><span class="icon-label">Contract</span>
-      </div>
-      <div id="icon-btn-markets" class="icon-rail-btn" onclick="toggleFlyout('markets')">
+      <div id="icon-btn-markets" class="icon-rail-btn" onclick="openFlyoutSection('markets')">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,17 9,11 13,15 21,6"/><polyline points="15,6 21,6 21,12"/></svg><span class="icon-label">Markets</span>
       </div>
 
-      <!-- Pricing (search lives in the header now, reachable from any page state) -->
-      <div id="flyout-search" class="flyout-panel open">
-        <h2 class="section-label text-orange-400 text-xs mb-1.5">Pricing</h2>
-        <div class="flex gap-2">
-          <select id="input-price-mode" onchange="recalculate()" class="field-line flex-1 text-white font-bold text-[11px]">
-            <option value="sell" selected>Sell (Instant)</option>
-            <option value="buy">Buy Order</option>
-          </select>
-          <select id="include-reactions" onchange="if(currentProduct) selectItem(currentProduct.id, currentProduct.name, true)" class="field-line flex-1 text-orange-300 font-bold text-[11px]">
-            <option value="true" selected>Reactions ON</option>
-            <option value="false">Reactions OFF</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Build Actions -->
-      <div id="flyout-build" class="flyout-panel">
-        <h2 class="section-label text-orange-400 text-xs mb-1.5">Build Actions</h2>
-        <div class="grid grid-cols-2 gap-1.5 mb-1.5">
-          <button onclick="buildAllComponents()" class="btn-glass py-2 px-3 text-xs">
-            Build All
-          </button>
-          <button onclick="buyAllSubComponents()" class="btn-glass btn-glass-muted py-2 px-3 text-xs">
-            Buy All
-          </button>
-        </div>
-        <div class="rounded bg-black/35 p-1.5 border border-orange-500/25 flex items-center gap-1.5" title="Build Margin Threshold">
-          <span class="text-slate-400 text-[10px] font-bold flex-shrink-0">Min Profit:</span>
-          <input type="number" id="build-profit-threshold" value="5.0" step="0.5" min="0" max="100"
-            class="w-14 bg-black/25 border border-orange-500/40 text-center text-orange-300 font-bold p-1 outline-none text-xs">
-          <span class="text-slate-500 text-xs flex-shrink-0">%</span>
-          <button onclick="applyBuildProfitOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] mono flex-shrink-0">
-            Optimize
-          </button>
-        </div>
-      </div>
-
-      <!-- Smart Optimizers -->
-      <div id="flyout-optimize" class="flyout-panel">
-        <h2 class="section-label text-orange-300 text-xs mb-2">Smart Optimizers</h2>
-        <div class="space-y-1.5">
-          <div class="lp-inset flex items-center gap-1.5" title="Component Market Spread Threshold">
-            <span class="text-slate-400 text-[10px] flex-shrink-0">Spread:</span>
-            <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100"
-              class="field-line w-14 text-center text-orange-300 font-bold p-1 text-xs">
-            <span class="text-slate-500 text-xs flex-shrink-0">%</span>
-            <button onclick="applyComponentSpreadOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] flex-shrink-0">
-              Optimize
-            </button>
+      <div id="control-flyout" class="flyout-panel open">
+        <div class="flyout-panel-header">
+          <span id="flyout-panel-title" class="flyout-panel-title">Pricing</span>
+          <div class="flyout-panel-close" onclick="closeFlyoutPanel()" title="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </div>
-          <div class="lp-inset flex items-center gap-1.5" title="Build Cost Savings Impact Threshold">
-            <span class="text-slate-400 text-[10px] flex-shrink-0">Budget:</span>
-            <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100"
-              class="field-line w-14 text-center text-orange-300 font-bold p-1 text-xs">
-            <span class="text-slate-500 text-xs flex-shrink-0">%</span>
-            <button onclick="applyBudgetImpactOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] flex-shrink-0">
-              Optimize
-            </button>
-          </div>
-          <button onclick="resetSmartBuyModes()" class="w-full rounded text-slate-400 hover:text-white hover:border-slate-500 text-[11px] mono transition py-1.5 border border-orange-500/20" title="Reset buy modes">
-            Reset Buy Modes
-          </button>
         </div>
-      </div>
+        <div class="flyout-panel-body">
 
-      <!-- System & Structure -->
-      <div id="flyout-structure" class="flyout-panel">
-        <h2 class="section-label text-orange-400 text-xs mb-1.5">System and Structure</h2>
-        <div class="space-y-1.5">
-          <div class="p-2 rounded" style="background:rgba(0,0,0,0.3); border:1px solid rgba(var(--accent-rgb),0.2);">
-            <div class="flex items-center gap-1.5 mb-1.5">
-              <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="field-line flex-1 min-w-0 text-orange-300 font-bold text-xs">
-                <option value="">— Load a saved production station —</option>
+          <!-- Pricing (search lives in the header now, reachable from any page state) -->
+          <div id="flyout-pricing" class="flyout-section active">
+            <div class="fo-group">
+              <label class="lp-label fo-group-label">Material Cost</label>
+              <select id="input-price-mode" onchange="recalculate()" class="field-line w-full font-bold text-sm">
+                <option value="sell" selected>Sell (Instant)</option>
+                <option value="buy">Buy Order</option>
               </select>
-              <button onclick="deleteProductionPreset()" class="toggle-btn" title="Delete the currently-selected preset">
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-              </button>
             </div>
-            <button onclick="saveProductionPreset()" class="btn-glass w-full py-1.5 text-xs flex items-center justify-center gap-1.5" title="Saves your current system, structure type, and rig fitting as a named preset you can switch back to instantly">
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
-              Save Current as Preset
-            </button>
+            <div class="fo-group">
+              <label class="lp-label fo-group-label">Reactions</label>
+              <select id="include-reactions" onchange="if(currentProduct) selectItem(currentProduct.id, currentProduct.name, true)" class="field-line w-full font-bold text-sm">
+                <option value="true" selected>Reactions ON</option>
+                <option value="false">Reactions OFF</option>
+              </select>
+            </div>
           </div>
-          <div class="relative">
-            <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="System..."
-              class="field-line w-full text-orange-300 font-bold mono uppercase text-sm">
-            <div id="system-results" class="fixed bg-black/25 border border-orange-500 max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
-          </div>
-          <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); recalculate();" class="field-line w-full text-white font-semibold text-xs" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
-            <option value="npc">NPC Station (0% ME / 0% TE / 0% Fee)</option>
-            <option value="raitaru">Raitaru - M EC (1% ME / 15% TE / 3% Fee)</option>
-            <option value="azbel">Azbel - L EC (1% ME / 20% TE / 4% Fee)</option>
-            <option value="sotiyo" selected>Sotiyo - XL EC (1% ME / 30% TE / 5% Fee)</option>
-          </select>
-          <div title="Search and select the actual rigs fitted in your structure (each Engineering Complex has 3 rig slots). Rigs only affect the specific item category and ship size they're built for. Bonus strength scales with your system's security status automatically.">
-            <div class="text-slate-400 text-[10px] font-bold uppercase tracking-wide mb-1">Rig Slots (search to fit)</div>
-            <div class="space-y-1.5">
-              <div class="relative">
-                <input type="text" id="rig-slot-1-input" placeholder="Rig Slot 1: None" autocomplete="off"
-                  oninput="searchRigSlot(1, this.value)" onfocus="searchRigSlot(1, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-1-results'); if (el) el.classList.add('hidden'); }, 200)"
-                  class="field-line w-full text-orange-300 font-semibold text-[11px]">
-                <div id="rig-slot-1-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
-              </div>
-              <div class="relative">
-                <input type="text" id="rig-slot-2-input" placeholder="Rig Slot 2: None" autocomplete="off"
-                  oninput="searchRigSlot(2, this.value)" onfocus="searchRigSlot(2, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-2-results'); if (el) el.classList.add('hidden'); }, 200)"
-                  class="field-line w-full text-orange-300 font-semibold text-[11px]">
-                <div id="rig-slot-2-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
-              </div>
-              <div class="relative">
-                <input type="text" id="rig-slot-3-input" placeholder="Rig Slot 3: None" autocomplete="off"
-                  oninput="searchRigSlot(3, this.value)" onfocus="searchRigSlot(3, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-3-results'); if (el) el.classList.add('hidden'); }, 200)"
-                  class="field-line w-full text-orange-300 font-semibold text-[11px]">
-                <div id="rig-slot-3-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+
+          <!-- Build Actions + Smart Optimizers -->
+          <div id="flyout-build" class="flyout-section">
+            <div class="fo-group">
+              <label class="lp-label fo-group-label">Actions</label>
+              <div class="grid grid-cols-2 gap-1.5">
+                <button onclick="buildAllComponents()" class="btn-glass py-2 px-3 text-xs">
+                  Build All
+                </button>
+                <button onclick="buyAllSubComponents()" class="btn-glass btn-glass-muted py-2 px-3 text-xs">
+                  Buy All
+                </button>
               </div>
             </div>
-          </div>
-          <div class="lp-inset space-y-1 text-[10px] mono">
-            <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">SCI:</span><span id="sci-badge" class="text-orange-300 font-bold text-right truncate">SCI: 4.25% (Mfg) / 1.10% (React)</span></div>
-            <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">Stock:</span><span id="stock-status-text" class="text-orange-400 font-bold text-right truncate"><span id="stock-count-display">0 items</span> in Stock</span></div>
-            <div class="flex justify-between gap-2"><span class="text-slate-500 flex-shrink-0">EIV:</span><span id="eiv-status-text" class="text-orange-400 font-bold text-right truncate">Fetching...</span></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Taxes & Fees -->
-      <div id="flyout-taxes" class="flyout-panel">
-        <h2 class="section-label text-orange-400 text-xs mb-1.5">Taxes and Fees</h2>
-        <div class="grid grid-cols-2 gap-1.5 text-[11px] mono">
-          <div class="lp-inset flex items-center gap-1.5" title="Facility Structure Tax %">
-            <span class="text-slate-400 font-semibold flex-shrink-0">Fac:</span>
-            <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center text-orange-400 font-bold p-1 text-[11px]">
-            <span class="text-slate-500 flex-shrink-0">%</span>
-          </div>
-          <div class="lp-inset flex items-center gap-1.5" title="SCC Surcharge %">
-            <span class="text-slate-400 font-semibold flex-shrink-0">SCC:</span>
-            <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center text-orange-400 font-bold p-1 text-[11px]">
-            <span class="text-slate-500 flex-shrink-0">%</span>
-          </div>
-          <div class="lp-inset flex items-center gap-1.5" title="Sales Tax %">
-            <span class="text-slate-400 font-semibold flex-shrink-0">Sales:</span>
-            <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center text-orange-300 font-bold p-1 text-[11px]">
-            <span class="text-slate-500 flex-shrink-0">%</span>
-          </div>
-          <div class="lp-inset flex items-center gap-1.5" title="Broker Fee %">
-            <span class="text-slate-400 font-semibold flex-shrink-0">Broker:</span>
-            <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center text-orange-300 font-bold p-1 text-[11px]">
-            <span class="text-slate-500 flex-shrink-0">%</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Contract Settings -->
-      <div id="flyout-contract" class="flyout-panel">
-        <h2 class="section-label text-orange-400 text-xs mb-1.5">Contract Settings</h2>
-        <div class="grid grid-cols-2 gap-1.5 text-[11px] mono">
-          <div class="lp-inset flex items-center gap-1.5" title="Contract Sales Tax %">
-            <span class="text-slate-400 font-semibold flex-shrink-0">C.Tax:</span>
-            <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center text-orange-400 font-bold p-1 text-[11px]">
-            <span class="text-slate-500 flex-shrink-0">%</span>
-          </div>
-          <div class="lp-inset flex items-center gap-1.5" title="Contract Broker Fee %">
-            <span class="text-slate-400 font-semibold flex-shrink-0">C.Brk:</span>
-            <input type="number" id="contract-broker" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center text-orange-400 font-bold p-1 text-[11px]">
-            <span class="text-slate-500 flex-shrink-0">%</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Markets -->
-      <div id="flyout-markets" class="flyout-panel">
-        <h2 class="section-label text-orange-400 text-xs mb-1.5">Markets</h2>
-        <div class="space-y-1.5">
-          <div title="All prices (materials and output) are fetched from this station - this is your 'home base' for pricing.">
-            <div class="text-slate-400 text-[10px] font-bold uppercase tracking-wide mb-1">Home Market</div>
-            <div class="relative">
-              <input type="text" id="home-market-input" placeholder="Search station name..." autocomplete="off"
-                oninput="searchHomeMarket(this.value)" onfocus="searchHomeMarket(this.value)"
-                onblur="setTimeout(() => { const el = document.getElementById('home-market-results'); if (el) el.classList.add('hidden'); }, 200)"
-                class="field-line w-full text-orange-300 font-bold mono text-xs">
-              <div id="home-market-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-52 overflow-y-auto hidden z-50 shadow-2xl text-xs"></div>
+            <div class="fo-group">
+              <label class="lp-label fo-group-label">Auto-Build Threshold</label>
+              <div class="lp-inset flex items-center gap-1.5" title="Build Margin Threshold">
+                <span class="fo-inline-label">Min Profit</span>
+                <input type="number" id="build-profit-threshold" value="5.0" step="0.5" min="0" max="100"
+                  class="field-line w-14 text-center font-bold p-1 text-xs">
+                <span class="fo-inline-suffix">%</span>
+                <button onclick="applyBuildProfitOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] mono flex-shrink-0">
+                  Optimize
+                </button>
+              </div>
+            </div>
+            <div class="fo-group">
+              <label class="lp-label fo-group-label">Smart Optimizers</label>
+              <div class="space-y-1.5">
+                <div class="lp-inset flex items-center gap-1.5" title="Component Market Spread Threshold">
+                  <span class="fo-inline-label">Spread</span>
+                  <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100"
+                    class="field-line w-14 text-center font-bold p-1 text-xs">
+                  <span class="fo-inline-suffix">%</span>
+                  <button onclick="applyComponentSpreadOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] flex-shrink-0">
+                    Optimize
+                  </button>
+                </div>
+                <div class="lp-inset flex items-center gap-1.5" title="Build Cost Savings Impact Threshold">
+                  <span class="fo-inline-label">Budget</span>
+                  <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100"
+                    class="field-line w-14 text-center font-bold p-1 text-xs">
+                  <span class="fo-inline-suffix">%</span>
+                  <button onclick="applyBudgetImpactOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] flex-shrink-0">
+                    Optimize
+                  </button>
+                </div>
+                <button onclick="resetSmartBuyModes()" class="btn-glass btn-glass-muted w-full py-1.5 text-[11px] mono" title="Reset buy modes">
+                  Reset Buy Modes
+                </button>
+              </div>
             </div>
           </div>
-          <div title="Markets compared side-by-side (price AND real daily trade volume) whenever you use Compare Markets on a card or BOM row.">
-            <div class="text-slate-400 text-[10px] font-bold uppercase tracking-wide mb-1">Tracked Markets (for Compare)</div>
-            <div id="tracked-markets-list" class="space-y-1 mb-1.5"></div>
-            <div class="relative">
-              <input type="text" id="add-market-input" placeholder="Add a market (search station)..." autocomplete="off"
-                oninput="searchAddMarket(this.value)" onfocus="searchAddMarket(this.value)"
-                onblur="setTimeout(() => { const el = document.getElementById('add-market-results'); if (el) el.classList.add('hidden'); }, 200)"
-                class="field-line w-full text-slate-200 text-[11px]">
-              <div id="add-market-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[11px]"></div>
+
+          <!-- System & Structure -->
+          <div id="flyout-structure" class="flyout-section">
+            <div class="fo-group">
+              <label class="lp-label fo-group-label">Production Preset</label>
+              <div class="lp-inset space-y-1.5">
+                <div class="flex items-center gap-1.5">
+                  <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="field-line flex-1 min-w-0 font-bold text-xs">
+                    <option value="">— Load a saved production station —</option>
+                  </select>
+                  <button onclick="deleteProductionPreset()" class="toggle-btn" title="Delete the currently-selected preset">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                  </button>
+                </div>
+                <button onclick="saveProductionPreset()" class="btn-glass w-full py-1.5 text-xs flex items-center justify-center gap-1.5" title="Saves your current system, structure type, and rig fitting as a named preset you can switch back to instantly">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
+                  Save Current as Preset
+                </button>
+              </div>
+            </div>
+            <div class="fo-group">
+              <label class="lp-label fo-group-label">System</label>
+              <div class="relative">
+                <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="System..."
+                  class="field-line w-full font-bold mono uppercase text-sm">
+                <div id="system-results" class="fixed bg-black/25 border border-orange-500 max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
+              </div>
+            </div>
+            <div class="fo-group">
+              <label class="lp-label fo-group-label">Structure</label>
+              <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); recalculate();" class="field-line w-full text-white font-semibold text-xs" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
+                <option value="npc">NPC Station (0% ME / 0% TE / 0% Fee)</option>
+                <option value="raitaru">Raitaru - M EC (1% ME / 15% TE / 3% Fee)</option>
+                <option value="azbel">Azbel - L EC (1% ME / 20% TE / 4% Fee)</option>
+                <option value="sotiyo" selected>Sotiyo - XL EC (1% ME / 30% TE / 5% Fee)</option>
+              </select>
+            </div>
+            <div class="fo-group" title="Search and select the actual rigs fitted in your structure (each Engineering Complex has 3 rig slots). Rigs only affect the specific item category and ship size they're built for. Bonus strength scales with your system's security status automatically.">
+              <label class="lp-label fo-group-label">Rig Slots (search to fit)</label>
+              <div class="space-y-1.5">
+                <div class="relative">
+                  <input type="text" id="rig-slot-1-input" placeholder="Rig Slot 1: None" autocomplete="off"
+                    oninput="searchRigSlot(1, this.value)" onfocus="searchRigSlot(1, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-1-results'); if (el) el.classList.add('hidden'); }, 200)"
+                    class="field-line w-full font-semibold text-[11px]">
+                  <div id="rig-slot-1-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+                </div>
+                <div class="relative">
+                  <input type="text" id="rig-slot-2-input" placeholder="Rig Slot 2: None" autocomplete="off"
+                    oninput="searchRigSlot(2, this.value)" onfocus="searchRigSlot(2, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-2-results'); if (el) el.classList.add('hidden'); }, 200)"
+                    class="field-line w-full font-semibold text-[11px]">
+                  <div id="rig-slot-2-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+                </div>
+                <div class="relative">
+                  <input type="text" id="rig-slot-3-input" placeholder="Rig Slot 3: None" autocomplete="off"
+                    oninput="searchRigSlot(3, this.value)" onfocus="searchRigSlot(3, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-3-results'); if (el) el.classList.add('hidden'); }, 200)"
+                    class="field-line w-full font-semibold text-[11px]">
+                  <div id="rig-slot-3-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+                </div>
+              </div>
+            </div>
+            <div class="lp-inset space-y-1 text-[10px] mono">
+              <div class="flex justify-between gap-2"><span class="fo-inline-label">SCI:</span><span id="sci-badge" class="font-bold text-right truncate" style="color:var(--text);">SCI: 4.25% (Mfg) / 1.10% (React)</span></div>
+              <div class="flex justify-between gap-2"><span class="fo-inline-label">Stock:</span><span id="stock-status-text" class="font-bold text-right truncate" style="color:var(--text);"><span id="stock-count-display">0 items</span> in Stock</span></div>
+              <div class="flex justify-between gap-2"><span class="fo-inline-label">EIV:</span><span id="eiv-status-text" class="font-bold text-right truncate" style="color:var(--text);">Fetching...</span></div>
             </div>
           </div>
+
+          <!-- Taxes & Fees + Contract Settings -->
+          <div id="flyout-fees" class="flyout-section">
+            <div class="fo-group">
+              <label class="lp-label fo-group-label">Market Orders</label>
+              <div class="grid grid-cols-2 gap-1.5 text-[11px] mono">
+                <div class="lp-inset flex items-center gap-1.5" title="Facility Structure Tax %">
+                  <span class="fo-inline-label">Fac</span>
+                  <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
+                  <span class="fo-inline-suffix">%</span>
+                </div>
+                <div class="lp-inset flex items-center gap-1.5" title="SCC Surcharge %">
+                  <span class="fo-inline-label">SCC</span>
+                  <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
+                  <span class="fo-inline-suffix">%</span>
+                </div>
+                <div class="lp-inset flex items-center gap-1.5" title="Sales Tax %">
+                  <span class="fo-inline-label">Sales</span>
+                  <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
+                  <span class="fo-inline-suffix">%</span>
+                </div>
+                <div class="lp-inset flex items-center gap-1.5" title="Broker Fee %">
+                  <span class="fo-inline-label">Broker</span>
+                  <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
+                  <span class="fo-inline-suffix">%</span>
+                </div>
+              </div>
+            </div>
+            <div class="fo-group">
+              <label class="lp-label fo-group-label">Contracts</label>
+              <div class="grid grid-cols-2 gap-1.5 text-[11px] mono">
+                <div class="lp-inset flex items-center gap-1.5" title="Contract Sales Tax %">
+                  <span class="fo-inline-label">C.Tax</span>
+                  <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
+                  <span class="fo-inline-suffix">%</span>
+                </div>
+                <div class="lp-inset flex items-center gap-1.5" title="Contract Broker Fee %">
+                  <span class="fo-inline-label">C.Brk</span>
+                  <input type="number" id="contract-broker" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
+                  <span class="fo-inline-suffix">%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Markets -->
+          <div id="flyout-markets" class="flyout-section">
+            <div class="fo-group" title="All prices (materials and output) are fetched from this station - this is your 'home base' for pricing.">
+              <label class="lp-label fo-group-label">Home Market</label>
+              <div class="relative">
+                <input type="text" id="home-market-input" placeholder="Search station name..." autocomplete="off"
+                  oninput="searchHomeMarket(this.value)" onfocus="searchHomeMarket(this.value)"
+                  onblur="setTimeout(() => { const el = document.getElementById('home-market-results'); if (el) el.classList.add('hidden'); }, 200)"
+                  class="field-line w-full font-bold mono text-xs">
+                <div id="home-market-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-52 overflow-y-auto hidden z-50 shadow-2xl text-xs"></div>
+              </div>
+            </div>
+            <div class="fo-group" title="Markets compared side-by-side (price AND real daily trade volume) whenever you use Compare Markets on a card or BOM row.">
+              <label class="lp-label fo-group-label">Tracked Markets (for Compare)</label>
+              <div id="tracked-markets-list" class="space-y-1 mb-1.5"></div>
+              <div class="relative">
+                <input type="text" id="add-market-input" placeholder="Add a market (search station)..." autocomplete="off"
+                  oninput="searchAddMarket(this.value)" onfocus="searchAddMarket(this.value)"
+                  onblur="setTimeout(() => { const el = document.getElementById('add-market-results'); if (el) el.classList.add('hidden'); }, 200)"
+                  class="field-line w-full text-slate-200 text-[11px]">
+                <div id="add-market-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[11px]"></div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
-
     </aside>
 
     <!-- Interactive Diagram Viewport -->
@@ -603,11 +619,11 @@
        serially blocking each download on the previous script finishing, while still guaranteeing
        they execute in this exact order once parsing completes - same behavior, faster to get there. -->
   <script src="eve_db.js?v=16.2.0" defer></script>
-  <script src="js/config.js?v=15.7.0" defer></script>
+  <script src="js/config.js?v=15.8.0" defer></script>
   <script src="js/esi.js?v=15.7.0" defer></script>
   <script src="js/tree.js?v=15.1.0" defer></script>
   <script src="js/optimizers.js?v=15.4.0" defer></script>
-  <script src="js/app.js?v=15.20.0" defer></script>
+  <script src="js/app.js?v=15.21.0" defer></script>
   <script src="js/custom-select.js?v=1.2.0" defer></script>
 </body>
 </html>
