@@ -10,7 +10,7 @@
 <title>EVE Deep-Industry Engine</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d3915a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='5' r='2.6'/%3E%3Ccircle cx='6' cy='18.5' r='2.6'/%3E%3Ccircle cx='12' cy='18.5' r='2.6'/%3E%3Ccircle cx='18' cy='18.5' r='2.6'/%3E%3Cpath d='M12 7.6v2.6M12 10.2L6 15.9M12 10.2v5.7M12 10.2l6 5.7'/%3E%3C/svg%3E">
 <script src="https://cdn.tailwindcss.com"></script>
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.13.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.14.0">
 </head>
 <body class="page-calc flex flex-col min-h-screen text-slate-200">
 
@@ -405,14 +405,14 @@
           <span class="group-open:rotate-90 transition-transform" style="color:var(--text-mute);">▶</span>
         </summary>
         <div class="pt-2.5 space-y-2.5">
-          <div class="flex items-center gap-3">
-            <label class="flex items-center gap-1 cursor-pointer font-bold text-[11px] mono" style="color:var(--text-soft);">
-              <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5" style="accent-color:var(--accent);">
-              <span>Pers</span>
+          <div class="flex items-center gap-2">
+            <label class="pill-check">
+              <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()">
+              <span class="pill-check-face"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>Personal</span>
             </label>
-            <label class="flex items-center gap-1 cursor-pointer font-bold text-[11px] mono" style="color:var(--text-soft);">
-              <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()" class="w-3.5 h-3.5" style="accent-color:var(--accent);">
-              <span>Corp</span>
+            <label class="pill-check">
+              <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()">
+              <span class="pill-check-face"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V7a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v14"/><path d="M12 11h6a1 1 0 0 1 1 1v9"/><line x1="8" y1="9" x2="8" y2="9.01"/><line x1="8" y1="13" x2="8" y2="13.01"/><line x1="8" y1="17" x2="8" y2="17.01"/><line x1="16" y1="15" x2="16" y2="15.01"/><line x1="16" y1="19" x2="16" y2="19.01"/></svg>Corp</span>
             </label>
           </div>
           <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterLocationDropdownOptions()"
@@ -435,6 +435,18 @@
             <button onclick="setBOMOrderFilter('buy')" id="btn-bom-order-buy" class="lp-pill" style="padding:5px 12px;">Buy</button>
             <button onclick="setBOMOrderFilter('sell')" id="btn-bom-order-sell" class="lp-pill" style="padding:5px 12px;">Sell</button>
           </div>
+        </div>
+        <!-- Category Filter dropdown -->
+        <div class="flex items-center justify-between text-[11px] mono">
+          <span class="font-bold" style="color:var(--text-mute);">Category:</span>
+          <select id="bom-category-select" onchange="setBOMCategoryFilter(this.value)" class="field-line px-2 py-1 text-[11px] w-40 font-semibold" style="color:var(--text);">
+            <option value="all">All Items</option>
+            <option value="minerals">Minerals</option>
+            <option value="pigas">PI / Gases</option>
+            <option value="fuel">Fuel Blocks</option>
+            <option value="ships">Ships</option>
+            <option value="others">Others</option>
+          </select>
         </div>
       </div>
 
@@ -575,11 +587,11 @@
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting -->
   <script src="eve_db.js?v=15.1.0"></script>
-  <script src="js/config.js?v=15.1.0"></script>
-  <script src="js/esi.js?v=15.3.0"></script>
+  <script src="js/config.js?v=15.2.0"></script>
+  <script src="js/esi.js?v=15.4.0"></script>
   <script src="js/tree.js?v=15.1.0"></script>
   <script src="js/optimizers.js?v=15.2.0"></script>
-  <script src="js/app.js?v=15.15.0"></script>
-  <script src="js/custom-select.js?v=1.1.0"></script>
+  <script src="js/app.js?v=15.16.0"></script>
+  <script src="js/custom-select.js?v=1.2.0"></script>
 </body>
 </html>
