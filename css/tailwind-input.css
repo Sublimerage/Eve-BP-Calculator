@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+/* Explicit source list instead of auto-detection - keeps the scanner away from eve_db.js (a large
+   pure-data file, ~8MB, that would slow the build down and has zero markup/class content anyway)
+   and node_modules. */
+@source "../index.html";
+@source "../ledger.html";
+@source "../invention.html";
+@source "../js/app.js";
+@source "../js/ledger.js";
+@source "../js/invention.js";
+@source "../js/esi.js";
+@source "../js/optimizers.js";
+@source "../js/tree.js";
+@source "../js/config.js";
+@source "../js/custom-select.js";

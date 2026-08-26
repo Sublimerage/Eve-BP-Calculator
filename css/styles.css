@@ -573,6 +573,56 @@ select option:checked, select option:hover { background-color: var(--accent); co
 .csel-option[aria-disabled="true"] { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
 .csel-empty { padding: 10px; font-size: 12px; font-style: italic; text-align: center; color: var(--text-mute); }
 
+/* Toast notifications (js/config.js showToast()) - a real on-screen signal for failures that
+   previously only hit the console or, worse, got overwritten by a false success message. */
+#toast-stack {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  max-width: 360px;
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+  border-left: 3px solid var(--text-mute);
+  border-radius: var(--radius-card);
+  box-shadow: var(--glass-shadow);
+  padding: 11px 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text);
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  opacity: 0;
+  transform: translateX(16px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.toast.is-visible { opacity: 1; transform: translateX(0); }
+.toast-icon { flex-shrink: 0; width: 15px; height: 15px; margin-top: 1px; stroke: currentColor; fill: none; }
+.toast-error { border-left-color: var(--red); }
+.toast-error .toast-icon { color: var(--red); }
+.toast-success { border-left-color: var(--accent); }
+.toast-success .toast-icon { color: var(--accent); }
+.toast-message { flex: 1; min-width: 0; }
+.toast-close {
+  flex-shrink: 0;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-mute);
+}
+.toast-close:hover { color: var(--text); }
+
 /* Pill-styled checkbox (Personal/Corp asset-source toggles, used site-wide) - a real <input
    type="checkbox"> drives it so every existing onchange="applyStockLocationFilter()"/checked read
    keeps working untouched, but it's visually hidden and a sibling face is styled off its :checked
@@ -609,6 +659,19 @@ body.page-calc .pill-check input:checked + .pill-check-face {
 }
 body.page-calc .pill-check input:focus-visible + .pill-check-face {
   box-shadow: 0 0 0 2px rgba(var(--accent-rgb),0.4);
+}
+/* Keyboard focus ring for the rest of the interactive vocabulary - .field-line/.csel-trigger/
+   .pill-check already got one when they were built, but the original buttons/pills/nav tabs only
+   ever styled :hover, so tabbing through them fell back to the browser default (or nothing). */
+body.page-calc .btn-glass:focus-visible,
+body.page-calc .icon-btn:focus-visible,
+body.page-calc .icon-rail-btn:focus-visible,
+body.page-calc .nav-tab:focus-visible,
+body.page-calc .lp-pill:focus-visible,
+body.page-calc .lp-chip-btn:focus-visible,
+body.page-calc .toggle-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb),0.45);
 }
 /* Same custom chevron the ledger/invention selects use, generalized so index.html's differently-
    styled selects (bg-black/*+border, not .field-line) get the same "obviously a dropdown" cue -
@@ -697,6 +760,11 @@ body.page-calc .flyout-panel select:not([size]) {
 .text-orange-200, .text-amber-200 { color: var(--text) !important; }
 .text-orange-300, .text-amber-300 { color: var(--text-soft) !important; }
 .text-orange-400, .text-amber-400 { color: var(--text-soft) !important; }
+/* Same leftover-color cleanup, for Tailwind's default slate gray this time - text-slate-500
+   specifically also failed WCAG AA contrast (4.2:1 against the page background, under the 4.5:1
+   minimum), which routing it to --text-soft (7.6:1) fixes as a side effect. */
+.text-slate-200, .text-slate-300 { color: var(--text) !important; }
+.text-slate-400, .text-slate-500 { color: var(--text-soft) !important; }
 .bg-orange-400, .bg-amber-400 { background: var(--copper-400) !important; }
 .bg-orange-500, [class^="bg-orange-500/"], [class*=" bg-orange-500/"] {
   background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
@@ -838,7 +906,9 @@ body.page-calc {
   --bg-0: #08090a;
   --text: #f2f3f5;
   --text-soft: #9ba0a8;
-  --text-mute: #6b7078;
+  /* #6b7078 (4.0:1 against --bg-0) failed WCAG AA's 4.5:1 minimum for normal text - lightened to
+     5.1:1 while keeping the same neutral gray-blue hue. */
+  --text-mute: #7d8288;
 
   /* Lime ramp dimmed from the original neon peak (was #c8ff4d, 100% saturation/65% lightness) to a
      calmer #9de137 (74%/55%) - same hue, still unmistakably "lime", but no longer bright enough to
@@ -1246,15 +1316,6 @@ body.page-calc #invention-main-area {
 }
 body.page-calc #viewport::before { content: none; }
 
-/* The ledger's Stock & Location toolbar predates the "floating rounded card" layout language -
-   it was a flat, square-cornered, edge-to-edge bar with a divider border, sitting between the
-   header and stat-strip which are both rounded floating cards, reading like a leftover strip from
-   the old UI. Rounding it and dropping the divider makes it a card like everything around it. */
-body.page-calc #ledger-toolbar {
-  border-radius: var(--radius-panel) !important;
-  border: none !important;
-}
-
 body.page-calc #viewport-hint {
   background: rgba(0,0,0,0.45) !important;
   border: none !important;
@@ -1274,3 +1335,48 @@ body.page-calc .hero-num {
 }
 body.page-calc .hero-num.profit { background: linear-gradient(135deg, #ddffa0, var(--accent)); -webkit-background-clip: text; background-clip: text; }
 body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var(--red)); -webkit-background-clip: text; background-clip: text; }
+
+/* ============================================================
+   Narrow-viewport fallback - .content-row (shared by all 3 pages) is a fixed-width side-by-side
+   flex row (icon rail + diagram + BOM sidebar on index.html; two panes on ledger/invention). Below
+   this it stacks vertically instead: nothing left permanently squeezed into a sliver, nothing
+   clipped. Not a full mobile redesign - a floor under "actually usable" instead of "crushed".
+   ============================================================ */
+@media (max-width: 860px) {
+  body.page-calc .content-row {
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: auto;
+  }
+  /* Every direct child (viewport, BOM sidebar, ledger's job list, invention's sidebar) stops
+     fighting for a fixed slice of width and just takes the full row instead. */
+  body.page-calc .content-row > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: none !important;
+  }
+  body.page-calc #viewport {
+    min-height: 60vh;
+  }
+  /* The icon rail switches from a tall narrow column to a horizontal strip along the top, so its
+     icons stay reachable instead of stretching down the page as 80px-wide rows. */
+  body.page-calc .icon-rail {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 10px 0;
+  }
+  /* .flyout-panel normally anchors 88px right of the (now full-width) rail at a fixed 340px wide -
+     on a narrow screen that overflows the viewport sideways. Anchoring to the viewport instead and
+     capping the width to what's actually available fixes that without changing how it opens/closes. */
+  body.page-calc .flyout-panel {
+    position: fixed !important;
+    left: 12px !important;
+    right: 12px !important;
+    top: 72px !important;
+    width: auto !important;
+    max-width: none;
+  }
+}
