@@ -173,6 +173,26 @@
 
     new MutationObserver(() => { trigger.disabled = select.disabled; })
       .observe(select, { attributes: true, attributeFilter: ['disabled'] });
+
+    // Code elsewhere sets select.value directly (e.g. loading a saved production preset) rather
+    // than clicking through this fake dropdown - that's the whole point of leaving the real
+    // <select> in the DOM per the file-header comment, and it DOES correctly update the real value
+    // everything else (recalculate(), etc.) reads. But a plain property assignment fires neither a
+    // 'change' event nor a DOM mutation the MutationObserver above can see, so without this the
+    // trigger button's own visible label silently kept showing the old selection - correct data,
+    // stale label. Overriding the instance's own value accessor (shadowing the prototype's) is the
+    // one place that can't be bypassed by a future call site forgetting to dispatch 'change'.
+    const nativeValueDescriptor = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+    if (nativeValueDescriptor && nativeValueDescriptor.set) {
+      Object.defineProperty(select, 'value', {
+        configurable: true,
+        get() { return nativeValueDescriptor.get.call(select); },
+        set(v) {
+          nativeValueDescriptor.set.call(select, v);
+          updateTriggerLabel(select, trigger);
+        }
+      });
+    }
   }
 
   function scan() {
