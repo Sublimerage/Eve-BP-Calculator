@@ -3,10 +3,16 @@
 let activeJobs = [];
 let buildHistory = [];
 
-let activeOrderFilter = 'all'; 
-let activeCategoryFilter = 'all'; 
+let activeOrderFilter = 'all';
+let activeCategoryFilter = 'all';
 let activeJobSearchQuery = '';
 let activeJobStatusFilter = 'all'; // 'all' | 'started' | 'pending'
+// Job IDs checked to "isolate" - when non-empty, the Consolidated BOM/multibuy below only reflects
+// these jobs' materials instead of the whole queue, so you can shop for just what you're about to
+// build without also buying for everything else still queued. Session-only (resets on reload), same
+// as the other BOM filters above - it's a "right now I'm working on these" scratch selection, not a
+// standing preference.
+let isolatedJobIds = new Set();
 // job IDs with the BOM/details section minimized - persisted so a reload doesn't silently re-expand
 // every card back to its default state.
 let collapsedJobCardIds = new Set(window.safeParseJSON(localStorage.getItem('eve_collapsed_job_cards'), []));
@@ -159,6 +165,18 @@ function renderJournalPage() {
     totalProfitEl.title = profitDataMissing ? 'One or more queued jobs were added before profit tracking existed and are excluded from this total.' : '';
   }
 
+  // When isolation is active, the BOM below is built only from these jobs instead of the whole
+  // queue - a job's own sub-build prerequisites are pulled in automatically (matched by name, the
+  // only link a sub-build job carries back to its parent) since excluding them would make the
+  // isolated list wrongly ask you to buy something your own selected build already makes internally.
+  const relevantJobsForBOM = (() => {
+    if (isolatedJobIds.size === 0) return activeJobs;
+    const isolatedNames = new Set(
+      Array.from(isolatedJobIds).map(id => activeJobs.find(j => j && j.id === id)?.name).filter(Boolean)
+    );
+    return activeJobs.filter(j => j && (isolatedJobIds.has(j.id) || (j.isSubBuild && isolatedNames.has(j.parentJobName))));
+  })();
+
   const consolidatedBOM = {};
   // Anything that's the PRODUCT of another job already in the queue is being supplied internally,
   // not something to shop for - without this, a prerequisite job's own output (e.g. "Pure Synth Exile
@@ -166,9 +184,9 @@ function renderJournalPage() {
   // shopping list as if it needed to be bought from the market, even though it's already accounted
   // for by the job that makes it.
   const internallySuppliedTypeIds = new Set(
-    activeJobs.filter(j => j && j.productTypeId !== undefined).map(j => j.productTypeId)
+    relevantJobsForBOM.filter(j => j && j.productTypeId !== undefined).map(j => j.productTypeId)
   );
-  activeJobs.forEach(job => {
+  relevantJobsForBOM.forEach(job => {
     // Already-started jobs have already committed their materials - a "what do I still need to
     // buy" list has nothing useful to say about them, so they're excluded entirely rather than
     // showing up as clutter (often at 0 qty needed, which conveys nothing).
@@ -224,7 +242,36 @@ function renderJournalPage() {
 
   renderActiveJobsList(allocatedStock);
   renderConsolidatedBOMList(bomItems, aggregatedMissingCost);
+  renderIsolationBanner();
   renderBuildHistoryLedger();
+}
+
+// Checked from a job card - toggles that one job in/out of the isolation set. Sub-build/started jobs
+// never get a checkbox of their own (see the card templates), so this only ever receives a real root
+// job's id.
+function toggleJobIsolation(jobId) {
+  if (isolatedJobIds.has(jobId)) isolatedJobIds.delete(jobId);
+  else isolatedJobIds.add(jobId);
+  renderJournalPage();
+}
+window.toggleJobIsolation = toggleJobIsolation;
+
+function clearJobIsolation() {
+  isolatedJobIds.clear();
+  renderJournalPage();
+}
+window.clearJobIsolation = clearJobIsolation;
+
+function renderIsolationBanner() {
+  const banner = document.getElementById('journal-isolation-banner');
+  if (!banner) return;
+  if (isolatedJobIds.size === 0) {
+    banner.classList.add('hidden');
+    return;
+  }
+  banner.classList.remove('hidden');
+  const countEl = document.getElementById('journal-isolation-count');
+  if (countEl) countEl.textContent = isolatedJobIds.size.toLocaleString();
 }
 
 function renderActiveJobsList(allocatedStock) {
@@ -338,6 +385,14 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
   const p = getEffectiveJobProfit(job);
   const isExpanded = !collapsedJobCardIds.has(job.id);
   const cardStateClass = job.isSubBuild ? 'job-subbuild' : (isJobReady ? 'job-ready' : (job.isStarted ? 'job-started' : ''));
+  // Isolation only makes sense for a real root job that still has materials to shop for - a sub-
+  // build is pulled in automatically whenever its parent is isolated (see renderJournalPage), and a
+  // started job's materials are already committed either way.
+  const isolationCheckboxHTML = (!job.isStarted && !job.isSubBuild) ? `
+    <label class="flex items-center flex-shrink-0" onclick="event.stopPropagation()" title="Isolate: show only this job's (and its prerequisites') materials in the Consolidated BOM">
+      <input type="checkbox" ${isolatedJobIds.has(job.id) ? 'checked' : ''} onchange="toggleJobIsolation(${job.id})" class="w-3.5 h-3.5" style="accent-color:var(--accent);">
+    </label>
+  ` : '';
 
   const expandedDetailHTML = isExpanded ? `
     <div class="px-3 pb-3 pt-1" onclick="event.stopPropagation()">
@@ -361,6 +416,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
          ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
       <div class="flex items-center gap-2 p-2 cursor-pointer overflow-x-auto scrollbar-thin" onclick="toggleJobCardCollapse(${job.id})">
         <span class="drag-handle cursor-grab active:cursor-grabbing px-1 text-sm select-none flex-shrink-0" style="color:var(--text-mute);" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>
+        ${isolationCheckboxHTML}
         <span class="text-xs flex-shrink-0" style="color:var(--text-mute);">${isExpanded ? '▾' : '▸'}</span>
         <img src="${jobIconUrl}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
         <div class="min-w-0 flex-1">
@@ -505,8 +561,18 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
     const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
     const isCollapsed = collapsedJobCardIds.has(job.id);
 
+    // Isolation only makes sense for a real root job that still has materials to shop for - a sub-
+    // build is pulled in automatically whenever its parent is isolated (see renderJournalPage), and
+    // a started job's materials are already committed either way.
+    const isolationCheckboxHTML = (!job.isStarted && !job.isSubBuild) ? `
+      <label class="flex items-center flex-shrink-0" title="Isolate: show only this job's (and its prerequisites') materials in the Consolidated BOM">
+        <input type="checkbox" ${isolatedJobIds.has(job.id) ? 'checked' : ''} onchange="toggleJobIsolation(${job.id})" class="w-3.5 h-3.5" style="accent-color:var(--accent);">
+      </label>
+    ` : '';
+
     const dragHandleHTML = `
-      <div class="flex items-center flex-shrink-0" onclick="event.stopPropagation()">
+      <div class="flex items-center gap-1 flex-shrink-0" onclick="event.stopPropagation()">
+        ${isolationCheckboxHTML}
         <button onclick="toggleJobCardCollapse(${job.id})" class="px-1 text-xs select-none" style="color:var(--text-mute);" title="${isCollapsed ? 'Show full details' : 'Hide Bill of Materials'}">
           ${isCollapsed ? '▸' : '▾'}
         </button>

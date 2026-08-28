@@ -116,18 +116,23 @@ window.selectRigForSlot = selectRigForSlot;
 // --- Blueprint Browser ---
 let _blueprintBrowserData = [];
 
-// The item_id of whichever blueprint was last sent to the calculator via "Load" - persisted (not
-// just an in-memory variable) so reopening the browser later, even after a reload, still shows
-// which one you're currently working from. Keyed by item_id (ESI's unique instance ID per physical
-// blueprint copy) rather than type/ME/TE, since two BPCs of the same item at the same stats are
-// still two different real objects and only one of them is the one you actually picked.
-function getLastLoadedBlueprintItemId() {
-  const raw = localStorage.getItem('eve_last_loaded_blueprint_item_id');
-  return raw ? parseInt(raw) : null;
+// The item_id (+ its blueprint type_id, to validate the link is still current) of whichever
+// blueprint was last sent to the calculator via "Load" - persisted (not just an in-memory variable)
+// so reopening the browser later, even after a reload, still shows which one you're currently
+// working from. Keyed by item_id (ESI's unique instance ID per physical blueprint copy) rather than
+// type/ME/TE, since two BPCs of the same item at the same stats are still two different real objects
+// and only one of them is the one you actually picked. The same pair is also what lets
+// addCurrentJobToLedger() tag a queued job back to the exact BPC it came from (see that function).
+function getLastLoadedBlueprintSource() {
+  return window.safeParseJSON(localStorage.getItem('eve_last_loaded_blueprint_source'), null);
 }
-function setLastLoadedBlueprintItemId(itemId) {
-  if (itemId === undefined || itemId === null) { localStorage.removeItem('eve_last_loaded_blueprint_item_id'); return; }
-  localStorage.setItem('eve_last_loaded_blueprint_item_id', String(itemId));
+function getLastLoadedBlueprintItemId() {
+  const source = getLastLoadedBlueprintSource();
+  return source ? source.itemId : null;
+}
+function setLastLoadedBlueprintSource(itemId, typeId) {
+  if (itemId === undefined || itemId === null) { localStorage.removeItem('eve_last_loaded_blueprint_source'); return; }
+  localStorage.setItem('eve_last_loaded_blueprint_source', JSON.stringify({ itemId, typeId }));
 }
 
 let _blueprintBrowserOpenerEl = null;
@@ -644,6 +649,15 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
   }
 
   const lastLoadedItemId = getLastLoadedBlueprintItemId();
+  // Read fresh from the queue itself every render, rather than maintaining a separate tracked set -
+  // that way the tag always matches reality with zero extra bookkeeping: deleting, collecting, or
+  // undoing a queued job automatically clears its tag here too, since it's just gone from the source
+  // of truth this reads.
+  const queuedBlueprintItemIds = new Set(
+    window.safeParseJSON(localStorage.getItem('eve_ledger_jobs'), [])
+      .map(j => j && j.sourceBlueprintItemId)
+      .filter(id => id !== undefined && id !== null)
+  );
 
   const renderRow = (bp, showStationLabel) => {
     const name = window.TYPE_ID_TO_NAME[bp.type_id] || `Type ${bp.type_id}`;
@@ -652,6 +666,10 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     const isCurrentlyLoaded = lastLoadedItemId !== null && bp.item_id === lastLoadedItemId;
     const loadedBadge = isCurrentlyLoaded
       ? `<span class="lp-badge lp-badge-accent flex-shrink-0" title="This is the blueprint currently loaded in the calculator">✔ Loaded</span>`
+      : '';
+    const isQueued = queuedBlueprintItemIds.has(bp.item_id);
+    const queuedBadge = isQueued
+      ? `<span class="lp-badge lp-badge-danger flex-shrink-0" title="This exact BPC is already sitting in a queued ledger job - re-using it here would plan the same copy twice">🔒 Queued</span>`
       : '';
     const stackBadge = (bp.stackCount && bp.stackCount > 1)
       ? `<span class="lp-badge flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
@@ -683,13 +701,20 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     // text row below - keeps each card to a slimmer two-line footprint instead of three.
     const sourceBadge = `<span class="text-[10px] font-semibold text-slate-500 flex-shrink-0">${window.esc(bp.source)}</span>`;
     const runsBadge = !isOriginal ? `<span class="text-[10px] font-semibold text-slate-500 flex-shrink-0">&bull; Runs: ${bp.runs}</span>` : '';
+    // BPO/BPC as an explicit text badge, not just the icon variant - the /bp vs /bpc render EVE's
+    // image server returns for the same type_id is a subtle white-vs-tinted document difference at
+    // 32px, easy to misread at a glance; this makes the distinction unambiguous regardless of how
+    // that icon renders.
+    const originalBadge = isOriginal
+      ? `<span class="text-[10px] font-bold flex-shrink-0" style="color:var(--text-mute);">BPO</span>`
+      : `<span class="text-[10px] font-bold flex-shrink-0" style="color:var(--blue);">BPC</span>`;
 
     return `
       <div class="rounded-lg bg-black/20 border border-orange-500/20 hover:border-orange-500 p-2.5 transition space-y-1.5${isCurrentlyLoaded ? ' bp-row-loaded' : ''}">
         <div class="flex items-center gap-1.5 min-w-0">
           <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded-md border border-white/10 bg-black/40 flex-shrink-0" loading="lazy" title="${isOriginal ? 'Blueprint Original (BPO)' : 'Blueprint Copy (BPC)'}">
           <span class="font-bold text-slate-200 truncate">${window.esc(name)}</span>
-          ${loadedBadge}${sourceBadge}${runsBadge}${stackBadge}${readinessBadge}
+          ${originalBadge}${loadedBadge}${queuedBadge}${sourceBadge}${runsBadge}${stackBadge}${readinessBadge}
         </div>
         <div class="flex items-center justify-between gap-3">
           <div class="text-[10px] text-slate-500 truncate flex items-center gap-1.5 min-w-0">
@@ -753,8 +778,9 @@ function loadBlueprintIntoCalculator(blueprintTypeId, me, te, runs, itemId) {
   window.customTEOverrides[blueprintTypeId] = te;
 
   // Remember exactly which physical blueprint copy this was, so reopening the browser later - even
-  // after a reload - still shows it highlighted (see getLastLoadedBlueprintItemId's comment).
-  setLastLoadedBlueprintItemId(itemId);
+  // after a reload - still shows it highlighted, and so Add to Job Queue can tag the resulting job
+  // back to it (see getLastLoadedBlueprintSource's comment).
+  setLastLoadedBlueprintSource(itemId, blueprintTypeId);
 
   // BPOs report runs as -1 (unlimited) - only a real BPC has a meaningful fixed run count to carry
   // over. Set before calling selectItem (with preserveView=true, which skips selectItem's own reset
@@ -2081,6 +2107,14 @@ function addCurrentJobToLedger(e) {
     addedAt: new Date().toISOString()
   }));
 
+  // If the currently-loaded item is still the exact BPC last pulled in via "Load" in the blueprint
+  // browser (typeId match - a plain search selection in between would have replaced currentProduct
+  // without touching this stored source, so the match check is what stops a stale link surviving
+  // onto an unrelated job), tag the job with that BPC's item_id so the browser can mark it as
+  // already spoken for and you don't accidentally plan to use the same copy again.
+  const bpSource = getLastLoadedBlueprintSource();
+  const sourceBlueprintItemId = (bpSource && bpSource.typeId === window.recipeTreeRoot.typeId) ? bpSource.itemId : undefined;
+
   const job = {
     id: Date.now() + Math.floor(Math.random() * 1000),
     typeId: window.recipeTreeRoot.typeId,
@@ -2095,6 +2129,7 @@ function addCurrentJobToLedger(e) {
     sellStrategy: selectedStrategy,
     unitSellPrice: unitSellPrice,
     materials: materials,
+    sourceBlueprintItemId: sourceBlueprintItemId,
     addedAt: new Date().toISOString()
   };
 
