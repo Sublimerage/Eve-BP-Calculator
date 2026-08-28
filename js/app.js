@@ -657,13 +657,16 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
   // Read fresh from the queue itself every render, rather than maintaining a separate tracked set -
   // that way the tag always matches reality with zero extra bookkeeping: deleting, collecting, or
   // undoing a queued job automatically clears its tag here too, since it's just gone from the source
-  // of truth this reads. Counts OCCURRENCES per item_id, not just presence - the same physical BPC
-  // (or the same native ESI stack, which already shares one item_id across all its identical copies)
-  // can legitimately be queued more than once if you're planning several jobs off of it.
-  const queuedItemIdCounts = new Map();
+  // of truth this reads. Sums RUNS, not job count or copy count - a BPC with runs left on it isn't
+  // "used up" by one job the way a single-run copy is, and queuing a second job against its
+  // remaining runs is completely legitimate, not a duplicate use. Counting jobs (or even physical
+  // copies) instead of runs was exactly the gap: a 5-run BPC with a single 2-run job queued against
+  // it read as "1/1 Queued" - fully spoken for - when really 3 runs were still free to plan against.
+  const queuedRunsByItemId = new Map();
   window.safeParseJSON(localStorage.getItem('eve_ledger_jobs'), []).forEach(j => {
     const id = j && j.sourceBlueprintItemId;
-    if (id !== undefined && id !== null) queuedItemIdCounts.set(id, (queuedItemIdCounts.get(id) || 0) + 1);
+    if (id === undefined || id === null) return;
+    queuedRunsByItemId.set(id, (queuedRunsByItemId.get(id) || 0) + (j.runsNeeded || 0));
   });
 
   const renderRow = (bp, showStationLabel) => {
@@ -674,15 +677,26 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     const loadedBadge = isCurrentlyLoaded
       ? `<span class="lp-badge lp-badge-accent flex-shrink-0" title="This is the blueprint currently loaded in the calculator">✔ Loaded</span>`
       : '';
-    // memberItemIds only exists on a stackBlueprints() group (stacking ON); with stacking OFF, bp is
-    // one real ESI row, so it's its own sole "member" - either way this adds queued usage across
-    // every physical copy folded into what's actually shown on screen as this one row.
-    const members = bp.memberItemIds || [{ itemId: bp.item_id, count: (bp.quantity > 0) ? bp.quantity : 1 }];
-    const totalCopies = members.reduce((sum, m) => sum + m.count, 0);
-    const queuedCopies = members.reduce((sum, m) => sum + (queuedItemIdCounts.get(m.itemId) || 0), 0);
-    const queuedBadge = queuedCopies > 0
-      ? `<span class="lp-badge lp-badge-danger flex-shrink-0" title="${queuedCopies} of ${totalCopies} cop${totalCopies > 1 ? 'ies' : 'y'} already sitting in a queued ledger job">🔒 ${queuedCopies}/${totalCopies} Queued</span>`
-      : '';
+    // A BPO never depletes (unlimited runs), so "runs queued" isn't a meaningful warning for one -
+    // this only ever shows for BPCs, matching what it's actually for: not double-planning a
+    // resource that runs out.
+    let queuedBadge = '';
+    if (!isOriginal) {
+      // memberItemIds only exists on a stackBlueprints() group (stacking ON); with stacking OFF, bp
+      // is one real ESI row, so it's its own sole "member" - either way, every member here shares
+      // the same runs-per-copy (bp.runs is part of the stacking key), so total available runs for
+      // the row is just runs-per-copy times how many physical copies are folded into it.
+      const members = bp.memberItemIds || [{ itemId: bp.item_id, count: (bp.quantity > 0) ? bp.quantity : 1 }];
+      const runsPerCopy = bp.runs || 1;
+      const totalRuns = members.reduce((sum, m) => sum + m.count, 0) * runsPerCopy;
+      const queuedRuns = members.reduce((sum, m) => {
+        const memberTotalRuns = m.count * runsPerCopy;
+        return sum + Math.min(queuedRunsByItemId.get(m.itemId) || 0, memberTotalRuns);
+      }, 0);
+      queuedBadge = queuedRuns > 0
+        ? `<span class="lp-badge lp-badge-danger flex-shrink-0" title="${queuedRuns} of ${totalRuns} run${totalRuns > 1 ? 's' : ''} already sitting in a queued ledger job">🔒 ${queuedRuns}/${totalRuns} runs queued</span>`
+        : '';
+    }
     const stackBadge = (bp.stackCount && bp.stackCount > 1)
       ? `<span class="lp-badge flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
       : '';
