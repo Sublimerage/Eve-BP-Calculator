@@ -263,15 +263,24 @@ function clearJobIsolation() {
 window.clearJobIsolation = clearJobIsolation;
 
 function renderIsolationBanner() {
-  const banner = document.getElementById('journal-isolation-banner');
-  if (!banner) return;
+  const inset = document.getElementById('journal-isolation-inset');
+  const textEl = document.getElementById('journal-isolation-text');
+  const clearBtn = document.getElementById('journal-isolation-clear-btn');
+  if (!inset || !textEl || !clearBtn) return;
+
   if (isolatedJobIds.size === 0) {
-    banner.classList.add('hidden');
-    return;
+    inset.style.background = '';
+    inset.style.border = '';
+    textEl.style.color = 'var(--text-mute)';
+    textEl.textContent = "Showing materials for the whole queue — check a job's box on the left to shop for just that one";
+    clearBtn.classList.add('hidden');
+  } else {
+    inset.style.background = 'rgba(var(--accent-rgb),0.12)';
+    inset.style.border = '1px solid rgba(var(--accent-rgb),0.35)';
+    textEl.style.color = 'var(--accent)';
+    textEl.textContent = `Showing materials for ${isolatedJobIds.size.toLocaleString()} selected job(s) only`;
+    clearBtn.classList.remove('hidden');
   }
-  banner.classList.remove('hidden');
-  const countEl = document.getElementById('journal-isolation-count');
-  if (countEl) countEl.textContent = isolatedJobIds.size.toLocaleString();
 }
 
 function renderActiveJobsList(allocatedStock) {
@@ -384,7 +393,8 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
 
   const p = getEffectiveJobProfit(job);
   const isExpanded = !collapsedJobCardIds.has(job.id);
-  const cardStateClass = job.isSubBuild ? 'job-subbuild' : (isJobReady ? 'job-ready' : (job.isStarted ? 'job-started' : ''));
+  const isIsolated = isolatedJobIds.has(job.id);
+  const cardStateClass = (job.isSubBuild ? 'job-subbuild' : (isJobReady ? 'job-ready' : (job.isStarted ? 'job-started' : ''))) + (isIsolated ? ' job-isolated' : '');
   // Isolation only makes sense for a real root job that still has materials to shop for - a sub-
   // build is pulled in automatically whenever its parent is isolated (see renderJournalPage), and a
   // started job's materials are already committed either way.
@@ -622,7 +632,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
       </div>
     ` : '';
 
-    const cardStateClass = job.isSubBuild ? 'job-subbuild' : (isJobReady ? 'job-ready' : (job.isStarted ? 'job-started' : ''));
+    const cardStateClass = (job.isSubBuild ? 'job-subbuild' : (isJobReady ? 'job-ready' : (job.isStarted ? 'job-started' : ''))) + (isolatedJobIds.has(job.id) ? ' job-isolated' : '');
 
     return `
       <div class="job-card lp-job-card ${cardStateClass} p-3 flex flex-col justify-between transition space-y-2"
@@ -1150,9 +1160,13 @@ async function syncWithEveIndustryJobs(silent) {
     return true;
   });
 
-  // Only manufacturing (1) and reaction (11) jobs represent "building an item" the way the ledger
-  // models it - research/copying/invention jobs are skipped.
-  const activeRealJobs = allRealJobs.filter(j => j && j.status === 'active' && (j.activity_id === 1 || j.activity_id === 11));
+  // Only manufacturing (1) and reaction jobs represent "building an item" the way the ledger models
+  // it - research/copying/invention jobs are skipped. Reaction is documented as activity_id 11, but
+  // ESI has a long-standing, confirmed inconsistency (see esi-issues#997) where it sometimes reports
+  // real reaction jobs as activity_id 9 instead - an undocumented value that doesn't appear in the
+  // SDE's own ramActivities table at all. Checking only 11 silently dropped any job ESI happened to
+  // tag this way, with no error or warning to explain why it never showed up.
+  const activeRealJobs = allRealJobs.filter(j => j && j.status === 'active' && (j.activity_id === 1 || j.activity_id === 9 || j.activity_id === 11));
   console.info(`[JobSync] ${activeRealJobs.length} active manufacturing/reaction job(s) out of ${allRealJobs.length} total fetched.`);
   activeRealJobs.forEach(rj => {
     console.info(`[JobSync]   Active real job: job_id=${rj.job_id}, product_type_id=${rj.product_type_id}, blueprint_id=${rj.blueprint_id}, blueprint_type_id=${rj.blueprint_type_id}, activity_id=${rj.activity_id}, runs=${rj.runs}`);
@@ -1308,11 +1322,18 @@ async function buildAutoImportedJob(realJob, blueprintMeTeMap) {
     window.recipeTreeRootProductTypeId = productTypeId; // we already know this for certain from ESI
 
     const productName = (window.TYPE_ID_TO_NAME && window.TYPE_ID_TO_NAME[productTypeId]) || (window.EVE_ITEMS && window.EVE_ITEMS[productTypeId]) || `Item ${productTypeId}`;
+    // A reaction's source item is a "Reaction Formula", never a "Blueprint" - matters here because
+    // this constructed name is what resolveProductIdFromBlueprintName() would parse if
+    // recipeTreeRootProductTypeId (set just above, and normally what actually resolves the root)
+    // were ever unset, and it's also just what ends up labeling the node before downstream suffix-
+    // stripping cleans it up.
+    const isReactionJob = realJob.activity_id === 9 || realJob.activity_id === 11;
+    const sourceName = productName + (isReactionJob ? ' Reaction Formula' : ' Blueprint');
 
     let root;
     try {
       // qty is a rough guess (batch yield unknown until the recipe resolves) - corrected below.
-      root = await window.buildRecursiveRecipeTree(blueprintTypeId, productName + ' Blueprint', runs, 0, 6, new Set(), null);
+      root = await window.buildRecursiveRecipeTree(blueprintTypeId, sourceName, runs, 0, 6, new Set(), null);
     } finally {
       window.recipeTreeRootProductTypeId = null; // don't leak into unrelated calls
     }

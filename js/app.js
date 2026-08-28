@@ -611,10 +611,15 @@ function stackBlueprints(list) {
       : `bpc|${bp.type_id}|${bp.material_efficiency}|${bp.time_efficiency}|${bp.runs}|${bp.rootLocationId}|${bp.containerId || ''}`;
     const countForThisEntry = (!isBPO && bp.quantity > 0) ? bp.quantity : 1;
     if (!groups[key]) {
-      groups[key] = { ...bp, stackCount: 0 };
+      groups[key] = { ...bp, stackCount: 0, memberItemIds: [] };
       order.push(key);
     }
     groups[key].stackCount += countForThisEntry;
+    // Track every ESI row (and how many physical copies IT represents - ESI can itself already
+    // report a stack of identical unused BPCs as one row with quantity > 1 sharing one item_id)
+    // folded into this displayed group, so the "N of M queued" badge below can add usage across
+    // all of them, not just whichever one happened to become the group's representative object.
+    groups[key].memberItemIds.push({ itemId: bp.item_id, count: countForThisEntry });
   });
   return order.map(key => groups[key]);
 }
@@ -652,12 +657,14 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
   // Read fresh from the queue itself every render, rather than maintaining a separate tracked set -
   // that way the tag always matches reality with zero extra bookkeeping: deleting, collecting, or
   // undoing a queued job automatically clears its tag here too, since it's just gone from the source
-  // of truth this reads.
-  const queuedBlueprintItemIds = new Set(
-    window.safeParseJSON(localStorage.getItem('eve_ledger_jobs'), [])
-      .map(j => j && j.sourceBlueprintItemId)
-      .filter(id => id !== undefined && id !== null)
-  );
+  // of truth this reads. Counts OCCURRENCES per item_id, not just presence - the same physical BPC
+  // (or the same native ESI stack, which already shares one item_id across all its identical copies)
+  // can legitimately be queued more than once if you're planning several jobs off of it.
+  const queuedItemIdCounts = new Map();
+  window.safeParseJSON(localStorage.getItem('eve_ledger_jobs'), []).forEach(j => {
+    const id = j && j.sourceBlueprintItemId;
+    if (id !== undefined && id !== null) queuedItemIdCounts.set(id, (queuedItemIdCounts.get(id) || 0) + 1);
+  });
 
   const renderRow = (bp, showStationLabel) => {
     const name = window.TYPE_ID_TO_NAME[bp.type_id] || `Type ${bp.type_id}`;
@@ -667,9 +674,14 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     const loadedBadge = isCurrentlyLoaded
       ? `<span class="lp-badge lp-badge-accent flex-shrink-0" title="This is the blueprint currently loaded in the calculator">✔ Loaded</span>`
       : '';
-    const isQueued = queuedBlueprintItemIds.has(bp.item_id);
-    const queuedBadge = isQueued
-      ? `<span class="lp-badge lp-badge-danger flex-shrink-0" title="This exact BPC is already sitting in a queued ledger job - re-using it here would plan the same copy twice">🔒 Queued</span>`
+    // memberItemIds only exists on a stackBlueprints() group (stacking ON); with stacking OFF, bp is
+    // one real ESI row, so it's its own sole "member" - either way this adds queued usage across
+    // every physical copy folded into what's actually shown on screen as this one row.
+    const members = bp.memberItemIds || [{ itemId: bp.item_id, count: (bp.quantity > 0) ? bp.quantity : 1 }];
+    const totalCopies = members.reduce((sum, m) => sum + m.count, 0);
+    const queuedCopies = members.reduce((sum, m) => sum + (queuedItemIdCounts.get(m.itemId) || 0), 0);
+    const queuedBadge = queuedCopies > 0
+      ? `<span class="lp-badge lp-badge-danger flex-shrink-0" title="${queuedCopies} of ${totalCopies} cop${totalCopies > 1 ? 'ies' : 'y'} already sitting in a queued ledger job">🔒 ${queuedCopies}/${totalCopies} Queued</span>`
       : '';
     const stackBadge = (bp.stackCount && bp.stackCount > 1)
       ? `<span class="lp-badge flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
