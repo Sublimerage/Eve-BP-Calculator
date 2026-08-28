@@ -144,6 +144,13 @@ async function openBlueprintBrowser() {
   if (drawer) requestAnimationFrame(() => drawer.classList.remove('translate-x-full'));
   if (_blueprintBrowserData.length === 0) {
     await loadBlueprintBrowserData();
+  } else {
+    // Re-render (not re-fetch) from the already-cached list every time the drawer opens, not just
+    // the first time - otherwise this just re-displays whatever was last rendered, which is from
+    // BEFORE "Load" was ever clicked (Load closes the drawer immediately), so the "✔ Loaded"/"🔒
+    // Queued" tags stay stuck at their old state until something forces a real refetch (the Refresh
+    // button). Cheap and instant since it works off data already in memory, no ESI round-trip.
+    filterBlueprintBrowser();
   }
 }
 window.openBlueprintBrowser = openBlueprintBrowser;
