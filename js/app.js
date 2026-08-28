@@ -116,6 +116,20 @@ window.selectRigForSlot = selectRigForSlot;
 // --- Blueprint Browser ---
 let _blueprintBrowserData = [];
 
+// The item_id of whichever blueprint was last sent to the calculator via "Load" - persisted (not
+// just an in-memory variable) so reopening the browser later, even after a reload, still shows
+// which one you're currently working from. Keyed by item_id (ESI's unique instance ID per physical
+// blueprint copy) rather than type/ME/TE, since two BPCs of the same item at the same stats are
+// still two different real objects and only one of them is the one you actually picked.
+function getLastLoadedBlueprintItemId() {
+  const raw = localStorage.getItem('eve_last_loaded_blueprint_item_id');
+  return raw ? parseInt(raw) : null;
+}
+function setLastLoadedBlueprintItemId(itemId) {
+  if (itemId === undefined || itemId === null) { localStorage.removeItem('eve_last_loaded_blueprint_item_id'); return; }
+  localStorage.setItem('eve_last_loaded_blueprint_item_id', String(itemId));
+}
+
 let _blueprintBrowserOpenerEl = null;
 async function openBlueprintBrowser() {
   _blueprintBrowserOpenerEl = document.activeElement;
@@ -629,10 +643,16 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     }
   }
 
+  const lastLoadedItemId = getLastLoadedBlueprintItemId();
+
   const renderRow = (bp, showStationLabel) => {
     const name = window.TYPE_ID_TO_NAME[bp.type_id] || `Type ${bp.type_id}`;
     const isOriginal = bp.quantity === -1;
     const bpImageVariant = isOriginal ? 'bp' : 'bpc';
+    const isCurrentlyLoaded = lastLoadedItemId !== null && bp.item_id === lastLoadedItemId;
+    const loadedBadge = isCurrentlyLoaded
+      ? `<span class="lp-badge lp-badge-accent flex-shrink-0" title="This is the blueprint currently loaded in the calculator">✔ Loaded</span>`
+      : '';
     const stackBadge = (bp.stackCount && bp.stackCount > 1)
       ? `<span class="lp-badge flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
       : '';
@@ -665,11 +685,11 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     const runsBadge = !isOriginal ? `<span class="text-[10px] font-semibold text-slate-500 flex-shrink-0">&bull; Runs: ${bp.runs}</span>` : '';
 
     return `
-      <div class="rounded-lg bg-black/20 border border-orange-500/20 hover:border-orange-500 p-2.5 transition space-y-1.5">
+      <div class="rounded-lg bg-black/20 border border-orange-500/20 hover:border-orange-500 p-2.5 transition space-y-1.5${isCurrentlyLoaded ? ' bp-row-loaded' : ''}">
         <div class="flex items-center gap-1.5 min-w-0">
           <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded-md border border-white/10 bg-black/40 flex-shrink-0" loading="lazy" title="${isOriginal ? 'Blueprint Original (BPO)' : 'Blueprint Copy (BPC)'}">
           <span class="font-bold text-slate-200 truncate">${window.esc(name)}</span>
-          ${sourceBadge}${runsBadge}${stackBadge}${readinessBadge}
+          ${loadedBadge}${sourceBadge}${runsBadge}${stackBadge}${readinessBadge}
         </div>
         <div class="flex items-center justify-between gap-3">
           <div class="text-[10px] text-slate-500 truncate flex items-center gap-1.5 min-w-0">
@@ -682,7 +702,7 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
             <button onclick="scanSingleBlueprintProfit(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs}, ${bp.quantity}, ${bp.productTypeId || 'null'}, this)" class="btn-glass px-2 py-1 flex items-center justify-center" title="Scan just this blueprint's profit">
               <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><line x1="4" y1="20" x2="4" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="20" y1="20" x2="20" y2="14"/></svg>
             </button>
-            <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs})" class="btn-glass px-2.5 py-1 text-[10px]">Load</button>
+            <button onclick="loadBlueprintIntoCalculator(${bp.type_id}, ${bp.material_efficiency}, ${bp.time_efficiency}, ${bp.runs}, ${bp.item_id || 'null'})" class="btn-glass px-2.5 py-1 text-[10px]">Load</button>
           </div>
         </div>
       </div>
@@ -726,11 +746,15 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
   }).join('');
 }
 
-function loadBlueprintIntoCalculator(blueprintTypeId, me, te, runs) {
+function loadBlueprintIntoCalculator(blueprintTypeId, me, te, runs, itemId) {
   window.customMEOverrides = window.customMEOverrides || {};
   window.customTEOverrides = window.customTEOverrides || {};
   window.customMEOverrides[blueprintTypeId] = me;
   window.customTEOverrides[blueprintTypeId] = te;
+
+  // Remember exactly which physical blueprint copy this was, so reopening the browser later - even
+  // after a reload - still shows it highlighted (see getLastLoadedBlueprintItemId's comment).
+  setLastLoadedBlueprintItemId(itemId);
 
   // BPOs report runs as -1 (unlimited) - only a real BPC has a meaningful fixed run count to carry
   // over. Set before calling selectItem (with preserveView=true, which skips selectItem's own reset
@@ -2081,13 +2105,15 @@ function addCurrentJobToLedger(e) {
 
   updateHeaderLedgerCount();
 
-  const btn = e.target.closest('button');
-  if (btn) {
-    const originalText = btn.innerHTML;
-    btn.innerHTML = subBuildJobs.length > 0 ? `✔ ADDED ${subBuildJobs.length + 1} JOBS` : '✔ ADDED TO QUEUE';
-    setTimeout(() => {
-      btn.innerHTML = originalText;
-    }, 1500);
+  // A toast (not the clicked button's own text, which the recalculate() call above already
+  // replaced by re-rendering the whole tree diagram - by the time execution gets here, e.target is
+  // a detached node from the OLD render, so writing to it was never actually visible) - this is the
+  // one piece of feedback for this action that's guaranteed to still be in the live DOM.
+  if (typeof window.showToast === 'function') {
+    const message = subBuildJobs.length > 0
+      ? `Added ${subBuildJobs.length + 1} jobs to the queue (${window.esc(rootJobName)} + ${subBuildJobs.length} prerequisite${subBuildJobs.length > 1 ? 's' : ''}).`
+      : `Added "${window.esc(rootJobName)}" to the job queue.`;
+    window.showToast(message, 'success');
   }
 }
 

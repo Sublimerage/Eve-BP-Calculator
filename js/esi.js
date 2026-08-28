@@ -1315,18 +1315,36 @@ window.fetchActiveCorpIndustryJobs = fetchActiveCorpIndustryJobs;
 // Fetches the character's owned blueprints (with real ME/TE research levels) from ESI. A job's
 // blueprint_id references a specific blueprint item instance - this is the only place its actual
 // researched ME/TE lives, since the industry jobs endpoint itself doesn't carry that data.
+// Both blueprint endpoints below are paginated by ESI exactly like /assets/ is (same "keep fetching
+// incrementing ?page= until an empty array comes back" pattern already used for assets, rather than
+// trusting the X-Pages header) - a character/corp with a large enough blueprint library (a big BPO
+// collection easily clears the ~1000-per-page default) would otherwise silently lose everything past
+// page 1 here. That's what made blueprints sitting in a well-stocked can look like "some show, some
+// don't" - which ones were missing depended only on where they fell in ESI's own paging, not on
+// anything about the can itself.
 async function fetchCharacterBlueprints() {
   const charId = localStorage.getItem('esi_char_id');
   const accessToken = localStorage.getItem('esi_access_token');
   if (!charId || !accessToken) return [];
+  const results = [];
+  let page = 1;
+  let hasMore = true;
   try {
-    const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/blueprints/?datasource=tranquility`, {}, accessToken, true);
-    if (!res || !res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    while (hasMore) {
+      const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/blueprints/?datasource=tranquility&page=${page}`, {}, accessToken, true);
+      if (!res || !res.ok) break;
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        results.push(...data);
+        page++;
+      } else {
+        hasMore = false;
+      }
+    }
+    return results;
   } catch (e) {
     console.warn('Character blueprints fetch failed:', e);
-    return [];
+    return results;
   }
 }
 window.fetchCharacterBlueprints = fetchCharacterBlueprints;
@@ -1335,14 +1353,25 @@ async function fetchCorpBlueprints() {
   const corpId = localStorage.getItem('esi_corp_id');
   const accessToken = localStorage.getItem('esi_access_token');
   if (!corpId || !accessToken) return [];
+  const results = [];
+  let page = 1;
+  let hasMore = true;
   try {
-    const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/blueprints/?datasource=tranquility`, {}, accessToken, true);
-    if (!res || !res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    while (hasMore) {
+      const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/blueprints/?datasource=tranquility&page=${page}`, {}, accessToken, true);
+      if (!res || !res.ok) break;
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        results.push(...data);
+        page++;
+      } else {
+        hasMore = false;
+      }
+    }
+    return results;
   } catch (e) {
     console.warn('Corp blueprints fetch failed (likely missing role):', e);
-    return [];
+    return results;
   }
 }
 window.fetchCorpBlueprints = fetchCorpBlueprints;
