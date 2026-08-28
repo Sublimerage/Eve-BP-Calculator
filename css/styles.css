@@ -1268,6 +1268,14 @@ body.page-calc .lp-badge-danger { background: rgba(var(--red-rgb),0.18); color: 
    existing buy/sell toggle buttons, where buy is already the highlighted "usually more
    profitable" choice; sell gets this blue so the two are distinguishable at a glance. */
 body.page-calc .lp-badge-blue { background: rgba(106,152,222,0.18); color: #6a98de; }
+
+/* Marks the blueprint-browser row for whatever's currently loaded into the calculator - persists
+   across closing/reopening the drawer (even across a reload) since it's driven by a localStorage-
+   backed item_id, not just in-memory state, so "where did I leave off" survives a full page cycle. */
+body.page-calc .bp-row-loaded {
+  border-color: var(--accent) !important;
+  background: rgba(var(--accent-rgb),0.08) !important;
+}
 body.page-calc .lp-pill {
   display: inline-flex;
   align-items: center;
