@@ -783,10 +783,17 @@ async function resolveAndPopulateLocationFilter(accessToken = null) {
     }
   });
   populateLocationDropdown();
-  if (typeof applyStockLocationFilter === 'function') {
-    applyStockLocationFilter();
-  } else if (typeof applyJournalStockFilter === 'function') {
+  // Ledger's own applyJournalStockFilter() must win when both exist - esi.js's own
+  // applyStockLocationFilter() is a plain top-level function declaration, so it's ALWAYS in scope
+  // on every page (esi.js loads everywhere), even though it was written for index.html/
+  // invention.html. Checking it first meant a fresh asset fetch on ledger.html silently never
+  // called the ledger's own re-render (applyJournalStockFilter -> renderJournalPage) - the stock
+  // data itself was correct, but the Consolidated BOM panel never reflected it. Confirmed bug:
+  // the "Refresh Assets" button appeared to do nothing on the ledger page.
+  if (typeof applyJournalStockFilter === 'function') {
     applyJournalStockFilter();
+  } else if (typeof applyStockLocationFilter === 'function') {
+    applyStockLocationFilter();
   }
 }
 
@@ -946,7 +953,11 @@ function applyStockLocationFilter() {
     }
   });
   updateStockDisplayCount();
-  if (typeof recalculate === 'function') recalculate();
+  // This same function backs both pages that use it directly (index.html's own checkbox/select
+  // onchange handlers, which already worked) - each page's actual recalculation entry point has a
+  // different name, so both are tried; only one will ever exist on a given page.
+  if (typeof window.recalculate === 'function') window.recalculate();
+  else if (typeof window.recalculateInvention === 'function') window.recalculateInvention();
 }
 
 let _pasteModalOpenerEl = null;
