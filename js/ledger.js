@@ -250,8 +250,17 @@ function renderJournalPage() {
 // never get a checkbox of their own (see the card templates), so this only ever receives a real root
 // job's id.
 function toggleJobIsolation(jobId) {
-  if (isolatedJobIds.has(jobId)) isolatedJobIds.delete(jobId);
-  else isolatedJobIds.add(jobId);
+  if (isolatedJobIds.has(jobId)) {
+    isolatedJobIds.delete(jobId);
+  } else {
+    isolatedJobIds.add(jobId);
+    // Isolating is "I'm about to work on this one" - force its detail open so the materials/preset
+    // info the isolation banner promises is actually visible immediately, not just filtered into an
+    // otherwise-still-collapsed card. Un-isolating deliberately leaves the expand state alone (the
+    // user may still want it open).
+    collapsedJobCardIds.delete(jobId);
+    saveCollapsedJobCardIds();
+  }
   renderJournalPage();
 }
 window.toggleJobIsolation = toggleJobIsolation;
@@ -433,6 +442,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
           <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></div>
           ${job.isSubBuild ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);">⚙ Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
           ${job.autoImported ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--accent);" title="No matching plan existed - imported from your active EVE job.">📥 Auto-imported ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
+          ${renderJobPresetBadgeHTML(job)}
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
           <div class="flex items-baseline justify-end gap-1.5 cursor-pointer flex-shrink-0" style="width:96px;" onclick="event.stopPropagation(); copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">
@@ -463,6 +473,231 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
   `;
 }
 
+// --- Production preset tracking (which system/structure/rigs a job's numbers assume) ---
+// app.js (and its getProductionPresets/loadProductionPreset helpers) isn't loaded on this page, so
+// saved presets are re-read directly from the same localStorage key rather than through a shared
+// function - it's just JSON, no need for a cross-file dependency for a one-line parse.
+function getSavedProductionPresetsLocal() {
+  return window.safeParseJSON(localStorage.getItem('eve_production_presets'), {});
+}
+
+// Turns a job's raw productionSnapshot into a friendly label: the name of a currently-saved preset
+// if all 5 fields still match exactly, otherwise a synthesized "Structure @ System" description so
+// there's always something readable even for a combo that was never saved as a named preset.
+function resolveProductionPresetLabel(snapshot) {
+  if (!snapshot) return 'Unknown';
+  const presets = getSavedProductionPresetsLocal();
+  const matchName = Object.keys(presets).find(name => {
+    const p = presets[name];
+    return p && p.systemId === snapshot.systemId && p.facilityKey === snapshot.facilityKey &&
+      (p.rig1 || '') === (snapshot.rig1 || '') && (p.rig2 || '') === (snapshot.rig2 || '') && (p.rig3 || '') === (snapshot.rig3 || '');
+  });
+  if (matchName) return matchName;
+  const structureLabel = (window.STRUCTURE_TYPES && window.STRUCTURE_TYPES[snapshot.facilityKey] && window.STRUCTURE_TYPES[snapshot.facilityKey].shortLabel) || snapshot.facilityKey || '?';
+  const rigCount = [snapshot.rig1, snapshot.rig2, snapshot.rig3].filter(Boolean).length;
+  const rigLabel = rigCount > 0 ? `, ${rigCount} rig${rigCount > 1 ? 's' : ''}` : ', no rigs';
+  return snapshot.systemName ? `${structureLabel} @ ${snapshot.systemName}${rigLabel}` : `${structureLabel}${rigLabel}`;
+}
+
+// Fallback for a job added before preset tracking existed - best guess is whatever's live right now.
+function getCurrentLiveProductionSnapshot() {
+  const sel = window.safeParseJSON(localStorage.getItem('eve_selected_system'), {});
+  return {
+    systemId: sel.id || null, systemName: sel.name || null,
+    facilityKey: localStorage.getItem('eve_active_facility_key') || 'sotiyo',
+    rig1: localStorage.getItem('eve_rig_slot_1') || '',
+    rig2: localStorage.getItem('eve_rig_slot_2') || '',
+    rig3: localStorage.getItem('eve_rig_slot_3') || ''
+  };
+}
+
+// One-line badge for the collapsed card header - visible without expanding, so a wrong preset is
+// spottable at a glance across the whole queue.
+function renderJobPresetBadgeHTML(job) {
+  if (job.autoImported) return '';
+  const isAssumed = !job.productionSnapshot;
+  const label = resolveProductionPresetLabel(job.productionSnapshot || getCurrentLiveProductionSnapshot());
+  return `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);" title="Production preset assumed for this job's materials/cost/time - see the expanded detail below to change it">🏭 ${window.esc(label)}${isAssumed ? ' (assumed)' : ''}</div>`;
+}
+
+// "Preset:" row + change control for the expanded job detail - skipped for auto-imported (real ESI)
+// jobs, whose cost/time/materials already come from EVE itself and shouldn't be replaced by a guess.
+function renderJobPresetRowHTML(job) {
+  if (job.autoImported) return '';
+  const isAssumed = !job.productionSnapshot;
+  const label = resolveProductionPresetLabel(job.productionSnapshot || getCurrentLiveProductionSnapshot());
+  const presets = getSavedProductionPresetsLocal();
+  const presetNames = Object.keys(presets).sort();
+  const optionsHTML = presetNames.length > 0
+    ? presetNames.map(name => `<option value="${window.esc(name)}">${window.esc(name)} (${window.esc(presets[name].systemName)}, ${window.esc(presets[name].facilityLabel)})</option>`).join('')
+    : `<option value="" disabled>No saved presets yet - save one from the Calculator</option>`;
+  return `
+    <div class="flex items-center justify-between gap-2 mb-1.5 pb-1.5 flex-wrap" style="border-bottom:1px solid rgba(255,255,255,0.06);">
+      <span class="text-xs font-bold flex-shrink-0" style="color:var(--text-mute);" title="${isAssumed ? 'This job predates preset tracking, or its preset no longer matches a saved one - showing your currently active setup as a best guess.' : 'Production preset this job\'s materials/cost/time assume'}">
+        🏭 ${window.esc(label)}${isAssumed ? ' <span style="font-style:italic;">(assumed)</span>' : ''}
+      </span>
+      <select onchange="changeJobProductionPreset(${job.id}, this.value); this.value='';" class="field-line text-[10px] font-bold flex-shrink-0" style="max-width:170px; color:var(--accent);" ${presetNames.length === 0 ? 'disabled' : ''} title="Change which production preset this job assumes and recompute its materials/cost/time">
+        <option value="" selected>Change preset...</option>
+        ${optionsHTML}
+      </select>
+    </div>
+  `;
+}
+
+// Shared engine behind "change this job's preset" and "spin off a prerequisite job": temporarily
+// applies a productionSnapshot's facility/rig/system globals, rebuilds a fresh ME/TE-adjusted tree
+// for the given blueprint+runs (same bridge buildAutoImportedJob already uses to do this outside the
+// Calculator page), and ALWAYS restores every touched global afterward regardless of success/failure.
+async function rebuildTreeForSnapshot(blueprintTypeId, name, runs, productTypeId, snapshot) {
+  if (typeof window.buildRecursiveRecipeTree !== 'function') throw new Error('Recipe tree builder not available.');
+
+  const prevFacilityKey = localStorage.getItem('eve_active_facility_key');
+  const prevRig1 = localStorage.getItem('eve_rig_slot_1');
+  const prevRig2 = localStorage.getItem('eve_rig_slot_2');
+  const prevRig3 = localStorage.getItem('eve_rig_slot_3');
+  const prevSecurity = window.activeSystemSecurity;
+  const prevMfgSCI = window.activeMfgSCI;
+  const prevReactSCI = window.activeReactSCI;
+  const prevInventionSCI = window.activeInventionSCI;
+
+  try {
+    localStorage.setItem('eve_active_facility_key', snapshot.facilityKey || 'sotiyo');
+    localStorage.setItem('eve_rig_slot_1', snapshot.rig1 || '');
+    localStorage.setItem('eve_rig_slot_2', snapshot.rig2 || '');
+    localStorage.setItem('eve_rig_slot_3', snapshot.rig3 || '');
+    const currentSystemId = window.safeParseJSON(localStorage.getItem('eve_selected_system'), {}).id;
+    if (snapshot.systemId && snapshot.systemId !== currentSystemId && typeof window.fetchSystemSCIById === 'function') {
+      await window.fetchSystemSCIById(snapshot.systemId, snapshot.systemName);
+    }
+
+    window.recipeTreeRootProductTypeId = productTypeId;
+    let root;
+    try {
+      root = await window.buildRecursiveRecipeTree(blueprintTypeId, name, runs, 0, 6, new Set(), null);
+    } finally {
+      window.recipeTreeRootProductTypeId = null;
+    }
+    if (!root) throw new Error('Could not resolve a recipe tree.');
+
+    root.runsNeeded = runs;
+    root.qtyNeeded = runs * (root.batchYield || 1);
+    const facility = (window.getActiveStructureType ? window.getActiveStructureType().meBonus : 1.0) / 100;
+    if (typeof window.scaleTreeQuantities === 'function') window.scaleTreeQuantities(root, facility);
+
+    const allTypeIds = new Set();
+    if (typeof window.collectAllTypeIds === 'function') window.collectAllTypeIds(root, allTypeIds);
+    if (typeof window.fetchMarketPrices === 'function') await window.fetchMarketPrices(Array.from(allTypeIds));
+    if (typeof window.calculateNodeEIV === 'function') window.calculateNodeEIV(root);
+
+    return {
+      root: root,
+      calculatedCost: typeof window.calculateTreeNodeCost === 'function' ? window.calculateTreeNodeCost(root) : 0,
+      materials: typeof window.extractJobMaterialsForNode === 'function' ? window.extractJobMaterialsForNode(root) : [],
+      totalBuildSeconds: typeof window.calculateTotalBuildSeconds === 'function' ? window.calculateTotalBuildSeconds(root) : 0
+    };
+  } finally {
+    if (prevFacilityKey === null) localStorage.removeItem('eve_active_facility_key'); else localStorage.setItem('eve_active_facility_key', prevFacilityKey);
+    if (prevRig1 === null) localStorage.removeItem('eve_rig_slot_1'); else localStorage.setItem('eve_rig_slot_1', prevRig1);
+    if (prevRig2 === null) localStorage.removeItem('eve_rig_slot_2'); else localStorage.setItem('eve_rig_slot_2', prevRig2);
+    if (prevRig3 === null) localStorage.removeItem('eve_rig_slot_3'); else localStorage.setItem('eve_rig_slot_3', prevRig3);
+    window.activeSystemSecurity = prevSecurity;
+    window.activeMfgSCI = prevMfgSCI;
+    window.activeReactSCI = prevReactSCI;
+    window.activeInventionSCI = prevInventionSCI;
+  }
+}
+
+async function changeJobProductionPreset(jobId, presetName) {
+  if (!presetName) return;
+  const job = activeJobs.find(j => j && j.id === jobId);
+  if (!job || job.autoImported) return;
+  const preset = getSavedProductionPresetsLocal()[presetName];
+  if (!preset) return;
+
+  if (typeof window.showToast === 'function') window.showToast(`Recomputing "${window.esc(job.name)}" for "${window.esc(presetName)}"...`, 'info');
+  try {
+    const result = await rebuildTreeForSnapshot(job.typeId, job.name + ' Blueprint', job.runsNeeded, job.productTypeId, preset);
+    job.calculatedCost = result.calculatedCost;
+    job.qtyNeeded = result.root.qtyNeeded;
+    job.materials = result.materials;
+    job.totalBuildSeconds = result.totalBuildSeconds;
+    // Keep the job's own sell price/strategy as-is - only the bonus-driven numbers (cost/time/
+    // materials) should move when the preset changes, not what you'd sell the output for.
+    if (job.netProfit !== undefined) {
+      job.netProfit = (job.unitSellPrice || 0) * job.qtyNeeded - job.calculatedCost;
+    }
+    job.productionSnapshot = {
+      systemId: preset.systemId || null, systemName: preset.systemName || null,
+      facilityKey: preset.facilityKey || 'sotiyo',
+      rig1: preset.rig1 || '', rig2: preset.rig2 || '', rig3: preset.rig3 || ''
+    };
+    localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
+    renderJournalPage();
+    if (typeof window.showToast === 'function') window.showToast(`"${window.esc(job.name)}" now uses the "${window.esc(presetName)}" preset.`, 'success');
+  } catch (e) {
+    console.warn('[Ledger] changeJobProductionPreset failed:', e);
+    if (typeof window.showToast === 'function') window.showToast('Failed to recompute this job for the new preset - it was left unchanged.', 'error');
+  }
+}
+window.changeJobProductionPreset = changeJobProductionPreset;
+
+// Spins a buildable material off a job's own material list into its own queued prerequisite job,
+// linked exactly the way a Calculator-side sub-build already is (isSubBuild/parentJobName) - so it
+// gets picked up by internallySuppliedTypeIds in renderJournalPage() for free, no new suppression
+// logic needed for the parent's material row to stop double-counting it.
+async function addMaterialAsPrerequisiteJob(jobId, typeId) {
+  const parentJob = activeJobs.find(j => j && j.id === jobId);
+  if (!parentJob) return;
+  const mat = Array.isArray(parentJob.materials) ? parentJob.materials.find(m => m && m.typeId === typeId) : null;
+  if (!mat) return;
+  if (activeJobs.some(j => j && j.productTypeId === typeId)) {
+    if (typeof window.showToast === 'function') window.showToast(`"${window.esc(mat.name)}" is already queued as its own job.`, 'info');
+    return;
+  }
+  const blueprintTypeId = (typeof window.findBlueprintTypeIdForProduct === 'function' ? window.findBlueprintTypeIdForProduct(typeId) : null)
+    || (typeof window.resolveBlueprintIdFromProductName === 'function' ? window.resolveBlueprintIdFromProductName(mat.name) : null);
+  if (!blueprintTypeId) {
+    if (typeof window.showToast === 'function') window.showToast(`No known blueprint for "${window.esc(mat.name)}" - it may be a raw material.`, 'error');
+    return;
+  }
+
+  const recipe = window.recipeMap ? window.recipeMap[blueprintTypeId] : null;
+  const batchYield = typeof window.getBatchYield === 'function' ? window.getBatchYield(recipe, false) : 1;
+  const runs = Math.max(1, Math.ceil(mat.qtyNeeded / (batchYield || 1)));
+  // Build using the PARENT job's own preset (falling back to whatever's currently live if the
+  // parent predates preset tracking), so a prerequisite spun off from a job stays consistent with
+  // it instead of silently picking up whatever the Calculator happens to be set to right now.
+  const snapshot = parentJob.productionSnapshot || getCurrentLiveProductionSnapshot();
+
+  try {
+    const result = await rebuildTreeForSnapshot(blueprintTypeId, mat.name + ' Blueprint', runs, typeId, snapshot);
+    const newJob = {
+      id: Date.now() + Math.floor(Math.random() * 1000),
+      typeId: blueprintTypeId,
+      productTypeId: typeId,
+      name: result.root.productName || mat.name,
+      runsNeeded: runs,
+      qtyNeeded: result.root.qtyNeeded,
+      calculatedCost: result.calculatedCost,
+      totalBuildSeconds: result.totalBuildSeconds,
+      materials: result.materials,
+      isSubBuild: true,
+      parentJobName: parentJob.name,
+      productionSnapshot: snapshot,
+      addedAt: new Date().toISOString()
+    };
+    const parentIndex = activeJobs.findIndex(j => j && j.id === jobId);
+    if (parentIndex === -1) activeJobs.push(newJob); else activeJobs.splice(parentIndex, 0, newJob);
+    localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
+    renderJournalPage();
+    if (typeof window.showToast === 'function') window.showToast(`Added "${window.esc(newJob.name)}" (${runs} run${runs > 1 ? 's' : ''}) as a prerequisite for "${window.esc(parentJob.name)}".`, 'success');
+  } catch (e) {
+    console.warn('[Ledger] addMaterialAsPrerequisiteJob failed:', e);
+    if (typeof window.showToast === 'function') window.showToast('Failed to queue this material as a job.', 'error');
+  }
+}
+window.addMaterialAsPrerequisiteJob = addMaterialAsPrerequisiteJob;
+
 function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) {
     const individualBOMHTML = Array.isArray(job.materials) ? job.materials.map(mat => {
       if (!mat) return '';
@@ -476,10 +711,25 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) {
       const netMissing = Math.max(0, mat.qtyNeeded - consumedQty);
       const isAcquired = netMissing === 0;
 
+      // "+ Build" lets a buildable material become its own prerequisite job in one click - resolved
+      // the same way buildRecursiveRecipeTree resolves it for its own children, so "buildable" here
+      // means exactly what it means everywhere else in the app.
+      let buildActionHTML = '';
+      if (activeJobs.some(j => j && j.productTypeId === mat.typeId)) {
+        buildActionHTML = `<span class="text-[9px] font-bold flex-shrink-0" style="color:var(--accent);" title="Already queued as its own job">✓ Queued</span>`;
+      } else {
+        const bpId = (typeof window.findBlueprintTypeIdForProduct === 'function' ? window.findBlueprintTypeIdForProduct(mat.typeId) : null)
+          || (typeof window.resolveBlueprintIdFromProductName === 'function' ? window.resolveBlueprintIdFromProductName(mat.name) : null);
+        if (bpId) {
+          buildActionHTML = `<button onclick="event.stopPropagation(); addMaterialAsPrerequisiteJob(${job.id}, ${mat.typeId})" class="lp-chip-btn flex-shrink-0" style="font-size:9px; padding:2px 6px;" title="Queue this as its own prerequisite job">+ Build</button>`;
+        }
+      }
+
       return `
-        <div class="flex justify-between items-center text-xs mono py-1" style="color:${isAcquired ? 'var(--accent)' : 'var(--text-mute)'};">
-          <span class="truncate pr-4"><span class="copy-name" data-copy-name="${window.esc(mat.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(mat.name)}">${window.esc(mat.name)}</span></span>
-          <span class="flex-shrink-0">${isAcquired ? `✔ ${mat.qtyNeeded.toLocaleString()}` : `x${mat.qtyNeeded.toLocaleString()} (Deficit: ${netMissing.toLocaleString()})`}</span>
+        <div class="flex justify-between items-center text-xs mono py-1 gap-2" style="color:${isAcquired ? 'var(--accent)' : 'var(--text-mute)'};">
+          <span class="truncate pr-2 flex-1"><span class="copy-name" data-copy-name="${window.esc(mat.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(mat.name)}">${window.esc(mat.name)}</span></span>
+          <span class="flex-shrink-0 whitespace-nowrap">${isAcquired ? `✔ ${mat.qtyNeeded.toLocaleString()}` : `x${mat.qtyNeeded.toLocaleString()} (Deficit: ${netMissing.toLocaleString()})`}</span>
+          ${buildActionHTML}
         </div>
       `;
     }).join('') : '<div class="text-xs italic py-1" style="color:var(--text-mute);">No materials logged for this build.</div>';
@@ -539,13 +789,14 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) {
 
     return `
       <div class="lp-inset">
+        ${renderJobPresetRowHTML(job)}
         <div class="flex justify-between items-center mb-1.5 pb-1.5" style="border-bottom:1px solid rgba(255,255,255,0.06);">
           <span class="text-xs font-bold uppercase tracking-wider rajdhani" style="color:var(--accent);">Job Materials (BOM)</span>
           <button onclick="copyIndividualJobMultibuy(event, ${job.id})" class="lp-chip-btn" style="font-size:10px; padding:3px 8px;">
             📋 Copy BOM
           </button>
         </div>
-        <div class="max-h-28 overflow-y-auto scrollbar-thin">
+        <div class="max-h-48 overflow-y-auto scrollbar-thin">
           ${individualBOMHTML}
         </div>
         <div class="flex flex-col text-xs mono font-bold pt-1.5 mt-1 space-y-1" style="border-top:1px solid rgba(255,255,255,0.06);">
@@ -646,6 +897,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
               <h3 class="font-bold text-base truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></h3>
               ${job.isSubBuild ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
               ${job.autoImported ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--accent);" title="No matching plan existed for this job - imported directly from your active EVE industry job using its real ME/TE and market sell pricing.">📥 Auto-imported from EVE ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
+              <div class="mt-0.5">${renderJobPresetBadgeHTML(job)}</div>
               <div class="text-xs mono mt-0.5" style="color:var(--text-mute);">Added on: ${formattedDate}</div>
             </div>
           </div>

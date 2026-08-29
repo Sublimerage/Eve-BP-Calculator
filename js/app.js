@@ -2118,6 +2118,21 @@ function addCurrentJobToLedger(e) {
 
   const rootJobName = window.recipeTreeRoot.productName || window.recipeTreeRoot.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
 
+  // Snapshot of the 5 raw values that actually drive ME/TE/cost bonuses, taken directly from
+  // whatever's live right now - NOT a reference to a saved preset name (presets can be renamed or
+  // deleted later; the job should stay accurate to what was really used regardless). The Ledger
+  // compares this against currently-saved presets at display time to show a friendly name if one
+  // still matches, and offers it as the starting point for "change this job's production preset".
+  const selectedSystem = window.safeParseJSON(localStorage.getItem('eve_selected_system'), {});
+  const productionSnapshot = {
+    systemId: selectedSystem.id || null,
+    systemName: selectedSystem.name || null,
+    facilityKey: localStorage.getItem('eve_active_facility_key') || 'sotiyo',
+    rig1: localStorage.getItem('eve_rig_slot_1') || '',
+    rig2: localStorage.getItem('eve_rig_slot_2') || '',
+    rig3: localStorage.getItem('eve_rig_slot_3') || ''
+  };
+
   // Every build-toggled sub-assembly becomes its own queued job, inserted before the final job since
   // it's a prerequisite for it. These deliberately have no netProfit field - the final job's profit
   // already accounts for the savings from building these instead of buying them, so giving each
@@ -2137,6 +2152,7 @@ function addCurrentJobToLedger(e) {
     materials: extractJobMaterialsForNode(node),
     isSubBuild: true,
     parentJobName: rootJobName,
+    productionSnapshot: productionSnapshot,
     addedAt: new Date().toISOString()
   }));
 
@@ -2163,6 +2179,7 @@ function addCurrentJobToLedger(e) {
     unitSellPrice: unitSellPrice,
     materials: materials,
     sourceBlueprintItemId: sourceBlueprintItemId,
+    productionSnapshot: productionSnapshot,
     addedAt: new Date().toISOString()
   };
 
