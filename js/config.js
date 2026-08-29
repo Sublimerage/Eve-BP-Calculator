@@ -125,6 +125,21 @@ function copyToClipboardWithFeedback(text, btnEl, options) {
 }
 window.copyToClipboardWithFeedback = copyToClipboardWithFeedback;
 
+// Click-to-copy for an item/job display name (e.g. BOM rows, job cards) - so it can be pasted
+// straight into EVE's own market/contract/multibuy search. The name is read from the clicked
+// element's own data-copy-name attribute rather than threaded through the onclick string, so
+// names containing quotes/apostrophes/ampersands (already HTML-escaped by esc() when the
+// attribute was written) can't break the markup or need JS-string escaping of their own.
+function copyNameToClipboard(e) {
+  if (!e) return;
+  e.stopPropagation();
+  const el = e.currentTarget;
+  const name = el && el.dataset ? el.dataset.copyName : null;
+  if (!name) return;
+  window.copyToClipboardWithFeedback(name, el, { duration: 900 });
+}
+window.copyNameToClipboard = copyNameToClipboard;
+
 // Escape closes the Blueprint Browser drawer / Paste modal (index.html only - both are absent
 // elsewhere, so the element lookups below just no-op on ledger.html/invention.html). custom-
 // select.js already handles Escape for its own dropdown panels independently.
