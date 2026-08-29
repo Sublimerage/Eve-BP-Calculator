@@ -407,9 +407,13 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
   // Isolation only makes sense for a real root job that still has materials to shop for - a sub-
   // build is pulled in automatically whenever its parent is isolated (see renderJournalPage), and a
   // started job's materials are already committed either way.
+  // A bare unlabeled checkbox here was easy to miss entirely (confirmed - users couldn't find it),
+  // so this uses the same labeled pill-check component the Stock & Location Personal/Corp toggles
+  // use, instead of a 14px checkmark with no text.
   const isolationCheckboxHTML = (!job.isStarted && !job.isSubBuild) ? `
-    <label class="flex items-center flex-shrink-0" onclick="event.stopPropagation()" title="Isolate: show only this job's (and its prerequisites') materials in the Consolidated BOM">
-      <input type="checkbox" ${isolatedJobIds.has(job.id) ? 'checked' : ''} onchange="toggleJobIsolation(${job.id})" class="w-3.5 h-3.5" style="accent-color:var(--accent);">
+    <label class="pill-check flex-shrink-0" onclick="event.stopPropagation()" title="Isolate: show only this job's (and its prerequisites') materials in the Consolidated BOM">
+      <input type="checkbox" ${isolatedJobIds.has(job.id) ? 'checked' : ''} onchange="toggleJobIsolation(${job.id})">
+      <span class="pill-check-face">🔍 Isolate</span>
     </label>
   ` : '';
 
@@ -825,9 +829,13 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
     // Isolation only makes sense for a real root job that still has materials to shop for - a sub-
     // build is pulled in automatically whenever its parent is isolated (see renderJournalPage), and
     // a started job's materials are already committed either way.
+    // Same labeled pill-check as the list-row version (see renderJobListRowHTML) instead of a bare
+    // unlabeled checkbox - this container already has its own stopPropagation, so the label doesn't
+    // need its own like the list-row version does.
     const isolationCheckboxHTML = (!job.isStarted && !job.isSubBuild) ? `
-      <label class="flex items-center flex-shrink-0" title="Isolate: show only this job's (and its prerequisites') materials in the Consolidated BOM">
-        <input type="checkbox" ${isolatedJobIds.has(job.id) ? 'checked' : ''} onchange="toggleJobIsolation(${job.id})" class="w-3.5 h-3.5" style="accent-color:var(--accent);">
+      <label class="pill-check flex-shrink-0" title="Isolate: show only this job's (and its prerequisites') materials in the Consolidated BOM">
+        <input type="checkbox" ${isolatedJobIds.has(job.id) ? 'checked' : ''} onchange="toggleJobIsolation(${job.id})">
+        <span class="pill-check-face">🔍 Isolate</span>
       </label>
     ` : '';
 
