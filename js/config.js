@@ -974,15 +974,28 @@ window.buildPrepackedIndexes = function() {
       });
     }
 
+    // EVE_RECIPES can contain a self-referential entry for a plain product item (its own
+    // blueprintTypeID wrongly equal to its productTypeID - an SDE/fetch data-quality issue, not
+    // something this app's own logic produces) sitting alongside the item's REAL recipe under a
+    // different key. Both write to the same recipeMap slot, so whichever happens to be iterated
+    // last here would silently win - this guard keeps a real (non-self-referential) recipe from
+    // ever being overwritten by a self-referential one, regardless of Object.entries() order.
+    const setRecipeMapEntry = (key, recipe) => {
+      const existing = recipeMap[key];
+      const incomingIsSelfRef = recipe.blueprintTypeID === recipe.productTypeID;
+      if (existing && incomingIsSelfRef && existing.blueprintTypeID !== existing.productTypeID) return;
+      recipeMap[key] = recipe;
+    };
+
     if (recipesObj && typeof recipesObj === 'object') {
       for (const [idStr, recipe] of Object.entries(recipesObj)) {
         if (!recipe) continue;
         const keyId = parseInt(idStr);
-        recipeMap[keyId] = recipe;
+        setRecipeMapEntry(keyId, recipe);
         const bpId = recipe.blueprintTypeID || recipe.bp || recipe.bpId;
         const pId = recipe.productTypeID || recipe.product || recipe.p || recipe.pId;
-        if (bpId) recipeMap[parseInt(bpId)] = recipe;
-        if (pId) recipeMap[parseInt(pId)] = recipe;
+        if (bpId) setRecipeMapEntry(parseInt(bpId), recipe);
+        if (pId) setRecipeMapEntry(parseInt(pId), recipe);
       }
     }
 
