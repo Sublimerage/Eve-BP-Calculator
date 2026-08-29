@@ -1337,6 +1337,11 @@ body.page-calc .lp-chip-btn {
 }
 body.page-calc .lp-chip-btn svg { width: 11px; height: 11px; stroke: currentColor; fill: none; flex-shrink: 0; }
 body.page-calc .lp-chip-btn:hover { background: rgba(var(--accent-rgb),0.28); }
+/* Click-to-copy affordance for item/job names (BOM rows, job cards) - a dotted underline plus an
+   accent color on hover, so the interactivity reads at a glance without needing a dedicated icon
+   on every single row. */
+body.page-calc .copy-name { cursor: pointer; text-decoration: underline dotted rgba(255,255,255,0.25); text-underline-offset: 2px; transition: color 0.15s ease, text-decoration-color 0.15s ease; }
+body.page-calc .copy-name:hover { color: var(--accent) !important; text-decoration-color: var(--accent); }
 body.page-calc .lp-table { width: 100%; border-collapse: collapse; text-align: left; }
 body.page-calc .lp-table th {
   padding: 8px;
