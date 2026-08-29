@@ -1768,6 +1768,20 @@ function updateJournalStockCountBadge() {
   el.textContent = `${totalItems.toLocaleString()} items`;
 }
 
+// "Last synced: Xm ago" line next to the Stock & Location panel's Refresh button - the age is
+// what actually answers "can I trust this stock count", not just whether a sync ever happened.
+function updateStockLastSyncedDisplay() {
+  const el = document.getElementById('stock-last-synced');
+  if (!el) return;
+  const raw = localStorage.getItem('eve_assets_last_synced');
+  const ts = raw ? parseInt(raw, 10) : null;
+  const ago = ts ? window.formatTimeAgo(ts) : null;
+  el.textContent = ago ? `Last synced: ${ago}` : 'Never synced';
+}
+window.updateStockLastSyncedDisplay = updateStockLastSyncedDisplay;
+// Keep the "Xm ago" text current while the ledger sits open, same idea as the job countdown timers.
+setInterval(() => { if (typeof updateStockLastSyncedDisplay === 'function') updateStockLastSyncedDisplay(); }, 60000);
+
 function applyJournalStockFilter() {
   const filterVal = document.getElementById('stock-location-filter')?.value || 'all';
   const useChar = document.getElementById('use-char-assets')?.checked ?? true;
@@ -1901,6 +1915,7 @@ window.onload = async () => {
     updateViewModeButtonLabel();
     populateJournalLocationDropdown();
     updateJournalStockCountBadge();
+    updateStockLastSyncedDisplay();
     renderJournalPage();
     applyHistoryDrawerState(getHistoryDrawerState());
     updateJobNotificationButton();

@@ -218,6 +218,20 @@ function formatDuration(seconds) {
 }
 window.formatDuration = formatDuration;
 
+// Compact "Xm ago" / "Xh Ym ago" relative-time string - e.g. for "last synced" indicators.
+function formatTimeAgo(timestampMs) {
+  if (!timestampMs) return null;
+  const seconds = Math.max(0, (Date.now() - timestampMs) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ${minutes % 60}m ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ${hours % 24}h ago`;
+}
+window.formatTimeAgo = formatTimeAgo;
+
 // --- Selectable color themes ---
 // The actual re-skinning happens purely in CSS (see css/styles.css's html[data-theme="..."] blocks)
 // by swapping --accent/--accent-2/--accent-rgb and the --copper-* ramp - this list is just the menu

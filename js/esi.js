@@ -670,6 +670,13 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     }
     await resolveAndPopulateLocationFilter(accessToken);
+    if (assetsFetchOk) {
+      localStorage.setItem('eve_assets_last_synced', String(Date.now()));
+      // Shared choke point for both the manual Refresh button AND the automatic re-fetch that
+      // happens on every page load when already logged in - so the "Last synced" text on the
+      // ledger's Stock & Location panel stays honest regardless of which path populated the data.
+      if (typeof window.updateStockLastSyncedDisplay === 'function') window.updateStockLastSyncedDisplay();
+    }
     return assetsFetchOk;
   } catch (err) {
     console.warn('Assets fetch error:', err);
