@@ -1380,9 +1380,14 @@ body.page-calc .lp-group-header {
   gap: 8px;
   padding: 8px 12px;
   border-radius: var(--radius-btn);
-  background: rgba(255,255,255,0.04);
+  /* Was rgba(255,255,255,0.04) - almost identical to a job card's own --glass-fill wash
+     (0.05 -> 0.013 gradient), so the "Pending" header (which unlike "In Progress" gets no accent
+     tint) barely read as a separate element from the cards below it. Bumped for contrast and
+     given its own bottom edge so the divide is unambiguous regardless of theme/monitor. */
+  background: rgba(255,255,255,0.1);
+  border-bottom: 1px solid var(--glass-border-top);
 }
-body.page-calc .lp-group-header.is-active { background: rgba(var(--accent-rgb),0.12); }
+body.page-calc .lp-group-header.is-active { background: rgba(var(--accent-rgb),0.12); border-bottom-color: rgba(var(--accent-rgb),0.35); }
 body.page-calc .lp-inset {
   background: rgba(0,0,0,0.18);
   border-radius: var(--radius-btn);
