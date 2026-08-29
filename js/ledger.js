@@ -263,8 +263,11 @@ function toggleJobIsolation(jobId) {
 window.toggleJobIsolation = toggleJobIsolation;
 
 // Focus mode - see the module-level focusedJobId comment for how this differs from isolation above.
+// Clicking Focus on the job that's already focused exits back to the normal queue (a toggle);
+// clicking it on a different job (e.g. a prerequisite's own Focus button while its parent is
+// focused) switches focus to that job instead.
 function enterJobFocus(jobId) {
-  focusedJobId = jobId;
+  focusedJobId = (focusedJobId === jobId) ? null : jobId;
   renderJournalPage();
 }
 window.enterJobFocus = enterJobFocus;
@@ -274,6 +277,17 @@ function exitJobFocus() {
   renderJournalPage();
 }
 window.exitJobFocus = exitJobFocus;
+
+// Shared by both card layouts - a visibly different (solid-filled) state when this job is the one
+// currently focused, both to confirm it worked and as a hint that clicking it again exits.
+function renderFocusButtonHTML(job) {
+  const isFocused = focusedJobId === job.id;
+  const activeStyle = isFocused ? 'background:var(--accent); color:#0a1002;' : '';
+  const title = isFocused
+    ? 'Exit focus mode'
+    : 'Focus: show just this job (and its prerequisites) full-size, with the rest of the queue hidden';
+  return `<button onclick="event.stopPropagation(); enterJobFocus(${job.id})" class="lp-chip-btn flex-shrink-0" style="${activeStyle}" title="${title}">🔎 Focus</button>`;
+}
 
 function clearJobIsolation() {
   isolatedJobIds.clear();
@@ -338,7 +352,7 @@ function renderFocusedJobView(container, jobId, allocatedStock, isStockDeductEna
   // change to the card (that's what the collapse toggle itself is for).
   const priorCollapseState = focusJobs.map(j => collapsedJobCardIds.has(j.id));
   focusJobs.forEach(j => collapsedJobCardIds.delete(j.id));
-  const cardsHTML = focusJobs.map(j => renderJobCardHTML(j, allocatedStock, isStockDeductEnabled)).join('');
+  const cardsHTML = focusJobs.map(j => renderJobCardHTML(j, allocatedStock, isStockDeductEnabled, true)).join('');
   focusJobs.forEach((j, i) => { if (priorCollapseState[i]) collapsedJobCardIds.add(j.id); });
 
   const prereqCount = focusJobs.length - 1;
@@ -349,7 +363,7 @@ function renderFocusedJobView(container, jobId, allocatedStock, isStockDeductEna
       </span>
       <button onclick="exitJobFocus()" class="lp-chip-btn flex-shrink-0">← Back to Queue</button>
     </div>
-    <div class="grid grid-cols-1 gap-3" style="max-width:900px;">
+    <div class="grid grid-cols-1 gap-3">
       ${cardsHTML}
     </div>
   `;
@@ -482,13 +496,18 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
   // A bare unlabeled checkbox here was easy to miss entirely (confirmed - users couldn't find it),
   // so this uses the same labeled pill-check component the Stock & Location Personal/Corp toggles
   // use, instead of a 14px checkmark with no text.
-  const isolationCheckboxHTML = (!job.isStarted && !job.isSubBuild) ? `
-    <label class="pill-check flex-shrink-0" onclick="event.stopPropagation()" title="Shop: show only this job's (and its prerequisites') materials in the Consolidated BOM sidebar">
+  // The Shop pill only applies to root pending jobs (see comment above) - a sub-build/started job
+  // renders the SAME pill markup but invisible (visibility:hidden, not an empty string) so it still
+  // reserves its exact width. Without this, rows that skip it end up with one fewer element before
+  // the icon than rows that have it, and everything after (icon, name, runs, cost...) drifts out of
+  // column alignment against neighboring rows that DO show the pill.
+  const isolationCheckboxHTML = `
+    <label class="pill-check flex-shrink-0" onclick="event.stopPropagation()" title="Shop: show only this job's (and its prerequisites') materials in the Consolidated BOM sidebar" ${(!job.isStarted && !job.isSubBuild) ? '' : 'style="visibility:hidden;"'}>
       <input type="checkbox" ${isolatedJobIds.has(job.id) ? 'checked' : ''} onchange="toggleJobIsolation(${job.id})">
       <span class="pill-check-face">🛒 Shop</span>
     </label>
-  ` : '';
-  const focusButtonHTML = `<button onclick="event.stopPropagation(); enterJobFocus(${job.id})" class="lp-chip-btn flex-shrink-0" title="Focus: show just this job (and its prerequisites) full-size, with the rest of the queue hidden">🔎 Focus</button>`;
+  `;
+  const focusButtonHTML = renderFocusButtonHTML(job);
 
   const expandedDetailHTML = isExpanded ? `
     <div class="px-3 pb-3 pt-1" onclick="event.stopPropagation()">
@@ -776,7 +795,15 @@ async function addMaterialAsPrerequisiteJob(jobId, typeId) {
 }
 window.addMaterialAsPrerequisiteJob = addMaterialAsPrerequisiteJob;
 
-function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) {
+function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocusMode) {
+    // Focus mode trades the compact per-card list (small text, no icons, clipped to a few rows -
+    // right for a grid full of cards) for a much roomier one (item icons, larger text, no clip) -
+    // it's the whole reason Focus mode exists, so this is the one place that distinction matters.
+    const rowTextClass = isFocusMode ? 'text-sm' : 'text-xs';
+    const rowPadClass = isFocusMode ? 'py-2' : 'py-1';
+    const buildBtnStyle = isFocusMode ? '' : 'font-size:9px; padding:2px 6px;';
+    const queuedTextClass = isFocusMode ? 'text-xs' : 'text-[9px]';
+
     const individualBOMHTML = Array.isArray(job.materials) ? job.materials.map(mat => {
       if (!mat) return '';
       const availableInStock = isStockDeductEnabled ? (allocatedStock[mat.typeId] || 0) : 0;
@@ -794,17 +821,22 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) {
       // means exactly what it means everywhere else in the app.
       let buildActionHTML = '';
       if (activeJobs.some(j => j && j.productTypeId === mat.typeId)) {
-        buildActionHTML = `<span class="text-[9px] font-bold flex-shrink-0" style="color:var(--accent);" title="Already queued as its own job">✓ Queued</span>`;
+        buildActionHTML = `<span class="${queuedTextClass} font-bold flex-shrink-0" style="color:var(--accent);" title="Already queued as its own job">✓ Queued</span>`;
       } else {
         const bpId = (typeof window.findBlueprintTypeIdForProduct === 'function' ? window.findBlueprintTypeIdForProduct(mat.typeId) : null)
           || (typeof window.resolveBlueprintIdFromProductName === 'function' ? window.resolveBlueprintIdFromProductName(mat.name) : null);
         if (bpId) {
-          buildActionHTML = `<button onclick="event.stopPropagation(); addMaterialAsPrerequisiteJob(${job.id}, ${mat.typeId})" class="lp-chip-btn flex-shrink-0" style="font-size:9px; padding:2px 6px;" title="Queue this as its own prerequisite job">+ Build</button>`;
+          buildActionHTML = `<button onclick="event.stopPropagation(); addMaterialAsPrerequisiteJob(${job.id}, ${mat.typeId})" class="lp-chip-btn flex-shrink-0" style="${buildBtnStyle}" title="Queue this as its own prerequisite job">+ Build</button>`;
         }
       }
 
+      const iconHTML = isFocusMode
+        ? `<img src="${window.getItemIconUrl(mat.typeId, mat.name, 32)}" class="w-6 h-6 rounded flex-shrink-0" loading="lazy" onerror="this.style.visibility='hidden';">`
+        : '';
+
       return `
-        <div class="flex justify-between items-center text-xs mono py-1 gap-2" style="color:${isAcquired ? 'var(--accent)' : 'var(--text-mute)'};">
+        <div class="flex justify-between items-center ${rowTextClass} mono ${rowPadClass} gap-2" style="color:${isAcquired ? 'var(--accent)' : 'var(--text-mute)'};">
+          ${iconHTML}
           <span class="truncate pr-2 flex-1"><span class="copy-name" data-copy-name="${window.esc(mat.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(mat.name)}">${window.esc(mat.name)}</span></span>
           <span class="flex-shrink-0 whitespace-nowrap">${isAcquired ? `✔ ${mat.qtyNeeded.toLocaleString()}` : `x${mat.qtyNeeded.toLocaleString()} (Deficit: ${netMissing.toLocaleString()})`}</span>
           ${buildActionHTML}
@@ -865,19 +897,21 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) {
       `;
     }
 
+    const headerTextClass = isFocusMode ? 'text-sm' : 'text-xs';
+    const statsTextClass = isFocusMode ? 'text-sm' : 'text-xs';
     return `
       <div class="lp-inset">
         ${renderJobPresetRowHTML(job)}
         <div class="flex justify-between items-center mb-1.5 pb-1.5" style="border-bottom:1px solid rgba(255,255,255,0.06);">
-          <span class="text-xs font-bold uppercase tracking-wider rajdhani" style="color:var(--accent);">Job Materials (BOM)</span>
+          <span class="${headerTextClass} font-bold uppercase tracking-wider rajdhani" style="color:var(--accent);">Job Materials (BOM)</span>
           <button onclick="copyIndividualJobMultibuy(event, ${job.id})" class="lp-chip-btn" style="font-size:10px; padding:3px 8px;">
             📋 Copy BOM
           </button>
         </div>
-        <div class="max-h-48 overflow-y-auto scrollbar-thin">
+        <div class="${isFocusMode ? '' : 'max-h-48 overflow-y-auto'} scrollbar-thin">
           ${individualBOMHTML}
         </div>
-        <div class="flex flex-col text-xs mono font-bold pt-1.5 mt-1 space-y-1" style="border-top:1px solid rgba(255,255,255,0.06);">
+        <div class="flex flex-col ${statsTextClass} mono font-bold pt-1.5 mt-1 space-y-1" style="border-top:1px solid rgba(255,255,255,0.06);">
           ${buildTimeUI}
           <div class="flex justify-between items-center mt-0.5">
             <span style="color:var(--text-soft);">Total Build Cost:</span>
@@ -894,7 +928,7 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) {
     `;
 }
 
-function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
+function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMode) {
     const iconTypeId = job.productTypeId || job.typeId;
     const isJobReady = job.isStarted && job.startedAt && ((Date.now() - job.startedAt) / 1000 >= (job.totalBuildSeconds || 0));
     const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
@@ -916,7 +950,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
     const dragHandleHTML = `
       <div class="flex items-center gap-1 flex-shrink-0" onclick="event.stopPropagation()">
         ${isolationCheckboxHTML}
-        <button onclick="enterJobFocus(${job.id})" class="lp-chip-btn" title="Focus: show just this job (and its prerequisites) full-size, with the rest of the queue hidden">🔎 Focus</button>
+        ${renderFocusButtonHTML(job)}
         <button onclick="toggleJobCardCollapse(${job.id})" class="px-1 text-xs select-none" style="color:var(--text-mute);" title="${isCollapsed ? 'Show full details' : 'Hide Bill of Materials'}">
           ${isCollapsed ? '▸' : '▾'}
         </button>
@@ -975,9 +1009,9 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
            ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
         <div class="flex items-start justify-between">
           <div class="flex items-start space-x-3 min-w-0 flex-1">
-            <img src="${jobIconUrl}" class="w-12 h-12 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
+            <img src="${jobIconUrl}" class="${isFocusMode ? 'w-20 h-20' : 'w-12 h-12'} rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
-              <h3 class="font-bold text-base truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></h3>
+              <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></h3>
               ${job.isSubBuild ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
               ${job.autoImported ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--accent);" title="No matching plan existed for this job - imported directly from your active EVE industry job using its real ME/TE and market sell pricing.">📥 Auto-imported from EVE ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
               <div class="mt-0.5">${renderJobPresetBadgeHTML(job)}</div>
@@ -1000,7 +1034,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
           <span class="text-sm mono" style="color:var(--text-mute);">${job.qtyNeeded.toLocaleString()} units total</span>
         </div>
 
-        ${!isCollapsed ? renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) : `
+        ${!isCollapsed ? renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocusMode) : `
           <div class="lp-inset text-xs italic text-center" style="color:var(--text-mute);">
             Details minimized - click ▸ above to expand
           </div>
