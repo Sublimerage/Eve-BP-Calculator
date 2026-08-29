@@ -2683,7 +2683,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
       row.innerHTML = `
         <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
         ${strategyBadge}
-        <span class="font-semibold truncate flex-1 copy-name" style="color:var(--text-soft);" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${item.name}</span>
+        <span class="font-semibold truncate flex-1" style="color:var(--text-soft);"><span class="copy-name" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${item.name}</span></span>
         <span class="text-xs mono flex-shrink-0" style="color:var(--text-mute);">&times;${item.qty.toLocaleString()}</span>
         <span class="font-bold mono flex-shrink-0 w-24 text-right" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>
       `;
@@ -2694,7 +2694,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
           <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-2">
-              <span class="font-semibold truncate copy-name" style="color:var(--text-soft);" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${item.name}</span>
+              <span class="font-semibold truncate" style="color:var(--text-soft);"><span class="copy-name" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${item.name}</span></span>
               <span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>
             </div>
             <div class="flex items-center gap-1 mt-1.5">

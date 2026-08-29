@@ -430,7 +430,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
         <span class="text-xs flex-shrink-0" style="color:var(--text-mute);">${isExpanded ? '▾' : '▸'}</span>
         <img src="${jobIconUrl}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
         <div class="min-w-0 flex-1">
-          <div class="font-bold text-sm truncate copy-name" style="color:var(--text);" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</div>
+          <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></div>
           ${job.isSubBuild ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);">⚙ Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
           ${job.autoImported ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--accent);" title="No matching plan existed - imported from your active EVE job.">📥 Auto-imported ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
         </div>
@@ -478,7 +478,7 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled) {
 
       return `
         <div class="flex justify-between items-center text-xs mono py-1" style="color:${isAcquired ? 'var(--accent)' : 'var(--text-mute)'};">
-          <span class="truncate pr-4 copy-name" data-copy-name="${window.esc(mat.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(mat.name)}">${window.esc(mat.name)}</span>
+          <span class="truncate pr-4"><span class="copy-name" data-copy-name="${window.esc(mat.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(mat.name)}">${window.esc(mat.name)}</span></span>
           <span class="flex-shrink-0">${isAcquired ? `✔ ${mat.qtyNeeded.toLocaleString()}` : `x${mat.qtyNeeded.toLocaleString()} (Deficit: ${netMissing.toLocaleString()})`}</span>
         </div>
       `;
@@ -643,7 +643,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
           <div class="flex items-start space-x-3 min-w-0 flex-1">
             <img src="${jobIconUrl}" class="w-12 h-12 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
-              <h3 class="font-bold text-base truncate copy-name" style="color:var(--text);" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</h3>
+              <h3 class="font-bold text-base truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></h3>
               ${job.isSubBuild ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
               ${job.autoImported ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--accent);" title="No matching plan existed for this job - imported directly from your active EVE industry job using its real ME/TE and market sell pricing.">📥 Auto-imported from EVE ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
               <div class="text-xs mono mt-0.5" style="color:var(--text-mute);">Added on: ${formattedDate}</div>
@@ -912,7 +912,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
         <div class="lp-list-item" style="padding-left:0; padding-right:0; ${isCompleted ? 'opacity:0.55;' : ''}">
           <img src="${itemIconUrl}" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           ${strategyBadge}
-          <span class="font-semibold truncate flex-1 copy-name" style="color:var(--text-soft);" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${window.esc(item.name)}</span>
+          <span class="font-semibold truncate flex-1" style="color:var(--text-soft);"><span class="copy-name" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${window.esc(item.name)}</span></span>
           <span class="text-xs mono flex-shrink-0" style="color:var(--text-mute);">&times;${item.netMissingQty.toLocaleString()}</span>
           <span class="font-bold mono flex-shrink-0 w-24 text-right" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>
         </div>
@@ -925,7 +925,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
           <img src="${itemIconUrl}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-2">
-              <span class="font-semibold truncate copy-name" style="color:var(--text-soft);" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${window.esc(item.name)}</span>
+              <span class="font-semibold truncate" style="color:var(--text-soft);"><span class="copy-name" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${window.esc(item.name)}</span></span>
               <span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>
             </div>
             <div class="flex items-center gap-1 mt-1.5">
