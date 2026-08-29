@@ -13,6 +13,12 @@ let activeJobStatusFilter = 'all'; // 'all' | 'started' | 'pending'
 // as the other BOM filters above - it's a "right now I'm working on these" scratch selection, not a
 // standing preference.
 let isolatedJobIds = new Set();
+// Which single job (if any) is in "Focus" mode - a completely different feature from isolation
+// above. Isolation scopes the Consolidated BOM sidebar while every job card stays visible; Focus
+// hides every OTHER job entirely and renders just this one (plus its full prerequisite chain) full-
+// size, for "I want to see everything about this one build and start its prerequisites from here."
+// Session-only, same as isolation.
+let focusedJobId = null;
 // job IDs with the BOM/details section minimized - persisted so a reload doesn't silently re-expand
 // every card back to its default state.
 let collapsedJobCardIds = new Set(window.safeParseJSON(localStorage.getItem('eve_collapsed_job_cards'), []));
@@ -250,20 +256,24 @@ function renderJournalPage() {
 // never get a checkbox of their own (see the card templates), so this only ever receives a real root
 // job's id.
 function toggleJobIsolation(jobId) {
-  if (isolatedJobIds.has(jobId)) {
-    isolatedJobIds.delete(jobId);
-  } else {
-    isolatedJobIds.add(jobId);
-    // Isolating is "I'm about to work on this one" - force its detail open so the materials/preset
-    // info the isolation banner promises is actually visible immediately, not just filtered into an
-    // otherwise-still-collapsed card. Un-isolating deliberately leaves the expand state alone (the
-    // user may still want it open).
-    collapsedJobCardIds.delete(jobId);
-    saveCollapsedJobCardIds();
-  }
+  if (isolatedJobIds.has(jobId)) isolatedJobIds.delete(jobId);
+  else isolatedJobIds.add(jobId);
   renderJournalPage();
 }
 window.toggleJobIsolation = toggleJobIsolation;
+
+// Focus mode - see the module-level focusedJobId comment for how this differs from isolation above.
+function enterJobFocus(jobId) {
+  focusedJobId = jobId;
+  renderJournalPage();
+}
+window.enterJobFocus = enterJobFocus;
+
+function exitJobFocus() {
+  focusedJobId = null;
+  renderJournalPage();
+}
+window.exitJobFocus = exitJobFocus;
 
 function clearJobIsolation() {
   isolatedJobIds.clear();
@@ -292,6 +302,59 @@ function renderIsolationBanner() {
   }
 }
 
+// The "isolate a job and see it in more detail" view: hides every other job in the queue and
+// renders just this one, plus its full prerequisite chain (at any depth - a prerequisite's own
+// prerequisite counts too), full-size and forced open. Reuses the existing grid card template
+// (which already carries the preset row, unclipped material list with "+ Build" actions, and a
+// working "Start Job" control) rather than a new layout - focus mode is a different FILTER + SCALE
+// over the same cards, not a new component.
+function renderFocusedJobView(container, jobId, allocatedStock, isStockDeductEnabled) {
+  const focusedJob = activeJobs.find(j => j && j.id === jobId);
+  if (!focusedJob) {
+    // The focused job was built/deleted while focus was active - fall back to the normal queue
+    // view instead of leaving the page on a dead end pointing at a job that no longer exists.
+    focusedJobId = null;
+    renderActiveJobsList(allocatedStock);
+    return;
+  }
+
+  const includedNames = new Set([focusedJob.name]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    activeJobs.forEach(j => {
+      if (j && j.isSubBuild && includedNames.has(j.parentJobName) && !includedNames.has(j.name)) {
+        includedNames.add(j.name);
+        grew = true;
+      }
+    });
+  }
+  const focusJobs = activeJobs
+    .filter(j => j && includedNames.has(j.name))
+    .sort((a, b) => (a.id === focusedJob.id ? -1 : b.id === focusedJob.id ? 1 : 0));
+
+  // Force every focused card open regardless of its remembered collapse state, then restore that
+  // state afterward - focus mode is a temporary spotlight, not a permanent "always expand this"
+  // change to the card (that's what the collapse toggle itself is for).
+  const priorCollapseState = focusJobs.map(j => collapsedJobCardIds.has(j.id));
+  focusJobs.forEach(j => collapsedJobCardIds.delete(j.id));
+  const cardsHTML = focusJobs.map(j => renderJobCardHTML(j, allocatedStock, isStockDeductEnabled)).join('');
+  focusJobs.forEach((j, i) => { if (priorCollapseState[i]) collapsedJobCardIds.add(j.id); });
+
+  const prereqCount = focusJobs.length - 1;
+  container.innerHTML = `
+    <div class="lp-card p-2.5 flex items-center justify-between gap-2 mb-3" style="border-color:rgba(var(--accent-rgb),0.4);">
+      <span class="text-xs font-bold uppercase tracking-wide" style="color:var(--accent);">
+        🔎 Focused on "${window.esc(focusedJob.name)}"${prereqCount > 0 ? ` + ${prereqCount} prerequisite${prereqCount > 1 ? 's' : ''}` : ''} - rest of the queue is hidden
+      </span>
+      <button onclick="exitJobFocus()" class="lp-chip-btn flex-shrink-0">← Back to Queue</button>
+    </div>
+    <div class="grid grid-cols-1 gap-3" style="max-width:900px;">
+      ${cardsHTML}
+    </div>
+  `;
+}
+
 function renderActiveJobsList(allocatedStock) {
   const container = document.getElementById('active-jobs-list');
   if (!container) return;
@@ -307,6 +370,15 @@ function renderActiveJobsList(allocatedStock) {
 
   const deductModeInput = document.getElementById('deduct-stock-mode');
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+
+  // Focus mode overrides everything below (search/status filters, grouping) - it's an explicit
+  // "show me just this one" request, so it wins even if the focused job wouldn't otherwise match
+  // the current filters.
+  if (focusedJobId !== null) {
+    renderFocusedJobView(container, focusedJobId, allocatedStock, isStockDeductEnabled);
+    return;
+  }
+
   const q = (activeJobSearchQuery || '').toLowerCase().trim();
 
   const visibleJobs = activeJobs.filter(job => {
@@ -411,11 +483,12 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
   // so this uses the same labeled pill-check component the Stock & Location Personal/Corp toggles
   // use, instead of a 14px checkmark with no text.
   const isolationCheckboxHTML = (!job.isStarted && !job.isSubBuild) ? `
-    <label class="pill-check flex-shrink-0" onclick="event.stopPropagation()" title="Isolate: show only this job's (and its prerequisites') materials in the Consolidated BOM">
+    <label class="pill-check flex-shrink-0" onclick="event.stopPropagation()" title="Shop: show only this job's (and its prerequisites') materials in the Consolidated BOM sidebar">
       <input type="checkbox" ${isolatedJobIds.has(job.id) ? 'checked' : ''} onchange="toggleJobIsolation(${job.id})">
-      <span class="pill-check-face">🔍 Isolate</span>
+      <span class="pill-check-face">🛒 Shop</span>
     </label>
   ` : '';
+  const focusButtonHTML = `<button onclick="event.stopPropagation(); enterJobFocus(${job.id})" class="lp-chip-btn flex-shrink-0" title="Focus: show just this job (and its prerequisites) full-size, with the rest of the queue hidden">🔎 Focus</button>`;
 
   const expandedDetailHTML = isExpanded ? `
     <div class="px-3 pb-3 pt-1" onclick="event.stopPropagation()">
@@ -440,6 +513,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
       <div class="flex items-center gap-2 p-2 cursor-pointer overflow-x-auto scrollbar-thin" onclick="toggleJobCardCollapse(${job.id})">
         <span class="drag-handle cursor-grab active:cursor-grabbing px-1 text-sm select-none flex-shrink-0" style="color:var(--text-mute);" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>
         ${isolationCheckboxHTML}
+        ${focusButtonHTML}
         <span class="text-xs flex-shrink-0" style="color:var(--text-mute);">${isExpanded ? '▾' : '▸'}</span>
         <img src="${jobIconUrl}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
         <div class="min-w-0 flex-1">
@@ -833,15 +907,16 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled) {
     // unlabeled checkbox - this container already has its own stopPropagation, so the label doesn't
     // need its own like the list-row version does.
     const isolationCheckboxHTML = (!job.isStarted && !job.isSubBuild) ? `
-      <label class="pill-check flex-shrink-0" title="Isolate: show only this job's (and its prerequisites') materials in the Consolidated BOM">
+      <label class="pill-check flex-shrink-0" title="Shop: show only this job's (and its prerequisites') materials in the Consolidated BOM sidebar">
         <input type="checkbox" ${isolatedJobIds.has(job.id) ? 'checked' : ''} onchange="toggleJobIsolation(${job.id})">
-        <span class="pill-check-face">🔍 Isolate</span>
+        <span class="pill-check-face">🛒 Shop</span>
       </label>
     ` : '';
 
     const dragHandleHTML = `
       <div class="flex items-center gap-1 flex-shrink-0" onclick="event.stopPropagation()">
         ${isolationCheckboxHTML}
+        <button onclick="enterJobFocus(${job.id})" class="lp-chip-btn" title="Focus: show just this job (and its prerequisites) full-size, with the rest of the queue hidden">🔎 Focus</button>
         <button onclick="toggleJobCardCollapse(${job.id})" class="px-1 text-xs select-none" style="color:var(--text-mute);" title="${isCollapsed ? 'Show full details' : 'Hide Bill of Materials'}">
           ${isCollapsed ? '▸' : '▾'}
         </button>
