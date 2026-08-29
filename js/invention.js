@@ -376,6 +376,19 @@ async function recalculateInventionImpl() {
     await window.fetchMarketPrices(decryptorTypeIds);
   }
 
+  // Invention job duration doesn't depend on which decryptor is used (decryptors change the
+  // OUTCOME - success chance/ME/TE/runs - not the job's own length), so this is computed once here
+  // rather than per-decryptor below. isReaction=true deliberately skips the TE-research factor
+  // (calculateAdjustedJobSeconds' TE handling) - a T1 blueprint's own TE research doesn't reduce
+  // invention time, that's a manufacturing-only mechanic - and requiredSkills is omitted for the
+  // same reason: the per-item manufacturing time-reduction skills (e.g. Caldari Starship
+  // Engineering) don't apply to invention either. Only Industry/Advanced Industry + facility/rig TE
+  // bonuses (already baked into calculateAdjustedJobSeconds unconditionally) actually reduce it.
+  const baseInventionTime = _inventionCurrentBlueprint.inventionTime;
+  const perAttemptInventionSeconds = (baseInventionTime && typeof window.calculateAdjustedJobSeconds === 'function')
+    ? window.calculateAdjustedJobSeconds(baseInventionTime, 0, 1, true, _inventionCurrentBlueprint.productTypeID, [])
+    : 0;
+
   const rows = await Promise.all(DECRYPTORS.map(async (dec) => {
     const successChance = Math.min(100, baseChance * (1 + (scienceLevelSum / 30) + (encryptionLevel / 40)) * (1 + dec.probMod / 100));
     const resultRuns = Math.max(1, baseRuns + dec.runsMod);
@@ -488,13 +501,20 @@ async function recalculateInventionImpl() {
     const totalRevenue = targetBPCs * unitSell;
     const totalProfit = isFinite(totalInventionCost) ? (totalRevenue - totalManufacturingCost - totalInventionCost) : -Infinity;
     const totalBuildSeconds = targetBPCs * unitBuildSeconds;
+    // Every attempt takes the full job duration whether it succeeds or fails - the risk that's
+    // already visible in "Attempts Needed" (more attempts for a low-chance decryptor) shows up here
+    // as more TIME too, not just more cost. null (not 0) when the database has no inventionTime for
+    // this blueprint, so "unknown" never silently displays as "instant" - regenerate the database to
+    // pick up this field for older data.
+    const totalInventionSeconds = !baseInventionTime ? null : (isFinite(requiredAttempts) ? requiredAttempts * perAttemptInventionSeconds : Infinity);
+    const totalTimeSeconds = totalInventionSeconds === null ? null : (isFinite(totalInventionSeconds) ? totalInventionSeconds + totalBuildSeconds : Infinity);
     const iskPerHour = totalBuildSeconds > 0 && isFinite(totalProfit) ? totalProfit / (totalBuildSeconds / 3600) : null;
     // Normalizes to a single manufacturing run (not a single attempt) so decryptors producing
     // different run counts per BPC (e.g. Augmentation's many runs vs Process's none) compare fairly.
     const totalRunsProduced = targetBPCs * resultRuns;
     const profitPerRun = (isFinite(totalProfit) && totalRunsProduced > 0) ? totalProfit / totalRunsProduced : (isFinite(totalProfit) ? totalProfit : -Infinity);
 
-    return { dec, successChance, resultRuns, resultME, resultTE, requiredAttempts, totalInventionCost, totalManufacturingCost, totalRevenue, totalProfit, totalBuildSeconds, iskPerHour, profitPerRun, multibuyItems, profitDetail };
+    return { dec, successChance, resultRuns, resultME, resultTE, requiredAttempts, totalInventionCost, totalManufacturingCost, totalRevenue, totalProfit, totalBuildSeconds, totalInventionSeconds, totalTimeSeconds, iskPerHour, profitPerRun, multibuyItems, profitDetail };
   }));
 
   renderInventionComparisonTable(rows);
@@ -535,6 +555,11 @@ function renderInventionSummaryTiles(rows) {
       <div class="lp-label truncate">Attempts Needed</div>
       <div class="text-lg font-bold mono leading-tight" style="color:var(--text);">${isFinite(best.requiredAttempts) ? best.requiredAttempts.toLocaleString() : '—'}</div>
       <div class="text-xs mt-0.5" style="color:var(--text-mute);">to get ${targetBPCs} successful BPC${targetBPCs > 1 ? 's' : ''}</div>
+    </div>
+    <div class="lp-tile">
+      <div class="lp-label truncate">Total Time (Invention + Mfg)</div>
+      <div class="text-lg font-bold mono leading-tight" style="color:var(--text);">${best.totalTimeSeconds !== null && isFinite(best.totalTimeSeconds) ? window.formatDuration(best.totalTimeSeconds) : 'No time data'}</div>
+      <div class="text-xs mt-0.5" style="color:var(--text-mute);">${best.totalInventionSeconds !== null && isFinite(best.totalInventionSeconds) ? window.formatDuration(best.totalInventionSeconds) + ' inventing + ' + window.formatDuration(best.totalBuildSeconds) + ' mfg' : 'no invention time data for this blueprint'}</div>
     </div>
     <div class="lp-tile">
       <div class="lp-label truncate">Total Cost (Invention + Mfg)</div>
@@ -609,6 +634,7 @@ function renderInventionComparisonTable(rows) {
           ${sortHeader('successChance', 'Success %', 'right')}
           <th class="text-right">Result BPC</th>
           ${sortHeader('requiredAttempts', `Attempts Needed (for ${targetBPCs})`, 'right')}
+          ${sortHeader('totalTimeSeconds', 'Total Time', 'right')}
           ${sortHeader('totalInventionCost', 'Total Invention Cost', 'right')}
           ${sortHeader('totalManufacturingCost', 'Total Mfg Cost', 'right')}
           ${sortHeader('totalProfit', 'Total Profit', 'right')}
@@ -621,12 +647,17 @@ function renderInventionComparisonTable(rows) {
         ${sortedRows.map(r => {
           const isBest = r.totalProfit === bestProfit && bestProfit > -Infinity;
           const rowIndex = rows.indexOf(r);
+          const perAttemptSeconds = r.requiredAttempts > 0 ? r.totalInventionSeconds / r.requiredAttempts : 0;
+          const timeTitle = (r.totalTimeSeconds !== null && isFinite(r.totalTimeSeconds))
+            ? `${window.formatDuration(r.totalInventionSeconds)} inventing (${r.requiredAttempts} attempt${r.requiredAttempts > 1 ? 's' : ''} x ${window.formatDuration(perAttemptSeconds)} each) + ${window.formatDuration(r.totalBuildSeconds)} manufacturing`
+            : 'No invention time data for this blueprint - regenerate the database to pick it up';
           return `
           <tr class="${isBest ? 'lp-table-best' : ''}" title="${window.esc(r.profitDetail)}">
             <td class="font-bold" style="color:${isBest ? 'var(--accent)' : 'var(--text)'};">${isBest ? '🏆 ' : ''}${window.esc(r.dec.name)}</td>
             <td class="text-right font-bold" style="color:var(--text);">${r.successChance.toFixed(1)}%</td>
             <td class="text-right" style="color:var(--text-mute);">${r.resultRuns} run${r.resultRuns > 1 ? 's' : ''}, ME${r.resultME >= 0 ? '+' : ''}${r.resultME}, TE${r.resultTE >= 0 ? '+' : ''}${r.resultTE}</td>
             <td class="text-right font-bold" style="color:var(--accent);">${isFinite(r.requiredAttempts) ? r.requiredAttempts.toLocaleString() : '—'}</td>
+            <td class="text-right font-bold" style="color:var(--text);" title="${window.esc(timeTitle)}">${r.totalTimeSeconds !== null && isFinite(r.totalTimeSeconds) ? window.formatDuration(r.totalTimeSeconds) : '—'}</td>
             <td class="text-right" style="color:var(--cost);">${isFinite(r.totalInventionCost) ? Math.round(r.totalInventionCost).toLocaleString() + ' ISK' : '—'}</td>
             <td class="text-right" style="color:var(--cost);">${Math.round(r.totalManufacturingCost).toLocaleString()} ISK</td>
             <td class="text-right font-bold" style="color:${isFinite(r.totalProfit) && r.totalProfit >= 0 ? 'var(--green)' : 'var(--red)'};">${isFinite(r.totalProfit) ? Math.round(r.totalProfit).toLocaleString() + ' ISK' : '—'}</td>
