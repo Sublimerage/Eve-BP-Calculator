@@ -244,7 +244,13 @@ async function selectInventionItem(typeId, name, skipSave) {
   document.getElementById('invention-config-panel').classList.remove('hidden');
   document.getElementById('invention-item-icon').src = `https://images.evetech.net/types/${typeId}/icon?size=64`;
   document.getElementById('invention-item-name').textContent = name;
-  document.getElementById('invention-product-name').textContent = `Invented from: ${t1Recipe.productName || 'T1 item'}`;
+
+  // The T1 BLUEPRINT is what invention actually consumes - always a copy (a BPO never gets used up
+  // for invention, so /bpc is the correct icon variant here regardless of what you actually own),
+  // shown by its own name so it reads as "go get this item," not just "made from this ship."
+  const t1BlueprintName = window.EVE_ITEMS[t1Recipe.blueprintTypeID] || `${t1Recipe.productName || 'T1 item'} Blueprint`;
+  document.getElementById('invention-t1-icon').src = `https://images.evetech.net/types/${t1Recipe.blueprintTypeID}/bpc?size=64`;
+  document.getElementById('invention-t1-name').textContent = t1BlueprintName;
 
   const baseChance = getInventionBaseChance(typeId);
   document.getElementById('invention-base-chance').value = baseChance;
