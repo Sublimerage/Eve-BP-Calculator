@@ -384,7 +384,11 @@ window.filterBlueprintBrowser = filterBlueprintBrowser;
 // Also correctly folds in blueprints ESI already reports as a pre-stacked group (quantity > 0).
 // --- Profit Scanner ---
 let _blueprintProfitCache = null; // key -> {profit, iskPerHour, runsUsed, qtyProduced, scannedAt} | null (scan failed) - loaded lazily from localStorage
-const BLUEPRINT_PROFIT_CACHE_KEY = 'eve_blueprint_profit_cache';
+// _v2: computeBlueprintManufacturingProfit used to compute a bare "revenue minus raw materials"
+// figure with no sales tax/broker fee/job installation fee at all - anything cached under the old
+// key is stale relative to the corrected formula and must never be read back as if it were still
+// valid, hence the new key rather than reusing the old one (old entries just become inert).
+const BLUEPRINT_PROFIT_CACHE_KEY = 'eve_blueprint_profit_cache_v2';
 
 function getBlueprintProfitCache() {
   if (_blueprintProfitCache === null) {
@@ -452,11 +456,32 @@ async function computeBlueprintManufacturingProfit(bp) {
   if (typeof window.collectAllTypeIds === 'function') window.collectAllTypeIds(root, allTypeIds);
   allTypeIds.add(bp.productTypeId);
   if (typeof window.fetchMarketPrices === 'function') await window.fetchMarketPrices(Array.from(allTypeIds));
+  // jobEIV feeds calculateNodeJobFee below - without this it's always 0, silently zeroing out the
+  // job installation fee regardless of build size.
+  if (typeof window.calculateNodeEIV === 'function') window.calculateNodeEIV(root);
 
   const materialCost = typeof window.calculateTreeNodeCost === 'function' ? window.calculateTreeNodeCost(root) : 0;
+
+  // Same fee inputs recalculate() itself reads for the number actually shown once you load a
+  // blueprint into the Calculator - sales tax + broker fee on the sale, and the manufacturing job
+  // installation fee (facility tax + SCC surcharge + system cost index, scaled by EIV). This scan
+  // previously computed a bare "revenue minus raw materials" figure with NONE of these, which
+  // quietly overstated profit - job fees scale with the economic value being processed, so the gap
+  // grows with the build, and was likely a big chunk of why a huge/expensive blueprint's scanned
+  // number here didn't match what the Calculator showed for the same blueprint.
+  const salesTax = (parseFloat(document.getElementById('sales-tax')?.value) || 3.6) / 100;
+  const brokerFee = (parseFloat(document.getElementById('broker-fee')?.value) || 1.0) / 100;
+  const facilityTax = (parseFloat(document.getElementById('facility-tax')?.value) || 1.0) / 100;
+  const sccSurcharge = (parseFloat(document.getElementById('scc-surcharge')?.value) || 4.0) / 100;
+  const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { costBonus: 0 };
+  const structureRoleBonus = (structureType.costBonus || 0) / 100;
+  const jobFees = typeof window.calculateNodeJobFee === 'function' ? window.calculateNodeJobFee(root, facilityTax, sccSurcharge, structureRoleBonus) : 0;
+  const totalCost = materialCost + jobFees;
+
   const outputPrices = window.priceCache[bp.productTypeId] || { sell: 0 };
   const grossSell = outputPrices.sell * root.qtyNeeded;
-  const profit = grossSell - materialCost;
+  const netSellRevenue = grossSell * (1 - salesTax - brokerFee);
+  const profit = netSellRevenue - totalCost;
   const buildSeconds = typeof window.calculateTotalBuildSeconds === 'function' ? window.calculateTotalBuildSeconds(root) : 0;
   const iskPerHour = buildSeconds > 0 ? profit / (buildSeconds / 3600) : null;
 
