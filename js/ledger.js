@@ -459,13 +459,20 @@ function renderActiveJobsList(allocatedStock) {
 
   const isListMode = activeQueueViewMode === 'list';
   const groupWrapClass = isListMode ? 'space-y-2' : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3';
-  const renderJob = (job, depth) => isListMode
-    ? renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth)
-    : renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, false, depth);
-  // Only the ROOTS of each cluster (see buildJobClusters) become items of the outer grid/list -
-  // a cluster with children renders as one self-contained block (card, then its nested children
-  // indented underneath), so the grid/list never sees individual parent/child cards separately.
+  // Nesting only works as a single column (list mode) - a CSS Grid row is only ever as tall as its
+  // tallest cell, so a cluster with children forces every OTHER card sharing that row to leave a
+  // huge empty gap beside it, and cards further down drift out of visual alignment entirely. Grid
+  // mode instead stays flat/uniform (every card its own independent cell, same as before clusters
+  // existed) and marks a prerequisite with a small icon on the card itself (see renderJobCardHTML)
+  // rather than physical nesting.
   const renderGroup = (jobs) => {
+    if (!isListMode) {
+      return jobs.map(job => renderJobCardHTML(job, allocatedStock, isStockDeductEnabled)).join('');
+    }
+    const renderJob = (job, depth) => renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth);
+    // Only the ROOTS of each cluster (see buildJobClusters) become items of the outer list - a
+    // cluster with children renders as one self-contained block (row, then its nested children
+    // indented underneath), so the list never sees individual parent/child rows separately.
     const { roots, childrenOf } = buildJobClusters(jobs);
     return roots.map(job => renderJobClusterHTML(job, childrenOf, 0, renderJob)).join('');
   };
@@ -1011,7 +1018,7 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
     `;
 }
 
-function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMode, depth) {
+function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMode) {
     const iconTypeId = job.productTypeId || job.typeId;
     const isJobReady = job.isStarted && job.startedAt && ((Date.now() - job.startedAt) / 1000 >= (job.totalBuildSeconds || 0));
     const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
@@ -1087,15 +1094,15 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
 
     return `
       <div class="job-card lp-job-card ${cardStateClass} p-3 flex flex-col justify-between transition space-y-2"
-           draggable="true" data-job-id="${job.id}" ${(depth && !isFocusMode) ? `title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}"` : ''}
+           draggable="true" data-job-id="${job.id}" ${(job.isSubBuild && !isFocusMode) ? `title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}"` : ''}
            ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
            ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
         <div class="flex items-start justify-between">
           <div class="flex items-start space-x-3 min-w-0 flex-1">
             <img src="${jobIconUrl}" class="${isFocusMode ? 'w-20 h-20' : 'w-12 h-12'} rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
-              <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></h3>
-              ${(job.isSubBuild && (!depth || isFocusMode)) ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
+              <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${(job.isSubBuild && !isFocusMode) ? `<span class="ml-1 text-xs align-middle" style="color:var(--text-mute);" title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}">⚙</span>` : ''}</h3>
+              ${(job.isSubBuild && isFocusMode) ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
               ${job.autoImported ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--accent);" title="No matching plan existed for this job - imported directly from your active EVE industry job using its real ME/TE and market sell pricing.">📥 Auto-imported from EVE ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
               <div class="mt-0.5">${renderJobPresetBadgeHTML(job)}</div>
               <div class="text-xs mono mt-0.5" style="color:var(--text-mute);">Added on: ${formattedDate}</div>
