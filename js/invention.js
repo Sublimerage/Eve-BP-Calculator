@@ -277,10 +277,10 @@ function renderInventionSkillInputs(skills) {
     const isEncryption = (sk.name || '').toLowerCase().includes('encryption');
     const trainedLevel = (charSkills.allSkills && charSkills.allSkills[sk.skillId] !== undefined) ? charSkills.allSkills[sk.skillId] : 0;
     return `
-      <div class="flex items-center justify-between px-2 py-1.5">
-        <span class="text-sm ${isEncryption ? 'text-amber-300' : 'text-cyan-300'} font-semibold truncate pr-2" title="${isEncryption ? 'Encryption skill (affects chance /40)' : 'Science skill (affects chance /30, combined with the other science skill)'}">${window.esc(sk.name || `Skill ${sk.skillId}`)}</span>
+      <div class="flex items-center gap-1.5 px-2 py-1 rounded-md" style="background:rgba(255,255,255,0.035);">
+        <span class="text-xs ${isEncryption ? 'text-amber-300' : 'text-cyan-300'} font-semibold" title="${isEncryption ? 'Encryption skill (affects chance /40)' : 'Science skill (affects chance /30, combined with the other science skill)'}">${window.esc(sk.name || `Skill ${sk.skillId}`)}</span>
         <input type="number" min="0" max="5" value="${trainedLevel}" data-skill-id="${sk.skillId}" data-is-encryption="${isEncryption}"
-          oninput="recalculateInvention()" class="invention-skill-input field-line w-12 text-center text-white font-bold text-sm p-1">
+          oninput="recalculateInvention()" class="invention-skill-input field-line field-editable w-10 text-center text-white font-bold text-xs p-0.5">
       </div>
     `;
   }).join('');
@@ -301,17 +301,22 @@ function getInventionInputPrice(typeId) {
   return price || 0;
 }
 
+// Despite the name, this doubles as the datacore price pre-fetch that recalculateInventionImpl()
+// depends on (getInventionInputPrice() reads window.priceCache synchronously) - the visible list
+// itself was removed from the sidebar (redundant with the exact numbers Copy Buy List already
+// gives), but the fetch it triggers is still load-bearing for cost math, so it must NOT be skipped
+// just because #invention-datacore-list no longer exists in the page.
 async function renderInventionDatacoreList(materials) {
   const container = document.getElementById('invention-datacore-list');
-  if (!container) return;
   if (materials.length === 0) {
-    container.innerHTML = `<div class="text-slate-500 italic">No datacore data found.</div>`;
+    if (container) container.innerHTML = `<div class="text-slate-500 italic">No datacore data found.</div>`;
     return;
   }
   const typeIds = materials.map(m => m.typeId);
   if (typeof window.fetchMarketPrices === 'function') {
     await window.fetchMarketPrices(typeIds);
   }
+  if (!container) return;
   container.innerHTML = materials.map(m => {
     const price = getInventionInputPrice(m.typeId);
     return `
@@ -347,7 +352,9 @@ async function recalculateInventionImpl() {
   });
 
   const datacores = _inventionCurrentBlueprint.inventionMaterials || [];
-  const deductStock = document.getElementById('invention-deduct-stock')?.checked ?? true;
+  // #invention-deduct-stock is now the same big value="true"/"false" toggle button the other two
+  // pages use (toggleDeductStockButton in config.js), not a checkbox.
+  const deductStock = (document.getElementById('invention-deduct-stock')?.value ?? 'true') === 'true';
 
   const t2ProductTypeId = _inventionCurrentProduct.typeId;
   // recipeMap stores the blueprint's own ID directly on the recipe object - far more reliable than

@@ -7,6 +7,11 @@ let activeOrderFilter = 'all';
 let activeCategoryFilter = 'all';
 let activeJobSearchQuery = '';
 let activeJobStatusFilter = 'all'; // 'all' | 'started' | 'pending'
+// Filters the queue to jobs whose resolved production preset label matches exactly - 'all' shows
+// everything. Auto-imported jobs have no preset concept (see getJobStationLabel) so they never
+// match a specific station and are hidden whenever one is selected, same as they're hidden from
+// the preset row/badge everywhere else.
+let activeStationFilter = 'all';
 // Job IDs checked to "isolate" - when non-empty, the Consolidated BOM/multibuy below only reflects
 // these jobs' materials instead of the whole queue, so you can shop for just what you're about to
 // build without also buying for everything else still queued. Session-only (resets on reload), same
@@ -373,6 +378,8 @@ function renderActiveJobsList(allocatedStock) {
   const container = document.getElementById('active-jobs-list');
   if (!container) return;
 
+  populateStationFilterDropdown();
+
   if (activeJobs.length === 0) {
     container.innerHTML = `
       <div class="lp-card p-8 text-center mono" style="color:var(--text-mute);">
@@ -400,6 +407,7 @@ function renderActiveJobsList(allocatedStock) {
     if (q && !(job.name || '').toLowerCase().includes(q)) return false;
     if (activeJobStatusFilter === 'started' && !job.isStarted) return false;
     if (activeJobStatusFilter === 'pending' && job.isStarted) return false;
+    if (activeStationFilter !== 'all' && getJobStationLabel(job) !== activeStationFilter) return false;
     return true;
   });
 
@@ -607,6 +615,41 @@ function getCurrentLiveProductionSnapshot() {
     rig3: localStorage.getItem('eve_rig_slot_3') || ''
   };
 }
+
+// The label used to both DISPLAY and FILTER by station - null for auto-imported jobs (no preset
+// concept, see the note on activeStationFilter above), otherwise the same resolved label the badge/
+// row already show, so "filter by station" always matches what's actually printed on the card.
+function getJobStationLabel(job) {
+  if (!job || job.autoImported) return null;
+  return resolveProductionPresetLabel(job.productionSnapshot || getCurrentLiveProductionSnapshot());
+}
+
+// Keeps the #station-filter-select options in sync with whatever stations are actually in use right
+// now - jobs/presets can change at any time, so this is cheap to just rebuild on every render rather
+// than trying to track when it might have gone stale.
+function populateStationFilterDropdown() {
+  const select = document.getElementById('station-filter-select');
+  if (!select) return;
+  const labels = Array.from(new Set(activeJobs.map(getJobStationLabel).filter(Boolean))).sort();
+  // Nothing to filter by (no jobs, or only auto-imported ones) - hide it entirely rather than show
+  // a dropdown with nothing but "All Stations" in it.
+  if (labels.length === 0) {
+    select.closest('[data-station-filter-wrap]')?.classList.add('hidden');
+    return;
+  }
+  select.closest('[data-station-filter-wrap]')?.classList.remove('hidden');
+  // A station that's no longer in use (last job using it was deleted/rebuilt) falls back to "all"
+  // instead of silently filtering to a now-empty list with no visible explanation why.
+  if (activeStationFilter !== 'all' && !labels.includes(activeStationFilter)) activeStationFilter = 'all';
+  select.innerHTML = `<option value="all">All Stations</option>` +
+    labels.map(l => `<option value="${window.esc(l)}" ${l === activeStationFilter ? 'selected' : ''}>${window.esc(l)}</option>`).join('');
+}
+
+function setStationFilter(value) {
+  activeStationFilter = value || 'all';
+  renderJournalPage();
+}
+window.setStationFilter = setStationFilter;
 
 // One-line badge for the collapsed card header - visible without expanding, so a wrong preset is
 // spottable at a glance across the whole queue.
