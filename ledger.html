@@ -155,18 +155,10 @@
         </div>
       </div>
 
-      <!-- Isolation status: always visible (not just once isolation is active) so the checkbox on
-           each job card - which otherwise has no visible label - is explained at the one place its
-           effect actually shows up, before you've even used it. See renderIsolationBanner(). -->
-      <div id="journal-isolation-banner" class="lp-row">
-        <div id="journal-isolation-inset" class="lp-inset flex items-center gap-2">
-          <span id="journal-isolation-text" class="text-xs font-semibold" style="color:var(--text-mute);">Showing materials for the whole queue &mdash; check a job's box on the left to shop for just that one</span>
-          <button id="journal-isolation-clear-btn" onclick="clearJobIsolation()" class="lp-chip-btn ml-auto flex-shrink-0 hidden">Show All</button>
-        </div>
-      </div>
-
-      <!-- Stock & Location Filters - collapsible, same placement/pattern as the main calculator's BOM sidebar -->
-      <details open class="lp-row group">
+      <!-- Stock & Location Filters - collapsible, same placement/pattern as the main calculator's BOM sidebar.
+           Closed by default - most visits don't need to touch these, and the item list below benefits
+           more from the space than this does from being open at a glance. -->
+      <details class="lp-row group">
         <summary class="cursor-pointer flex items-center justify-between list-none" style="color:var(--text-mute);">
           <span class="lp-label flex items-center gap-1.5">
             Stock &amp; Location
@@ -175,18 +167,15 @@
           <span class="group-open:rotate-90 transition-transform" style="color:var(--text-mute);">▶</span>
         </summary>
         <div class="pt-2.5 space-y-2.5">
-          <div class="flex items-center justify-between flex-wrap gap-2">
-            <div class="flex items-center gap-2">
-              <label class="pill-check">
-                <input type="checkbox" id="use-char-assets" checked onchange="applyJournalStockFilter()">
-                <span class="pill-check-face"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>Personal</span>
-              </label>
-              <label class="pill-check">
-                <input type="checkbox" id="use-corp-assets" checked onchange="applyJournalStockFilter()">
-                <span class="pill-check-face"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V7a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v14"/><path d="M12 11h6a1 1 0 0 1 1 1v9"/><line x1="8" y1="9" x2="8" y2="9.01"/><line x1="8" y1="13" x2="8" y2="13.01"/><line x1="8" y1="17" x2="8" y2="17.01"/><line x1="16" y1="15" x2="16" y2="15.01"/><line x1="16" y1="19" x2="16" y2="19.01"/></svg>Corp</span>
-              </label>
-            </div>
-            <span class="text-[10.5px] mono" style="color:var(--text-mute);">Filtered: <span id="stock-count-display" class="font-bold" style="color:var(--accent);">0 items</span></span>
+          <div class="flex items-center gap-2 flex-wrap">
+            <label class="pill-check">
+              <input type="checkbox" id="use-char-assets" checked onchange="applyJournalStockFilter()">
+              <span class="pill-check-face"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>Personal</span>
+            </label>
+            <label class="pill-check">
+              <input type="checkbox" id="use-corp-assets" checked onchange="applyJournalStockFilter()">
+              <span class="pill-check-face"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V7a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v14"/><path d="M12 11h6a1 1 0 0 1 1 1v9"/><line x1="8" y1="9" x2="8" y2="9.01"/><line x1="8" y1="13" x2="8" y2="13.01"/><line x1="8" y1="17" x2="8" y2="17.01"/><line x1="16" y1="15" x2="16" y2="15.01"/><line x1="16" y1="19" x2="16" y2="19.01"/></svg>Corp</span>
+            </label>
           </div>
           <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterJournalLocationOptions()"
             class="field-line w-full text-[11px] mono" style="color:var(--text);">
@@ -297,7 +286,7 @@
   <script src="js/esi.js?v=8.0.10" defer></script>
   <script src="js/tree.js?v=8.0.1" defer></script>
   <script src="js/optimizers.js?v=8.0.4" defer></script>
-  <script src="js/ledger.js?v=9.22.1" defer></script>
+  <script src="js/ledger.js?v=9.23.0" defer></script>
   <script src="js/custom-select.js?v=1.4.0" defer></script>
 </body>
 </html>
