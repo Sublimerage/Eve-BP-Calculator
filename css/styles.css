@@ -573,8 +573,15 @@ select option:checked, select option:hover { background-color: var(--accent); co
   border-bottom: 1.5px solid rgba(255,255,255,0.08) !important;
   border-radius: var(--radius-sm) !important;
   padding: 6px 10px !important;
-  color: var(--text) !important;
-  font: inherit;
+  /* Sensible fallback ONLY - not !important, and font-family only (not the `font` shorthand, which
+     also resets size/weight/line-height). custom-select.js copies the source <select>'s className
+     AND inline style onto this trigger, so whatever font-size/color that select actually specified
+     (Tailwind utility class or inline style) is what should render - this just normalizes the
+     button-element default font-family for triggers that specified nothing of their own, rather
+     than silently discarding every select's intended text size the way `font: inherit` + a bare
+     !important color was doing app-wide. */
+  color: var(--text);
+  font-family: inherit;
   text-align: left;
   cursor: pointer;
   outline: none;
