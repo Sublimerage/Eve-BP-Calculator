@@ -1239,7 +1239,11 @@ body.page-calc .field-editable {
   background: rgba(255,255,255,0.035) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ba0a8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z'/%3E%3C/svg%3E") right 4px center / 10px no-repeat !important;
   border-bottom: 1.5px solid rgba(255,255,255,0.1) !important;
   border-radius: var(--radius-sm) !important;
-  padding-right: 17px !important;
+  /* .field-line itself sets no padding at all (fine when it was invisible at rest - nothing to
+     visually misalign against) - now that this modifier gives it a real box, an unpadded left edge
+     read as the number being crammed against the box's edge. Matches select.field-line's own
+     padding (6px 24px 6px 10px) on the sides that aren't already spoken for by the pencil icon. */
+  padding: 6px 17px 6px 10px !important;
 }
 body.page-calc .field-editable:hover {
   background-color: rgba(255,255,255,0.065) !important;
