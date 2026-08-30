@@ -374,6 +374,40 @@ function renderFocusedJobView(container, jobId, allocatedStock, isStockDeductEna
   `;
 }
 
+// Groups a status-filtered job list into clusters for visual hierarchy (see the .job-cluster CSS
+// comment) instead of the old "⚙ Prereq for: X" text line: each root is a job that ISN'T a sub-
+// build, or IS one but its parent isn't in this same list - a prerequisite added after its parent
+// already started can land in a different status group than its parent, and there's no adjacent
+// parent to nest it under in that case, so it renders as its own top-level entry (with the text
+// line kept as a fallback for exactly that situation - see renderJobCardHTML/renderJobListRowHTML).
+function buildJobClusters(jobs) {
+  const byName = new Map();
+  jobs.forEach(j => { if (j) byName.set(j.name, j); });
+  const childrenOf = new Map();
+  const roots = [];
+  jobs.forEach(j => {
+    if (!j) return;
+    if (j.isSubBuild && j.parentJobName && byName.has(j.parentJobName)) {
+      if (!childrenOf.has(j.parentJobName)) childrenOf.set(j.parentJobName, []);
+      childrenOf.get(j.parentJobName).push(j);
+    } else {
+      roots.push(j);
+    }
+  });
+  return { roots, childrenOf };
+}
+
+// Recursively renders a job followed by its nested children (a prerequisite's own prerequisite
+// nests one level deeper again) as one combined block. renderJob(job, depth) is whichever of
+// renderJobListRowHTML/renderJobCardHTML the caller is using for the current view mode.
+function renderJobClusterHTML(job, childrenOf, depth, renderJob) {
+  const ownHTML = renderJob(job, depth);
+  const kids = childrenOf.get(job.name) || [];
+  if (kids.length === 0) return ownHTML;
+  const kidsHTML = kids.map(k => renderJobClusterHTML(k, childrenOf, depth + 1, renderJob)).join('');
+  return `<div class="job-cluster">${ownHTML}<div class="job-cluster-children">${kidsHTML}</div></div>`;
+}
+
 function renderActiveJobsList(allocatedStock) {
   const container = document.getElementById('active-jobs-list');
   if (!container) return;
@@ -425,10 +459,16 @@ function renderActiveJobsList(allocatedStock) {
 
   const isListMode = activeQueueViewMode === 'list';
   const groupWrapClass = isListMode ? 'space-y-2' : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3';
-  const renderGroup = (jobs) => jobs.map(job => isListMode
-    ? renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled)
-    : renderJobCardHTML(job, allocatedStock, isStockDeductEnabled)
-  ).join('');
+  const renderJob = (job, depth) => isListMode
+    ? renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth)
+    : renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, false, depth);
+  // Only the ROOTS of each cluster (see buildJobClusters) become items of the outer grid/list -
+  // a cluster with children renders as one self-contained block (card, then its nested children
+  // indented underneath), so the grid/list never sees individual parent/child cards separately.
+  const renderGroup = (jobs) => {
+    const { roots, childrenOf } = buildJobClusters(jobs);
+    return roots.map(job => renderJobClusterHTML(job, childrenOf, 0, renderJob)).join('');
+  };
 
   let html = '';
   if (activeJobStatusFilter !== 'pending' && startedJobs.length > 0) {
@@ -476,7 +516,7 @@ window.toggleQueueViewMode = toggleQueueViewMode;
 // Compact single-line-per-job view. Shows the essentials (icon/name, runs, status, cost, profit,
 // actions) with a chevron to expand the same BOM/details block used in grid view, reusing the same
 // collapse state so switching views doesn't lose whether you had a job's details open.
-function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
+function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) {
   const iconTypeId = job.productTypeId || job.typeId;
   const isJobReady = job.isStarted && job.startedAt && ((Date.now() - job.startedAt) / 1000 >= (job.totalBuildSeconds || 0));
   const jobIconUrl = window.getItemIconUrl(iconTypeId, window.TYPE_ID_TO_NAME[iconTypeId] || job.name, 64);
@@ -534,7 +574,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
 
   return `
     <div class="job-card lp-job-card ${cardStateClass}"
-         draggable="true" data-job-id="${job.id}"
+         draggable="true" data-job-id="${job.id}" ${depth ? `title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}"` : ''}
          ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
          ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
       <div class="flex items-center gap-2 p-2 cursor-pointer overflow-x-auto scrollbar-thin" onclick="toggleJobCardCollapse(${job.id})">
@@ -545,7 +585,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled) {
         <img src="${jobIconUrl}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
         <div class="min-w-0 flex-1">
           <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></div>
-          ${job.isSubBuild ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);">⚙ Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
+          ${(job.isSubBuild && !depth) ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);">⚙ Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
           ${job.autoImported ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--accent);" title="No matching plan existed - imported from your active EVE job.">📥 Auto-imported ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
           ${renderJobPresetBadgeHTML(job)}
         </div>
@@ -971,7 +1011,7 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
     `;
 }
 
-function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMode) {
+function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMode, depth) {
     const iconTypeId = job.productTypeId || job.typeId;
     const isJobReady = job.isStarted && job.startedAt && ((Date.now() - job.startedAt) / 1000 >= (job.totalBuildSeconds || 0));
     const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
@@ -1047,7 +1087,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
 
     return `
       <div class="job-card lp-job-card ${cardStateClass} p-3 flex flex-col justify-between transition space-y-2"
-           draggable="true" data-job-id="${job.id}"
+           draggable="true" data-job-id="${job.id}" ${(depth && !isFocusMode) ? `title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}"` : ''}
            ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
            ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
         <div class="flex items-start justify-between">
@@ -1055,7 +1095,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
             <img src="${jobIconUrl}" class="${isFocusMode ? 'w-20 h-20' : 'w-12 h-12'} rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
               <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></h3>
-              ${job.isSubBuild ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
+              ${(job.isSubBuild && (!depth || isFocusMode)) ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
               ${job.autoImported ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--accent);" title="No matching plan existed for this job - imported directly from your active EVE industry job using its real ME/TE and market sell pricing.">📥 Auto-imported from EVE ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
               <div class="mt-0.5">${renderJobPresetBadgeHTML(job)}</div>
               <div class="text-xs mono mt-0.5" style="color:var(--text-mute);">Added on: ${formattedDate}</div>
