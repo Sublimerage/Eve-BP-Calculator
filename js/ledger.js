@@ -1021,7 +1021,6 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
 function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMode) {
     const iconTypeId = job.productTypeId || job.typeId;
     const isJobReady = job.isStarted && job.startedAt && ((Date.now() - job.startedAt) / 1000 >= (job.totalBuildSeconds || 0));
-    const formattedDate = job.addedAt ? new Date(job.addedAt).toLocaleDateString() : 'N/A';
     const isCollapsed = collapsedJobCardIds.has(job.id);
 
     // Isolation only makes sense for a real root job that still has materials to shop for - a sub-
@@ -1105,7 +1104,6 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
               ${(job.isSubBuild && isFocusMode) ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
               ${job.autoImported ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--accent);" title="No matching plan existed for this job - imported directly from your active EVE industry job using its real ME/TE and market sell pricing.">📥 Auto-imported from EVE ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
               <div class="mt-0.5">${renderJobPresetBadgeHTML(job)}</div>
-              <div class="text-xs mono mt-0.5" style="color:var(--text-mute);">Added on: ${formattedDate}</div>
             </div>
           </div>
           ${dragHandleHTML}
