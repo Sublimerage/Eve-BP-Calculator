@@ -610,7 +610,12 @@ function copyInventionMultibuy(rowIndex) {
   }
   const text = row.multibuyItems.map(i => `${i.name} x${i.qty}`).join('\n');
   const btn = document.getElementById(`invention-multibuy-btn-${rowIndex}`);
-  window.copyToClipboardWithFeedback(text, btn);
+  // This button has an SVG icon alongside its "Copy" text - the default textContent-based swap
+  // (like ledger.js's plain-text "Copy Multibuy" button uses) would wipe the icon out permanently
+  // on the first click, since .textContent replaces ALL child nodes, SVG included, and the restore
+  // step then has no way to bring it back. useInnerHTML keeps the icon markup intact through the
+  // swap (see ledger.js's copyIndividualJobMultibuy for the same fix on the same kind of button).
+  window.copyToClipboardWithFeedback(text, btn, { useInnerHTML: true });
 }
 window.copyInventionMultibuy = copyInventionMultibuy;
 

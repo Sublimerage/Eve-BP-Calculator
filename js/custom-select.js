@@ -141,6 +141,12 @@
     const trigger = document.createElement('button');
     trigger.type = 'button';
     trigger.className = (originalClassName + ' csel-trigger').trim();
+    // className copies Tailwind utility classes (font-size, font-weight, etc.), but NOT an inline
+    // style="..." attribute - any select styled that way (e.g. style="color:var(--accent)") would
+    // otherwise silently render with .csel-trigger's plain default color instead, since the real
+    // <select> carrying that style gets hidden and only this trigger is ever visible.
+    const inlineStyle = select.getAttribute('style');
+    if (inlineStyle) trigger.setAttribute('style', inlineStyle);
     if (select.title) trigger.title = select.title;
     trigger.disabled = select.disabled;
 
