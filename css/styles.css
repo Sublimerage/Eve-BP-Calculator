@@ -1399,6 +1399,21 @@ body.page-calc .lp-job-card {
 body.page-calc .lp-job-card.job-ready { border-left-color: var(--accent); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),0.18), 0 0 20px rgba(var(--accent-rgb),0.10); }
 body.page-calc .lp-job-card.job-started { border-left-color: rgba(var(--accent-rgb),0.45); }
 body.page-calc .lp-job-card.job-subbuild { border-left-color: var(--text-mute); }
+/* Visual hierarchy for a job + its prerequisites, replacing the "⚙ Prereq for: X" text line that
+   used to be the only thing showing the relationship - a tree-style connector reads at a glance
+   without adding a line of text to every child card. Works identically whether the queue is in grid
+   or list view: .job-cluster is a plain flex column, so it behaves as one self-sizing block whether
+   it's sitting in a CSS grid cell or stacked in a list - the grid/list wrapper never sees individual
+   parent/child cards directly, only whole clusters, so nesting doesn't disturb either layout. */
+body.page-calc .job-cluster { display: flex; flex-direction: column; gap: 8px; }
+body.page-calc .job-cluster-children {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-left: 20px;
+  padding-left: 14px;
+  border-left: 2px solid rgba(255,255,255,0.1);
+}
 /* Isolation gets its own full-outline treatment (not just the left-edge color job-ready/job-started
    use) specifically so it reads as visually distinct from those - checking a job's isolation box is
    the one state that's about the card being SELECTED, not about its build status, and the checkbox
