@@ -1229,6 +1229,26 @@ body.page-calc .field-box:focus {
   outline: none;
 }
 
+/* .field-editable: an opt-in modifier for .field-line number/text inputs where the value genuinely
+   drives the math (invention success chance, skill levels, target BPCs, tax %) and blending into
+   plain text at rest was actively misleading, not just understated - the same problem .field-line's
+   own comment already solved for <select> (a persistent faint fill + icon) but never extended to
+   text/number inputs. Adds that same resting affordance, with a pencil instead of a chevron, without
+   touching the shared .field-line rule everywhere else it's used for genuinely secondary fields. */
+body.page-calc .field-editable {
+  background: rgba(255,255,255,0.035) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ba0a8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z'/%3E%3C/svg%3E") right 4px center / 10px no-repeat !important;
+  border-bottom: 1.5px solid rgba(255,255,255,0.1) !important;
+  border-radius: var(--radius-sm) !important;
+  padding-right: 17px !important;
+}
+body.page-calc .field-editable:hover {
+  background-color: rgba(255,255,255,0.065) !important;
+}
+body.page-calc .field-editable:focus {
+  background-color: rgba(255,255,255,0.065) !important;
+  border-bottom-color: var(--accent) !important;
+}
+
 /* ============================================================
    Shared component vocabulary (originally built for Ledger + Invention, extended to the whole
    page-calc family so any page can reuse it) - small set of classes reused everywhere instead of
