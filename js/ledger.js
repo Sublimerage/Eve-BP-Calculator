@@ -253,7 +253,6 @@ function renderJournalPage() {
 
   renderActiveJobsList(allocatedStock);
   renderConsolidatedBOMList(bomItems, aggregatedMissingCost);
-  renderIsolationBanner();
   renderBuildHistoryLedger();
 }
 
@@ -300,26 +299,10 @@ function clearJobIsolation() {
 }
 window.clearJobIsolation = clearJobIsolation;
 
-function renderIsolationBanner() {
-  const inset = document.getElementById('journal-isolation-inset');
-  const textEl = document.getElementById('journal-isolation-text');
-  const clearBtn = document.getElementById('journal-isolation-clear-btn');
-  if (!inset || !textEl || !clearBtn) return;
-
-  if (isolatedJobIds.size === 0) {
-    inset.style.background = '';
-    inset.style.border = '';
-    textEl.style.color = 'var(--text-mute)';
-    textEl.textContent = "Showing materials for the whole queue — check a job's box on the left to shop for just that one";
-    clearBtn.classList.add('hidden');
-  } else {
-    inset.style.background = 'rgba(var(--accent-rgb),0.12)';
-    inset.style.border = '1px solid rgba(var(--accent-rgb),0.35)';
-    textEl.style.color = 'var(--accent)';
-    textEl.textContent = `Showing materials for ${isolatedJobIds.size.toLocaleString()} selected job(s) only`;
-    clearBtn.classList.remove('hidden');
-  }
-}
+// Isolation status used to be its own always-visible banner row in the BOM sidebar - moved onto
+// the Pending group divider instead (see renderActiveJobsList), since isolation only ever applies
+// to pending jobs (the Shop checkbox only appears on those) and only needs to be visible AT ALL
+// once something is actually isolated, saving a permanent row of space the rest of the time.
 
 // The "isolate a job and see it in more detail" view: hides every other job in the queue and
 // renders just this one, plus its full prerequisite chain (at any depth - a prerequisite's own
@@ -499,6 +482,10 @@ function renderActiveJobsList(allocatedStock) {
           <span class="flex-shrink-0" style="color:var(--text-mute);">${isCollapsed ? '▸' : '▾'}</span>
           <span class="font-extrabold text-base rajdhani uppercase tracking-wider" style="color:var(--text);">⏳ Pending</span>
           <span class="font-bold text-sm mono" style="color:var(--text-mute);">(${pendingJobs.length})</span>
+          ${isolatedJobIds.size > 0 ? `
+            <span class="text-xs font-bold mono ml-auto flex-shrink-0" style="color:var(--accent);" title="The Consolidated BOM sidebar is only showing materials for these jobs (and their prerequisites), not the whole queue">🛒 ${isolatedJobIds.size.toLocaleString()} selected</span>
+            <button onclick="event.stopPropagation(); clearJobIsolation()" class="lp-chip-btn flex-shrink-0" title="Go back to showing materials for the whole queue">Show All</button>
+          ` : ''}
         </div>
         ${isCollapsed ? '' : `<div class="${groupWrapClass}">${renderGroup(pendingJobs)}</div>`}
       </div>
@@ -2218,13 +2205,6 @@ function filterJournalLocationOptions() {
   if (typeof window.openCustomSelect === 'function') window.openCustomSelect('stock-location-filter');
 }
 
-function updateJournalStockCountBadge() {
-  const el = document.getElementById('stock-count-display');
-  if (!el) return;
-  const totalItems = Object.values(window.userStockMap || {}).reduce((acc, q) => acc + q, 0);
-  el.textContent = `${totalItems.toLocaleString()} items`;
-}
-
 // "Last synced: Xm ago" line next to the Stock & Location panel's Refresh button - the age is
 // what actually answers "can I trust this stock count", not just whether a sync ever happened.
 function updateStockLastSyncedDisplay() {
@@ -2277,7 +2257,6 @@ function applyJournalStockFilter() {
   });
 
   localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap));
-  updateJournalStockCountBadge();
   renderJournalPage();
 }
 
@@ -2371,7 +2350,6 @@ window.onload = async () => {
     loadJournalState();
     updateViewModeButtonLabel();
     populateJournalLocationDropdown();
-    updateJournalStockCountBadge();
     updateStockLastSyncedDisplay();
     renderJournalPage();
     applyHistoryDrawerState(getHistoryDrawerState());
