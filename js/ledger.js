@@ -24,15 +24,17 @@ let isolatedJobIds = new Set();
 // size, for "I want to see everything about this one build and start its prerequisites from here."
 // Session-only, same as isolation.
 let focusedJobId = null;
-// job IDs with the BOM/details section minimized - persisted so a reload doesn't silently re-expand
-// every card back to its default state.
-let collapsedJobCardIds = new Set(window.safeParseJSON(localStorage.getItem('eve_collapsed_job_cards'), []));
+// job IDs with the BOM/details section explicitly EXPANDED - inverted from how this used to work
+// (a set of collapsed ids, default expanded) specifically so a job you've never touched - most
+// importantly a newly-added one - defaults to collapsed instead of dumping its full material list
+// into an already-busy queue. Persisted so a reload doesn't lose which ones you opened.
+let expandedJobCardIds = new Set(window.safeParseJSON(localStorage.getItem('eve_expanded_job_cards'), []));
 let activeQueueViewMode = localStorage.getItem('eve_queue_view_mode') || 'grid'; // 'grid' | 'list'
 // Which status groups ("started"/"pending") are collapsed - persisted the same way as card state.
 let collapsedJobGroups = new Set(window.safeParseJSON(localStorage.getItem('eve_collapsed_job_groups'), []));
 
-function saveCollapsedJobCardIds() {
-  localStorage.setItem('eve_collapsed_job_cards', JSON.stringify([...collapsedJobCardIds]));
+function saveExpandedJobCardIds() {
+  localStorage.setItem('eve_expanded_job_cards', JSON.stringify([...expandedJobCardIds]));
 }
 
 function saveCollapsedJobGroups() {
@@ -169,9 +171,13 @@ function renderJournalPage() {
   });
 
   if (activeJobsCountEl) activeJobsCountEl.textContent = activeJobs.length.toLocaleString();
-  if (totalCostEl) totalCostEl.textContent = Math.round(totalActiveCost).toLocaleString() + ' ISK';
+  if (totalCostEl) {
+    totalCostEl.textContent = window.formatISKCompact(totalActiveCost);
+    totalCostEl.title = Math.round(totalActiveCost).toLocaleString() + ' ISK';
+  }
   if (totalProfitEl) {
-    totalProfitEl.textContent = Math.round(totalPotentialProfit).toLocaleString() + ' ISK' + (profitDataMissing ? ' *' : '');
+    totalProfitEl.textContent = window.formatISKCompact(totalPotentialProfit) + (profitDataMissing ? ' *' : '');
+    totalProfitEl.title = Math.round(totalPotentialProfit).toLocaleString() + ' ISK';
     totalProfitEl.className = `text-lg font-bold mono leading-tight ${totalPotentialProfit >= 0 ? 'text-green-400' : 'text-red-400'}`;
     totalProfitEl.title = profitDataMissing ? 'One or more queued jobs were added before profit tracking existed and are excluded from this total.' : '';
   }
@@ -247,7 +253,10 @@ function renderJournalPage() {
   bomItems.sort((a, b) => b.lineCost - a.lineCost);
 
   if (materialsVolumeEl) materialsVolumeEl.textContent = totalMaterialsVolume.toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' m3';
-  if (materialsCostEl) materialsCostEl.textContent = Math.round(aggregatedMissingCost).toLocaleString() + ' ISK';
+  if (materialsCostEl) {
+    materialsCostEl.textContent = window.formatISKCompact(aggregatedMissingCost);
+    materialsCostEl.title = Math.round(aggregatedMissingCost).toLocaleString() + ' ISK';
+  }
 
   const allocatedStock = { ...userStockMap };
 
@@ -338,10 +347,10 @@ function renderFocusedJobView(container, jobId, allocatedStock, isStockDeductEna
   // Force every focused card open regardless of its remembered collapse state, then restore that
   // state afterward - focus mode is a temporary spotlight, not a permanent "always expand this"
   // change to the card (that's what the collapse toggle itself is for).
-  const priorCollapseState = focusJobs.map(j => collapsedJobCardIds.has(j.id));
-  focusJobs.forEach(j => collapsedJobCardIds.delete(j.id));
+  const priorExpandState = focusJobs.map(j => expandedJobCardIds.has(j.id));
+  focusJobs.forEach(j => expandedJobCardIds.add(j.id));
   const cardsHTML = focusJobs.map(j => renderJobCardHTML(j, allocatedStock, isStockDeductEnabled, true)).join('');
-  focusJobs.forEach((j, i) => { if (priorCollapseState[i]) collapsedJobCardIds.add(j.id); });
+  focusJobs.forEach((j, i) => { if (!priorExpandState[i]) expandedJobCardIds.delete(j.id); });
 
   const prereqCount = focusJobs.length - 1;
   container.innerHTML = `
@@ -529,7 +538,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
   const statusColor = job.isStarted && job.startedAt ? (statusText.startsWith('✓') ? 'var(--accent)' : 'var(--blue-300)') : 'var(--text-mute)';
 
   const p = getEffectiveJobProfit(job);
-  const isExpanded = !collapsedJobCardIds.has(job.id);
+  const isExpanded = expandedJobCardIds.has(job.id);
   const isIsolated = isolatedJobIds.has(job.id);
   const cardStateClass = (job.isSubBuild ? 'job-subbuild' : (isJobReady ? 'job-ready' : (job.isStarted ? 'job-started' : ''))) + (isIsolated ? ' job-isolated' : '');
   // Isolation only makes sense for a real root job that still has materials to shop for - a sub-
@@ -580,8 +589,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
         <div class="min-w-0 flex-1">
           <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></div>
           ${(job.isSubBuild && !depth) ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);">⚙ Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
-          ${job.autoImported ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--accent);" title="No matching plan existed - imported from your active EVE job.">📥 Auto-imported ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
-          ${renderJobPresetBadgeHTML(job)}
+          ${renderJobMetaChipHTML(job)}
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
           <div class="flex items-baseline justify-end gap-1.5 cursor-pointer flex-shrink-0" style="width:96px;" onclick="event.stopPropagation(); copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">
@@ -593,13 +601,13 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
               ? `<span class="job-timer" data-job-id="${job.id}" data-job-name="${window.esc(jobDisplayName)}" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}"><span class="timer-display text-xs font-extrabold mono whitespace-nowrap" style="color:${statusColor};">${statusText}</span></span>`
               : `<span class="text-xs font-extrabold mono whitespace-nowrap" style="color:${statusColor};">${statusText}</span>`}
           </div>
-          <div class="flex flex-col items-end lp-divider-col flex-shrink-0" style="width:190px;" title="Total manufacturing cost for this job">
+          <div class="flex flex-col items-end lp-divider-col flex-shrink-0" style="width:190px;" title="Total manufacturing cost for this job: ${Math.round(job.calculatedCost || 0).toLocaleString()} ISK">
             <span class="text-[8px] uppercase tracking-wide font-bold" style="color:var(--text-mute);">Cost</span>
-            <span class="text-xs font-bold mono whitespace-nowrap" style="color:var(--cost);">${Math.round(job.calculatedCost || 0).toLocaleString()} ISK</span>
+            <span class="text-xs font-bold mono whitespace-nowrap" style="color:var(--cost);">${window.formatISKCompact(job.calculatedCost || 0)}</span>
           </div>
-          <div class="flex flex-col items-end lp-divider-col flex-shrink-0" style="width:190px;" title="Net sell profit for this job">
+          <div class="flex flex-col items-end lp-divider-col flex-shrink-0" style="width:190px;" title="Net sell profit for this job${p !== undefined ? ': ' + Math.round(p).toLocaleString() + ' ISK' : ''}">
             <span class="text-[8px] uppercase tracking-wide font-bold" style="color:var(--text-mute);">Profit</span>
-            <span class="text-xs font-bold mono whitespace-nowrap" style="color:${p !== undefined ? (p >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-mute)'};">${p !== undefined ? Math.round(p).toLocaleString() + ' ISK' : '—'}</span>
+            <span class="text-xs font-bold mono whitespace-nowrap" style="color:${p !== undefined ? (p >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-mute)'};">${p !== undefined ? window.formatISKCompact(p) : '—'}</span>
           </div>
           <div class="flex items-center gap-2 lp-divider-col flex-shrink-0" onclick="event.stopPropagation()">
           <button onclick="markJobAsBuilt(${job.id})" class="lp-chip-btn">✔</button>
@@ -685,13 +693,24 @@ function setStationFilter(value) {
 }
 window.setStationFilter = setStationFilter;
 
-// One-line badge for the collapsed card header - visible without expanding, so a wrong preset is
-// spottable at a glance across the whole queue.
-function renderJobPresetBadgeHTML(job) {
-  if (job.autoImported) return '';
+// Compact metadata chip for the collapsed card header - visible without expanding, so a wrong
+// preset (or an auto-imported source) is still spottable at a glance across the whole queue. Used
+// to be two separate full-width uppercase text lines (one for auto-imported, one for preset); a
+// job only ever shows one of the two (auto-imported jobs have no preset concept - see
+// getJobStationLabel), so one small pill in place of a whole sentence-line covers both cases.
+// .lp-badge wraps by default (fine for the short fixed badges it's normally used for elsewhere -
+// "BPO"/"BPC", "✓ Queued") but a preset label is arbitrary-length text, and a wrapped multi-line
+// pill looks broken rather than compact - truncating with an ellipsis (full label still in the
+// title) keeps it a clean single line regardless of how long the label is.
+const CHIP_TRUNCATE_STYLE = 'display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom;';
+function renderJobMetaChipHTML(job) {
+  if (job.autoImported) {
+    const meTe = job.meLevel !== undefined ? ` | ME: ${job.meLevel}% TE: ${job.teLevel}%` : '';
+    return `<div class="mt-1"><span class="lp-badge lp-badge-accent" style="${CHIP_TRUNCATE_STYLE}" title="No matching plan existed - imported from your active EVE job${window.esc(meTe)}">📥 Auto-imported</span></div>`;
+  }
   const isAssumed = !job.productionSnapshot;
   const label = resolveProductionPresetLabel(job.productionSnapshot || getCurrentLiveProductionSnapshot());
-  return `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);" title="Production preset assumed for this job's materials/cost/time - see the expanded detail below to change it">🏭 ${window.esc(label)}${isAssumed ? ' (assumed)' : ''}</div>`;
+  return `<div class="mt-1"><span class="lp-badge" style="${CHIP_TRUNCATE_STYLE}" title="Production preset assumed for this job's materials/cost/time - see the expanded detail below to change it">🏭 ${window.esc(label)}${isAssumed ? ' (assumed)' : ''}</span></div>`;
 }
 
 // "Preset:" row + change control for the expanded job detail - skipped for auto-imported (real ESI)
@@ -953,7 +972,7 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
       const effJobProfit = getEffectiveJobProfit(job);
       const iskPerHour = effJobProfit !== undefined ? (effJobProfit / (totalBuildSeconds / 3600)) : null;
       const iskPerHourUI = iskPerHour !== null
-        ? `<div class="flex justify-between text-xs mono"><span style="color:var(--text-mute);">Est. ISK/Hour:</span><span class="font-bold" style="color:${iskPerHour >= 0 ? 'var(--green)' : 'var(--red)'};">${Math.round(iskPerHour).toLocaleString()} ISK</span></div>`
+        ? `<div class="flex justify-between text-xs mono" title="${Math.round(iskPerHour).toLocaleString()} ISK/hour"><span style="color:var(--text-mute);">Est. ISK/Hour:</span><span class="font-bold" style="color:${iskPerHour >= 0 ? 'var(--green)' : 'var(--red)'};">${window.formatISKCompact(iskPerHour)}</span></div>`
         : '';
 
       buildTimeUI = `
@@ -990,14 +1009,14 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
         </div>
         <div class="flex flex-col ${statsTextClass} mono font-bold pt-1.5 mt-1 space-y-1" style="border-top:1px solid rgba(255,255,255,0.06);">
           ${buildTimeUI}
-          <div class="flex justify-between items-center mt-0.5">
+          <div class="flex justify-between items-center mt-0.5" title="${Math.round(job.calculatedCost).toLocaleString()} ISK">
             <span style="color:var(--text-soft);">Total Build Cost:</span>
-            <span style="color:var(--cost);">${Math.round(job.calculatedCost).toLocaleString()} ISK</span>
+            <span style="color:var(--cost);">${window.formatISKCompact(job.calculatedCost)}</span>
           </div>
           ${(() => { const p = getEffectiveJobProfit(job); return p !== undefined ? `
-            <div class="flex justify-between items-center">
+            <div class="flex justify-between items-center" title="${Math.round(p).toLocaleString()} ISK">
               <span style="color:var(--text-soft);">Total Profit:</span>
-              <span style="color:${p >= 0 ? 'var(--green)' : 'var(--red)'};">${Math.round(p).toLocaleString()} ISK</span>
+              <span style="color:${p >= 0 ? 'var(--green)' : 'var(--red)'};">${window.formatISKCompact(p)}</span>
             </div>
           ` : ''; })()}
         </div>
@@ -1008,7 +1027,7 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
 function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMode) {
     const iconTypeId = job.productTypeId || job.typeId;
     const isJobReady = job.isStarted && job.startedAt && ((Date.now() - job.startedAt) / 1000 >= (job.totalBuildSeconds || 0));
-    const isCollapsed = collapsedJobCardIds.has(job.id);
+    const isCollapsed = !expandedJobCardIds.has(job.id);
 
     // Isolation only makes sense for a real root job that still has materials to shop for - a sub-
     // build is pulled in automatically whenever its parent is isolated (see renderJournalPage), and
@@ -1089,8 +1108,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
             <div class="min-w-0 flex-1">
               <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${(job.isSubBuild && !isFocusMode) ? `<span class="ml-1 text-xs align-middle" style="color:var(--text-mute);" title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}">⚙</span>` : ''}</h3>
               ${(job.isSubBuild && isFocusMode) ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
-              ${job.autoImported ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--accent);" title="No matching plan existed for this job - imported directly from your active EVE industry job using its real ME/TE and market sell pricing.">📥 Auto-imported from EVE ${job.meLevel !== undefined ? `| ME: ${job.meLevel}% TE: ${job.teLevel}%` : ''}</div>` : ''}
-              <div class="mt-0.5">${renderJobPresetBadgeHTML(job)}</div>
+              ${renderJobMetaChipHTML(job)}
             </div>
           </div>
           ${dragHandleHTML}
@@ -1148,23 +1166,23 @@ window.setJobStatusFilter = setJobStatusFilter;
 
 // --- Minimize/maximize card details ---
 function toggleJobCardCollapse(jobId) {
-  if (collapsedJobCardIds.has(jobId)) collapsedJobCardIds.delete(jobId);
-  else collapsedJobCardIds.add(jobId);
-  saveCollapsedJobCardIds();
+  if (expandedJobCardIds.has(jobId)) expandedJobCardIds.delete(jobId);
+  else expandedJobCardIds.add(jobId);
+  saveExpandedJobCardIds();
   renderJournalPage();
 }
 window.toggleJobCardCollapse = toggleJobCardCollapse;
 
 function collapseAllJobCards() {
-  activeJobs.forEach(j => { if (j) collapsedJobCardIds.add(j.id); });
-  saveCollapsedJobCardIds();
+  expandedJobCardIds.clear();
+  saveExpandedJobCardIds();
   renderJournalPage();
 }
 window.collapseAllJobCards = collapseAllJobCards;
 
 function expandAllJobCards() {
-  collapsedJobCardIds.clear();
-  saveCollapsedJobCardIds();
+  activeJobs.forEach(j => { if (j) expandedJobCardIds.add(j.id); });
+  saveExpandedJobCardIds();
   renderJournalPage();
 }
 window.expandAllJobCards = expandAllJobCards;
@@ -1536,14 +1554,15 @@ function updateJobNotificationButton() {
   if (!btn) return;
   const supported = typeof Notification !== 'undefined';
   const enabled = isJobNotificationsEnabled();
-  btn.className = `btn-glass ${enabled ? '' : 'btn-glass-muted'} px-2.5 py-1 text-[10px] flex items-center gap-1.5`;
+  // Icon-only now (see ledger.html) - on/off state reads from the same accent-vs-muted color
+  // language every other toggle in this app already uses, plus the tooltip on hover, rather than a
+  // permanent "Notify: On"/"Notify When Ready" text label.
+  btn.className = `btn-glass ${enabled ? '' : 'btn-glass-muted'} px-2 py-1 flex items-center justify-center`;
   btn.title = !supported
     ? 'Your browser does not support notifications'
     : enabled
-      ? 'Job-ready notifications are on - click to turn off'
-      : 'Get a browser notification when a job finishes building';
-  const label = document.getElementById('btn-job-notifications-label');
-  if (label) label.textContent = enabled ? 'Notify: On' : 'Notify When Ready';
+      ? 'Notify When Ready: job-ready notifications are on - click to turn off'
+      : 'Notify When Ready: get a browser notification when a job finishes building';
 }
 
 function toggleJobNotifications() {

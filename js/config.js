@@ -218,6 +218,22 @@ function formatDuration(seconds) {
 }
 window.formatDuration = formatDuration;
 
+// Compact "23.5M ISK" style formatting for tight spaces (ledger job cards, summary tiles) - full
+// precision stays available via the caller's own title/tooltip, this is display-only. Deliberately
+// kept as ONE shared function used from a small, specific set of call sites (not a global find/
+// replace of every .toLocaleString() + ' ISK' in the app) so it's easy to dial back later if it
+// turns out to trade away more clarity than it saves in space.
+function formatISKCompact(value) {
+  const n = Math.round(value || 0);
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (abs >= 1e9) return `${sign}${(abs / 1e9).toFixed(2)}B ISK`;
+  if (abs >= 1e6) return `${sign}${(abs / 1e6).toFixed(1)}M ISK`;
+  if (abs >= 1e3) return `${sign}${(abs / 1e3).toFixed(1)}K ISK`;
+  return `${sign}${abs.toLocaleString()} ISK`;
+}
+window.formatISKCompact = formatISKCompact;
+
 // Compact "Xm ago" / "Xh Ym ago" relative-time string - e.g. for "last synced" indicators.
 function formatTimeAgo(timestampMs) {
   if (!timestampMs) return null;
