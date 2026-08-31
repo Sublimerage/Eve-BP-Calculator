@@ -703,6 +703,12 @@ window.setStationFilter = setStationFilter;
 // pill looks broken rather than compact - truncating with an ellipsis (full label still in the
 // title) keeps it a clean single line regardless of how long the label is.
 const CHIP_TRUNCATE_STYLE = 'display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom;';
+// A LIVE control, not just a readout: the select's own "currently selected" option IS the resolved
+// label, so at rest it reads exactly like the old static badge did - but opening it lists every other
+// saved preset, and picking one calls the same changeJobProductionPreset the expanded BOM block's own
+// preset row uses. Previously this only existed inside the expanded detail (renderJobPresetRowHTML),
+// so changing a job's preset required expanding the card (or Focus mode, which force-expands it) -
+// this puts the same action one click away from the collapsed title in both list and grid mode.
 function renderJobMetaChipHTML(job) {
   if (job.autoImported) {
     const meTe = job.meLevel !== undefined ? ` | ME: ${job.meLevel}% TE: ${job.teLevel}%` : '';
@@ -710,7 +716,18 @@ function renderJobMetaChipHTML(job) {
   }
   const isAssumed = !job.productionSnapshot;
   const label = resolveProductionPresetLabel(job.productionSnapshot || getCurrentLiveProductionSnapshot());
-  return `<div class="mt-1"><span class="lp-badge" style="${CHIP_TRUNCATE_STYLE}" title="Production preset assumed for this job's materials/cost/time - see the expanded detail below to change it">🏭 ${window.esc(label)}${isAssumed ? ' (assumed)' : ''}</span></div>`;
+  const presets = getSavedProductionPresetsLocal();
+  const presetNames = Object.keys(presets).sort();
+  const currentOptionHTML = `<option value="" selected>🏭 ${window.esc(label)}${isAssumed ? ' (assumed)' : ''}</option>`;
+  const optionsHTML = presetNames.map(name => `<option value="${window.esc(name)}">🏭 ${window.esc(name)}</option>`).join('');
+  return `
+    <div class="mt-1" onclick="event.stopPropagation()">
+      <select onchange="if (this.value) changeJobProductionPreset(${job.id}, this.value);" class="lp-badge" style="${CHIP_TRUNCATE_STYLE} max-width:220px; font-size:10px; cursor:pointer;" ${presetNames.length === 0 ? 'disabled' : ''} title="Production preset this job assumes - click to change">
+        ${currentOptionHTML}
+        ${optionsHTML}
+      </select>
+    </div>
+  `;
 }
 
 // "Preset:" row + change control for the expanded job detail - skipped for auto-imported (real ESI)
