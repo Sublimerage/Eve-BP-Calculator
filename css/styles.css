@@ -854,6 +854,9 @@ body.page-calc .flyout-panel select:not([size]) {
    minimum), which routing it to --text-soft (7.6:1) fixes as a side effect. */
 .text-slate-200, .text-slate-300 { color: var(--text) !important; }
 .text-slate-400, .text-slate-500 { color: var(--text-soft) !important; }
+/* text-white had no compat rule at all - every other color utility on this page maps onto the
+   active theme, so this was the one spot that stayed literal white regardless of theme choice. */
+.text-white { color: var(--text) !important; }
 .bg-orange-400, .bg-amber-400 { background: var(--copper-400) !important; }
 .bg-orange-500, [class^="bg-orange-500/"], [class*=" bg-orange-500/"] {
   background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
