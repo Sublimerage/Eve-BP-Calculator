@@ -60,6 +60,18 @@ function renderRunsEditIconHTML(jobId, isEditing) {
   return `<svg onclick="toggleRunsEditMode(event, ${jobId})" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px; height:12px; flex-shrink:0; color:var(--text-mute); cursor:pointer;" title="${isEditing ? 'Cancel' : 'Edit run count'}">${icon}</svg>`;
 }
 
+// Real SVG icons for job status (pending/counting down/ready), replacing the ⏳/⏱/✓ emoji this used
+// to render - matches the stroke-based icon style already used everywhere else in the app (edit
+// pencil above, delete/copy/etc.). 'kind' is 'pending' | 'remaining' | 'ready'.
+function renderJobStatusIconHTML(kind) {
+  const paths = kind === 'ready'
+    ? `<polyline points="20 6 9 17 4 12"/>`
+    : kind === 'remaining'
+      ? `<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>`
+      : `<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>`;
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px; height:12px; flex-shrink:0;">${paths}</svg>`;
+}
+
 let activeQueueViewMode = localStorage.getItem('eve_queue_view_mode') || 'grid'; // 'grid' | 'list'
 // Which status groups ("started"/"pending") are collapsed - persisted the same way as card state.
 let collapsedJobGroups = new Set(window.safeParseJSON(localStorage.getItem('eve_collapsed_job_groups'), []));
@@ -560,17 +572,23 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
   // Pending jobs previously just said "PENDING" with no indication of how long the build would
   // actually take once started - the estimated time was only visible after expanding the card's own
   // BOM block. Showing it right in the status column (same duration already computed for that block)
-  // means "how long is this going to take" is answerable from the collapsed row alone.
-  let statusText = job.totalBuildSeconds > 0 ? `⏳ PENDING (${window.formatDuration(job.totalBuildSeconds)})` : '⏳ PENDING';
+  // means "how long is this going to take" is answerable from the collapsed row alone. The word
+  // "PENDING" itself is dropped - every row in this column already sits under a "⏳ PENDING" group
+  // header, so repeating it on each individual row said nothing the icon+group context didn't already.
+  // formatDurationCompact (not formatDuration) - full seconds-level precision on an estimate just
+  // pushed long durations past this column's fixed width, and isn't information anyone needs anyway.
+  let statusIconKind = 'pending';
+  let statusText = job.totalBuildSeconds > 0 ? window.formatDurationCompact(job.totalBuildSeconds) : 'No time data';
   let isTimerBacked = false;
   if (job.isStarted && job.startedAt) {
     isTimerBacked = true;
     const elapsedSeconds = (Date.now() - job.startedAt) / 1000;
     const remaining = (job.totalBuildSeconds || 0) - elapsedSeconds;
     const ready = remaining <= 0;
-    statusText = ready ? '✓ READY' : `⏱ ${window.formatDuration(Math.ceil(remaining))}`;
+    statusIconKind = ready ? 'ready' : 'remaining';
+    statusText = ready ? 'Ready to Collect!' : `${window.formatDuration(Math.ceil(remaining))} remaining`;
   }
-  const statusColor = job.isStarted && job.startedAt ? (statusText.startsWith('✓') ? 'var(--accent)' : 'var(--blue-300)') : 'var(--text-mute)';
+  const statusColor = job.isStarted && job.startedAt ? (statusIconKind === 'ready' ? 'var(--accent)' : 'var(--blue-300)') : 'var(--text-mute)';
 
   const p = getEffectiveJobProfit(job);
   const isExpanded = expandedJobCardIds.has(job.id);
@@ -633,15 +651,24 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
               : `<span class="text-lg font-extrabold mono whitespace-nowrap cursor-pointer" style="color:var(--accent);" onclick="copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">${job.runsNeeded.toLocaleString()}</span>`}
             <span class="text-xs mono whitespace-nowrap" style="color:var(--text-mute);">runs</span>
           </div>
+          <!-- Edit icon sits in its own fixed-width slot right next to the runs block (before the
+               divider), not inside it - its presence/absence (editable jobs vs started/auto-imported
+               ones) used to shift the runs block's own content width row to row, landing the run count
+               at a different x position depending on the job. It also used to live on the OTHER side
+               of the divider next to the status/time text, which read as "this edits the manufacturing
+               time" - wrong on both counts, since it edits run count. This slot is fixed-width whether
+               or not the icon renders, and sits with the runs number it actually belongs to. -->
+          <span class="flex-shrink-0" style="width:14px;" onclick="event.stopPropagation()">${(!job.isStarted && !job.autoImported) ? renderRunsEditIconHTML(job.id, editingRunsJobIds.has(job.id)) : ''}</span>
           <div class="lp-divider-col flex items-center gap-1.5 flex-shrink-0" style="width:260px;" title="Job status">
-            <!-- Edit icon lives here, right of the divider bar, instead of inside the runs block above -
-                 it used to sit right next to the run count, but its presence/absence (editable jobs vs
-                 started/auto-imported ones) shifted that block's content width row to row, so the run
-                 count itself landed at a different x position depending on the job - no longer lined up
-                 down the list. A fixed-width slot here keeps the runs block's own content identical
-                 (and therefore aligned) on every row, editable or not. -->
-            <span class="flex-shrink-0" style="width:12px;">${(!job.isStarted && !job.autoImported) ? renderRunsEditIconHTML(job.id, editingRunsJobIds.has(job.id)) : ''}</span>
-            <span class="flex-1 text-right">
+            <!-- Status icon (hourglass/stopwatch/check) gets the same fixed-slot treatment - it used to
+                 be an emoji prefixed directly onto the status text, so its position (like the edit icon
+                 above) drifted depending on how long that text was. id lets updateJobTimers() (below)
+                 swap it from stopwatch to checkmark the moment a job goes ready, live, no full re-render
+                 needed - it can't just be a child of .job-timer the way .timer-display is since that
+                 would put it back inside the flex group whose width varies with the text, which is
+                 exactly the misalignment this whole restructure exists to avoid. -->
+            <span id="status-icon-${job.id}" class="flex-shrink-0" style="width:13px; color:${statusColor};">${renderJobStatusIconHTML(statusIconKind)}</span>
+            <span class="flex-1 text-right" style="overflow:hidden; text-overflow:ellipsis;">
               ${isTimerBacked
                 ? `<span class="job-timer" data-job-id="${job.id}" data-job-name="${window.esc(jobDisplayName)}" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}"><span class="timer-display text-xs font-extrabold mono whitespace-nowrap" style="color:${statusColor};">${statusText}</span></span>`
                 : `<span class="text-xs font-extrabold mono whitespace-nowrap" style="color:${statusColor};">${statusText}</span>`}
@@ -1180,19 +1207,28 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
       const elapsedSeconds = (Date.now() - job.startedAt) / 1000;
       const remaining = (job.totalBuildSeconds || 0) - elapsedSeconds;
       const ready = remaining <= 0;
-      const text = ready ? '✓ READY TO COLLECT!' : `⏱ ${window.formatDuration(Math.ceil(remaining))} remaining`;
+      const text = ready ? 'Ready to Collect!' : `${window.formatDuration(Math.ceil(remaining))} remaining`;
       statusBannerHTML = `
         <div class="job-timer lp-status-row ${ready ? 'is-ready' : ''}" data-job-id="${job.id}" data-job-name="${window.esc(job.name)}" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}">
           <span class="text-xs font-bold uppercase tracking-wide flex-shrink-0" style="color:var(--text-soft);">Status:</span>
-          <span class="timer-display text-sm font-extrabold mono" style="color:${ready ? 'var(--accent)' : 'var(--blue-300)'};">${text}</span>
+          <span class="flex items-center gap-1.5">
+            <span id="status-icon-${job.id}" class="flex-shrink-0" style="width:14px; color:${ready ? 'var(--accent)' : 'var(--blue-300)'};">${renderJobStatusIconHTML(ready ? 'ready' : 'remaining')}</span>
+            <span class="timer-display text-sm font-extrabold mono" style="color:${ready ? 'var(--accent)' : 'var(--blue-300)'};">${text}</span>
+          </span>
         </div>
       `;
     } else {
-      const pendingText = job.totalBuildSeconds > 0 ? `⏳ PENDING (${window.formatDuration(job.totalBuildSeconds)})` : '⏳ PENDING';
+      // "Pending" is dropped - it's the only status a not-yet-started job can have, so the word said
+      // nothing the hourglass icon didn't already. formatDurationCompact (not formatDuration) keeps a
+      // long estimate from ballooning into "11d 16h 49m 38s" for what's just an estimate anyway.
+      const pendingText = job.totalBuildSeconds > 0 ? window.formatDurationCompact(job.totalBuildSeconds) : 'No time data';
       statusBannerHTML = `
         <div class="lp-status-row">
           <span class="text-xs font-bold uppercase tracking-wide flex-shrink-0" style="color:var(--text-soft);">Status:</span>
-          <span class="text-sm font-extrabold mono" style="color:var(--text-mute);">${pendingText}</span>
+          <span class="flex items-center gap-1.5">
+            <span id="status-icon-${job.id}" class="flex-shrink-0" style="width:14px; color:var(--text-mute);">${renderJobStatusIconHTML('pending')}</span>
+            <span class="text-sm font-extrabold mono" style="color:var(--text-mute);">${pendingText}</span>
+          </span>
         </div>
       `;
     }
@@ -1658,8 +1694,13 @@ function updateJobTimers() {
     // row vs. grid card banner) and must not be clobbered here, or a live tick would silently strip
     // e.g. whitespace-nowrap and cause the text to re-wrap mid-countdown.
     if (remaining <= 0) {
-      display.textContent = '✓ Ready to Collect!';
+      display.textContent = 'Ready to Collect!';
       display.style.color = 'var(--accent)';
+      // The status icon (stopwatch, set at render time) has to be flipped to a checkmark live too - it
+      // isn't inside .job-timer (see the render-time comment on status-icon-*), so it's not touched by
+      // anything else here unless done explicitly.
+      const icon = document.getElementById(`status-icon-${el.dataset.jobId}`);
+      if (icon) { icon.innerHTML = renderJobStatusIconHTML('ready'); icon.style.color = 'var(--accent)'; }
       el.classList.add('is-ready');
       // The parent card only shows the bold "ready" color once actually ready - update it live here
       // so it doesn't sit in the wrong color until the next full re-render.
@@ -1674,7 +1715,7 @@ function updateJobTimers() {
         if (_jobTimerTickCount > 1) notifyJobReady(el.dataset.jobName || 'A job');
       }
     } else {
-      display.textContent = `⏱ ${window.formatDuration(Math.ceil(remaining))} remaining`;
+      display.textContent = `${window.formatDuration(Math.ceil(remaining))} remaining`;
       display.style.color = 'var(--blue-300)';
     }
   });

@@ -269,6 +269,25 @@ function formatDuration(seconds) {
 }
 window.formatDuration = formatDuration;
 
+// Top-2-significant-units version of the above, for spots where full seconds-level precision on an
+// ESTIMATE is more clutter than information (and can overflow a fixed-width column) - "11d 16h"
+// instead of "11d 16h 49m 38s". formatDuration() itself stays untouched (its full precision matters
+// for live-ticking countdowns), this is a separate, deliberately-scoped variant.
+function formatDurationCompact(seconds) {
+  if (!seconds || isNaN(seconds) || seconds <= 0) return '0s';
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  let primary, secondary;
+  if (days > 0) { primary = `${days}d`; secondary = hours > 0 ? `${hours}h` : null; }
+  else if (hours > 0) { primary = `${hours}h`; secondary = mins > 0 ? `${mins}m` : null; }
+  else if (mins > 0) { primary = `${mins}m`; secondary = secs > 0 ? `${secs}s` : null; }
+  else { primary = `${secs}s`; secondary = null; }
+  return secondary ? `${primary} ${secondary}` : primary;
+}
+window.formatDurationCompact = formatDurationCompact;
+
 // Compact "23.5M ISK" style formatting for tight spaces (ledger job cards, summary tiles) - full
 // precision stays available via the caller's own title/tooltip, this is display-only. Deliberately
 // kept as ONE shared function used from a small, specific set of call sites (not a global find/
