@@ -5,6 +5,28 @@ function esc(s) {
 }
 window.esc = esc;
 
+// <input type="number"> validates keystrokes against the BROWSER'S LOCALE, not a fixed period - on a
+// browser/OS set to a language that uses comma as its decimal separator, "." is silently rejected and
+// only whole numbers can be typed at all (a well-known HTML gotcha, unrelated to this app's own code -
+// every reader of these fields already uses parseFloat and is fully decimal-safe). Every percentage/fee
+// field in this app uses type="text" + this locale-independent sanitizer instead: digits and at most
+// one literal "." allowed, on every locale, with no native number-input weirdness to fight.
+function sanitizeDecimalInput(e) {
+  const input = e.target;
+  const cursorFromEnd = input.value.length - input.selectionStart;
+  let cleaned = input.value.replace(/[^0-9.]/g, '');
+  const firstDot = cleaned.indexOf('.');
+  if (firstDot !== -1) {
+    cleaned = cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+  }
+  if (cleaned !== input.value) {
+    input.value = cleaned;
+    const pos = Math.max(0, cleaned.length - cursorFromEnd);
+    input.setSelectionRange(pos, pos);
+  }
+}
+window.sanitizeDecimalInput = sanitizeDecimalInput;
+
 // Shared BOM item categorization (calculator + ledger consolidated BOM category filters).
 function getItemCategory(typeId, name) {
   if (!name) return 'others';
