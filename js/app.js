@@ -875,7 +875,11 @@ function renderProductionPresetDropdown() {
   const presets = getProductionPresets();
   const currentValue = select.value;
   select.innerHTML = `<option value="">— Load a saved production station —</option>` +
-    Object.keys(presets).sort().map(name => `<option value="${window.esc(name)}">${window.esc(name)} (${window.esc(presets[name].systemName)}, ${window.esc(presets[name].facilityLabel)})</option>`).join('');
+    Object.keys(presets).sort().map(name => {
+      const p = presets[name];
+      const taxLabel = p.facilityTax !== undefined ? `, ${p.facilityTax}% Fac Tax` : '';
+      return `<option value="${window.esc(name)}">${window.esc(name)} (${window.esc(p.systemName)}, ${window.esc(p.facilityLabel)}${taxLabel})</option>`;
+    }).join('');
   if (presets[currentValue]) select.value = currentValue;
 }
 window.renderProductionPresetDropdown = renderProductionPresetDropdown;
@@ -895,6 +899,11 @@ function saveProductionPreset() {
     systemName: savedSystem.name,
     facilityKey: facilityKey,
     facilityLabel: facilityLabel,
+    // Facility (job installation) tax is set per-structure by whoever owns it, not a fixed game
+    // constant like the SCC surcharge - it genuinely varies station to station, so it belongs in the
+    // preset alongside the structure/system/rigs rather than staying one global "Fac" input that gets
+    // silently left over from whichever station was last used.
+    facilityTax: document.getElementById('facility-tax')?.value || '1.0',
     rig1: localStorage.getItem('eve_rig_slot_1') || '',
     rig2: localStorage.getItem('eve_rig_slot_2') || '',
     rig3: localStorage.getItem('eve_rig_slot_3') || ''
@@ -921,6 +930,14 @@ async function loadProductionPreset(name) {
     facilitySelect.value = preset.facilityKey;
     onStructureTypeChange();
   }
+
+  // Older presets saved before facilityTax existed have no such field - leave whatever tax rate is
+  // currently entered alone rather than clobbering it with something.
+  const facilityTaxInput = document.getElementById('facility-tax');
+  if (facilityTaxInput && preset.facilityTax !== undefined) {
+    facilityTaxInput.value = preset.facilityTax;
+  }
+  saveTaxSettings();
 
   [1, 2, 3].forEach(slot => {
     const rigTypeId = preset[`rig${slot}`];
