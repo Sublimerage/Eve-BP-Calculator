@@ -521,7 +521,7 @@ async function recalculateInventionImpl() {
     const totalRunsProduced = targetBPCs * resultRuns;
     const profitPerRun = (isFinite(totalProfit) && totalRunsProduced > 0) ? totalProfit / totalRunsProduced : (isFinite(totalProfit) ? totalProfit : -Infinity);
 
-    return { dec, successChance, resultRuns, resultME, resultTE, requiredAttempts, totalInventionCost, totalManufacturingCost, totalRevenue, totalProfit, totalBuildSeconds, totalInventionSeconds, totalTimeSeconds, iskPerHour, profitPerRun, multibuyItems, profitDetail };
+    return { dec, successChance, resultRuns, resultME, resultTE, requiredAttempts, totalInventionCost, totalManufacturingCost, totalRevenue, totalProfit, totalBuildSeconds, totalInventionSeconds, totalTimeSeconds, iskPerHour, profitPerRun, multibuyItems, profitDetail, t2BlueprintTypeId, t2ProductName: _inventionCurrentProduct.name };
   }));
 
   renderInventionComparisonTable(rows);
@@ -619,6 +619,25 @@ function copyInventionMultibuy(rowIndex) {
 }
 window.copyInventionMultibuy = copyInventionMultibuy;
 
+// Sends this decryptor's resulting T2 BPC to the Calculator (new tab, so the invention comparison
+// table stays put - sending several different decryptors' results one after another is the whole
+// point). Reuses the Calculator's own shareCurrentBuild/applySharedBuildFromUrl link format (app.js)
+// rather than inventing a second one - runs/me/te ride along in the same ?build= param so the
+// Calculator opens already set to the run count THIS decryptor actually produces (never just 1) and
+// the ME/TE this decryptor actually grants, not a plain unresearched copy of the blueprint.
+function sendInventionRowToCalculator(rowIndex) {
+  const row = _inventionLastComparisonRows[rowIndex];
+  if (!row) return;
+  if (!row.t2BlueprintTypeId) {
+    if (typeof window.showToast === 'function') window.showToast('No manufacturing recipe found for this item - cannot send it to the Calculator.', 'error');
+    return;
+  }
+  const state = { id: row.t2BlueprintTypeId, name: row.t2ProductName, runs: row.resultRuns, me: row.resultME, te: row.resultTE };
+  const encoded = btoa(encodeURIComponent(JSON.stringify(state)));
+  window.open(`index.html?build=${encoded}`, '_blank');
+}
+window.sendInventionRowToCalculator = sendInventionRowToCalculator;
+
 function renderInventionComparisonTable(rows) {
   const container = document.getElementById('invention-comparison-table');
   if (!container) return;
@@ -653,6 +672,7 @@ function renderInventionComparisonTable(rows) {
           ${sortHeader('iskPerHour', 'ISK/Hour', 'right')}
           ${sortHeader('profitPerRun', 'Profit / 1 Run', 'right')}
           <th class="text-right">Buy List</th>
+          <th class="text-right">Calculator</th>
         </tr>
       </thead>
       <tbody>
@@ -677,6 +697,9 @@ function renderInventionComparisonTable(rows) {
             <td class="text-right font-bold" style="color:${isFinite(r.profitPerRun) && r.profitPerRun >= 0 ? 'var(--green)' : 'var(--red)'};">${isFinite(r.profitPerRun) ? Math.round(r.profitPerRun).toLocaleString() + ' ISK' : '—'}</td>
             <td class="text-right">
               <button id="invention-multibuy-btn-${rowIndex}" onclick="copyInventionMultibuy(${rowIndex})" class="lp-chip-btn" title="Copy datacores + decryptor needed for this decryptor's Attempts Needed, minus whatever stock you already own"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy</button>
+            </td>
+            <td class="text-right">
+              <button onclick="sendInventionRowToCalculator(${rowIndex})" class="lp-chip-btn" ${r.t2BlueprintTypeId ? '' : 'disabled'} title="Open this decryptor's resulting BPC in the Calculator, already set to its ${r.resultRuns} max run${r.resultRuns > 1 ? 's' : ''} and ME${r.resultME >= 0 ? '+' : ''}${r.resultME}/TE${r.resultTE >= 0 ? '+' : ''}${r.resultTE}"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>Calculator</button>
             </td>
           </tr>
         `; }).join('')}

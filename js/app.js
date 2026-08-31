@@ -1460,10 +1460,27 @@ async function applySharedBuildFromUrl() {
 
   await window.selectItem(state.id, state.name, false);
 
+  // Runs AND the optional ME/TE override (used by the Invention page's "send to Calculator" button,
+  // linking to a specific decryptor's actual resulting BPC - e.g. ME+4/TE+8 out of a real decryptor,
+  // not a plain unresearched ME0/TE0 copy of the blueprint) both have to be applied AFTER selectItem
+  // returns, never before - selectItem(..., false) unconditionally resets globalRuns to 1 and
+  // customMEOverrides/customTEOverrides to {} as part of "starting fresh" on a new item, so anything
+  // set beforehand is immediately wiped out. A single recalculate() afterward picks up both: it reads
+  // window.globalRuns directly, and its first step (syncTreeOverrides) re-reads customMEOverrides/
+  // customTEOverrides onto the already-built tree - no second selectItem/rebuild needed for either.
+  let needsRecalculate = false;
   if (state.runs && state.runs > 1) {
     window.globalRuns = state.runs;
-    if (typeof recalculate === 'function') recalculate();
+    needsRecalculate = true;
   }
+  if (state.me !== undefined || state.te !== undefined) {
+    window.customMEOverrides = window.customMEOverrides || {};
+    window.customTEOverrides = window.customTEOverrides || {};
+    if (state.me !== undefined) window.customMEOverrides[state.id] = state.me;
+    if (state.te !== undefined) window.customTEOverrides[state.id] = state.te;
+    needsRecalculate = true;
+  }
+  if (needsRecalculate && typeof recalculate === 'function') recalculate();
 
   if (typeof window.showToast === 'function') window.showToast(`Loaded shared build: ${state.name}`, 'success');
   // Strip the param so refreshing doesn't keep re-applying (and re-toasting) the same shared state.

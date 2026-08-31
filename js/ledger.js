@@ -592,8 +592,10 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
           ${renderJobMetaChipHTML(job)}
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
-          <div class="flex items-baseline justify-end gap-1.5 cursor-pointer flex-shrink-0" style="width:96px;" onclick="event.stopPropagation(); copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">
-            <span class="text-lg font-extrabold mono whitespace-nowrap" style="color:var(--accent);">${job.runsNeeded.toLocaleString()}</span>
+          <div class="flex items-baseline justify-end gap-1.5 flex-shrink-0" style="width:96px;" onclick="event.stopPropagation()">
+            ${(!job.isStarted && !job.autoImported) ? `
+              <input type="number" min="1" value="${job.runsNeeded}" onfocus="this.select()" onchange="changeJobRunCount(${job.id}, this.value)" class="field-line field-editable text-lg font-extrabold mono text-right" style="width:60px; color:var(--accent);" title="Edit run count - recalculates materials, cost, and time">
+            ` : `<span class="text-lg font-extrabold mono whitespace-nowrap cursor-pointer" style="color:var(--accent);" onclick="copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">${job.runsNeeded.toLocaleString()}</span>`}
             <span class="text-xs mono whitespace-nowrap" style="color:var(--text-mute);">runs</span>
           </div>
           <div class="lp-divider-col text-right flex-shrink-0" style="width:260px;" title="Job status">
@@ -851,11 +853,48 @@ async function changeJobProductionPreset(jobId, presetName) {
 }
 window.changeJobProductionPreset = changeJobProductionPreset;
 
+// Lets a not-yet-started job's total run count be edited directly, instead of having to delete it and
+// re-add it from the Calculator at the right quantity. Full rebuild (not a linear qty/cost scale) for
+// the same reason changeJobProductionPreset does one - batch yields and sub-component rounding don't
+// scale proportionally with run count, so only a real rebuild keeps materials/cost/time accurate.
+// Blocked for a started job (EVE itself won't let you change a job's runs once it's actually running -
+// see startJobRuns for the real mechanic, splitting off a subset before starting) and for an auto-
+// imported job (its run count is real ESI data, not something to overwrite with a guess).
+async function changeJobRunCount(jobId, newRuns) {
+  const job = activeJobs.find(j => j && j.id === jobId);
+  if (!job || job.isStarted || job.autoImported) return;
+  const runs = Math.max(1, Math.floor(Number(newRuns)) || 1);
+  if (runs === job.runsNeeded) { renderJournalPage(); return; } // no-op (e.g. re-typed the same value) - just redraw to restore the input's displayed value
+
+  const snapshot = job.productionSnapshot || getCurrentLiveProductionSnapshot();
+  if (typeof window.showToast === 'function') window.showToast(`Recomputing "${window.esc(job.name)}" for ${runs} run${runs > 1 ? 's' : ''}...`, 'info');
+  try {
+    const result = await rebuildTreeForSnapshot(job.typeId, job.name + ' Blueprint', runs, job.productTypeId, snapshot);
+    job.runsNeeded = runs;
+    job.qtyNeeded = result.root.qtyNeeded;
+    job.calculatedCost = result.calculatedCost;
+    job.materials = result.materials;
+    job.totalBuildSeconds = result.totalBuildSeconds;
+    // Keep the job's own sell price/strategy as-is - only what scales with quantity should move.
+    if (job.netProfit !== undefined) {
+      job.netProfit = (job.unitSellPrice || 0) * job.qtyNeeded - job.calculatedCost;
+    }
+    localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
+    renderJournalPage();
+    if (typeof window.showToast === 'function') window.showToast(`"${window.esc(job.name)}" now set to ${runs} run${runs > 1 ? 's' : ''}.`, 'success');
+  } catch (e) {
+    console.warn('[Ledger] changeJobRunCount failed:', e);
+    if (typeof window.showToast === 'function') window.showToast('Failed to recompute this job for the new run count - it was left unchanged.', 'error');
+    renderJournalPage(); // restore the input to the job's actual (unchanged) run count
+  }
+}
+window.changeJobRunCount = changeJobRunCount;
+
 // Spins a buildable material off a job's own material list into its own queued prerequisite job,
 // linked exactly the way a Calculator-side sub-build already is (isSubBuild/parentJobName) - so it
 // gets picked up by internallySuppliedTypeIds in renderJournalPage() for free, no new suppression
 // logic needed for the parent's material row to stop double-counting it.
-async function addMaterialAsPrerequisiteJob(jobId, typeId) {
+async function addMaterialAsPrerequisiteJob(jobId, typeId, missingQty) {
   const parentJob = activeJobs.find(j => j && j.id === jobId);
   if (!parentJob) return;
   const mat = Array.isArray(parentJob.materials) ? parentJob.materials.find(m => m && m.typeId === typeId) : null;
@@ -864,6 +903,11 @@ async function addMaterialAsPrerequisiteJob(jobId, typeId) {
     if (typeof window.showToast === 'function') window.showToast(`"${window.esc(mat.name)}" is already queued as its own job.`, 'info');
     return;
   }
+  // Build for what's actually MISSING after stock (passed in by the caller, which already knows the
+  // stock-adjusted deficit), not the material's full requirement - falls back to the full amount only
+  // if no deficit was given (e.g. called directly, outside the normal "+ Build" button flow).
+  const targetQty = (missingQty !== undefined && missingQty !== null) ? Number(missingQty) : mat.qtyNeeded;
+  if (targetQty <= 0) return;
   const blueprintTypeId = (typeof window.findBlueprintTypeIdForProduct === 'function' ? window.findBlueprintTypeIdForProduct(typeId) : null)
     || (typeof window.resolveBlueprintIdFromProductName === 'function' ? window.resolveBlueprintIdFromProductName(mat.name) : null);
   if (!blueprintTypeId) {
@@ -873,7 +917,7 @@ async function addMaterialAsPrerequisiteJob(jobId, typeId) {
 
   const recipe = window.recipeMap ? window.recipeMap[blueprintTypeId] : null;
   const batchYield = typeof window.getBatchYield === 'function' ? window.getBatchYield(recipe, false) : 1;
-  const runs = Math.max(1, Math.ceil(mat.qtyNeeded / (batchYield || 1)));
+  const runs = Math.max(1, Math.ceil(targetQty / (batchYield || 1)));
   // Build using the PARENT job's own preset (falling back to whatever's currently live if the
   // parent predates preset tracking), so a prerequisite spun off from a job stays consistent with
   // it instead of silently picking up whatever the Calculator happens to be set to right now.
@@ -931,15 +975,20 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
 
       // "+ Build" lets a buildable material become its own prerequisite job in one click - resolved
       // the same way buildRecursiveRecipeTree resolves it for its own children, so "buildable" here
-      // means exactly what it means everywhere else in the app.
+      // means exactly what it means everywhere else in the app. Sized for netMissing (what's actually
+      // short after stock), not mat.qtyNeeded (the material's full requirement) - otherwise stock you
+      // already hold gets built again on top of what you have instead of just topping up the deficit.
+      // Only offered while there IS a deficit - nothing to build once stock already covers it.
       let buildActionHTML = '';
-      if (activeJobs.some(j => j && j.productTypeId === mat.typeId)) {
+      if (isAcquired) {
+        buildActionHTML = '';
+      } else if (activeJobs.some(j => j && j.productTypeId === mat.typeId)) {
         buildActionHTML = `<span class="${queuedTextClass} font-bold flex-shrink-0" style="color:var(--accent);" title="Already queued as its own job">✓ Queued</span>`;
       } else {
         const bpId = (typeof window.findBlueprintTypeIdForProduct === 'function' ? window.findBlueprintTypeIdForProduct(mat.typeId) : null)
           || (typeof window.resolveBlueprintIdFromProductName === 'function' ? window.resolveBlueprintIdFromProductName(mat.name) : null);
         if (bpId) {
-          buildActionHTML = `<button onclick="event.stopPropagation(); addMaterialAsPrerequisiteJob(${job.id}, ${mat.typeId})" class="lp-chip-btn flex-shrink-0" style="${buildBtnStyle}" title="Queue this as its own prerequisite job">+ Build</button>`;
+          buildActionHTML = `<button onclick="event.stopPropagation(); addMaterialAsPrerequisiteJob(${job.id}, ${mat.typeId}, ${netMissing})" class="lp-chip-btn flex-shrink-0" style="${buildBtnStyle}" title="Queue a job for just the ${netMissing.toLocaleString()} missing, not the full ${mat.qtyNeeded.toLocaleString()} needed">+ Build</button>`;
         }
       }
 
@@ -1133,14 +1182,21 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
 
         ${statusBannerHTML}
 
-        <div class="flex items-center justify-between px-1">
-          <span
-            class="text-xl font-extrabold mono cursor-pointer transition"
-            style="color:var(--accent);"
-            onclick="event.stopPropagation(); copyRunsToClipboard(event, ${job.runsNeeded})"
-            title="Click to copy the run count to clipboard">
-            ${job.runsNeeded.toLocaleString()} Run${job.runsNeeded > 1 ? 's' : ''}
-          </span>
+        <div class="flex items-center justify-between px-1" onclick="event.stopPropagation()">
+          ${(!job.isStarted && !job.autoImported) ? `
+            <span class="flex items-baseline gap-1.5">
+              <input type="number" min="1" value="${job.runsNeeded}" onfocus="this.select()" onchange="changeJobRunCount(${job.id}, this.value)" class="field-line field-editable text-xl font-extrabold mono" style="width:70px; color:var(--accent);" title="Edit run count - recalculates materials, cost, and time">
+              <span class="text-sm mono" style="color:var(--text-mute);">Run${job.runsNeeded > 1 ? 's' : ''}</span>
+            </span>
+          ` : `
+            <span
+              class="text-xl font-extrabold mono cursor-pointer transition"
+              style="color:var(--accent);"
+              onclick="copyRunsToClipboard(event, ${job.runsNeeded})"
+              title="Click to copy the run count to clipboard">
+              ${job.runsNeeded.toLocaleString()} Run${job.runsNeeded > 1 ? 's' : ''}
+            </span>
+          `}
           <span class="text-sm mono" style="color:var(--text-mute);">${job.qtyNeeded.toLocaleString()} units total</span>
         </div>
 
@@ -1370,8 +1426,18 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
 
   const isCompact = bomViewMode === 'compact';
 
-  container.innerHTML = bomItems.map(item => {
-    const isCompleted = item.netMissingQty === 0;
+  // A stock-covered item used to just fade to 55% opacity in place and still print "0 ISK" - both
+  // read as "this line is broken/loading", not "you already have this", especially at a glance
+  // scanning a long list. Now it's a hard split: still-need-to-buy items render first, full strength,
+  // exactly as before; anything fully covered by stock drops into its own "Already in Stock" section
+  // below a divider (same .lp-group-header treatment the job queue's own Pending/In Progress groups
+  // use, for a consistent visual vocabulary), with a green accent stripe standing in for the old fade
+  // and a plain "✔ In Stock" replacing the redundant "0 ISK" - the point isn't that it costs nothing,
+  // it's that there's nothing left to buy.
+  const needToBuyItems = bomItems.filter(item => item.netMissingQty > 0);
+  const acquiredItems = bomItems.filter(item => item.netMissingQty === 0);
+
+  const renderItemHTML = (item, isCompleted) => {
     const statusBadge = isCompleted
       ? `<span class="lp-badge lp-badge-accent">Acquired</span>`
       : `<span class="lp-badge">Missing</span>`;
@@ -1385,27 +1451,30 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
 
     // CORRECTION: Direct blueprint path safety check inside the consolidated BOM prevents any imageservers 400 errors [1.1.1, 1.1.4]
     const itemIconUrl = window.getItemIconUrl(item.typeId, window.TYPE_ID_TO_NAME[item.typeId] || item.name, 32);
+    const costOrInStockHTML = isCompleted
+      ? `<span class="font-bold mono flex-shrink-0" style="color:var(--green);">✔ In Stock</span>`
+      : `<span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>`;
 
     if (isCompact) {
       return `
-        <div class="lp-list-item" style="padding-left:0; padding-right:0; ${isCompleted ? 'opacity:0.55;' : ''}">
+        <div class="lp-list-item" style="padding-left:0; padding-right:0; ${isCompleted ? 'border-left:3px solid var(--green); background:rgba(var(--green-rgb),0.06);' : ''}">
           <img src="${itemIconUrl}" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           ${strategyBadge}
           <span class="font-semibold truncate flex-1" style="color:var(--text-soft);"><span class="copy-name" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${window.esc(item.name)}</span></span>
-          <span class="text-xs mono flex-shrink-0" style="color:var(--text-mute);">&times;${item.netMissingQty.toLocaleString()}</span>
-          <span class="font-bold mono flex-shrink-0 w-24 text-right" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>
+          ${isCompleted ? '' : `<span class="text-xs mono flex-shrink-0" style="color:var(--text-mute);">&times;${item.netMissingQty.toLocaleString()}</span>`}
+          <span class="flex-shrink-0 w-24 text-right">${costOrInStockHTML}</span>
         </div>
       `;
     }
 
     return `
-      <div class="lp-card p-2.5 transition" style="${isCompleted ? 'opacity:0.55;' : ''}">
+      <div class="lp-card p-2.5 transition" style="${isCompleted ? 'border-left:3px solid var(--green); background:rgba(var(--green-rgb),0.06);' : ''}">
         <div class="flex items-start gap-2.5">
           <img src="${itemIconUrl}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-2">
               <span class="font-semibold truncate" style="color:var(--text-soft);"><span class="copy-name" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${window.esc(item.name)}</span></span>
-              <span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>
+              ${costOrInStockHTML}
             </div>
             <div class="flex items-center gap-1 mt-1.5">
               ${strategyBadge}
@@ -1416,7 +1485,18 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
         </div>
       </div>
     `;
-  }).join('');
+  };
+
+  const needToBuyHTML = needToBuyItems.map(item => renderItemHTML(item, false)).join('');
+  const acquiredHTML = acquiredItems.length > 0 ? `
+    <div class="lp-group-header mt-2.5 mb-2.5" style="cursor:default;">
+      <span class="text-xs font-bold uppercase tracking-wide" style="color:var(--green);">✔ Already in Stock</span>
+      <span class="text-xs font-bold mono ml-auto" style="color:var(--text-mute);">${acquiredItems.length.toLocaleString()}</span>
+    </div>
+    ${acquiredItems.map(item => renderItemHTML(item, true)).join('')}
+  ` : '';
+
+  container.innerHTML = needToBuyHTML + acquiredHTML;
 
   window.journalMultibuyText = bomItems
     .filter(i => i.netMissingQty > 0)
