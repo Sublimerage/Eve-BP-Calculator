@@ -696,6 +696,22 @@ select option:checked, select option:hover { background-color: var(--accent); co
 }
 .toast-action-btn:hover { background: rgba(var(--accent-rgb),0.28); }
 
+/* Inline SVG icons (window.svgIcon / <svg class="ico">) that replaced the old emoji glyphs in
+   button labels, badges and status text. Sized in `em` so they track the text they sit next to;
+   `flex:0 0 auto` keeps them from shrinking in the many flex button/badge rows, and the negative
+   `vertical-align` optically centers them against a text baseline in the non-flex contexts. Kept
+   ABOVE .pill-check-face/.lp-chip-btn's own `svg` rules further down so those still win (12/11px)
+   for their own contexts. */
+body.page-calc svg.ico {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  vertical-align: -0.14em;
+}
+body.page-calc .lp-badge svg.ico { width: 11px; height: 11px; vertical-align: -1.5px; }
+body.page-calc .lp-pill svg.ico { width: 13px; height: 13px; vertical-align: -2.5px; margin-right: 5px; }
+body.page-calc .lp-group-header svg.ico { width: 1.05em; height: 1.05em; vertical-align: -0.16em; }
+
 /* Pill-styled checkbox (Personal/Corp asset-source toggles, used site-wide) - a real <input
    type="checkbox"> drives it so every existing onchange="applyStockLocationFilter()"/checked read
    keeps working untouched, but it's visually hidden and a sibling face is styled off its :checked
