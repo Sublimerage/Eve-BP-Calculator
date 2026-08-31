@@ -122,12 +122,10 @@ async function applyBuildProfitOptimizer() {
   }
   collectManufacturableNodes(window.recipeTreeRoot);
 
-  const facilityTax = (parseFloat(document.getElementById('facility-tax')?.value) || 1.0) / 100;
-  const sccSurcharge = (parseFloat(document.getElementById('scc-surcharge')?.value) || 4.0) / 100;
+  const { facilityTax, sccSurcharge, brokerFee, salesTax } = window.getActiveFeeInputs();
   const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { costBonus: 5.0, meBonus: 1.0 };
   const structureRoleBonus = structureType.costBonus / 100;
   const facility = structureType.meBonus / 100;
-  const brokerFee = (parseFloat(document.getElementById('broker-fee')?.value) || 1.0) / 100;
 
   // Helper to run a silent simulation test for profit under given build overrides
   function simulateProfit() {
@@ -156,7 +154,6 @@ async function applyBuildProfitOptimizer() {
     const productTypeId = window.recipeTreeRoot.productTypeId || window.recipeTreeRoot.typeId;
     const outputPrices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
     const grossSell = outputPrices.sell * window.recipeTreeRoot.qtyNeeded;
-    const salesTax = (parseFloat(document.getElementById('sales-tax')?.value) || 3.6) / 100;
     const netSell = grossSell * (1 - salesTax - brokerFee);
 
     return netSell - totalCost;

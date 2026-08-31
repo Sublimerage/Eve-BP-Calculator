@@ -405,7 +405,7 @@ function applyColorTheme(themeId) {
   } else {
     document.documentElement.setAttribute('data-theme', themeId);
   }
-  try { localStorage.setItem('eve_color_theme', themeId); } catch (e) {}
+  try { localStorage.setItem('eve_color_theme', themeId); } catch (e) { console.warn('[Config] Failed to save the color theme choice - it will reset on next reload:', e); }
   document.querySelectorAll('.theme-swatch').forEach(el => {
     el.classList.toggle('is-active', el.dataset.themeId === themeId);
   });
@@ -693,7 +693,7 @@ function getTrackedMarkets() {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
-  } catch (e) {}
+  } catch (e) { console.warn('[Config] Failed to load saved tracked markets - falling back to the default list:', e); }
   return [];
 }
 window.getTrackedMarkets = getTrackedMarkets;
@@ -775,6 +775,22 @@ function getActiveStructureType() {
   return STRUCTURE_TYPES[key] || STRUCTURE_TYPES.npc;
 }
 window.getActiveStructureType = getActiveStructureType;
+
+// The single canonical read of the 4 tax/fee input fields (Facility/SCC/Sales/Broker), same idea as
+// getActiveStructureType() above - already divided by 100 into fraction form (0.01 = 1%), same
+// defaults every call site already agreed on. This exact set of expressions used to be copy-pasted
+// verbatim across app.js, optimizers.js, and invention.js (18+ near-identical occurrences) - precisely
+// the kind of duplication that already caused two real profit-formula bugs in this app (one page
+// computing a fee correctly, a sibling silently missing it). One reader, one place to fix from now on.
+function getActiveFeeInputs() {
+  return {
+    facilityTax: (parseFloat(document.getElementById('facility-tax')?.value) || 1.0) / 100,
+    sccSurcharge: (parseFloat(document.getElementById('scc-surcharge')?.value) || 4.0) / 100,
+    salesTax: (parseFloat(document.getElementById('sales-tax')?.value) || 3.6) / 100,
+    brokerFee: (parseFloat(document.getElementById('broker-fee')?.value) || 1.0) / 100
+  };
+}
+window.getActiveFeeInputs = getActiveFeeInputs;
 
 
 // Real rig items are discovered directly from the generated database (window.EVE_ITEMS +

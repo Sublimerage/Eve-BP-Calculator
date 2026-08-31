@@ -403,7 +403,7 @@ function updateEsiUserUI(charName, charId, corpName, corpTicker) {
   const safeCorpName = window.esc(corpName || localStorage.getItem('esi_corp_name') || '');
   container.innerHTML = `
     <div class="pilot-badge mono" title="${safeName}${safeCorpName ? ' — ' + safeCorpName : ''}">
-      <img src="https://images.evetech.net/characters/${charId}/portrait?size=128" class="pilot-portrait" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/characters/1/portrait?size=128';">
+      <img src="https://images.evetech.net/characters/${charId}/portrait?size=128" alt="${safeName}" class="pilot-portrait" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/characters/1/portrait?size=128';">
       <div class="pilot-meta">
         <span class="pilot-name">${safeName}</span>
         ${ticker ? `<span class="pilot-corp">[${safeTicker}]</span>` : ''}
@@ -509,7 +509,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
             });
           }
         }
-      } catch (e) {}
+      } catch (e) { console.warn('[ESI] Corp division names fetch failed - hangar divisions will show as generic names:', e); }
     }
     try {
       const skillsRes = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/skills/?datasource=tranquility`, {}, accessToken, true);
@@ -644,7 +644,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
               });
             }
           }
-        } catch (e) {}
+        } catch (e) { console.warn('[ESI] Personal container custom-name fetch failed - those containers will show a generic name instead:', e); }
       }
     }
     if (corpId && corpContainerIds.length > 0 && accessToken) {
@@ -666,7 +666,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
               });
             }
           }
-        } catch (e) {}
+        } catch (e) { console.warn('[ESI] Corp container custom-name fetch failed - those containers will show a generic name instead:', e); }
       }
     }
     await resolveAndPopulateLocationFilter(accessToken);
@@ -713,7 +713,7 @@ async function resolveLocationIds(locationIds, accessToken = null) {
             });
           }
         }
-      } catch (e) {}
+      } catch (e) { console.warn('[ESI] Bulk location name lookup failed - those locations will show a raw ID instead:', e); }
     }
   }
 
@@ -735,7 +735,7 @@ async function resolveLocationIds(locationIds, accessToken = null) {
                   sysName = sysData.name.toUpperCase();
                   window.systemNameCache[structData.solar_system_id] = sysName;
                 }
-              } catch (e) {}
+              } catch (e) { console.warn('[ESI] System name lookup for a structure failed - its name will show without the "(SYSTEM)" suffix:', e); }
             }
             const fullName = structData.name.toUpperCase();
             window.resolvedLocationNames[structId] = sysName ? `${fullName} (${sysName})` : fullName;
@@ -743,7 +743,7 @@ async function resolveLocationIds(locationIds, accessToken = null) {
         } else if (res && res.status === 403) {
           window.resolvedLocationNames[structId] = `UPWELL STRUCTURE (${structId.toString().slice(-6)}) [PRIVATE]`;
         }
-      } catch (e) {}
+      } catch (e) { console.warn(`[ESI] Structure ${structId} name lookup failed - it will show as a raw ID instead:`, e); }
     }));
   }
 }
@@ -1059,7 +1059,7 @@ async function selectSolarSystem(systemId, systemName) {
   if (resultsEl) resultsEl.classList.add('hidden');
   try {
     localStorage.setItem('eve_selected_system', JSON.stringify({ id: systemId, name: systemName.toUpperCase() }));
-  } catch (e) {}
+  } catch (e) { console.warn('[ESI] Failed to save the selected system - it will reset to the default on next reload:', e); }
   await fetchSystemSCIById(systemId, systemName);
 }
 
@@ -1075,7 +1075,7 @@ async function loadSavedSystem() {
         return;
       }
     }
-  } catch (e) {}
+  } catch (e) { console.warn('[ESI] Failed to restore the last saved system - falling back to JITA:', e); }
   await resolveSystemSCI('JITA');
 }
 

@@ -47,7 +47,7 @@ function saveTaxSettings() {
       rigSlot3: rigSlot3
     };
     localStorage.setItem('eve_tax_settings', JSON.stringify(settings));
-  } catch (e) {}
+  } catch (e) { console.warn('[App] Failed to save tax/fee settings - they will reset on next reload:', e); }
 }
 
 // Called immediately when the structure-type dropdown changes, so the canonical localStorage key is
@@ -72,7 +72,7 @@ function loadTaxSettings() {
       if (settings.contractTax !== undefined && document.getElementById('contract-tax')) document.getElementById('contract-tax').value = settings.contractTax;
       if (settings.contractBroker !== undefined && document.getElementById('contract-broker')) document.getElementById('contract-broker').value = settings.contractBroker;
     }
-  } catch (e) {}
+  } catch (e) { console.warn('[App] Failed to load saved tax/fee settings - falling back to defaults:', e); }
 }
 
 // Filters the real rig item catalog (pulled from the generated database) as the user types, and
@@ -471,10 +471,7 @@ async function computeBlueprintManufacturingProfit(bp) {
   // quietly overstated profit - job fees scale with the economic value being processed, so the gap
   // grows with the build, and was likely a big chunk of why a huge/expensive blueprint's scanned
   // number here didn't match what the Calculator showed for the same blueprint.
-  const salesTax = (parseFloat(document.getElementById('sales-tax')?.value) || 3.6) / 100;
-  const brokerFee = (parseFloat(document.getElementById('broker-fee')?.value) || 1.0) / 100;
-  const facilityTax = (parseFloat(document.getElementById('facility-tax')?.value) || 1.0) / 100;
-  const sccSurcharge = (parseFloat(document.getElementById('scc-surcharge')?.value) || 4.0) / 100;
+  const { salesTax, brokerFee, facilityTax, sccSurcharge } = window.getActiveFeeInputs();
   const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { costBonus: 0 };
   const structureRoleBonus = (structureType.costBonus || 0) / 100;
   const jobFees = typeof window.calculateNodeJobFee === 'function' ? window.calculateNodeJobFee(root, facilityTax, sccSurcharge, structureRoleBonus) : 0;
@@ -774,7 +771,7 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     return `
       <div class="rounded-lg bg-black/20 border border-orange-500/20 hover:border-orange-500 p-2.5 transition space-y-1.5${isCurrentlyLoaded ? ' bp-row-loaded' : ''}">
         <div class="flex items-center gap-1.5 min-w-0">
-          <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" class="w-8 h-8 rounded-md border border-white/10 bg-black/40 flex-shrink-0" loading="lazy" title="${isOriginal ? 'Blueprint Original (BPO)' : 'Blueprint Copy (BPC)'}">
+          <img src="https://images.evetech.net/types/${bp.type_id}/${bpImageVariant}?size=32" alt="${window.esc(name)}" class="w-8 h-8 rounded-md border border-white/10 bg-black/40 flex-shrink-0" loading="lazy" title="${isOriginal ? 'Blueprint Original (BPO)' : 'Blueprint Copy (BPC)'}">
           <span class="font-bold text-slate-200 truncate">${window.esc(name)}</span>
           ${originalBadge}${loadedBadge}${queuedBadge}${sourceBadge}${runsBadge}${stackBadge}${readinessBadge}
         </div>
@@ -1265,7 +1262,7 @@ async function resolveProductIdFromBlueprintNameAsync(blueprintName) {
       const match = hits.find(h => h.name.toLowerCase() === pName.toLowerCase());
       if (match) return match.id;
     }
-  } catch (e) {}
+  } catch (e) { console.warn(`[App] ESI search fallback failed while resolving product id for "${blueprintName}":`, e); }
   return null;
 }
 
@@ -1325,7 +1322,7 @@ if (searchInput) {
         return `
         <div class="px-3 py-2 hover:bg-orange-500/15 cursor-pointer flex items-center space-x-3 text-xs border-b border-orange-500/15"
              onclick="selectItem(${item.id}, '${window.esc(item.name)}')">
-          <img src="https://images.evetech.net/types/${displayIconId}/icon?size=32" class="w-6 h-6 " loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${displayIconId}/render?size=32';">
+          <img src="https://images.evetech.net/types/${displayIconId}/icon?size=32" alt="${window.esc(item.name)}" class="w-6 h-6 " loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${displayIconId}/render?size=32';">
           <span class="font-semibold text-slate-200">${window.esc(item.name)}</span>
         </div>
       `;
@@ -1562,7 +1559,7 @@ function saveActiveState() {
     localStorage.setItem('eve_global_runs', window.globalRuns);
     localStorage.setItem('eve_root_sell_strategy', window.rootSellStrategy);
     localStorage.setItem('eve_root_custom_price', window.rootCustomPrice);
-  } catch (e) {}
+  } catch (e) { console.warn('[App] Failed to save the current build state - it will be lost on reload:', e); }
 }
 
 function loadSavedState() {
@@ -1592,10 +1589,7 @@ function recalculate() {
   syncTreeOverrides(window.recipeTreeRoot);
   const inputVal = Math.max(1, window.globalRuns || 1);
 
-  const salesTax = (parseFloat(document.getElementById('sales-tax')?.value) || 3.6) / 100;
-  const brokerFee = (parseFloat(document.getElementById('broker-fee')?.value) || 1.0) / 100;
-  const facilityTax = (parseFloat(document.getElementById('facility-tax')?.value) || 1.0) / 100;
-  const sccSurcharge = (parseFloat(document.getElementById('scc-surcharge')?.value) || 4.0) / 100;
+  const { salesTax, brokerFee, facilityTax, sccSurcharge } = window.getActiveFeeInputs();
   const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { costBonus: 5.0, meBonus: 1.0 };
   const structureRoleBonus = structureType.costBonus / 100;
 
@@ -1951,7 +1945,7 @@ function createNodeCard(node) {
   if (borderAccent) card.setAttribute('style', borderAccent);
   card.innerHTML = `
     <div class="flex items-start space-x-3 border-b border-[#3a3025] pb-2.5 mb-2.5">
-      <img src="${iconUrl}" class="w-10 h-10 rounded-md border border-white/10 bg-black/40 flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
+      <img src="${iconUrl}" alt="${window.esc(node.productName || node.name)}" class="w-10 h-10 rounded-md border border-white/10 bg-black/40 flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
       <div class="min-w-0 flex-1">
         <div class="flex items-center justify-between gap-1.5">
           <span class="font-bold text-sm text-white truncate min-w-0 cursor-pointer hover:text-orange-300 hover:underline transition" onclick="copyMaterialNameToClipboard(event, this, '${window.esc(node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()).replace(/'/g, "\\'")}')" title="Click to copy this item's exact name to your clipboard, ready to paste into EVE's search/market">${node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()}</span>
@@ -2808,7 +2802,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
       row.className = 'lp-list-item' + (isAcquired ? '' : ' cursor-pointer');
       row.style.cssText = 'padding-left:0; padding-right:0;';
       row.innerHTML = `
-        <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
+        <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" alt="${window.esc(item.name)}" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
         ${strategyBadge}
         <span class="font-semibold truncate flex-1" style="color:var(--text-soft);"><span class="copy-name" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${item.name}</span></span>
         ${isAcquired ? '' : `<span class="text-xs mono flex-shrink-0" style="color:var(--text-mute);">&times;${item.qty.toLocaleString()}</span>`}
@@ -2818,7 +2812,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
       row.className = 'lp-card p-2.5 transition' + (isAcquired ? '' : ' cursor-pointer');
       row.innerHTML = `
         <div class="flex items-start gap-2.5">
-          <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
+          <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" alt="${window.esc(item.name)}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-2">
               <span class="font-semibold truncate" style="color:var(--text-soft);"><span class="copy-name" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${item.name}</span></span>

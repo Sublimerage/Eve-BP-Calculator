@@ -91,7 +91,7 @@ function renderInventionSearchResults(hits, profitById) {
       : '';
     return `
     <div class="lp-list-item" onmousedown="selectInventionItem(${h.id}, '${window.esc(h.name)}')">
-      <img src="https://images.evetech.net/types/${h.id}/icon?size=32" class="w-6 h-6 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${h.id}/render?size=32';">
+      <img src="https://images.evetech.net/types/${h.id}/icon?size=32" alt="${window.esc(h.name)}" class="w-6 h-6 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${h.id}/render?size=32';">
       <span class="font-semibold truncate" style="color:var(--text);">${window.esc(h.name)}</span>
       ${profitBadge}
     </div>
@@ -242,14 +242,18 @@ async function selectInventionItem(typeId, name, skipSave) {
   console.info(`[Invention] Selected T2 product "${name}" (typeId=${typeId}), invented from T1 "${t1Recipe.productName}" (blueprint typeId=${t1Recipe.blueprintTypeID}).`);
 
   document.getElementById('invention-config-panel').classList.remove('hidden');
-  document.getElementById('invention-item-icon').src = `https://images.evetech.net/types/${typeId}/icon?size=64`;
+  const itemIconEl = document.getElementById('invention-item-icon');
+  itemIconEl.src = `https://images.evetech.net/types/${typeId}/icon?size=64`;
+  itemIconEl.alt = name;
   document.getElementById('invention-item-name').textContent = name;
 
   // The T1 BLUEPRINT is what invention actually consumes - always a copy (a BPO never gets used up
   // for invention, so /bpc is the correct icon variant here regardless of what you actually own),
   // shown by its own name so it reads as "go get this item," not just "made from this ship."
   const t1BlueprintName = window.EVE_ITEMS[t1Recipe.blueprintTypeID] || `${t1Recipe.productName || 'T1 item'} Blueprint`;
-  document.getElementById('invention-t1-icon').src = `https://images.evetech.net/types/${t1Recipe.blueprintTypeID}/bpc?size=64`;
+  const t1IconEl = document.getElementById('invention-t1-icon');
+  t1IconEl.src = `https://images.evetech.net/types/${t1Recipe.blueprintTypeID}/bpc?size=64`;
+  t1IconEl.alt = t1BlueprintName;
   document.getElementById('invention-t1-name').textContent = t1BlueprintName;
 
   const baseChance = getInventionBaseChance(typeId);
@@ -396,6 +400,12 @@ async function recalculateInventionImpl() {
     ? window.calculateAdjustedJobSeconds(baseInventionTime, 0, 1, true, _inventionCurrentBlueprint.productTypeID, [])
     : 0;
 
+  // Read once, outside the per-decryptor loop below - none of these 4 values depend on which
+  // decryptor is being evaluated, so re-reading them from the DOM 9 times (once per DECRYPTORS
+  // entry) was pure waste, on top of being yet another copy of the same duplicated expressions app.js
+  // and optimizers.js also used to carry (see getActiveFeeInputs' own comment, config.js).
+  const { facilityTax, sccSurcharge, salesTax, brokerFee } = window.getActiveFeeInputs();
+
   const rows = await Promise.all(DECRYPTORS.map(async (dec) => {
     const successChance = Math.min(100, baseChance * (1 + (scienceLevelSum / 30) + (encryptionLevel / 40)) * (1 + dec.probMod / 100));
     const resultRuns = Math.max(1, baseRuns + dec.runsMod);
@@ -435,13 +445,11 @@ async function recalculateInventionImpl() {
       // The invention job's own installation fee - same EIV-based formula as manufacturing jobs
       // (facility tax + SCC surcharge + system cost index), but using invention's own SCI and EIV
       // based on the datacores actually consumed per attempt (invention has no ME to reduce this).
-      const facilityTaxForInv = (parseFloat(document.getElementById('facility-tax')?.value) || 1.0) / 100;
-      const sccSurchargeForInv = (parseFloat(document.getElementById('scc-surcharge')?.value) || 4.0) / 100;
       const structureTypeForInv = window.getActiveStructureType ? window.getActiveStructureType() : { costBonus: 5.0 };
       const structureRoleBonusForInv = structureTypeForInv.costBonus / 100;
       const inventionSCI = window.activeInventionSCI !== undefined ? window.activeInventionSCI : 0.02;
       const attemptEIV = datacores.reduce((sum, m) => sum + (window.eivCache && window.eivCache[m.typeId] ? window.eivCache[m.typeId] * m.qty : 0), 0);
-      const inventionJobFeePerAttempt = attemptEIV * (inventionSCI * (1 - structureRoleBonusForInv) + facilityTaxForInv + sccSurchargeForInv);
+      const inventionJobFeePerAttempt = attemptEIV * (inventionSCI * (1 - structureRoleBonusForInv) + facilityTax + sccSurcharge);
       totalInventionCost += inventionJobFeePerAttempt * requiredAttempts;
     } else {
       totalInventionCost = Infinity;
@@ -476,8 +484,6 @@ async function recalculateInventionImpl() {
           // Manufacturing job installation fee (facility tax + SCC surcharge + system cost index on
           // the job's EIV) - reuses the exact same calculation the main calculator uses, not a
           // separate approximation, so this stays consistent if that formula is ever revisited.
-          const facilityTax = (parseFloat(document.getElementById('facility-tax')?.value) || 1.0) / 100;
-          const sccSurcharge = (parseFloat(document.getElementById('scc-surcharge')?.value) || 4.0) / 100;
           const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { costBonus: 5.0 };
           const structureRoleBonus = structureType.costBonus / 100;
           let mfgJobFee = 0;
@@ -489,9 +495,7 @@ async function recalculateInventionImpl() {
 
           const outputPrices = window.priceCache[t2ProductTypeId] || { sell: 0 };
           const grossSell = outputPrices.sell * root.qtyNeeded;
-          const salesTax = (parseFloat(document.getElementById('sales-tax')?.value) || 3.6) / 100;
-          const sellBrokerFee = (parseFloat(document.getElementById('broker-fee')?.value) || 1.0) / 100;
-          unitSell = grossSell * (1 - salesTax - sellBrokerFee);
+          unitSell = grossSell * (1 - salesTax - brokerFee);
 
           unitBuildSeconds = typeof window.calculateTotalBuildSeconds === 'function' ? window.calculateTotalBuildSeconds(root) : 0;
           profitDetail = `${root.qtyNeeded} units @ ${Math.round(outputPrices.sell).toLocaleString()} ISK sell (net of tax/broker: ${Math.round(unitSell).toLocaleString()}), ${Math.round(materialCost).toLocaleString()} ISK mats + ${Math.round(mfgJobFee).toLocaleString()} ISK job fee per BPC, ${unitBuildSeconds > 0 ? window.formatDuration(unitBuildSeconds) : 'no time data'} to manufacture per BPC`;
@@ -859,7 +863,7 @@ function loadSharedTaxSettings() {
     if (settings.sccSurcharge !== undefined && document.getElementById('scc-surcharge')) document.getElementById('scc-surcharge').value = settings.sccSurcharge;
     if (settings.salesTax !== undefined && document.getElementById('sales-tax')) document.getElementById('sales-tax').value = settings.salesTax;
     if (settings.brokerFee !== undefined && document.getElementById('broker-fee')) document.getElementById('broker-fee').value = settings.brokerFee;
-  } catch (e) {}
+  } catch (e) { console.warn('[Invention] Failed to load saved tax/fee settings - falling back to defaults:', e); }
 }
 window.loadSharedTaxSettings = loadSharedTaxSettings;
 
@@ -872,7 +876,7 @@ function saveSharedTaxSettings() {
     existing.salesTax = document.getElementById('sales-tax')?.value;
     existing.brokerFee = document.getElementById('broker-fee')?.value;
     localStorage.setItem('eve_tax_settings', JSON.stringify(existing));
-  } catch (e) {}
+  } catch (e) { console.warn('[Invention] Failed to save tax/fee settings - they will reset on next reload:', e); }
 }
 window.saveSharedTaxSettings = saveSharedTaxSettings;
 

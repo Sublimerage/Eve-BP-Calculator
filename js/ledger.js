@@ -692,7 +692,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
         ${isolationCheckboxHTML}
         ${focusButtonHTML}
         <span class="text-xs flex-shrink-0" style="color:var(--text-mute);">${window.svgIcon(isExpanded ? 'chevron-down' : 'chevron-right')}</span>
-        <img src="${jobIconUrl}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
+        <img src="${jobIconUrl}" alt="${window.esc(jobDisplayName)}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
         <div class="min-w-0 flex-1">
           <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></div>
           ${(job.isSubBuild && !depth) ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);">${window.svgIcon('gear')} Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
@@ -1121,7 +1121,7 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
       }
 
       const iconHTML = isFocusMode
-        ? `<img src="${window.getItemIconUrl(mat.typeId, mat.name, 32)}" class="w-6 h-6 rounded flex-shrink-0" loading="lazy" onerror="this.style.visibility='hidden';">`
+        ? `<img src="${window.getItemIconUrl(mat.typeId, mat.name, 32)}" alt="${window.esc(mat.name)}" class="w-6 h-6 rounded flex-shrink-0" loading="lazy" onerror="this.style.visibility='hidden';">`
         : '';
 
       return `
@@ -1308,7 +1308,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
            ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
         <div class="flex items-start justify-between">
           <div class="flex items-start space-x-3 min-w-0 flex-1">
-            <img src="${jobIconUrl}" class="${isFocusMode ? 'w-20 h-20' : 'w-12 h-12'} rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
+            <img src="${jobIconUrl}" alt="${window.esc(jobDisplayName)}" class="${isFocusMode ? 'w-20 h-20' : 'w-12 h-12'} rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
               <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${(job.isSubBuild && !isFocusMode) ? `<span class="ml-1 text-xs align-middle" style="color:var(--text-mute);" title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}">${window.svgIcon('gear')}</span>` : ''}</h3>
               ${(job.isSubBuild && isFocusMode) ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">${window.svgIcon('gear')} Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
@@ -1611,7 +1611,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
     if (isCompact) {
       return `
         <div class="lp-list-item" style="padding-left:0; padding-right:0;">
-          <img src="${itemIconUrl}" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
+          <img src="${itemIconUrl}" alt="${window.esc(item.name)}" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           ${strategyBadge}
           <span class="font-semibold truncate flex-1" style="color:var(--text-soft);"><span class="copy-name" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${window.esc(item.name)}</span></span>
           ${isCompleted ? '' : `<span class="text-xs mono flex-shrink-0" style="color:var(--text-mute);">&times;${item.netMissingQty.toLocaleString()}</span>`}
@@ -1623,7 +1623,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
     return `
       <div class="lp-card p-2.5 transition">
         <div class="flex items-start gap-2.5">
-          <img src="${itemIconUrl}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
+          <img src="${itemIconUrl}" alt="${window.esc(item.name)}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-2">
               <span class="font-semibold truncate" style="color:var(--text-soft);"><span class="copy-name" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${window.esc(item.name)}</span></span>
@@ -1803,7 +1803,7 @@ function notifyJobReady(jobName) {
   try {
     const n = new Notification('Job Ready to Collect', { body: `${jobName} has finished building.`, tag: 'eve-job-ready-' + jobName });
     n.onclick = () => { window.focus(); n.close(); };
-  } catch (e) {}
+  } catch (e) { console.warn('[Ledger] Failed to show the job-ready browser notification:', e); }
 }
 
 function updateJobNotificationButton() {
