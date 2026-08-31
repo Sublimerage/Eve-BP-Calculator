@@ -557,7 +557,11 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
   const jobDisplayName = window.TYPE_ID_TO_NAME[iconTypeId] || (job.name || '')
     .replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
 
-  let statusText = '⏳ PENDING';
+  // Pending jobs previously just said "PENDING" with no indication of how long the build would
+  // actually take once started - the estimated time was only visible after expanding the card's own
+  // BOM block. Showing it right in the status column (same duration already computed for that block)
+  // means "how long is this going to take" is answerable from the collapsed row alone.
+  let statusText = job.totalBuildSeconds > 0 ? `⏳ PENDING (${window.formatDuration(job.totalBuildSeconds)})` : '⏳ PENDING';
   let isTimerBacked = false;
   if (job.isStarted && job.startedAt) {
     isTimerBacked = true;
@@ -624,19 +628,24 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
           <div class="flex items-baseline justify-end gap-1.5 flex-shrink-0" style="width:96px;" onclick="event.stopPropagation()">
-            ${editingRunsJobIds.has(job.id) ? `
-              <input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsNeeded}" onchange="changeJobRunCount(${job.id}, this.value)" class="field-line text-lg font-extrabold mono text-right" style="width:${Math.max(3, String(job.runsNeeded).length + 2)}ch; color:var(--accent);" title="Recalculates materials, cost, and time">
-              ${renderRunsEditIconHTML(job.id, true)}
-            ` : `
-              <span class="text-lg font-extrabold mono whitespace-nowrap cursor-pointer" style="color:var(--accent);" onclick="copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">${job.runsNeeded.toLocaleString()}</span>
-              ${(!job.isStarted && !job.autoImported) ? renderRunsEditIconHTML(job.id, false) : ''}
-            `}
+            ${editingRunsJobIds.has(job.id)
+              ? `<input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsNeeded}" onchange="changeJobRunCount(${job.id}, this.value)" class="field-line text-lg font-extrabold mono text-right" style="width:${Math.max(3, String(job.runsNeeded).length + 2)}ch; color:var(--accent);" title="Recalculates materials, cost, and time">`
+              : `<span class="text-lg font-extrabold mono whitespace-nowrap cursor-pointer" style="color:var(--accent);" onclick="copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">${job.runsNeeded.toLocaleString()}</span>`}
             <span class="text-xs mono whitespace-nowrap" style="color:var(--text-mute);">runs</span>
           </div>
-          <div class="lp-divider-col text-right flex-shrink-0" style="width:260px;" title="Job status">
-            ${isTimerBacked
-              ? `<span class="job-timer" data-job-id="${job.id}" data-job-name="${window.esc(jobDisplayName)}" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}"><span class="timer-display text-xs font-extrabold mono whitespace-nowrap" style="color:${statusColor};">${statusText}</span></span>`
-              : `<span class="text-xs font-extrabold mono whitespace-nowrap" style="color:${statusColor};">${statusText}</span>`}
+          <div class="lp-divider-col flex items-center gap-1.5 flex-shrink-0" style="width:260px;" title="Job status">
+            <!-- Edit icon lives here, right of the divider bar, instead of inside the runs block above -
+                 it used to sit right next to the run count, but its presence/absence (editable jobs vs
+                 started/auto-imported ones) shifted that block's content width row to row, so the run
+                 count itself landed at a different x position depending on the job - no longer lined up
+                 down the list. A fixed-width slot here keeps the runs block's own content identical
+                 (and therefore aligned) on every row, editable or not. -->
+            <span class="flex-shrink-0" style="width:12px;">${(!job.isStarted && !job.autoImported) ? renderRunsEditIconHTML(job.id, editingRunsJobIds.has(job.id)) : ''}</span>
+            <span class="flex-1 text-right">
+              ${isTimerBacked
+                ? `<span class="job-timer" data-job-id="${job.id}" data-job-name="${window.esc(jobDisplayName)}" data-started-at="${job.startedAt}" data-total-seconds="${job.totalBuildSeconds || 0}"><span class="timer-display text-xs font-extrabold mono whitespace-nowrap" style="color:${statusColor};">${statusText}</span></span>`
+                : `<span class="text-xs font-extrabold mono whitespace-nowrap" style="color:${statusColor};">${statusText}</span>`}
+            </span>
           </div>
           <div class="flex flex-col items-end lp-divider-col flex-shrink-0" style="width:190px;" title="Total manufacturing cost for this job: ${Math.round(job.calculatedCost || 0).toLocaleString()} ISK">
             <span class="text-[8px] uppercase tracking-wide font-bold" style="color:var(--text-mute);">Cost</span>
@@ -1179,10 +1188,11 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
         </div>
       `;
     } else {
+      const pendingText = job.totalBuildSeconds > 0 ? `⏳ PENDING (${window.formatDuration(job.totalBuildSeconds)})` : '⏳ PENDING';
       statusBannerHTML = `
         <div class="lp-status-row">
           <span class="text-xs font-bold uppercase tracking-wide flex-shrink-0" style="color:var(--text-soft);">Status:</span>
-          <span class="text-sm font-extrabold mono" style="color:var(--text-mute);">⏳ PENDING</span>
+          <span class="text-sm font-extrabold mono" style="color:var(--text-mute);">${pendingText}</span>
         </div>
       `;
     }
