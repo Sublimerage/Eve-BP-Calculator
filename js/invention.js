@@ -619,12 +619,11 @@ function copyInventionMultibuy(rowIndex) {
 }
 window.copyInventionMultibuy = copyInventionMultibuy;
 
-// Sends this decryptor's resulting T2 BPC to the Calculator (new tab, so the invention comparison
-// table stays put - sending several different decryptors' results one after another is the whole
-// point). Reuses the Calculator's own shareCurrentBuild/applySharedBuildFromUrl link format (app.js)
-// rather than inventing a second one - runs/me/te ride along in the same ?build= param so the
-// Calculator opens already set to the run count THIS decryptor actually produces (never just 1) and
-// the ME/TE this decryptor actually grants, not a plain unresearched copy of the blueprint.
+// Sends this decryptor's resulting T2 BPC to the Calculator, navigating there in the same tab.
+// Reuses the Calculator's own shareCurrentBuild/applySharedBuildFromUrl link format (app.js) rather
+// than inventing a second one - runs/me/te ride along in the same ?build= param so the Calculator
+// opens already set to the run count THIS decryptor actually produces (never just 1) and the ME/TE
+// this decryptor actually grants, not a plain unresearched copy of the blueprint.
 function sendInventionRowToCalculator(rowIndex) {
   const row = _inventionLastComparisonRows[rowIndex];
   if (!row) return;
@@ -634,7 +633,7 @@ function sendInventionRowToCalculator(rowIndex) {
   }
   const state = { id: row.t2BlueprintTypeId, name: row.t2ProductName, runs: row.resultRuns, me: row.resultME, te: row.resultTE };
   const encoded = btoa(encodeURIComponent(JSON.stringify(state)));
-  window.open(`index.html?build=${encoded}`, '_blank');
+  window.location.href = `index.html?build=${encoded}`;
 }
 window.sendInventionRowToCalculator = sendInventionRowToCalculator;
 
@@ -699,7 +698,7 @@ function renderInventionComparisonTable(rows) {
               <button id="invention-multibuy-btn-${rowIndex}" onclick="copyInventionMultibuy(${rowIndex})" class="lp-chip-btn" title="Copy datacores + decryptor needed for this decryptor's Attempts Needed, minus whatever stock you already own"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy</button>
             </td>
             <td class="text-right">
-              <button onclick="sendInventionRowToCalculator(${rowIndex})" class="lp-chip-btn" ${r.t2BlueprintTypeId ? '' : 'disabled'} title="Open this decryptor's resulting BPC in the Calculator, already set to its ${r.resultRuns} max run${r.resultRuns > 1 ? 's' : ''} and ME${r.resultME >= 0 ? '+' : ''}${r.resultME}/TE${r.resultTE >= 0 ? '+' : ''}${r.resultTE}"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>Calculator</button>
+              <button onclick="sendInventionRowToCalculator(${rowIndex})" class="lp-chip-btn" style="padding:5px 7px;" ${r.t2BlueprintTypeId ? '' : 'disabled'} title="Open this decryptor's resulting BPC in the Calculator, already set to its ${r.resultRuns} max run${r.resultRuns > 1 ? 's' : ''} and ME${r.resultME >= 0 ? '+' : ''}${r.resultME}/TE${r.resultTE >= 0 ? '+' : ''}${r.resultTE}"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg></button>
             </td>
           </tr>
         `; }).join('')}
