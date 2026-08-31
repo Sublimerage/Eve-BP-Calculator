@@ -687,16 +687,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
          draggable="true" data-job-id="${job.id}" ${depth ? `title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}"` : ''}
          ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
          ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
-      <!-- items-start (not items-center): the name column is two lines tall (name + prereq/preset
-           line) but every other column here (icon, shop pill, runs, status, cost, profit, actions)
-           is one line. Centering a one-line column against a two-line sibling lands it in the gap
-           between the two lines rather than next to either one - concretely, the runs number ended
-           up floating between "item name" and the preset pill instead of sitting level with either.
-           Top-aligning everything instead lines the runs/status/cost/profit/actions row up with the
-           item name (the primary line), and leaves the prereq/preset line hanging below on its own,
-           same as a caption under a title - no different from how every column already behaved
-           before that second line existed. -->
-      <div class="flex items-start gap-2 p-2 cursor-pointer overflow-x-auto scrollbar-thin" onclick="toggleJobCardCollapse(${job.id})">
+      <div class="flex items-center gap-2 p-2 cursor-pointer overflow-x-auto scrollbar-thin" onclick="toggleJobCardCollapse(${job.id})">
         <span class="drag-handle cursor-grab active:cursor-grabbing px-1 text-sm select-none flex-shrink-0" style="color:var(--text-mute);" onclick="event.stopPropagation()" title="Drag to reorder">${window.svgIcon('grip')}</span>
         ${isolationCheckboxHTML}
         ${focusButtonHTML}
