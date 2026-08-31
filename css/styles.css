@@ -573,6 +573,14 @@ select option:checked, select option:hover { background-color: var(--accent); co
   border-bottom: 1.5px solid rgba(255,255,255,0.08) !important;
   border-radius: var(--radius-sm) !important;
   padding: 6px 10px !important;
+  /* !important because custom-select.js copies the source <select>'s className onto this trigger
+     too, and one of those classes is often .lp-badge - whose own line-height:1.6 (meant for a plain
+     one-line text badge with 2px vertical padding) otherwise rides along here and inflates the label
+     span's own box well past its actual glyph height. align-items:center then centers that oversized
+     box correctly, but the text *inside* it still sits high in the extra leading - reading as
+     "not centered" even though the flex alignment itself is fine. Collapsing line-height back down
+     removes the excess leading so the glyphs fill their box and centering actually looks centered. */
+  line-height: 1 !important;
   /* Sensible fallback ONLY - not !important, and font-family only (not the `font` shorthand, which
      also resets size/weight/line-height). custom-select.js copies the source <select>'s className
      AND inline style onto this trigger, so whatever font-size/color that select actually specified
