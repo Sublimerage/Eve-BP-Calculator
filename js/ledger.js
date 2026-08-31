@@ -2137,7 +2137,6 @@ function renderBuildHistoryLedger() {
         <td class="text-right font-bold" style="color:var(--accent);">${Math.round(record.calculatedCost || 0).toLocaleString()} ISK</td>
         <td>
           <div class="flex items-center space-x-1.5">
-            <span class="lp-badge lp-badge-accent">✔ Built</span>
             <button onclick="requeueCompletedJob(${record.id})" class="lp-chip-btn">
               🔄 Re-queue
             </button>
