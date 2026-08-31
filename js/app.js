@@ -286,7 +286,9 @@ function populateBlueprintLocationDropdown() {
     mainOpt.style.color = isUpwellStructure ? 'var(--accent)' : '#4caf6f';
     mainOpt.style.backgroundColor = '#0a0d0e';
     mainOpt.style.fontWeight = 'bold';
-    mainOpt.textContent = `${isUpwellStructure ? '🟧' : '🟩'} ${data.name} (${data.count})`;
+    // Native <option> can't hold an inline SVG - the orange/green text color already distinguishes
+    // Upwell structures from NPC stations, so no leading glyph is needed.
+    mainOpt.textContent = `${data.name} (${data.count})`;
     filterSelect.appendChild(mainOpt);
     for (const [sagFlag, sagData] of Object.entries(data.corpDivisions)) {
       const sagOpt = document.createElement('option');
@@ -294,7 +296,7 @@ function populateBlueprintLocationDropdown() {
       sagOpt.style.color = '#c084fc';
       sagOpt.style.backgroundColor = '#030405';
       sagOpt.style.fontWeight = 'bold';
-      sagOpt.textContent = `  └─ 🟪 Corp: ${sagData.name} (${sagData.count})`;
+      sagOpt.textContent = `  └─ Corp: ${sagData.name} (${sagData.count})`;
       filterSelect.appendChild(sagOpt);
     }
     for (const [cId, cData] of Object.entries(data.containers)) {
@@ -302,7 +304,7 @@ function populateBlueprintLocationDropdown() {
       containerOpt.value = `container_${cId}`;
       containerOpt.style.color = '#f8fafc';
       containerOpt.style.backgroundColor = '#030405';
-      containerOpt.textContent = `  └─ 📦 ${cData.name} (${cData.count})`;
+      containerOpt.textContent = `  └─ Container: ${cData.name} (${cData.count})`;
       filterSelect.appendChild(containerOpt);
     }
   }
@@ -528,11 +530,11 @@ async function scanBlueprintProfits() {
       cache[key] = null;
     }
     done++;
-    if (btn) btn.textContent = `⏳ Scanning ${done}/${toScan.length}...`;
+    if (btn) btn.innerHTML = window.svgIcon('hourglass') + ` Scanning ${done}/${toScan.length}...`;
   }
   saveBlueprintProfitCache();
 
-  if (btn) { btn.disabled = false; btn.textContent = '📊 Scan Profit'; }
+  if (btn) { btn.disabled = false; btn.innerHTML = window.svgIcon('chart') + ' Scan Profit'; }
   filterBlueprintBrowser();
 }
 window.scanBlueprintProfits = scanBlueprintProfits;
@@ -588,7 +590,7 @@ async function scanBlueprintReadiness() {
   // already-cached data, no need to rescan since stock hasn't been touched by this action.
   if (_readinessFilterActive) {
     _readinessFilterActive = false;
-    btn.textContent = '🧰 What Can I Build Right Now?';
+    btn.innerHTML = window.svgIcon('zap') + ' What Can I Build Right Now?';
     btn.className = 'btn-glass w-full px-2.5 py-1.5 text-[10px]';
     filterBlueprintBrowser();
     return;
@@ -603,9 +605,9 @@ async function scanBlueprintReadiness() {
 
   if (toCheck.length === 0) {
     btn.disabled = false;
-    const originalText = btn.textContent;
-    btn.textContent = '⚠ No blueprints match your current filters';
-    setTimeout(() => { if (btn) btn.textContent = originalText; }, 3000);
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = window.svgIcon('warning') + ' No blueprints match your current filters';
+    setTimeout(() => { if (btn) btn.innerHTML = originalHTML; }, 3000);
     return;
   }
 
@@ -619,14 +621,16 @@ async function scanBlueprintReadiness() {
   const checkedCount = Object.values(_blueprintReadinessCache).filter(r => r !== null).length;
 
   if (buildableCount === 0) {
-    const originalText = btn.textContent;
-    btn.textContent = checkedCount > 0 ? '⚠ Nothing buildable with current stock' : '⚠ No material data found';
-    setTimeout(() => { if (btn) btn.textContent = originalText; }, 4000);
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = checkedCount > 0
+      ? window.svgIcon('warning') + ' Nothing buildable with current stock'
+      : window.svgIcon('warning') + ' No material data found';
+    setTimeout(() => { if (btn) btn.innerHTML = originalHTML; }, 4000);
     return;
   }
 
   _readinessFilterActive = true;
-  btn.textContent = `👁 Show All (${buildableCount} Buildable)`;
+  btn.innerHTML = window.svgIcon('eye') + ` Show All (${buildableCount} Buildable)`;
   btn.className = 'btn-glass btn-glass-muted w-full px-2.5 py-1.5 text-[10px]';
   btn.title = `Showing only the ${buildableCount} of ${checkedCount} checked blueprints you can build right now with current stock - click to show everything again`;
   filterBlueprintBrowser();
@@ -707,7 +711,7 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     const bpImageVariant = isOriginal ? 'bp' : 'bpc';
     const isCurrentlyLoaded = lastLoadedItemId !== null && bp.item_id === lastLoadedItemId;
     const loadedBadge = isCurrentlyLoaded
-      ? `<span class="lp-badge lp-badge-accent flex-shrink-0" title="This is the blueprint currently loaded in the calculator">✔ Loaded</span>`
+      ? `<span class="lp-badge lp-badge-accent flex-shrink-0" title="This is the blueprint currently loaded in the calculator">${window.svgIcon('check')} Loaded</span>`
       : '';
     // A BPO never depletes (unlimited runs), so "runs queued" isn't a meaningful warning for one -
     // this only ever shows for BPCs, matching what it's actually for: not double-planning a
@@ -726,21 +730,21 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
         return sum + Math.min(queuedRunsByItemId.get(m.itemId) || 0, memberTotalRuns);
       }, 0);
       queuedBadge = queuedRuns > 0
-        ? `<span class="lp-badge lp-badge-danger flex-shrink-0" title="${queuedRuns} of ${totalRuns} run${totalRuns > 1 ? 's' : ''} already sitting in a queued ledger job">🔒 ${queuedRuns}/${totalRuns} runs queued</span>`
+        ? `<span class="lp-badge lp-badge-danger flex-shrink-0" title="${queuedRuns} of ${totalRuns} run${totalRuns > 1 ? 's' : ''} already sitting in a queued ledger job">${window.svgIcon('lock')} ${queuedRuns}/${totalRuns} runs queued</span>`
         : '';
     }
     const stackBadge = (bp.stackCount && bp.stackCount > 1)
       ? `<span class="lp-badge flex-shrink-0" title="${bp.stackCount} identical copies stacked together">x${bp.stackCount}</span>`
       : '';
     const containerBadge = bp.containerName
-      ? `<span class="lp-badge flex-shrink-0" title="Inside container: ${window.esc(bp.containerName)}">📦 ${window.esc(bp.containerName)}</span>`
+      ? `<span class="lp-badge flex-shrink-0" title="Inside container: ${window.esc(bp.containerName)}">${window.svgIcon('package')} ${window.esc(bp.containerName)}</span>`
       : '';
     const stationBadge = showStationLabel
-      ? `<span class="text-[9px] text-slate-500 flex-shrink-0" title="${window.esc(bp.stationName)}">📍 ${window.esc(bp.stationName)}</span>`
+      ? `<span class="text-[9px] text-slate-500 flex-shrink-0" title="${window.esc(bp.stationName)}">${window.svgIcon('pin')} ${window.esc(bp.stationName)}</span>`
       : '';
     let profitBadge = '';
     if (bp._profitResult === null) {
-      profitBadge = `<span class="text-xs text-red-400 font-bold flex-shrink-0 whitespace-nowrap" title="Profit scan failed for this item - see console">⚠ scan failed</span>`;
+      profitBadge = `<span class="text-xs text-red-400 font-bold flex-shrink-0 whitespace-nowrap" title="Profit scan failed for this item - see console">${window.svgIcon('warning')} scan failed</span>`;
     } else if (bp._profitResult) {
       const p = bp._profitResult;
       const profitColor = p.profit >= 0 ? 'text-green-400' : 'text-red-400';
@@ -752,8 +756,8 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     } else if (bp._readinessResult) {
       const r = bp._readinessResult;
       readinessBadge = r.buildableRuns > 0
-        ? `<span class="lp-badge lp-badge-accent flex-shrink-0" title="Current stock covers ${r.buildableRuns.toLocaleString()} full run${r.buildableRuns > 1 ? 's' : ''}">✔ ${r.buildableRuns.toLocaleString()} run${r.buildableRuns > 1 ? 's' : ''}</span>`
-        : `<span class="lp-badge lp-badge-danger flex-shrink-0" title="Not enough stock for even 1 run right now">⚠ 0 runs</span>`;
+        ? `<span class="lp-badge lp-badge-accent flex-shrink-0" title="Current stock covers ${r.buildableRuns.toLocaleString()} full run${r.buildableRuns > 1 ? 's' : ''}">${window.svgIcon('check')} ${r.buildableRuns.toLocaleString()} run${r.buildableRuns > 1 ? 's' : ''}</span>`
+        : `<span class="lp-badge lp-badge-danger flex-shrink-0" title="Not enough stock for even 1 run right now">${window.svgIcon('warning')} 0 runs</span>`;
     }
     // Source ("Personal"/"Corp") and run count sit inline with the name now, not on their own
     // text row below - keeps each card to a slimmer two-line footprint instead of three.
@@ -802,7 +806,7 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     });
     const unscannedCount = sorted.filter(bp => bp._profitResult === undefined).length;
     const hint = unscannedCount > 0
-      ? `<div class="text-[10px] text-orange-400 italic mb-2 px-1">${unscannedCount} item${unscannedCount > 1 ? 's' : ''} not yet scanned - click "📊 Scan Profit" to include them in the ranking.</div>`
+      ? `<div class="text-[10px] text-orange-400 italic mb-2 px-1">${unscannedCount} item${unscannedCount > 1 ? 's' : ''} not yet scanned - click "Scan Profit" to include them in the ranking.</div>`
       : '';
     listEl.innerHTML = hint + `<div class="space-y-1.5">${sorted.map(bp => renderRow(bp, true)).join('')}</div>`;
     return;
@@ -822,7 +826,7 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
     const rows = byStation[stationName].map(bp => renderRow(bp, false)).join('');
     return `
       <div class="mb-3">
-        <div class="text-[10px] font-bold text-orange-300 uppercase tracking-wide mb-1.5 px-1">📍 ${window.esc(stationName)}</div>
+        <div class="text-[10px] font-bold text-orange-300 uppercase tracking-wide mb-1.5 px-1">${window.svgIcon('pin')} ${window.esc(stationName)}</div>
         <div class="space-y-1.5">${rows}</div>
       </div>
     `;
@@ -997,7 +1001,7 @@ async function searchHomeMarket(query) {
   const matches = await window.searchStationsByName(q);
   if (token !== _homeMarketSearchToken) return; // a newer search superseded this one
   if (matches === null) {
-    resultsEl.innerHTML = `<div class="p-1.5 text-orange-400">⚠ Log in via EVE SSO first - station search requires an authenticated character (ESI removed the old public search endpoint).</div>`;
+    resultsEl.innerHTML = `<div class="p-1.5 text-orange-400">${window.svgIcon('warning')} Log in via EVE SSO first - station search requires an authenticated character (ESI removed the old public search endpoint).</div>`;
     return;
   }
   if (matches.length === 0) {
@@ -1076,7 +1080,7 @@ async function searchAddMarket(query) {
   const matches = await window.searchStationsByName(q);
   if (token !== _addMarketSearchToken) return;
   if (matches === null) {
-    resultsEl.innerHTML = `<div class="p-1.5 text-orange-400">⚠ Log in via EVE SSO first - station search requires an authenticated character (ESI removed the old public search endpoint).</div>`;
+    resultsEl.innerHTML = `<div class="p-1.5 text-orange-400">${window.svgIcon('warning')} Log in via EVE SSO first - station search requires an authenticated character (ESI removed the old public search endpoint).</div>`;
     return;
   }
   if (matches.length === 0) {
@@ -1121,8 +1125,8 @@ async function openMarketComparison(e, typeId, itemName) {
   modal.innerHTML = `
     <div class="bg-[#0a0d0e] border border-orange-500/80 p-5 w-full max-w-2xl shadow-2xl text-xs mono">
       <div class="flex justify-between items-center border-b border-orange-500/20 pb-3 mb-3">
-        <h3 class="text-base font-bold text-orange-300 rajdhani tracking-wider">💹 Compare Markets: ${window.esc(itemName)}</h3>
-        <button onclick="document.getElementById('market-comparison-modal').remove()" class="text-slate-400 hover:text-white font-bold text-base">✖</button>
+        <h3 class="text-base font-bold text-orange-300 rajdhani tracking-wider">${window.svgIcon('trending')} Compare Markets: ${window.esc(itemName)}</h3>
+        <button onclick="document.getElementById('market-comparison-modal').remove()" class="text-slate-400 hover:text-white font-bold text-base" title="Close">${window.svgIcon('x')}</button>
       </div>
       <div id="market-comparison-body" class="text-slate-400">Loading prices and trade volume across tracked markets...</div>
       <div class="text-[10px] text-slate-500 mt-3 leading-relaxed">
@@ -1415,7 +1419,7 @@ function shareCurrentBuild(event) {
     if (typeof window.showToast === 'function') window.showToast('Build link copied to clipboard.', 'success');
     if (btn) {
       const orig = btn.innerHTML;
-      btn.innerHTML = '✔ Copied!';
+      btn.innerHTML = window.svgIcon('check') + ' Copied!';
       setTimeout(() => { btn.innerHTML = orig; }, 1500);
     }
   }).catch(() => {
@@ -2200,6 +2204,13 @@ function addCurrentJobToLedger(e) {
     rig3: localStorage.getItem('eve_rig_slot_3') || ''
   };
 
+  // Generated up front (not inline in the job object below) so subBuildJobs can link to it - a
+  // sub-build needs to know its parent's actual unique id, not just its NAME, or the Ledger's list-
+  // mode hierarchy (buildJobClusters) can't tell apart two different queued jobs that happen to share
+  // a product name (e.g. one 7-run job split by hand into several same-named smaller ones) and ends
+  // up attaching the same single sub-build under EVERY same-named root instead of just its actual one.
+  const rootJobId = Date.now() + Math.floor(Math.random() * 1000);
+
   // Every build-toggled sub-assembly becomes its own queued job, inserted before the final job since
   // it's a prerequisite for it. These deliberately have no netProfit field - the final job's profit
   // already accounts for the savings from building these instead of buying them, so giving each
@@ -2218,7 +2229,8 @@ function addCurrentJobToLedger(e) {
     totalBuildSeconds: calculateTotalBuildSeconds(node),
     materials: extractJobMaterialsForNode(node),
     isSubBuild: true,
-    parentJobName: rootJobName,
+    parentJobId: rootJobId,
+    parentJobName: rootJobName, // display-only now (the "⚙ Prereq for: X" label) - parentJobId is the real link
     productionSnapshot: productionSnapshot,
     addedAt: new Date().toISOString()
   }));
@@ -2232,7 +2244,7 @@ function addCurrentJobToLedger(e) {
   const sourceBlueprintItemId = (bpSource && bpSource.typeId === window.recipeTreeRoot.typeId) ? bpSource.itemId : undefined;
 
   const job = {
-    id: Date.now() + Math.floor(Math.random() * 1000),
+    id: rootJobId,
     typeId: window.recipeTreeRoot.typeId,
     name: rootJobName,
     productTypeId: window.recipeTreeRoot.productTypeId,
@@ -2640,7 +2652,9 @@ window.setBOMCategoryFilter = setBOMCategoryFilter;
 
 function updateBomViewModeButtonLabel() {
   const btn = document.getElementById('btn-bom-view-mode');
-  if (btn) btn.textContent = bomViewMode === 'compact' ? '▦ Detailed' : '☰ Compact';
+  if (btn) btn.innerHTML = bomViewMode === 'compact'
+    ? window.svgIcon('grid') + ' Detailed'
+    : window.svgIcon('list') + ' Compact';
 }
 
 function toggleBomViewMode() {
@@ -2783,7 +2797,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
     const row = document.createElement('div');
     const strategyBadge = buildStrategyBadgeHTML(item);
     const costOrInStockHTML = isAcquired
-      ? `<span class="font-bold mono flex-shrink-0" style="color:var(--text-mute);">✔ In Stock</span>`
+      ? `<span class="font-bold mono flex-shrink-0" style="color:var(--text-mute);">${window.svgIcon('check')} In Stock</span>`
       : `<span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>`;
     if (!isAcquired) {
       row.title = 'Click to find and focus this material in the build diagram';

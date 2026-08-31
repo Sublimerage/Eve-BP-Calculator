@@ -845,16 +845,18 @@ function populateLocationDropdown() {
     mainOpt.value = `loc_${locId}`;
     const numericLocId = parseInt(locId);
     const isUpwellStructure = numericLocId > 1000000000000;
+    // Native <option> can't hold an inline SVG - the orange/green text color already distinguishes
+    // Upwell structures from NPC stations, so no leading glyph is needed.
     if (isUpwellStructure) {
       mainOpt.style.color = '#f97316';
       mainOpt.style.backgroundColor = '#0c1318';
       mainOpt.style.fontWeight = 'bold';
-      mainOpt.textContent = `🟧 ${data.name} (${data.count.toLocaleString()} items)`;
+      mainOpt.textContent = `${data.name} (${data.count.toLocaleString()} items)`;
     } else {
       mainOpt.style.color = '#4caf6f';
       mainOpt.style.backgroundColor = '#0c1318';
       mainOpt.style.fontWeight = 'bold';
-      mainOpt.textContent = `🟩 ${data.name} (${data.count.toLocaleString()} items)`;
+      mainOpt.textContent = `${data.name} (${data.count.toLocaleString()} items)`;
     }
     filterSelect.appendChild(mainOpt);
     for (const [sagFlag, sagData] of Object.entries(data.corpDivisions)) {
@@ -863,7 +865,7 @@ function populateLocationDropdown() {
       sagOpt.style.color = '#c084fc';
       sagOpt.style.backgroundColor = '#070b0f';
       sagOpt.style.fontWeight = 'bold';
-      sagOpt.textContent = `  └─ 🟪 Corp: ${sagData.name} (${sagData.count.toLocaleString()} items)`;
+      sagOpt.textContent = `  └─ Corp: ${sagData.name} (${sagData.count.toLocaleString()} items)`;
       filterSelect.appendChild(sagOpt);
     }
     for (const [cId, cData] of Object.entries(data.containers)) {
@@ -871,7 +873,7 @@ function populateLocationDropdown() {
       containerOpt.value = `container_${cId}`;
       containerOpt.style.color = '#f8fafc';
       containerOpt.style.backgroundColor = '#070b0f';
-      containerOpt.textContent = `  └─ 📦 Container: ${cData.name} (${cData.count.toLocaleString()} items)`;
+      containerOpt.textContent = `  └─ Container: ${cData.name} (${cData.count.toLocaleString()} items)`;
       filterSelect.appendChild(containerOpt);
     }
   }

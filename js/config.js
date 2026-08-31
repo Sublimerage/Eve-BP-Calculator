@@ -260,11 +260,11 @@ window.toggleDeductStockButton = toggleDeductStockButton;
 function updateDeductStockButtonVisual(btn) {
   if (!btn) return;
   if (btn.value === 'true') {
-    btn.textContent = '✔ Deducting Stock';
+    btn.innerHTML = window.svgIcon('check') + ' Deducting Stock';
     btn.className = 'btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5';
     btn.title = 'Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead';
   } else {
-    btn.textContent = '✖ Not Deducting Stock';
+    btn.innerHTML = window.svgIcon('x') + ' Not Deducting Stock';
     btn.className = 'btn-glass btn-glass-muted w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5';
     btn.title = 'Shopping list/multibuy below shows the FULL amount needed, even for materials you already own - click to deduct owned stock instead';
   }
@@ -289,11 +289,11 @@ window.toggleMaterialPricingButton = toggleMaterialPricingButton;
 function updateMaterialPricingButtonVisual(btn) {
   if (!btn) return;
   if (btn.value === 'buy') {
-    btn.textContent = '💰 Jita Buy Order';
+    btn.innerHTML = window.svgIcon('coin') + ' Jita Buy Order';
     btn.className = 'btn-glass btn-glass-muted w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5';
     btn.title = 'Materials/datacores/decryptor priced at the Jita buy order price - cheaper, but not guaranteed to fill. Click to switch to sell order pricing.';
   } else {
-    btn.textContent = '💰 Jita Sell (Instant Buy)';
+    btn.innerHTML = window.svgIcon('coin') + ' Jita Sell (Instant Buy)';
     btn.className = 'btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5';
     btn.title = 'Materials/datacores/decryptor priced at the Jita sell/instant-buy price - what it actually costs to acquire them right now. Click to switch to buy order pricing.';
   }

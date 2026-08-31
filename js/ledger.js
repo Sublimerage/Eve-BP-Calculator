@@ -242,10 +242,19 @@ function renderJournalPage() {
   // isolated list wrongly ask you to buy something your own selected build already makes internally.
   const relevantJobsForBOM = (() => {
     if (isolatedJobIds.size === 0) return activeJobs;
-    const isolatedNames = new Set(
+    // parentJobId (the real per-job link - see buildJobClusters' own comment) is checked first; the
+    // name-based fallback only fires for a sub-build saved before that field existed, and even then
+    // only matters if you isolate a job that happens to share its name with another job's real parent.
+    const isolatedNamesLegacy = new Set(
       Array.from(isolatedJobIds).map(id => activeJobs.find(j => j && j.id === id)?.name).filter(Boolean)
     );
-    return activeJobs.filter(j => j && (isolatedJobIds.has(j.id) || (j.isSubBuild && isolatedNames.has(j.parentJobName))));
+    return activeJobs.filter(j => {
+      if (!j) return false;
+      if (isolatedJobIds.has(j.id)) return true;
+      if (!j.isSubBuild) return false;
+      if (j.parentJobId !== undefined && j.parentJobId !== null) return isolatedJobIds.has(j.parentJobId);
+      return isolatedNamesLegacy.has(j.parentJobName);
+    });
   })();
 
   const consolidatedBOM = {};
@@ -353,7 +362,7 @@ function renderFocusButtonHTML(job) {
   const title = isFocused
     ? 'Exit focus mode'
     : 'Focus: show just this job (and its prerequisites) full-size, with the rest of the queue hidden';
-  return `<button onclick="event.stopPropagation(); enterJobFocus(${job.id})" class="lp-chip-btn flex-shrink-0" style="${activeStyle}" title="${title}">🔎 Focus</button>`;
+  return `<button onclick="event.stopPropagation(); enterJobFocus(${job.id})" class="lp-chip-btn flex-shrink-0" style="${activeStyle}" title="${title}">${window.svgIcon('search')} Focus</button>`;
 }
 
 function clearJobIsolation() {
@@ -383,19 +392,30 @@ function renderFocusedJobView(container, jobId, allocatedStock, isStockDeductEna
     return;
   }
 
-  const includedNames = new Set([focusedJob.name]);
+  // Walks the prerequisite chain by unique id (parentJobId), not by name - name-matching alone would
+  // pull in every OTHER job sharing this one's product name too (e.g. one job split by hand into
+  // several same-named smaller ones), not just this job's own real prerequisites. Falls back to name
+  // matching only for a sub-build saved before parentJobId existed (see buildJobClusters' own comment
+  // on the same tradeoff).
+  const includedIds = new Set([focusedJob.id]);
+  const includedNamesLegacy = new Set([focusedJob.name]);
   let grew = true;
   while (grew) {
     grew = false;
     activeJobs.forEach(j => {
-      if (j && j.isSubBuild && includedNames.has(j.parentJobName) && !includedNames.has(j.name)) {
-        includedNames.add(j.name);
+      if (!j || includedIds.has(j.id) || !j.isSubBuild) return;
+      const matched = (j.parentJobId !== undefined && j.parentJobId !== null)
+        ? includedIds.has(j.parentJobId)
+        : (j.parentJobName && includedNamesLegacy.has(j.parentJobName));
+      if (matched) {
+        includedIds.add(j.id);
+        includedNamesLegacy.add(j.name);
         grew = true;
       }
     });
   }
   const focusJobs = activeJobs
-    .filter(j => j && includedNames.has(j.name))
+    .filter(j => j && includedIds.has(j.id))
     .sort((a, b) => (a.id === focusedJob.id ? -1 : b.id === focusedJob.id ? 1 : 0));
 
   // Force every focused card open regardless of its remembered collapse state, then restore that
@@ -410,7 +430,7 @@ function renderFocusedJobView(container, jobId, allocatedStock, isStockDeductEna
   container.innerHTML = `
     <div class="lp-card p-2.5 flex items-center justify-between gap-2 mb-3" style="border-color:rgba(var(--accent-rgb),0.4);">
       <span class="text-xs font-bold uppercase tracking-wide" style="color:var(--accent);">
-        🔎 Focused on "${window.esc(focusedJob.name)}"${prereqCount > 0 ? ` + ${prereqCount} prerequisite${prereqCount > 1 ? 's' : ''}` : ''} - rest of the queue is hidden
+        ${window.svgIcon('search')} Focused on "${window.esc(focusedJob.name)}"${prereqCount > 0 ? ` + ${prereqCount} prerequisite${prereqCount > 1 ? 's' : ''}` : ''} - rest of the queue is hidden
       </span>
       <button onclick="exitJobFocus()" class="lp-chip-btn flex-shrink-0">← Back to Queue</button>
     </div>
@@ -426,16 +446,36 @@ function renderFocusedJobView(container, jobId, allocatedStock, isStockDeductEna
 // already started can land in a different status group than its parent, and there's no adjacent
 // parent to nest it under in that case, so it renders as its own top-level entry (with the text
 // line kept as a fallback for exactly that situation - see renderJobCardHTML/renderJobListRowHTML).
+// Links a sub-build to its REAL parent job by unique id, not by product name - two different queued
+// jobs can easily share a name (e.g. one big run split by hand into several smaller same-product
+// jobs), and matching by name alone can't tell them apart. Before parentJobId existed, a single
+// sub-build job named-matched against EVERY root sharing its parent's name, so it visually rendered
+// as a duplicate "child" under each one, even though only one real job record existed (confirmed by:
+// deleting any one of the duplicates deleted the single underlying job and all the copies vanished
+// together). Jobs saved before this fix only have parentJobName - those fall back to attaching to
+// the first same-named root found (deterministic, at least not duplicated across all of them; WHICH
+// one is arbitrary since the old data never recorded which specific instance it was really for).
 function buildJobClusters(jobs) {
-  const byName = new Map();
-  jobs.forEach(j => { if (j) byName.set(j.name, j); });
-  const childrenOf = new Map();
+  const byId = new Map();
+  const firstByName = new Map();
+  jobs.forEach(j => {
+    if (!j) return;
+    byId.set(j.id, j);
+    if (!firstByName.has(j.name)) firstByName.set(j.name, j);
+  });
+  const childrenOf = new Map(); // keyed by the PARENT's unique id
   const roots = [];
   jobs.forEach(j => {
     if (!j) return;
-    if (j.isSubBuild && j.parentJobName && byName.has(j.parentJobName)) {
-      if (!childrenOf.has(j.parentJobName)) childrenOf.set(j.parentJobName, []);
-      childrenOf.get(j.parentJobName).push(j);
+    let parentId = null;
+    if (j.isSubBuild && j.parentJobId !== undefined && j.parentJobId !== null && byId.has(j.parentJobId)) {
+      parentId = j.parentJobId;
+    } else if (j.isSubBuild && !j.parentJobId && j.parentJobName && firstByName.has(j.parentJobName)) {
+      parentId = firstByName.get(j.parentJobName).id;
+    }
+    if (parentId !== null) {
+      if (!childrenOf.has(parentId)) childrenOf.set(parentId, []);
+      childrenOf.get(parentId).push(j);
     } else {
       roots.push(j);
     }
@@ -445,10 +485,11 @@ function buildJobClusters(jobs) {
 
 // Recursively renders a job followed by its nested children (a prerequisite's own prerequisite
 // nests one level deeper again) as one combined block. renderJob(job, depth) is whichever of
-// renderJobListRowHTML/renderJobCardHTML the caller is using for the current view mode.
+// renderJobListRowHTML/renderJobCardHTML the caller is using for the current view mode. Keyed by
+// the job's own unique id (see buildJobClusters above), not its name.
 function renderJobClusterHTML(job, childrenOf, depth, renderJob) {
   const ownHTML = renderJob(job, depth);
-  const kids = childrenOf.get(job.name) || [];
+  const kids = childrenOf.get(job.id) || [];
   if (kids.length === 0) return ownHTML;
   const kidsHTML = kids.map(k => renderJobClusterHTML(k, childrenOf, depth + 1, renderJob)).join('');
   return `<div class="job-cluster">${ownHTML}<div class="job-cluster-children">${kidsHTML}</div></div>`;
@@ -529,8 +570,8 @@ function renderActiveJobsList(allocatedStock) {
     html += `
       <div class="mb-2">
         <div class="lp-group-header is-active mb-2.5 cursor-pointer select-none" onclick="toggleJobGroupCollapse('started')">
-          <span class="flex-shrink-0" style="color:var(--accent);">${isCollapsed ? '▸' : '▾'}</span>
-          <span class="font-extrabold text-base rajdhani uppercase tracking-wider" style="color:var(--accent);">🟢 In Progress</span>
+          <span class="flex-shrink-0" style="color:var(--accent);">${window.svgIcon(isCollapsed ? 'chevron-right' : 'chevron-down')}</span>
+          <span class="font-extrabold text-base rajdhani uppercase tracking-wider" style="color:var(--accent);">${window.svgIcon('activity')} In Progress</span>
           <span class="font-bold text-sm mono" style="color:var(--accent);">(${startedJobs.length})</span>
         </div>
         ${isCollapsed ? '' : `<div class="${groupWrapClass}">${renderGroup(startedJobs)}</div>`}
@@ -542,11 +583,11 @@ function renderActiveJobsList(allocatedStock) {
     html += `
       <div>
         <div class="lp-group-header mb-2.5 cursor-pointer select-none" onclick="toggleJobGroupCollapse('pending')">
-          <span class="flex-shrink-0" style="color:var(--text-mute);">${isCollapsed ? '▸' : '▾'}</span>
-          <span class="font-extrabold text-base rajdhani uppercase tracking-wider" style="color:var(--text);">⏳ Pending</span>
+          <span class="flex-shrink-0" style="color:var(--text-mute);">${window.svgIcon(isCollapsed ? 'chevron-right' : 'chevron-down')}</span>
+          <span class="font-extrabold text-base rajdhani uppercase tracking-wider" style="color:var(--text);">${window.svgIcon('hourglass')} Pending</span>
           <span class="font-bold text-sm mono" style="color:var(--text-mute);">(${pendingJobs.length})</span>
           ${isolatedJobIds.size > 0 ? `
-            <span class="text-xs font-bold mono ml-auto flex-shrink-0" style="color:var(--accent);" title="The Consolidated BOM sidebar is only showing materials for these jobs (and their prerequisites), not the whole queue">🛒 ${isolatedJobIds.size.toLocaleString()} selected</span>
+            <span class="text-xs font-bold mono ml-auto flex-shrink-0" style="color:var(--accent);" title="The Consolidated BOM sidebar is only showing materials for these jobs (and their prerequisites), not the whole queue">${window.svgIcon('cart')} ${isolatedJobIds.size.toLocaleString()} selected</span>
             <button onclick="event.stopPropagation(); clearJobIsolation()" class="lp-chip-btn flex-shrink-0" title="Go back to showing materials for the whole queue">Show All</button>
           ` : ''}
         </div>
@@ -559,7 +600,9 @@ function renderActiveJobsList(allocatedStock) {
 
 function updateViewModeButtonLabel() {
   const btn = document.getElementById('btn-view-mode');
-  if (btn) btn.textContent = activeQueueViewMode === 'list' ? '▦ Grid View' : '☰ List View';
+  if (btn) btn.innerHTML = activeQueueViewMode === 'list'
+    ? window.svgIcon('grid') + ' Grid View'
+    : window.svgIcon('list') + ' List View';
 }
 
 function toggleQueueViewMode() {
@@ -619,7 +662,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
   const isolationCheckboxHTML = `
     <label class="pill-check flex-shrink-0" onclick="event.stopPropagation()" title="Shop: show only this job's (and its prerequisites') materials in the Consolidated BOM sidebar" ${(!job.isStarted && !job.isSubBuild) ? '' : 'style="visibility:hidden;"'}>
       <input type="checkbox" ${isolatedJobIds.has(job.id) ? 'checked' : ''} onchange="toggleJobIsolation(${job.id})">
-      <span class="pill-check-face">🛒 Shop</span>
+      <span class="pill-check-face">${window.svgIcon('cart')} Shop</span>
     </label>
   `;
   const focusButtonHTML = renderFocusButtonHTML(job);
@@ -633,7 +676,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
           <input type="number" id="start-runs-${job.id}" value="${job.runsNeeded}" min="1" max="${job.runsNeeded}"
             onmousedown="event.stopPropagation()" onfocus="this.select()"
             class="field-line w-16 text-center font-bold p-1 text-sm" style="color:var(--accent);">
-          <button onclick="startJobRuns(${job.id})" class="lp-chip-btn ml-auto flex-shrink-0">▶ Start Job</button>
+          <button onclick="startJobRuns(${job.id})" class="lp-chip-btn ml-auto flex-shrink-0">${window.svgIcon('play')} Start Job</button>
         </div>
       ` : ''}
     </div>
@@ -645,14 +688,14 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
          ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
          ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
       <div class="flex items-center gap-2 p-2 cursor-pointer overflow-x-auto scrollbar-thin" onclick="toggleJobCardCollapse(${job.id})">
-        <span class="drag-handle cursor-grab active:cursor-grabbing px-1 text-sm select-none flex-shrink-0" style="color:var(--text-mute);" onclick="event.stopPropagation()" title="Drag to reorder">⠿</span>
+        <span class="drag-handle cursor-grab active:cursor-grabbing px-1 text-sm select-none flex-shrink-0" style="color:var(--text-mute);" onclick="event.stopPropagation()" title="Drag to reorder">${window.svgIcon('grip')}</span>
         ${isolationCheckboxHTML}
         ${focusButtonHTML}
-        <span class="text-xs flex-shrink-0" style="color:var(--text-mute);">${isExpanded ? '▾' : '▸'}</span>
+        <span class="text-xs flex-shrink-0" style="color:var(--text-mute);">${window.svgIcon(isExpanded ? 'chevron-down' : 'chevron-right')}</span>
         <img src="${jobIconUrl}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
         <div class="min-w-0 flex-1">
           <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></div>
-          ${(job.isSubBuild && !depth) ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);">⚙ Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
+          ${(job.isSubBuild && !depth) ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);">${window.svgIcon('gear')} Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
           ${renderJobMetaChipHTML(job)}
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
@@ -695,8 +738,8 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
             <span class="text-xs font-bold mono whitespace-nowrap" style="color:${p !== undefined ? (p >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-mute)'};">${p !== undefined ? window.formatISKCompact(p) : '—'}</span>
           </div>
           <div class="flex items-center gap-2 lp-divider-col flex-shrink-0" onclick="event.stopPropagation()">
-          <button onclick="markJobAsBuilt(${job.id})" class="lp-chip-btn">✔</button>
-          <button onclick="deleteJobFromQueue(${job.id})" class="lp-badge lp-badge-danger" style="cursor:pointer;">❌</button>
+          <button onclick="markJobAsBuilt(${job.id})" class="lp-chip-btn" title="Mark as built" aria-label="Mark as built">${window.svgIcon('check')}</button>
+          <button onclick="deleteJobFromQueue(${job.id})" class="lp-badge lp-badge-danger" style="cursor:pointer;" title="Delete job" aria-label="Delete job">${window.svgIcon('x', { style: 'margin:0' })}</button>
           </div>
         </div>
       </div>
@@ -797,14 +840,14 @@ const CHIP_TRUNCATE_STYLE = 'display:inline-block; max-width:100%; overflow:hidd
 function renderJobMetaChipHTML(job) {
   if (job.autoImported) {
     const meTe = job.meLevel !== undefined ? ` | ME: ${job.meLevel}% TE: ${job.teLevel}%` : '';
-    return `<div class="mt-1"><span class="lp-badge lp-badge-accent" style="${CHIP_TRUNCATE_STYLE}" title="No matching plan existed - imported from your active EVE job${window.esc(meTe)}">📥 Auto-imported</span></div>`;
+    return `<div class="mt-1"><span class="lp-badge lp-badge-accent" style="${CHIP_TRUNCATE_STYLE}" title="No matching plan existed - imported from your active EVE job${window.esc(meTe)}">${window.svgIcon('download')} Auto-imported</span></div>`;
   }
   const isAssumed = !job.productionSnapshot;
   const label = resolveProductionPresetLabel(job.productionSnapshot || getCurrentLiveProductionSnapshot());
   const presets = getSavedProductionPresetsLocal();
   const presetNames = Object.keys(presets).sort();
-  const currentOptionHTML = `<option value="" selected>🏭 ${window.esc(label)}${isAssumed ? ' (assumed)' : ''}</option>`;
-  const optionsHTML = presetNames.map(name => `<option value="${window.esc(name)}">🏭 ${window.esc(name)}</option>`).join('');
+  const currentOptionHTML = `<option value="" selected>${window.esc(label)}${isAssumed ? ' (assumed)' : ''}</option>`;
+  const optionsHTML = presetNames.map(name => `<option value="${window.esc(name)}">${window.esc(name)}</option>`).join('');
   return `
     <div class="mt-1" onclick="event.stopPropagation()">
       <select onchange="if (this.value) changeJobProductionPreset(${job.id}, this.value);" class="lp-badge" style="${CHIP_TRUNCATE_STYLE} max-width:220px; font-size:10px; cursor:pointer;" ${presetNames.length === 0 ? 'disabled' : ''} title="Production preset this job assumes - click to change">
@@ -829,7 +872,7 @@ function renderJobPresetRowHTML(job) {
   return `
     <div class="flex items-center justify-between gap-2 mb-1.5 pb-1.5 flex-wrap" style="border-bottom:1px solid rgba(255,255,255,0.06);">
       <span class="text-xs font-bold flex-shrink-0" style="color:var(--text-mute);" title="${isAssumed ? 'This job predates preset tracking, or its preset no longer matches a saved one - showing your currently active setup as a best guess.' : 'Production preset this job\'s materials/cost/time assume'}">
-        🏭 ${window.esc(label)}${isAssumed ? ' <span style="font-style:italic;">(assumed)</span>' : ''}
+        ${window.svgIcon('factory')} ${window.esc(label)}${isAssumed ? ' <span style="font-style:italic;">(assumed)</span>' : ''}
       </span>
       <select onchange="changeJobProductionPreset(${job.id}, this.value); this.value='';" class="field-line text-[10px] font-bold flex-shrink-0" style="max-width:170px; color:var(--accent);" ${presetNames.length === 0 ? 'disabled' : ''} title="Change which production preset this job assumes and recompute its materials/cost/time">
         <option value="" selected>Change preset...</option>
@@ -1020,7 +1063,8 @@ async function addMaterialAsPrerequisiteJob(jobId, typeId, missingQty) {
       totalBuildSeconds: result.totalBuildSeconds,
       materials: result.materials,
       isSubBuild: true,
-      parentJobName: parentJob.name,
+      parentJobId: jobId,
+      parentJobName: parentJob.name, // display-only (the "⚙ Prereq for: X" label) - parentJobId is the real link
       productionSnapshot: snapshot,
       addedAt: new Date().toISOString()
     };
@@ -1067,7 +1111,7 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
       if (isAcquired) {
         buildActionHTML = '';
       } else if (activeJobs.some(j => j && j.productTypeId === mat.typeId)) {
-        buildActionHTML = `<span class="${queuedTextClass} font-bold flex-shrink-0" style="color:var(--accent);" title="Already queued as its own job">✓ Queued</span>`;
+        buildActionHTML = `<span class="${queuedTextClass} font-bold flex-shrink-0" style="color:var(--accent);" title="Already queued as its own job">${window.svgIcon('check')} Queued</span>`;
       } else {
         const bpId = (typeof window.findBlueprintTypeIdForProduct === 'function' ? window.findBlueprintTypeIdForProduct(mat.typeId) : null)
           || (typeof window.resolveBlueprintIdFromProductName === 'function' ? window.resolveBlueprintIdFromProductName(mat.name) : null);
@@ -1084,7 +1128,7 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
         <div class="flex justify-between items-center ${rowTextClass} mono ${rowPadClass} gap-2" style="color:${isAcquired ? 'var(--accent)' : 'var(--text-mute)'};">
           ${iconHTML}
           <span class="truncate pr-2 flex-1"><span class="copy-name" data-copy-name="${window.esc(mat.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(mat.name)}">${window.esc(mat.name)}</span></span>
-          <span class="flex-shrink-0 whitespace-nowrap">${isAcquired ? `✔ ${mat.qtyNeeded.toLocaleString()}` : `x${mat.qtyNeeded.toLocaleString()} (Deficit: ${netMissing.toLocaleString()})`}</span>
+          <span class="flex-shrink-0 whitespace-nowrap">${isAcquired ? `${window.svgIcon('check')} ${mat.qtyNeeded.toLocaleString()}` : `x${mat.qtyNeeded.toLocaleString()} (Deficit: ${netMissing.toLocaleString()})`}</span>
           ${buildActionHTML}
         </div>
       `;
@@ -1151,7 +1195,7 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
         <div class="flex justify-between items-center mb-1.5 pb-1.5" style="border-bottom:1px solid rgba(255,255,255,0.06);">
           <span class="${headerTextClass} font-bold uppercase tracking-wider rajdhani" style="color:var(--accent);">Job Materials (BOM)</span>
           <button onclick="copyIndividualJobMultibuy(event, ${job.id})" class="lp-chip-btn" style="font-size:10px; padding:3px 8px;">
-            📋 Copy BOM
+            ${window.svgIcon('clipboard')} Copy BOM
           </button>
         </div>
         <div class="${isFocusMode ? '' : 'max-h-48 overflow-y-auto'} scrollbar-thin">
@@ -1188,7 +1232,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
     const isolationCheckboxHTML = (!job.isStarted && !job.isSubBuild) ? `
       <label class="pill-check flex-shrink-0" title="Shop: show only this job's (and its prerequisites') materials in the Consolidated BOM sidebar">
         <input type="checkbox" ${isolatedJobIds.has(job.id) ? 'checked' : ''} onchange="toggleJobIsolation(${job.id})">
-        <span class="pill-check-face">🛒 Shop</span>
+        <span class="pill-check-face">${window.svgIcon('cart')} Shop</span>
       </label>
     ` : '';
 
@@ -1197,10 +1241,10 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
         ${isolationCheckboxHTML}
         ${renderFocusButtonHTML(job)}
         <button onclick="toggleJobCardCollapse(${job.id})" class="px-1 text-xs select-none" style="color:var(--text-mute);" title="${isCollapsed ? 'Show full details' : 'Hide Bill of Materials'}">
-          ${isCollapsed ? '▸' : '▾'}
+          ${window.svgIcon(isCollapsed ? 'chevron-right' : 'chevron-down')}
         </button>
         <span class="drag-handle cursor-grab active:cursor-grabbing px-1.5 py-0.5 text-sm select-none" style="color:var(--text-mute);" title="Drag to reorder (changes stock allocation priority)">
-          ⠿
+          ${window.svgIcon('grip')}
         </span>
       </div>
     `;
@@ -1251,7 +1295,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
         <input type="number" id="start-runs-${job.id}" value="${job.runsNeeded}" min="1" max="${job.runsNeeded}"
           onmousedown="event.stopPropagation()" onfocus="this.select()"
           class="field-line w-16 text-center font-bold p-1 text-sm" style="color:var(--accent);">
-        <button onclick="startJobRuns(${job.id})" class="lp-chip-btn ml-auto flex-shrink-0">▶ Start Job</button>
+        <button onclick="startJobRuns(${job.id})" class="lp-chip-btn ml-auto flex-shrink-0">${window.svgIcon('play')} Start Job</button>
       </div>
     ` : '';
 
@@ -1266,8 +1310,8 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
           <div class="flex items-start space-x-3 min-w-0 flex-1">
             <img src="${jobIconUrl}" class="${isFocusMode ? 'w-20 h-20' : 'w-12 h-12'} rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
-              <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${(job.isSubBuild && !isFocusMode) ? `<span class="ml-1 text-xs align-middle" style="color:var(--text-mute);" title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}">⚙</span>` : ''}</h3>
-              ${(job.isSubBuild && isFocusMode) ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">⚙ Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
+              <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${(job.isSubBuild && !isFocusMode) ? `<span class="ml-1 text-xs align-middle" style="color:var(--text-mute);" title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}">${window.svgIcon('gear')}</span>` : ''}</h3>
+              ${(job.isSubBuild && isFocusMode) ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">${window.svgIcon('gear')} Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
               ${renderJobMetaChipHTML(job)}
             </div>
           </div>
@@ -1300,7 +1344,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
 
         ${!isCollapsed ? renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocusMode) : `
           <div class="lp-inset text-xs italic text-center" style="color:var(--text-mute);">
-            Details minimized - click ▸ above to expand
+            Details minimized - click the chevron above to expand
           </div>
         `}
 
@@ -1308,10 +1352,10 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
 
         <div class="flex items-center gap-2 pt-1">
           <button onclick="markJobAsBuilt(${job.id})" class="lp-badge lp-badge-accent py-1.5 px-3 text-sm flex items-center justify-center gap-1" style="cursor:pointer;">
-            ✔ Built
+            ${window.svgIcon('check')} Built
           </button>
           <button onclick="deleteJobFromQueue(${job.id})" class="lp-badge lp-badge-danger py-1.5 px-3 text-sm flex items-center justify-center gap-1" style="cursor:pointer;">
-            ❌ Delete
+            ${window.svgIcon('x')} Delete
           </button>
         </div>
       </div>
@@ -1378,10 +1422,17 @@ function combineDuplicateJobs() {
   activeJobs.forEach(job => {
     if (!job) return;
     if (job.isStarted) { order.push({ key: null, job }); return; } // never combine started jobs
+    // Two sub-builds only combine if they're prerequisites for the SAME actual parent job - grouping
+    // by parentJobId (falling back to parentJobName only for a sub-build saved before that field
+    // existed) instead of name alone, or two different jobs' prerequisites could get merged together
+    // just because their parents happen to share a product name (see buildJobClusters' own comment).
+    const parentKey = job.isSubBuild
+      ? ((job.parentJobId !== undefined && job.parentJobId !== null) ? `id:${job.parentJobId}` : `name:${job.parentJobName || ''}`)
+      : '';
     const key = [
       job.productTypeId || job.typeId,
       job.isSubBuild ? 'sub' : 'final',
-      job.parentJobName || '',
+      parentKey,
       job.sellStrategy || ''
     ].join('|');
     if (!groups[key]) groups[key] = [];
@@ -1491,7 +1542,9 @@ let bomViewMode = localStorage.getItem('eve_bom_view_mode') || 'card'; // 'card'
 
 function updateBomViewModeButtonLabel() {
   const btn = document.getElementById('btn-bom-view-mode');
-  if (btn) btn.textContent = bomViewMode === 'compact' ? '▦ Detailed' : '☰ Compact';
+  if (btn) btn.innerHTML = bomViewMode === 'compact'
+    ? window.svgIcon('grid') + ' Detailed'
+    : window.svgIcon('list') + ' Compact';
 }
 
 function toggleBomViewMode() {
@@ -1552,7 +1605,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
     // CORRECTION: Direct blueprint path safety check inside the consolidated BOM prevents any imageservers 400 errors [1.1.1, 1.1.4]
     const itemIconUrl = window.getItemIconUrl(item.typeId, window.TYPE_ID_TO_NAME[item.typeId] || item.name, 32);
     const costOrInStockHTML = isCompleted
-      ? `<span class="font-bold mono flex-shrink-0" style="color:var(--text-mute);">✔ In Stock</span>`
+      ? `<span class="font-bold mono flex-shrink-0" style="color:var(--text-mute);">${window.svgIcon('check')} In Stock</span>`
       : `<span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>`;
 
     if (isCompact) {
@@ -2089,6 +2142,7 @@ function markJobAsBuilt(jobId) {
     calculatedCost: job.calculatedCost,
     netProfit: job.netProfit,
     isSubBuild: job.isSubBuild,
+    parentJobId: job.parentJobId,
     parentJobName: job.parentJobName,
     autoImported: job.autoImported,
     materials: job.materials,
@@ -2198,17 +2252,17 @@ function renderBuildHistoryLedger() {
     return `
       <tr style="color:var(--text-soft);">
         <td>${formattedDate}</td>
-        <td class="font-bold" style="color:var(--text);">${window.esc(recordDisplayName)}${record.isSubBuild ? `<span class="ml-1.5 text-xs font-semibold normal-case" style="color:var(--text-mute);" title="Prerequisite for: ${window.esc(record.parentJobName || 'another job')}">⚙ prereq</span>` : ''}</td>
+        <td class="font-bold" style="color:var(--text);">${window.esc(recordDisplayName)}${record.isSubBuild ? `<span class="ml-1.5 text-xs font-semibold normal-case" style="color:var(--text-mute);" title="Prerequisite for: ${window.esc(record.parentJobName || 'another job')}">${window.svgIcon('gear')} prereq</span>` : ''}</td>
         <td class="text-right">${record.runsNeeded.toLocaleString()}</td>
         <td class="text-right font-bold" style="color:var(--accent);">${record.qtyNeeded.toLocaleString()}</td>
         <td class="text-right font-bold" style="color:var(--accent);">${Math.round(record.calculatedCost || 0).toLocaleString()} ISK</td>
         <td>
           <div class="flex items-center space-x-1.5">
             <button onclick="requeueCompletedJob(${record.id})" class="lp-chip-btn">
-              🔄 Re-queue
+              ${window.svgIcon('refresh')} Re-queue
             </button>
-            <button onclick="deleteHistoryRecord(${record.id})" class="lp-badge lp-badge-danger" style="cursor:pointer;" title="Delete this entry">
-              ❌
+            <button onclick="deleteHistoryRecord(${record.id})" class="lp-badge lp-badge-danger" style="cursor:pointer;" title="Delete this entry" aria-label="Delete this entry">
+              ${window.svgIcon('x', { style: 'margin:0' })}
             </button>
           </div>
         </td>
@@ -2354,16 +2408,18 @@ function populateJournalLocationDropdown() {
     mainOpt.value = `loc_${locId}`;
     const numericLocId = parseInt(locId);
     const isUpwellStructure = numericLocId > 1000000000000;
+    // Native <option> can't hold an inline SVG - the orange/green text color already distinguishes
+    // Upwell structures from NPC stations, so no leading glyph is needed.
     if (isUpwellStructure) {
       mainOpt.style.color = 'var(--accent)';
       mainOpt.style.backgroundColor = '#0c1318';
       mainOpt.style.fontWeight = 'bold';
-      mainOpt.textContent = `🟧 ${data.name} (${data.count.toLocaleString()} items)`;
+      mainOpt.textContent = `${data.name} (${data.count.toLocaleString()} items)`;
     } else {
       mainOpt.style.color = 'var(--green)';
       mainOpt.style.backgroundColor = '#0c1318';
       mainOpt.style.fontWeight = 'bold';
-      mainOpt.textContent = `🟩 ${data.name} (${data.count.toLocaleString()} items)`;
+      mainOpt.textContent = `${data.name} (${data.count.toLocaleString()} items)`;
     }
     filterSelect.appendChild(mainOpt);
 
@@ -2373,7 +2429,7 @@ function populateJournalLocationDropdown() {
       sagOpt.style.color = 'var(--accent)';
       sagOpt.style.backgroundColor = '#070b0f';
       sagOpt.style.fontWeight = 'bold';
-      sagOpt.textContent = `  └─ 🟪 Corp: ${sagData.name} (${sagData.count.toLocaleString()} items)`;
+      sagOpt.textContent = `  └─ Corp: ${sagData.name} (${sagData.count.toLocaleString()} items)`;
       filterSelect.appendChild(sagOpt);
     }
 
@@ -2382,7 +2438,7 @@ function populateJournalLocationDropdown() {
       containerOpt.value = `container_${cId}`;
       containerOpt.style.color = '#f8fafc';
       containerOpt.style.backgroundColor = '#070b0f';
-      containerOpt.textContent = `  └─ 📦 Container: ${cData.name} (${cData.count.toLocaleString()} items)`;
+      containerOpt.textContent = `  └─ Container: ${cData.name} (${cData.count.toLocaleString()} items)`;
       filterSelect.appendChild(containerOpt);
     }
   }
@@ -2536,19 +2592,19 @@ function applyHistoryDrawerState(state) {
   // the row's own bottom edge (and the table underneath) peek out past the drawer's painted background.
   if (state === 'collapsed') {
     drawer.style.height = (header ? header.getBoundingClientRect().height : 48) + 'px';
-    if (chevron) chevron.textContent = '▲';
-    if (pulltab) pulltab.textContent = '▲▲▲';
+    if (chevron) chevron.innerHTML = window.svgIcon('chevron-up');
+    if (pulltab) pulltab.innerHTML = window.svgIcon('chevrons-up');
     if (sizeBtn) sizeBtn.classList.add('hidden');
   } else if (state === 'tall') {
     drawer.style.height = '70vh';
-    if (chevron) chevron.textContent = '▼';
-    if (pulltab) pulltab.textContent = '▼▼▼';
-    if (sizeBtn) { sizeBtn.classList.remove('hidden'); sizeBtn.textContent = '⤡ Shorter'; }
+    if (chevron) chevron.innerHTML = window.svgIcon('chevron-down');
+    if (pulltab) pulltab.innerHTML = window.svgIcon('chevrons-down');
+    if (sizeBtn) { sizeBtn.classList.remove('hidden'); sizeBtn.innerHTML = window.svgIcon('collapse') + ' Shorter'; }
   } else {
     drawer.style.height = '24rem';
-    if (chevron) chevron.textContent = '▼';
-    if (pulltab) pulltab.textContent = '▼▼▼';
-    if (sizeBtn) { sizeBtn.classList.remove('hidden'); sizeBtn.textContent = '⤢ Taller'; }
+    if (chevron) chevron.innerHTML = window.svgIcon('chevron-down');
+    if (pulltab) pulltab.innerHTML = window.svgIcon('chevrons-down');
+    if (sizeBtn) { sizeBtn.classList.remove('hidden'); sizeBtn.innerHTML = window.svgIcon('expand') + ' Taller'; }
   }
   localStorage.setItem('eve_history_drawer_state', state);
 }

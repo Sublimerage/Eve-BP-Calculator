@@ -653,7 +653,7 @@ function renderInventionComparisonTable(rows) {
 
   const sortHeader = (column, label, align) => {
     const isActive = _inventionSortColumn === column;
-    const arrow = isActive ? (_inventionSortDescending ? ' ▼' : ' ▲') : '';
+    const arrow = isActive ? ' ' + window.svgIcon(_inventionSortDescending ? 'chevron-down' : 'chevron-up') : '';
     return `<th class="sortable${align === 'right' ? ' text-right' : ''}" onclick="sortInventionComparisonBy('${column}')">${label}${arrow}</th>`;
   };
 
@@ -685,7 +685,7 @@ function renderInventionComparisonTable(rows) {
             : 'No invention time data for this blueprint - regenerate the database to pick it up';
           return `
           <tr class="${isBest ? 'lp-table-best' : ''}" title="${window.esc(r.profitDetail)}">
-            <td class="font-bold" style="color:${isBest ? 'var(--accent)' : 'var(--text)'};">${isBest ? '🏆 ' : ''}${window.esc(r.dec.name)}</td>
+            <td class="font-bold" style="color:${isBest ? 'var(--accent)' : 'var(--text)'};">${isBest ? window.svgIcon('award') + ' ' : ''}${window.esc(r.dec.name)}</td>
             <td class="text-right font-bold" style="color:var(--text);">${r.successChance.toFixed(1)}%</td>
             <td class="text-right" style="color:var(--text-mute);">${r.resultRuns} run${r.resultRuns > 1 ? 's' : ''}, ME${r.resultME >= 0 ? '+' : ''}${r.resultME}, TE${r.resultTE >= 0 ? '+' : ''}${r.resultTE}</td>
             <td class="text-right font-bold" style="color:var(--accent);">${isFinite(r.requiredAttempts) ? r.requiredAttempts.toLocaleString() : '—'}</td>
