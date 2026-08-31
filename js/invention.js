@@ -526,6 +526,7 @@ async function recalculateInventionImpl() {
 
   renderInventionComparisonTable(rows);
   renderInventionSummaryTiles(rows);
+  renderInventionActiveStationLabel();
 
   document.getElementById('invention-empty-state').classList.add('hidden');
   document.getElementById('invention-results-area').classList.remove('hidden');
@@ -711,10 +712,94 @@ function renderInventionComparisonTable(rows) {
       <b>Total Invention Cost</b> = Attempts Needed × (datacores + decryptor cost per attempt), net of owned stock - you pay this on every attempt, win or lose.
       <b>Total Mfg Cost / Total Profit</b> = manufacturing your ${targetBPCs} target BPC${targetBPCs > 1 ? 's' : ''} worth of production, at your chosen Jita buy/sell pricing, minus Total Invention Cost.
       <b>Profit / 1 Run</b> normalizes Total Profit to a single manufacturing run, so decryptors with different run counts per BPC compare fairly.
-      Not included: the T1 BPC's own acquisition cost, the invention job's own installation fee, or manufacturing job fees (facility tax/SCC/broker).
+      Total Invention Cost already includes the invention job's own installation fee, and Total Mfg Cost already includes the manufacturing job's installation fee (facility tax + SCC + system cost index) - not just raw material cost. Materials/decryptors/datacores are priced by the Material Pricing setting on the left (Jita Sell = instant buy price, Jita Buy Order = cheaper but not guaranteed to fill); the resulting BPC's output is always valued at Jita Sell, as if you list it yourself (net of sales tax + broker fee) - real fills can be lower if you have to undercut competition. Not included: the T1 BPC's own acquisition cost (its price if bought fresh, or nothing if you already own the BPO and use it repeatedly).
     </p>
   `;
 }
+
+// --- Production station preset (system + structure + rigs + facility tax) ---
+// This page has no system/structure/rig controls of its own - it silently reads whatever the
+// Calculator last set (getActiveStructureType/getEffectiveRigBonusForTypeId both read shared
+// localStorage directly, see config.js), so there was no way to see OR change what's actually
+// driving the invention/manufacturing job fees and ME/TE bonuses without leaving this page. This
+// preset picker (same saved presets the Calculator/Ledger already use) closes that gap, plus a small
+// always-visible readout of whatever's currently active so it's never a guess.
+// app.js isn't loaded here (same reasoning as ledger.js's own copy of this) - own tiny parse helper
+// rather than a cross-file dependency for reading one localStorage key.
+function getSavedProductionPresetsLocal() {
+  return window.safeParseJSON(localStorage.getItem('eve_production_presets'), {});
+}
+
+function renderInventionPresetDropdown() {
+  const select = document.getElementById('invention-preset-select');
+  if (!select) return;
+  const presets = getSavedProductionPresetsLocal();
+  select.innerHTML = `<option value="">— Load a saved production station —</option>` +
+    Object.keys(presets).sort().map(name => `<option value="${window.esc(name)}">${window.esc(name)} (${window.esc(presets[name].systemName)}, ${window.esc(presets[name].facilityLabel)})</option>`).join('');
+}
+window.renderInventionPresetDropdown = renderInventionPresetDropdown;
+
+async function applyInventionProductionPreset(presetName) {
+  if (!presetName) return;
+  const presets = getSavedProductionPresetsLocal();
+  const preset = presets[presetName];
+  if (!preset) return;
+
+  localStorage.setItem('eve_active_facility_key', preset.facilityKey || 'sotiyo');
+  localStorage.setItem('eve_rig_slot_1', preset.rig1 || '');
+  localStorage.setItem('eve_rig_slot_2', preset.rig2 || '');
+  localStorage.setItem('eve_rig_slot_3', preset.rig3 || '');
+  if (preset.facilityTax !== undefined) {
+    const facilityTaxInput = document.getElementById('facility-tax');
+    if (facilityTaxInput) facilityTaxInput.value = preset.facilityTax;
+    if (typeof saveSharedTaxSettings === 'function') saveSharedTaxSettings();
+  }
+  localStorage.setItem('eve_selected_system', JSON.stringify({ id: preset.systemId, name: preset.systemName }));
+  if (preset.systemId && typeof window.fetchSystemSCIById === 'function') {
+    try { await window.fetchSystemSCIById(preset.systemId, preset.systemName); }
+    catch (e) { console.warn('[Invention] Failed to fetch system cost index for preset:', e); }
+  }
+
+  const select = document.getElementById('invention-preset-select');
+  if (select) select.value = '';
+  if (_inventionCurrentBlueprint) recalculateInventionImpl();
+  renderInventionActiveStationLabel();
+  if (typeof window.showToast === 'function') window.showToast(`Now using the "${window.esc(presetName)}" production preset.`, 'success');
+}
+window.applyInventionProductionPreset = applyInventionProductionPreset;
+
+// Resolves the CURRENTLY active system/structure/rigs into a readable label - the name of a saved
+// preset if all fields still match exactly (same matching logic as the Ledger's own per-job preset
+// label), otherwise a synthesized "Structure @ System, N rigs" description. Shown regardless of
+// whether a preset was ever explicitly picked here, so what's driving the numbers is never a guess.
+function renderInventionActiveStationLabel() {
+  const el = document.getElementById('invention-active-station-label');
+  if (!el) return;
+  const sel = window.safeParseJSON(localStorage.getItem('eve_selected_system'), {});
+  const facilityKey = localStorage.getItem('eve_active_facility_key') || 'sotiyo';
+  const rig1 = localStorage.getItem('eve_rig_slot_1') || '';
+  const rig2 = localStorage.getItem('eve_rig_slot_2') || '';
+  const rig3 = localStorage.getItem('eve_rig_slot_3') || '';
+
+  const presets = getSavedProductionPresetsLocal();
+  const matchName = Object.keys(presets).find(name => {
+    const p = presets[name];
+    return p && p.systemId === sel.id && p.facilityKey === facilityKey &&
+      (p.rig1 || '') === rig1 && (p.rig2 || '') === rig2 && (p.rig3 || '') === rig3;
+  });
+
+  let label;
+  if (matchName) {
+    label = matchName;
+  } else {
+    const structureLabel = (window.STRUCTURE_TYPES && window.STRUCTURE_TYPES[facilityKey] && window.STRUCTURE_TYPES[facilityKey].shortLabel) || facilityKey;
+    const rigCount = [rig1, rig2, rig3].filter(Boolean).length;
+    const rigLabel = rigCount > 0 ? `, ${rigCount} rig${rigCount > 1 ? 's' : ''}` : ', no rigs';
+    label = sel.name ? `${structureLabel} @ ${sel.name}${rigLabel}` : `${structureLabel}${rigLabel}`;
+  }
+  el.textContent = label;
+}
+window.renderInventionActiveStationLabel = renderInventionActiveStationLabel;
 
 // --- State persistence (survives reload and navigating away/back) ---
 function saveInventionState() {
@@ -745,7 +830,10 @@ async function restoreInventionState() {
   }
   if (state.priceMode !== undefined) {
     const priceEl = document.getElementById('input-price-mode');
-    if (priceEl) priceEl.value = state.priceMode;
+    // input-price-mode is a toggle <button> (see toggleMaterialPricingButton, config.js), not a
+    // <select> - setting .value alone doesn't update its visible text/style, so that has to be
+    // refreshed explicitly here too, or a restored "buy" state would still visually show "Sell".
+    if (priceEl) { priceEl.value = state.priceMode; if (typeof window.updateMaterialPricingButtonVisual === 'function') window.updateMaterialPricingButtonVisual(priceEl); }
   }
   if (Array.isArray(state.skillLevels)) {
     state.skillLevels.forEach(sl => {
@@ -793,6 +881,8 @@ window.onload = async () => {
     window.buildPrepackedIndexes();
   }
   loadSharedTaxSettings();
+  renderInventionPresetDropdown();
+  renderInventionActiveStationLabel();
   // Restore the last-viewed item's search box/icon/name/skill inputs FIRST, before any network
   // calls - these all come from local data (recipeMap, localStorage), so there's no reason to make
   // the user stare at a blank page for a second or two while SSO callback handling, system cost

@@ -214,6 +214,35 @@ function updateDeductStockButtonVisual(btn) {
 }
 window.updateDeductStockButtonVisual = updateDeductStockButtonVisual;
 
+// Same toggle-button pattern as Deduct Stock above, for the "Material Pricing" (buy order vs sell
+// order) control - was a plain <select id="input-price-mode">, which read like a shared/generic
+// setting rather than something you'd reach for on this specific page. A dedicated button, right next
+// to Deduct Stock, makes it obviously this page's own control. getNodePriceStrategy() (optimizers.js)
+// and getInventionInputPrice() (invention.js) both just read #input-price-mode's .value, unaware of
+// whether it's a <select> or a <button> underneath - swapping the element needed no changes there.
+function toggleMaterialPricingButton(btn, recalcFnName) {
+  if (!btn) return;
+  const newValue = btn.value === 'sell' ? 'buy' : 'sell';
+  btn.value = newValue;
+  updateMaterialPricingButtonVisual(btn);
+  if (recalcFnName && typeof window[recalcFnName] === 'function') window[recalcFnName]();
+}
+window.toggleMaterialPricingButton = toggleMaterialPricingButton;
+
+function updateMaterialPricingButtonVisual(btn) {
+  if (!btn) return;
+  if (btn.value === 'buy') {
+    btn.textContent = '💰 Jita Buy Order';
+    btn.className = 'btn-glass btn-glass-muted w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5';
+    btn.title = 'Materials/datacores/decryptor priced at the Jita buy order price - cheaper, but not guaranteed to fill. Click to switch to sell order pricing.';
+  } else {
+    btn.textContent = '💰 Jita Sell (Instant Buy)';
+    btn.className = 'btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5';
+    btn.title = 'Materials/datacores/decryptor priced at the Jita sell/instant-buy price - what it actually costs to acquire them right now. Click to switch to buy order pricing.';
+  }
+}
+window.updateMaterialPricingButtonVisual = updateMaterialPricingButtonVisual;
+
 function safeParseJSON(str, fallback) {
   if (!str || str === 'undefined' || str === 'null') return fallback;
   try {
