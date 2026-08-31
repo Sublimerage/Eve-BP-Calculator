@@ -195,7 +195,7 @@
               <label class="lp-label fo-group-label">Auto-Build Threshold</label>
               <div class="lp-inset flex items-center gap-1.5" title="Build Margin Threshold">
                 <span class="fo-inline-label">Min Profit</span>
-                <input type="number" id="build-profit-threshold" value="5.0" step="0.5" min="0" max="100"
+                <input type="text" inputmode="decimal" id="build-profit-threshold" value="5.0" oninput="sanitizeDecimalInput(event)"
                   class="field-line w-14 text-center font-bold p-1 text-xs">
                 <span class="fo-inline-suffix">%</span>
                 <button onclick="applyBuildProfitOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] mono flex-shrink-0">
@@ -208,7 +208,7 @@
               <div class="space-y-1.5">
                 <div class="lp-inset flex items-center gap-1.5" title="Component Market Spread Threshold">
                   <span class="fo-inline-label">Spread</span>
-                  <input type="number" id="buy-savings-threshold" value="5.0" step="0.5" min="0" max="100"
+                  <input type="text" inputmode="decimal" id="buy-savings-threshold" value="5.0" oninput="sanitizeDecimalInput(event)"
                     class="field-line w-14 text-center font-bold p-1 text-xs">
                   <span class="fo-inline-suffix">%</span>
                   <button onclick="applyComponentSpreadOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] flex-shrink-0">
@@ -217,7 +217,7 @@
                 </div>
                 <div class="lp-inset flex items-center gap-1.5" title="Build Cost Savings Impact Threshold">
                   <span class="fo-inline-label">Budget</span>
-                  <input type="number" id="total-cost-savings-threshold" value="1.0" step="0.5" min="0" max="100"
+                  <input type="text" inputmode="decimal" id="total-cost-savings-threshold" value="1.0" oninput="sanitizeDecimalInput(event)"
                     class="field-line w-14 text-center font-bold p-1 text-xs">
                   <span class="fo-inline-suffix">%</span>
                   <button onclick="applyBudgetImpactOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] flex-shrink-0">
@@ -271,7 +271,7 @@
                 </select>
                 <div class="lp-inset flex items-center gap-1.5" title="Facility Structure Tax % - set by whoever owns the structure, so it varies station to station independent of the structure's tier. Lives here (not in Taxes & Fees) so it saves and loads together with the rest of this production preset.">
                   <span class="fo-inline-label">Job Tax</span>
-                  <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
+                  <input type="text" inputmode="decimal" id="facility-tax" value="1.0" oninput="sanitizeDecimalInput(event); saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
                   <span class="fo-inline-suffix">%</span>
                 </div>
               </div>
@@ -313,17 +313,17 @@
               <div class="grid grid-cols-3 gap-1.5 text-[11px] mono">
                 <div class="lp-inset flex items-center gap-1.5" title="SCC Surcharge %">
                   <span class="fo-inline-label">SCC</span>
-                  <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
+                  <input type="text" inputmode="decimal" id="scc-surcharge" value="4.0" oninput="sanitizeDecimalInput(event); saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
                   <span class="fo-inline-suffix">%</span>
                 </div>
                 <div class="lp-inset flex items-center gap-1.5" title="Sales Tax %">
                   <span class="fo-inline-label">Sales</span>
-                  <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
+                  <input type="text" inputmode="decimal" id="sales-tax" value="3.6" oninput="sanitizeDecimalInput(event); saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
                   <span class="fo-inline-suffix">%</span>
                 </div>
                 <div class="lp-inset flex items-center gap-1.5" title="Broker Fee %">
                   <span class="fo-inline-label">Broker</span>
-                  <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
+                  <input type="text" inputmode="decimal" id="broker-fee" value="1.0" oninput="sanitizeDecimalInput(event); saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
                   <span class="fo-inline-suffix">%</span>
                 </div>
               </div>
@@ -333,12 +333,12 @@
               <div class="grid grid-cols-2 gap-1.5 text-[11px] mono">
                 <div class="lp-inset flex items-center gap-1.5" title="Contract Sales Tax %">
                   <span class="fo-inline-label">C.Tax</span>
-                  <input type="number" id="contract-tax" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
+                  <input type="text" inputmode="decimal" id="contract-tax" value="0.5" oninput="sanitizeDecimalInput(event); saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
                   <span class="fo-inline-suffix">%</span>
                 </div>
                 <div class="lp-inset flex items-center gap-1.5" title="Contract Broker Fee %">
                   <span class="fo-inline-label">C.Brk</span>
-                  <input type="number" id="contract-broker" value="0.5" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
+                  <input type="text" inputmode="decimal" id="contract-broker" value="0.5" oninput="sanitizeDecimalInput(event); saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
                   <span class="fo-inline-suffix">%</span>
                 </div>
               </div>
@@ -633,7 +633,7 @@
        serially blocking each download on the previous script finishing, while still guaranteeing
        they execute in this exact order once parsing completes - same behavior, faster to get there. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
-  <script src="js/config.js?v=15.8.6" defer></script>
+  <script src="js/config.js?v=15.8.7" defer></script>
   <script src="js/esi.js?v=15.8.2" defer></script>
   <script src="js/tree.js?v=15.1.0" defer></script>
   <script src="js/optimizers.js?v=15.4.0" defer></script>

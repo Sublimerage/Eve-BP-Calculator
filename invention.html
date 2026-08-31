@@ -136,7 +136,7 @@
             <span class="text-[9px] text-slate-500" title="Auto-classified from item type. Override if you know the exact value from the in-game invention window.">auto-detected</span>
           </div>
           <div class="flex items-end gap-2">
-            <input type="number" id="invention-base-chance" min="0" max="100" step="0.1" class="field-line field-editable mono w-20 text-lg font-bold" style="color:var(--accent);" oninput="recalculateInvention()">
+            <input type="text" inputmode="decimal" id="invention-base-chance" class="field-line field-editable mono w-20 text-lg font-bold" style="color:var(--accent);" oninput="sanitizeDecimalInput(event); recalculateInvention()">
             <span class="text-xs pb-0.5" style="color:var(--text-mute);">%</span>
           </div>
         </div>
@@ -157,22 +157,22 @@
           <div class="grid grid-cols-2 gap-1.5 text-[11px] mono">
             <div class="lp-inset flex items-center gap-1.5" title="Facility/structure tax applied to every manufacturing AND invention job's installation cost.">
               <span class="fo-inline-label">Fac</span>
-              <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
+              <input type="text" inputmode="decimal" id="facility-tax" value="1.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettings(); recalculateInvention();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
               <span class="fo-inline-suffix">%</span>
             </div>
             <div class="lp-inset flex items-center gap-1.5" title="SCC surcharge applied to every manufacturing AND invention job's installation cost.">
               <span class="fo-inline-label">SCC</span>
-              <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
+              <input type="text" inputmode="decimal" id="scc-surcharge" value="4.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettings(); recalculateInvention();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
               <span class="fo-inline-suffix">%</span>
             </div>
             <div class="lp-inset flex items-center gap-1.5" title="Sales tax deducted when selling the manufactured output.">
               <span class="fo-inline-label">Sales</span>
-              <input type="number" id="sales-tax" value="3.6" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
+              <input type="text" inputmode="decimal" id="sales-tax" value="3.6" oninput="sanitizeDecimalInput(event); saveSharedTaxSettings(); recalculateInvention();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
               <span class="fo-inline-suffix">%</span>
             </div>
             <div class="lp-inset flex items-center gap-1.5" title="Broker fee, applied when selling AND when buying materials via buy orders.">
               <span class="fo-inline-label">Broker</span>
-              <input type="number" id="broker-fee" value="1.0" step="0.1" min="0" max="10" oninput="saveSharedTaxSettings(); recalculateInvention();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
+              <input type="text" inputmode="decimal" id="broker-fee" value="1.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettings(); recalculateInvention();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
               <span class="fo-inline-suffix">%</span>
             </div>
           </div>
@@ -215,7 +215,7 @@
        serially blocking each download on the previous script finishing, while still guaranteeing
        they execute in this exact order once parsing completes - same behavior, faster to get there. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
-  <script src="js/config.js?v=8.0.14" defer></script>
+  <script src="js/config.js?v=8.0.15" defer></script>
   <script src="js/esi.js?v=8.0.10" defer></script>
   <script src="js/tree.js?v=8.0.1" defer></script>
   <script src="js/optimizers.js?v=8.0.4" defer></script>
