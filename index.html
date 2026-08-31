@@ -244,7 +244,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
                   </button>
                 </div>
-                <button onclick="saveProductionPreset()" class="btn-glass w-full py-1.5 text-xs flex items-center justify-center gap-1.5" title="Saves your current system, structure type, and rig fitting as a named preset you can switch back to instantly">
+                <button onclick="saveProductionPreset()" class="btn-glass w-full py-1.5 text-xs flex items-center justify-center gap-1.5" title="Saves your current system, structure type, rig fitting, and facility tax as a named preset you can switch back to instantly">
                   <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
                   Save Current as Preset
                 </button>
@@ -260,14 +260,21 @@
             </div>
             <div class="fo-group">
               <label class="lp-label fo-group-label">Structure</label>
-              <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); recalculate();" class="field-line w-full text-white font-semibold text-xs" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
-                <option value="npc">NPC Station (0% ME / 0% TE / 0% Fee)</option>
-                <option value="raitaru">Raitaru - M EC (1% ME / 15% TE / 3% Fee)</option>
-                <option value="azbel">Azbel - L EC (1% ME / 20% TE / 4% Fee)</option>
-                <option value="sotiyo" selected>Sotiyo - XL EC (1% ME / 30% TE / 5% Fee)</option>
-                <option value="athanor">Athanor - M Refinery (0% ME / 20% TE / 3% Fee)</option>
-                <option value="tatara">Tatara - L Refinery (0% ME / 30% TE / 5% Fee)</option>
-              </select>
+              <div class="space-y-1.5">
+                <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); recalculate();" class="field-line w-full text-white font-semibold text-xs" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
+                  <option value="npc">NPC Station (0% ME / 0% TE / 0% Fee)</option>
+                  <option value="raitaru">Raitaru - M EC (1% ME / 15% TE / 3% Fee)</option>
+                  <option value="azbel">Azbel - L EC (1% ME / 20% TE / 4% Fee)</option>
+                  <option value="sotiyo" selected>Sotiyo - XL EC (1% ME / 30% TE / 5% Fee)</option>
+                  <option value="athanor">Athanor - M Refinery (0% ME / 20% TE / 3% Fee)</option>
+                  <option value="tatara">Tatara - L Refinery (0% ME / 30% TE / 5% Fee)</option>
+                </select>
+                <div class="lp-inset flex items-center gap-1.5" title="Facility Structure Tax % - set by whoever owns the structure, so it varies station to station independent of the structure's tier. Lives here (not in Taxes & Fees) so it saves and loads together with the rest of this production preset.">
+                  <span class="fo-inline-label">Job Tax</span>
+                  <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
+                  <span class="fo-inline-suffix">%</span>
+                </div>
+              </div>
             </div>
             <div class="fo-group" title="Search and select the actual rigs fitted in your structure (Engineering Complexes and Refineries both have 3 rig slots). Rigs only affect the specific item category and ship size they're built for. Bonus strength scales with your system's security status automatically.">
               <label class="lp-label fo-group-label">Rig Slots (search to fit)</label>
@@ -303,12 +310,7 @@
           <div id="flyout-fees" class="flyout-section">
             <div class="fo-group">
               <label class="lp-label fo-group-label">Market Orders</label>
-              <div class="grid grid-cols-2 gap-1.5 text-[11px] mono">
-                <div class="lp-inset flex items-center gap-1.5" title="Facility Structure Tax %">
-                  <span class="fo-inline-label">Fac</span>
-                  <input type="number" id="facility-tax" value="1.0" step="0.1" min="0" max="100" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
-                  <span class="fo-inline-suffix">%</span>
-                </div>
+              <div class="grid grid-cols-3 gap-1.5 text-[11px] mono">
                 <div class="lp-inset flex items-center gap-1.5" title="SCC Surcharge %">
                   <span class="fo-inline-label">SCC</span>
                   <input type="number" id="scc-surcharge" value="4.0" step="0.1" min="0" max="10" oninput="saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
