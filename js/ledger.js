@@ -695,8 +695,10 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
         <img src="${jobIconUrl}" alt="${window.esc(jobDisplayName)}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
         <div class="min-w-0 flex-1">
           <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></div>
-          <div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);${(job.isSubBuild && !depth) ? '' : 'visibility:hidden;'}">${window.svgIcon('gear')} Prereq for: ${window.esc((job.isSubBuild && !depth) ? (job.parentJobName || '?') : ' ')}</div>
-          ${renderJobMetaChipHTML(job)}
+          <div class="flex items-center gap-2 mt-1 min-w-0">
+            <span class="text-xs mono font-bold uppercase truncate min-w-0 flex-1" style="color:var(--text-mute);${(job.isSubBuild && !depth) ? '' : 'visibility:hidden;'}">${window.svgIcon('gear')} Prereq for: ${window.esc((job.isSubBuild && !depth) ? (job.parentJobName || '?') : ' ')}</span>
+            ${renderJobMetaChipHTML(job, true)}
+          </div>
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
           <!-- Edit icon lives INSIDE this same items-baseline row, right after "runs" - not as a
@@ -837,10 +839,16 @@ const CHIP_TRUNCATE_STYLE = 'display:inline-block; max-width:100%; overflow:hidd
 // preset row uses. Previously this only existed inside the expanded detail (renderJobPresetRowHTML),
 // so changing a job's preset required expanding the card (or Focus mode, which force-expands it) -
 // this puts the same action one click away from the collapsed title in both list and grid mode.
-function renderJobMetaChipHTML(job) {
+// `inline` (used by the list row) drops the own-line "mt-1" wrapper and shrinks the select's max
+// width, since the caller there already places this chip in a shared flex row next to the prereq
+// text instead of stacking it on its own line beneath - see renderJobListRowHTML. flex-shrink-0
+// keeps the preset control at a consistent, clickable width in that shared row - the prereq text
+// next to it (min-w-0 flex-1, no shrink-0) is the one that gives up space and truncates first.
+function renderJobMetaChipHTML(job, inline) {
+  const outerCls = inline ? 'min-w-0 flex-shrink-0' : 'mt-1';
   if (job.autoImported) {
     const meTe = job.meLevel !== undefined ? ` | ME: ${job.meLevel}% TE: ${job.teLevel}%` : '';
-    return `<div class="mt-1"><span class="lp-badge lp-badge-accent" style="${CHIP_TRUNCATE_STYLE}" title="No matching plan existed - imported from your active EVE job${window.esc(meTe)}">${window.svgIcon('download')} Auto-imported</span></div>`;
+    return `<div class="${outerCls}"><span class="lp-badge lp-badge-accent" style="${CHIP_TRUNCATE_STYLE}" title="No matching plan existed - imported from your active EVE job${window.esc(meTe)}">${window.svgIcon('download')} Auto-imported</span></div>`;
   }
   const isAssumed = !job.productionSnapshot;
   const label = resolveProductionPresetLabel(job.productionSnapshot || getCurrentLiveProductionSnapshot());
@@ -849,8 +857,8 @@ function renderJobMetaChipHTML(job) {
   const currentOptionHTML = `<option value="" selected>${window.esc(label)}${isAssumed ? ' (assumed)' : ''}</option>`;
   const optionsHTML = presetNames.map(name => `<option value="${window.esc(name)}">${window.esc(name)}</option>`).join('');
   return `
-    <div class="mt-1" onclick="event.stopPropagation()">
-      <select onchange="if (this.value) changeJobProductionPreset(${job.id}, this.value);" class="lp-badge" style="${CHIP_TRUNCATE_STYLE} max-width:220px; font-size:10px; cursor:pointer;" ${presetNames.length === 0 ? 'disabled' : ''} title="Production preset this job assumes - click to change">
+    <div class="${outerCls}" onclick="event.stopPropagation()">
+      <select onchange="if (this.value) changeJobProductionPreset(${job.id}, this.value);" class="lp-badge" style="${CHIP_TRUNCATE_STYLE} max-width:${inline ? '160px' : '220px'}; font-size:10px; cursor:pointer;" ${presetNames.length === 0 ? 'disabled' : ''} title="Production preset this job assumes - click to change">
         ${currentOptionHTML}
         ${optionsHTML}
       </select>
