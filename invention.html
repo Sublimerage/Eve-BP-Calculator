@@ -9,7 +9,7 @@
 <title>EVE Invention Calculator</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8ff4d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 3h4'/%3E%3Cpath d='M10.5 3v5.3L5.9 16.8A2 2 0 007.6 20h8.8a2 2 0 001.7-3.2L13.5 8.3V3'/%3E%3Cpath d='M8.2 14.5h7.6'/%3E%3C/svg%3E">
 <link class="cache-bust" rel="stylesheet" href="css/tailwind-build.css?v=1.0.1">
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.32.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.33.0">
 <script>(function(){try{var t=localStorage.getItem('eve_color_theme');if(t&&t!=='lime')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
@@ -73,7 +73,7 @@
       <div id="invention-config-panel" class="hidden">
 
         <div class="lp-row flex items-center gap-3">
-          <img id="invention-item-icon" src="" class="w-12 h-12 rounded-md border border-white/10 bg-[#070b0f] flex-shrink-0">
+          <img id="invention-item-icon" src="" alt="" class="w-12 h-12 rounded-md border border-white/10 bg-[#070b0f] flex-shrink-0">
           <div class="min-w-0 flex-1">
             <div id="invention-item-name" class="font-bold text-white truncate"></div>
           </div>
@@ -82,7 +82,7 @@
         <div class="lp-row" title="Invention consumes one copy of this blueprint per attempt (win or lose) - its own run count doesn't matter, it's used up either way.">
           <div class="lp-label mb-2">T1 Blueprint Copy Needed</div>
           <div class="flex items-center gap-2.5">
-            <img id="invention-t1-icon" src="" class="w-9 h-9 rounded-md border border-white/10 bg-[#070b0f] flex-shrink-0">
+            <img id="invention-t1-icon" src="" alt="" class="w-9 h-9 rounded-md border border-white/10 bg-[#070b0f] flex-shrink-0">
             <div id="invention-t1-name" class="font-bold text-sm truncate" style="color:var(--text);"></div>
           </div>
         </div>
@@ -93,7 +93,7 @@
              Calculator/Ledger already offer; the label under it always shows what's actually active,
              preset picked or not. -->
         <div class="lp-row">
-          <label class="lp-label mb-2 block">Production Station</label>
+          <label class="lp-label mb-2 block" for="invention-preset-select">Production Station</label>
           <select id="invention-preset-select" onchange="applyInventionProductionPreset(this.value)" class="field-line w-full font-bold text-xs">
             <option value="">— Load a saved production station —</option>
           </select>
@@ -135,7 +135,7 @@
             <option value="industry_system">Current System Only (JITA)</option>
           </select>
           <div class="pt-2.5" style="border-top:1px solid rgba(255,255,255,0.06);">
-            <label class="lp-label mb-2 block" title="How input materials/datacores/decryptor for this page's calculations are priced.">Material Pricing</label>
+            <label class="lp-label mb-2 block" for="input-price-mode" title="How input materials/datacores/decryptor for this page's calculations are priced.">Material Pricing</label>
             <button id="input-price-mode" value="sell" onclick="toggleMaterialPricingButton(this, 'recalculateInvention')" class="btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5" title="Materials/datacores/decryptor priced at the Jita sell/instant-buy price - what it actually costs to acquire them right now. Click to switch to buy order pricing."><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg> Jita Sell (Instant Buy)</button>
           </div>
         </div>
@@ -225,11 +225,11 @@
        serially blocking each download on the previous script finishing, while still guaranteeing
        they execute in this exact order once parsing completes - same behavior, faster to get there. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
-  <script src="js/config.js?v=8.0.18" defer></script>
-  <script src="js/esi.js?v=8.0.11" defer></script>
+  <script src="js/config.js?v=8.0.19" defer></script>
+  <script src="js/esi.js?v=8.0.12" defer></script>
   <script src="js/tree.js?v=8.0.1" defer></script>
-  <script src="js/optimizers.js?v=8.0.4" defer></script>
-  <script src="js/invention.js?v=9.10.1" defer></script>
+  <script src="js/optimizers.js?v=8.0.5" defer></script>
+  <script src="js/invention.js?v=9.11.0" defer></script>
   <script src="js/custom-select.js?v=1.4.0" defer></script>
 </body>
 </html>
