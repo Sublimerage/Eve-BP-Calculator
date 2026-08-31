@@ -694,17 +694,19 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
         <span class="text-xs flex-shrink-0" style="color:var(--text-mute);">${window.svgIcon(isExpanded ? 'chevron-down' : 'chevron-right')}</span>
         <img src="${jobIconUrl}" alt="${window.esc(jobDisplayName)}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
         <div class="min-w-0 flex-1">
-          <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></div>
-          <!-- Prereq caption ALWAYS renders (never omitted), toggling only visibility/content - see
-               the width-reservation comment on the runs-edit-icon slot below for why: without a
-               same-shape placeholder here, a job with no prereq caption is one line shorter than a
-               job with one, and every fixed-width column to the right (which centers against this
-               whole block via the row-level items-center) shifts up or down row to row depending on
-               which jobs happen to have it. The preset selector used to live on this same line too,
-               but that made its position drift with how wide this (flexible) name column happened to
-               be - it is now its own fixed-width column below, so it centers consistently regardless
-               of the name column width or how many lines this block has. -->
-          <div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);${(job.isSubBuild && !depth) ? '' : 'visibility:hidden;'}">${window.svgIcon('gear')} Prereq for: ${window.esc((job.isSubBuild && !depth) ? (job.parentJobName || '?') : ' ')}</div>
+          <!-- Sub-build relationship is a small inline badge next to the name, not its own text line
+               below it - same treatment the grid card already uses. A dedicated "Prereq for: X" line
+               was tried here, but keeping it out of the flow entirely (even hidden via visibility, it
+               still occupies height) made the name column two lines tall on EVERY row, so the single-
+               line columns beside it (icon, runs, status, cost, profit, preset) - centered via the
+               row-level items-center - landed off from the name text itself, which is what "not
+               centered" kept coming back to no matter how those other columns were tuned. Folding the
+               relationship into the name line instead keeps every row genuinely one line tall, so
+               items-center has nothing left to misalign. The parent name is still fully available on
+               hover (title), same as a properly-nested (depth>0) sub-build already conveys via its own
+               indentation + connector line - this just also covers an orphaned one (parent not present
+               in the current filtered list) that has no indentation to lean on. -->
+          <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${job.isSubBuild ? `<span class="ml-1 text-xs align-middle" style="color:var(--text-mute);" title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}">${window.svgIcon('gear')}</span>` : ''}</div>
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
           <!-- Edit icon lives INSIDE this same items-baseline row, right after "runs" - not as a
