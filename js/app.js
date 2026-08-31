@@ -1739,8 +1739,16 @@ function renderTreeDiagram(rootNode, priceStrategy, profitSell, roiSell) {
     if (!levels[node.depth]) levels[node.depth] = [];
     levels[node.depth].push(node);
     // A collapsed node still renders itself, but its children (and everything beneath them) are
-    // hidden from every depth column - this is what actually shrinks a runaway-tall build.
-    if (window.collapsedInstanceIds.has(node.instanceId)) return;
+    // hidden from every depth column - this is what actually shrinks a runaway-tall build. A node
+    // no longer in "build" mode gets the same treatment: buildRecursiveRecipeTree only fetches a
+    // node's children while isBuildingSelf is true (tree.js), so flipping a node from Build back to
+    // Buy later WITHOUT a full rebuild (the Min Profit optimizer does exactly this - a flag-sync +
+    // recalculate, not selectItem() - see applyBuildProfitOptimizer's own comment on why) leaves
+    // node.children still populated with stale data from when it WAS building. drawLinesForNode
+    // already skips drawing a line to a non-building node's children; without the same check here,
+    // those stale children kept getting cards rendered anyway - present on screen with no line
+    // connecting them to anything, exactly the bug this fixes.
+    if (window.collapsedInstanceIds.has(node.instanceId) || !node.isBuildingSelf) return;
     if (node.children) { node.children.forEach(child => { if (child) traverse(child); }); }
   }
   traverse(rootNode);

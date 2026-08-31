@@ -625,11 +625,19 @@ window.ensureDefaultTrackedMarkets = ensureDefaultTrackedMarkets;
 // confirmed the way Azbel/Sotiyo's cost bonus is). Azbel: 1% ME / 20% TE / 4% cost (confirmed).
 // Sotiyo: 1% ME / 30% TE / 5% cost (confirmed). NOTE: this corrects a bug in this app's own prior
 // dropdown, which had listed Sotiyo's fee bonus as -3% instead of the correct -5%.
+// Athanor/Tatara are Refineries, not Engineering Complexes - they run reactions (and reprocessing),
+// not manufacturing, so their meBonus is 0.0 (a Refinery's base structure bonus grants no material
+// efficiency at all; reaction ME only ever comes from a fitted rig, never the structure itself -
+// see getEffectiveRigBonusForTypeId). Their TE/cost progression mirrors the EC line one tier down
+// (Refineries only come in M/L, there's no XL refinery): Athanor 20% TE / 3% cost like Raitaru,
+// Tatara 30% TE / 5% cost like Sotiyo.
 const STRUCTURE_TYPES = {
   npc:     { label: 'NPC Station',        shortLabel: 'NPC Station', meBonus: 0.0, teBonus: 0.0,  costBonus: 0.0 },
   raitaru: { label: 'Raitaru (M Engineering Complex)', shortLabel: 'Raitaru', meBonus: 1.0, teBonus: 15.0, costBonus: 3.0 },
   azbel:   { label: 'Azbel (L Engineering Complex)',   shortLabel: 'Azbel',   meBonus: 1.0, teBonus: 20.0, costBonus: 4.0 },
-  sotiyo:  { label: 'Sotiyo (XL Engineering Complex)', shortLabel: 'Sotiyo',  meBonus: 1.0, teBonus: 30.0, costBonus: 5.0 }
+  sotiyo:  { label: 'Sotiyo (XL Engineering Complex)', shortLabel: 'Sotiyo',  meBonus: 1.0, teBonus: 30.0, costBonus: 5.0 },
+  athanor: { label: 'Athanor (M Refinery)',  shortLabel: 'Athanor', meBonus: 0.0, teBonus: 20.0, costBonus: 3.0 },
+  tatara:  { label: 'Tatara (L Refinery)',   shortLabel: 'Tatara',  meBonus: 0.0, teBonus: 30.0, costBonus: 5.0 }
 };
 window.STRUCTURE_TYPES = STRUCTURE_TYPES;
 
