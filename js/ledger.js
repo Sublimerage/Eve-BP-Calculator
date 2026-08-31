@@ -29,6 +29,37 @@ let focusedJobId = null;
 // importantly a newly-added one - defaults to collapsed instead of dumping its full material list
 // into an already-busy queue. Persisted so a reload doesn't lose which ones you opened.
 let expandedJobCardIds = new Set(window.safeParseJSON(localStorage.getItem('eve_expanded_job_cards'), []));
+// Job IDs whose run count is currently showing an editable input instead of the plain display -
+// click-to-edit, not a permanently-visible input box, so the collapsed/default look stays exactly as
+// clean as before this feature existed. Session-only, same as isolation/focus above.
+let editingRunsJobIds = new Set();
+function toggleRunsEditMode(e, jobId) {
+  if (e) e.stopPropagation();
+  if (editingRunsJobIds.has(jobId)) editingRunsJobIds.delete(jobId);
+  else editingRunsJobIds.add(jobId);
+  renderJournalPage();
+  if (editingRunsJobIds.has(jobId)) {
+    // Focus the input right after it appears - re-rendering just replaced the DOM node, so this has
+    // to happen on the next frame, not synchronously here.
+    requestAnimationFrame(() => {
+      const input = document.getElementById(`runs-edit-input-${jobId}`);
+      if (input) { input.focus(); input.select(); }
+    });
+  }
+}
+window.toggleRunsEditMode = toggleRunsEditMode;
+
+// A small icon-only toggle next to the run count - pencil when showing the plain number (click to
+// edit), a plain "x" when the input is already open (click to cancel without changing anything).
+// Deliberately NOT a bordered/filled button like the rest of the app's chip buttons - the whole point
+// is a quiet affordance that doesn't turn the collapsed card's header into a form.
+function renderRunsEditIconHTML(jobId, isEditing) {
+  const icon = isEditing
+    ? `<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>`
+    : `<path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>`;
+  return `<svg onclick="toggleRunsEditMode(event, ${jobId})" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px; height:12px; flex-shrink:0; color:var(--text-mute); cursor:pointer;" title="${isEditing ? 'Cancel' : 'Edit run count'}">${icon}</svg>`;
+}
+
 let activeQueueViewMode = localStorage.getItem('eve_queue_view_mode') || 'grid'; // 'grid' | 'list'
 // Which status groups ("started"/"pending") are collapsed - persisted the same way as card state.
 let collapsedJobGroups = new Set(window.safeParseJSON(localStorage.getItem('eve_collapsed_job_groups'), []));
@@ -593,9 +624,13 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
           <div class="flex items-baseline justify-end gap-1.5 flex-shrink-0" style="width:96px;" onclick="event.stopPropagation()">
-            ${(!job.isStarted && !job.autoImported) ? `
-              <input type="number" min="1" value="${job.runsNeeded}" onfocus="this.select()" onchange="changeJobRunCount(${job.id}, this.value)" class="field-line field-editable text-lg font-extrabold mono text-right" style="width:60px; color:var(--accent);" title="Edit run count - recalculates materials, cost, and time">
-            ` : `<span class="text-lg font-extrabold mono whitespace-nowrap cursor-pointer" style="color:var(--accent);" onclick="copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">${job.runsNeeded.toLocaleString()}</span>`}
+            ${editingRunsJobIds.has(job.id) ? `
+              <input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsNeeded}" onchange="changeJobRunCount(${job.id}, this.value)" class="field-line text-lg font-extrabold mono text-right" style="width:${Math.max(3, String(job.runsNeeded).length + 2)}ch; color:var(--accent);" title="Recalculates materials, cost, and time">
+              ${renderRunsEditIconHTML(job.id, true)}
+            ` : `
+              <span class="text-lg font-extrabold mono whitespace-nowrap cursor-pointer" style="color:var(--accent);" onclick="copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">${job.runsNeeded.toLocaleString()}</span>
+              ${(!job.isStarted && !job.autoImported) ? renderRunsEditIconHTML(job.id, false) : ''}
+            `}
             <span class="text-xs mono whitespace-nowrap" style="color:var(--text-mute);">runs</span>
           </div>
           <div class="lp-divider-col text-right flex-shrink-0" style="width:260px;" title="Job status">
@@ -864,6 +899,7 @@ async function changeJobRunCount(jobId, newRuns) {
   const job = activeJobs.find(j => j && j.id === jobId);
   if (!job || job.isStarted || job.autoImported) return;
   const runs = Math.max(1, Math.floor(Number(newRuns)) || 1);
+  editingRunsJobIds.delete(jobId); // editing is done either way (committed or a no-op) - back to plain display
   if (runs === job.runsNeeded) { renderJournalPage(); return; } // no-op (e.g. re-typed the same value) - just redraw to restore the input's displayed value
 
   const snapshot = job.productionSnapshot || getCurrentLiveProductionSnapshot();
@@ -1183,18 +1219,22 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
         ${statusBannerHTML}
 
         <div class="flex items-center justify-between px-1" onclick="event.stopPropagation()">
-          ${(!job.isStarted && !job.autoImported) ? `
+          ${editingRunsJobIds.has(job.id) ? `
             <span class="flex items-baseline gap-1.5">
-              <input type="number" min="1" value="${job.runsNeeded}" onfocus="this.select()" onchange="changeJobRunCount(${job.id}, this.value)" class="field-line field-editable text-xl font-extrabold mono" style="width:70px; color:var(--accent);" title="Edit run count - recalculates materials, cost, and time">
+              <input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsNeeded}" onchange="changeJobRunCount(${job.id}, this.value)" class="field-line text-xl font-extrabold mono" style="width:${Math.max(3, String(job.runsNeeded).length + 2)}ch; color:var(--accent);" title="Recalculates materials, cost, and time">
               <span class="text-sm mono" style="color:var(--text-mute);">Run${job.runsNeeded > 1 ? 's' : ''}</span>
+              ${renderRunsEditIconHTML(job.id, true)}
             </span>
           ` : `
-            <span
-              class="text-xl font-extrabold mono cursor-pointer transition"
-              style="color:var(--accent);"
-              onclick="copyRunsToClipboard(event, ${job.runsNeeded})"
-              title="Click to copy the run count to clipboard">
-              ${job.runsNeeded.toLocaleString()} Run${job.runsNeeded > 1 ? 's' : ''}
+            <span class="flex items-baseline gap-1.5">
+              <span
+                class="text-xl font-extrabold mono cursor-pointer transition"
+                style="color:var(--accent);"
+                onclick="copyRunsToClipboard(event, ${job.runsNeeded})"
+                title="Click to copy the run count to clipboard">
+                ${job.runsNeeded.toLocaleString()} Run${job.runsNeeded > 1 ? 's' : ''}
+              </span>
+              ${(!job.isStarted && !job.autoImported) ? renderRunsEditIconHTML(job.id, false) : ''}
             </span>
           `}
           <span class="text-sm mono" style="color:var(--text-mute);">${job.qtyNeeded.toLocaleString()} units total</span>
