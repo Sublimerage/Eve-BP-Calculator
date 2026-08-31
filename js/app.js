@@ -494,7 +494,7 @@ async function scanSingleBlueprintProfit(typeId, me, te, runs, quantity, product
   const cache = getBlueprintProfitCache();
 
   const origHTML = btnEl ? btnEl.innerHTML : null;
-  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳'; }
+  if (btnEl) { btnEl.disabled = true; btnEl.innerHTML = window.svgIcon('hourglass'); }
   try {
     cache[key] = await computeBlueprintManufacturingProfit(bp);
   } catch (e) {
@@ -2664,6 +2664,18 @@ function setBOMOrderFilter(type) {
 }
 window.setBOMOrderFilter = setBOMOrderFilter;
 
+// Whether the Bill of Materials' "Already in Stock" section is expanded - same collapsible-divider
+// system as the Ledger's Consolidated BOM (js/ledger.js), applied here too. Defaults collapsed: stock
+// you already own is the least important thing on this list, what you still need to buy is what
+// matters, so it starts tucked behind the divider instead of competing for attention with the actual
+// shopping list above it. Session-only (not persisted), same as this app's other display toggles.
+let isCalcAcquiredBomSectionExpanded = false;
+function toggleCalcAcquiredBomSection() {
+  isCalcAcquiredBomSectionExpanded = !isCalcAcquiredBomSectionExpanded;
+  if (typeof recalculate === 'function') recalculate();
+}
+window.toggleCalcAcquiredBomSection = toggleCalcAcquiredBomSection;
+
 function renderBillOfMaterials(rootNode, brokerFee = 0) {
   const listContainer = document.getElementById('bom-items-list');
   if (!listContainer) return;
@@ -2699,10 +2711,13 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
           typeId: productTypeId,
           name: node.name.replace(' Blueprint', ''),
           qty: 0,
+          totalQtyNeeded: 0, // gross demand BEFORE stock deduction - lets a fully-covered item still
+                              // show up (in the "Already in Stock" section) instead of vanishing outright
           strategy: strategy
         };
       }
       bomMap[productTypeId].qty += netQtyNeeded;
+      bomMap[productTypeId].totalQtyNeeded += node.qtyNeeded;
     } else {
       node.children.forEach(child => {
         if (child) generateBOM(child);
@@ -2720,11 +2735,14 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
     const stockQty = isStockDeductEnabled ? (window.userStockMap[rootTypeId] || window.userStockMap[rootNode.typeId] || 0) : 0;
     const netQtyNeeded = Math.max(0, rootNode.qtyNeeded - stockQty);
 
-    bomMap[rootTypeId] = { typeId: rootTypeId, name: rootNode.productName || rootNode.name.replace(' Blueprint', ''), qty: netQtyNeeded, strategy: strategy };
+    bomMap[rootTypeId] = { typeId: rootTypeId, name: rootNode.productName || rootNode.name.replace(' Blueprint', ''), qty: netQtyNeeded, totalQtyNeeded: rootNode.qtyNeeded, strategy: strategy };
   }
 
+  // Keeps a fully-stock-covered item (qty === 0) IN the list now, instead of filtering it out - it
+  // still has real demand (totalQtyNeeded > 0), just none of it left to buy. Only genuine zero-demand
+  // entries (shouldn't normally occur, but a stale/rounding edge case isn't impossible) get dropped.
   const bomItems = Object.values(bomMap).filter(item => {
-    if (item.qty <= 0) return false;
+    if (item.totalQtyNeeded <= 0) return false;
     if (bomOrderFilter !== 'all' && item.strategy !== bomOrderFilter) return false;
     if (bomCategoryFilter !== 'all' && window.getItemCategory(item.typeId, item.name) !== bomCategoryFilter) return false;
     return true;
@@ -2751,49 +2769,79 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
   updateBomViewModeButtonLabel();
   const isCompact = bomViewMode === 'compact';
 
-  bomItems.forEach(item => {
+  // Buy stays lime (matches the buy/sell toggle buttons, where buy is highlighted as "usually more
+  // profitable"); sell gets a distinct blue so the two read apart instead of both being green.
+  const buildStrategyBadgeHTML = (item) => item.strategy === 'sell'
+    ? `<span class="lp-badge lp-badge-blue">SELL</span>`
+    : `<span class="lp-badge lp-badge-accent">BUY</span>`;
+
+  // Shared row builder for both groups below - an "acquired" row (fully covered by stock) drops the
+  // click-to-focus behavior, the qty/unit-price breakdown, and the ISK figure (replaced with a plain
+  // "✔ In Stock", muted rather than green - stock you already own shouldn't visually outrank what you
+  // still need to buy, which is what actually matters here).
+  function buildBOMRowElement(item, isAcquired) {
     const row = document.createElement('div');
-    row.title = 'Click to find and focus this material in the build diagram';
-    row.onclick = () => highlightNodeByTypeId(item.typeId);
-    // Buy stays lime (matches the buy/sell toggle buttons, where buy is highlighted as "usually
-    // more profitable"); sell gets a distinct blue so the two read apart instead of both being green.
-    const strategyBadge = item.strategy === 'sell'
-      ? `<span class="lp-badge lp-badge-blue">SELL</span>`
-      : `<span class="lp-badge lp-badge-accent">BUY</span>`;
+    const strategyBadge = buildStrategyBadgeHTML(item);
+    const costOrInStockHTML = isAcquired
+      ? `<span class="font-bold mono flex-shrink-0" style="color:var(--text-mute);">✔ In Stock</span>`
+      : `<span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>`;
+    if (!isAcquired) {
+      row.title = 'Click to find and focus this material in the build diagram';
+      row.onclick = () => highlightNodeByTypeId(item.typeId);
+    }
 
     if (isCompact) {
-      row.className = 'lp-list-item cursor-pointer';
+      row.className = 'lp-list-item' + (isAcquired ? '' : ' cursor-pointer');
       row.style.cssText = 'padding-left:0; padding-right:0;';
       row.innerHTML = `
         <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
         ${strategyBadge}
         <span class="font-semibold truncate flex-1" style="color:var(--text-soft);"><span class="copy-name" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${item.name}</span></span>
-        <span class="text-xs mono flex-shrink-0" style="color:var(--text-mute);">&times;${item.qty.toLocaleString()}</span>
-        <span class="font-bold mono flex-shrink-0 w-24 text-right" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>
+        ${isAcquired ? '' : `<span class="text-xs mono flex-shrink-0" style="color:var(--text-mute);">&times;${item.qty.toLocaleString()}</span>`}
+        <span class="flex-shrink-0 w-24 text-right">${costOrInStockHTML}</span>
       `;
     } else {
-      row.className = 'lp-card p-2.5 cursor-pointer transition';
+      row.className = 'lp-card p-2.5 transition' + (isAcquired ? '' : ' cursor-pointer');
       row.innerHTML = `
         <div class="flex items-start gap-2.5">
           <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-2">
               <span class="font-semibold truncate" style="color:var(--text-soft);"><span class="copy-name" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${item.name}</span></span>
-              <span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>
+              ${costOrInStockHTML}
             </div>
             <div class="flex items-center gap-1 mt-1.5">
               ${strategyBadge}
             </div>
-            <div class="text-xs mono mt-1.5" style="color:var(--text-mute);">
-              Qty: ${item.qty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK${item.lineVolume > 0 ? ` &bull; ${item.lineVolume.toLocaleString(undefined, {maximumFractionDigits: 1})} m3` : ''}
-            </div>
+            ${isAcquired ? '' : `<div class="text-xs mono mt-1.5" style="color:var(--text-mute);">Qty: ${item.qty.toLocaleString()} &times; ${Math.round(item.unitPrice).toLocaleString()} ISK${item.lineVolume > 0 ? ` &bull; ${item.lineVolume.toLocaleString(undefined, {maximumFractionDigits: 1})} m3` : ''}</div>`}
           </div>
         </div>
       `;
     }
+    return row;
+  }
 
-    listContainer.appendChild(row);
-  });
+  const needToBuyItems = bomItems.filter(item => item.qty > 0);
+  const acquiredItems = bomItems.filter(item => item.qty === 0);
+
+  needToBuyItems.forEach(item => listContainer.appendChild(buildBOMRowElement(item, false)));
+
+  if (acquiredItems.length > 0) {
+    const divider = document.createElement('div');
+    divider.className = 'lp-group-header mt-2.5 mb-2.5';
+    divider.style.cursor = 'pointer';
+    divider.title = isCalcAcquiredBomSectionExpanded ? 'Collapse' : 'Expand';
+    divider.onclick = () => window.toggleCalcAcquiredBomSection();
+    divider.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px; flex-shrink:0; transform:rotate(${isCalcAcquiredBomSectionExpanded ? '0' : '-90'}deg); transition:transform 0.15s ease;"><polyline points="6 9 12 15 18 9"/></svg>
+      <span class="text-xs font-bold uppercase tracking-wide" style="color:var(--text-mute);">Already in Stock</span>
+      <span class="text-xs font-bold mono ml-auto" style="color:var(--text-mute);">${acquiredItems.length.toLocaleString()}</span>
+    `;
+    listContainer.appendChild(divider);
+    if (isCalcAcquiredBomSectionExpanded) {
+      acquiredItems.forEach(item => listContainer.appendChild(buildBOMRowElement(item, true)));
+    }
+  }
 
   const countEl = document.getElementById('bom-type-count');
   if (countEl) countEl.textContent = bomItems.length.toLocaleString();
@@ -2804,7 +2852,10 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
   const volumeEl = document.getElementById('bom-total-volume');
   if (volumeEl) volumeEl.textContent = totalBOMVolume.toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' m3';
 
-  window.currentBOMText = bomItems.map(i => `${i.name} x${i.qty}`).join('\n');
+  // Only what's actually still needed - bomItems now also carries fully-stock-covered entries (qty
+  // === 0, shown in the "Already in Stock" section), which have nothing left to buy and would only
+  // pollute a multibuy paste with "Item x0" lines if included here.
+  window.currentBOMText = bomItems.filter(i => i.qty > 0).map(i => `${i.name} x${i.qty}`).join('\n');
 }
 
 function getNodeStrategyOnly(node) {

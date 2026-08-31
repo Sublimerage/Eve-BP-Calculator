@@ -137,7 +137,7 @@ function copyToClipboardWithFeedback(text, btnEl, options) {
     if (!btnEl) return;
     const originalContent = useInnerHTML ? btnEl.innerHTML : btnEl.textContent;
     const originalClass = btnEl.className;
-    if (useInnerHTML) btnEl.innerHTML = '✔ Copied!'; else btnEl.textContent = '✔ Copied!';
+    if (useInnerHTML) btnEl.innerHTML = window.svgIcon('check') + ' Copied!'; else btnEl.textContent = 'Copied!';
     if (options.flashClassName) btnEl.className = options.flashClassName;
     setTimeout(() => {
       if (useInnerHTML) btnEl.innerHTML = originalContent; else btnEl.textContent = originalContent;
@@ -146,6 +146,63 @@ function copyToClipboardWithFeedback(text, btnEl, options) {
   }).catch(() => {});
 }
 window.copyToClipboardWithFeedback = copyToClipboardWithFeedback;
+
+// --- Shared inline-SVG icon set ---
+// Replaces the emoji glyphs (🛒 ✔ ✖ ⚙ 💰 📥 🏭 🔎 📊 ...) that used to sit inside button labels,
+// badges and status text. Every icon is a 24x24 stroke path in the same visual language as the
+// rest of the app's icons (renderJobStatusIconHTML/renderRunsEditIconHTML in ledger.js, the toast
+// icons above, the disclosure carets in the HTML): fill:none, stroke:currentColor, 2px round caps.
+// Sizing + baseline alignment live in `svg.ico` rules in styles.css, so a call site can just drop
+// in `window.svgIcon('cart')` with no dimensions and it inherits the surrounding text color/size.
+const SVG_ICON_PATHS = {
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  cart: '<circle cx="9" cy="21" r="1.6"/><circle cx="18.5" cy="21" r="1.6"/><path d="M2 3h3l2.4 12.2a1.8 1.8 0 0 0 1.77 1.45h9a1.8 1.8 0 0 0 1.77-1.45L23 7H6"/>',
+  search: '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.05" y2="16.05"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 4 21 9 16 9"/>',
+  clipboard: '<rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/>',
+  factory: '<path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M7 18h.01"/><path d="M12 18h.01"/><path d="M17 18h.01"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  coin: '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/>',
+  hourglass: '<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.17a2 2 0 0 0-.59-1.41L12 12l-4.41 4.42A2 2 0 0 0 7 17.83V22"/><path d="M7 2v4.17a2 2 0 0 0 .59 1.41L12 12l4.41-4.42A2 2 0 0 0 17 6.17V2"/>',
+  chart: '<line x1="4" y1="20" x2="4" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="20" y1="20" x2="20" y2="14"/>',
+  tool: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  eye: '<path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/>',
+  lock: '<rect x="4" y="10.5" width="16" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>',
+  package: '<path d="M21 8 12 3 3 8l9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><line x1="12" y1="13" x2="12" y2="21"/>',
+  pin: '<path d="M12 21s7-5.2 7-11a7 7 0 0 0-14 0c0 5.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  trending: '<polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/>',
+  award: '<circle cx="12" cy="8" r="6"/><path d="M15.5 12.5 17 22l-5-3-5 3 1.5-9.5"/>',
+  warning: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.71 3h18.98a2 2 0 0 0 1.71-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  play: '<polygon points="6 4 20 12 6 20 6 4"/>',
+  list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3.5" y1="6" x2="3.51" y2="6"/><line x1="3.5" y1="12" x2="3.51" y2="12"/><line x1="3.5" y1="18" x2="3.51" y2="18"/>',
+  grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="1"/><rect x="13.5" y="3.5" width="7" height="7" rx="1"/><rect x="13.5" y="13.5" width="7" height="7" rx="1"/><rect x="3.5" y="13.5" width="7" height="7" rx="1"/>',
+  activity: '<polyline points="3 12 8 12 11 4 15 20 18 12 21 12"/>',
+  'chevron-right': '<polyline points="9 6 15 12 9 18"/>',
+  'chevron-down': '<polyline points="6 9 12 15 18 9"/>',
+  'chevron-up': '<polyline points="18 15 12 9 6 15"/>',
+  'chevrons-up': '<polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/>',
+  'chevrons-down': '<polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/>',
+  grip: '<circle cx="9" cy="6" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="6" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="15" cy="18" r="1.3"/>',
+  expand: '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>',
+  collapse: '<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>'
+};
+
+function svgIcon(name, opts) {
+  opts = opts || {};
+  const paths = SVG_ICON_PATHS[name];
+  if (!paths) return '';
+  const filled = name === 'grip';
+  const cls = 'ico' + (opts.cls ? ' ' + opts.cls : '');
+  const style = opts.style ? ` style="${opts.style}"` : '';
+  const stroke = filled
+    ? 'fill="currentColor" stroke="none"'
+    : 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+  return `<svg class="${cls}" viewBox="0 0 24 24" ${stroke} aria-hidden="true"${style}>${paths}</svg>`;
+}
+window.svgIcon = svgIcon;
 
 // Click-to-copy for an item/job display name (e.g. BOM rows, job cards) - so it can be pasted
 // straight into EVE's own market/contract/multibuy search. The name is read from the clicked

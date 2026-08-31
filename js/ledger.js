@@ -33,6 +33,17 @@ let expandedJobCardIds = new Set(window.safeParseJSON(localStorage.getItem('eve_
 // click-to-edit, not a permanently-visible input box, so the collapsed/default look stays exactly as
 // clean as before this feature existed. Session-only, same as isolation/focus above.
 let editingRunsJobIds = new Set();
+
+// Whether the Consolidated BOM's "Already in Stock" section is expanded. Defaults collapsed - stock
+// you already have is the LEAST important thing on this screen (what you still need to buy is), so
+// starting it tucked away behind the divider keeps it from competing for attention with the shopping
+// list above it. Session-only, same as the rest of this file's display toggles.
+let isAcquiredBomSectionExpanded = false;
+function toggleAcquiredBomSection() {
+  isAcquiredBomSectionExpanded = !isAcquiredBomSectionExpanded;
+  renderJournalPage();
+}
+window.toggleAcquiredBomSection = toggleAcquiredBomSection;
 function toggleRunsEditMode(e, jobId) {
   if (e) e.stopPropagation();
   if (editingRunsJobIds.has(jobId)) editingRunsJobIds.delete(jobId);
@@ -645,20 +656,21 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
           ${renderJobMetaChipHTML(job)}
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
-          <div class="flex items-baseline justify-end gap-1.5 flex-shrink-0" style="width:96px;" onclick="event.stopPropagation()">
+          <!-- Edit icon lives INSIDE this same items-baseline row, right after "runs" - not as a
+               separate sibling block. A separate sibling had no gap/baseline relationship to this row
+               at all (cramped against "runs", vertically centered against the whole row's height
+               instead of sitting on the small text's baseline the way "runs" itself does). Sharing this
+               row's own items-baseline + gap-1.5 fixes both. Its width is still ALWAYS reserved (via
+               visibility:hidden, not by omitting the element - same technique the Shop pill above uses)
+               for started/auto-imported jobs, so the run count's own x position still doesn't drift
+               row to row depending on which jobs happen to be editable. -->
+          <div class="flex items-baseline justify-end gap-1.5 flex-shrink-0" style="width:112px;" onclick="event.stopPropagation()">
             ${editingRunsJobIds.has(job.id)
               ? `<input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsNeeded}" onchange="changeJobRunCount(${job.id}, this.value)" class="field-line text-lg font-extrabold mono text-right" style="width:${Math.max(3, String(job.runsNeeded).length + 2)}ch; color:var(--accent);" title="Recalculates materials, cost, and time">`
               : `<span class="text-lg font-extrabold mono whitespace-nowrap cursor-pointer" style="color:var(--accent);" onclick="copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">${job.runsNeeded.toLocaleString()}</span>`}
             <span class="text-xs mono whitespace-nowrap" style="color:var(--text-mute);">runs</span>
+            <span class="flex-shrink-0" style="width:12px;${(!job.isStarted && !job.autoImported) ? '' : ' visibility:hidden;'}">${renderRunsEditIconHTML(job.id, editingRunsJobIds.has(job.id))}</span>
           </div>
-          <!-- Edit icon sits in its own fixed-width slot right next to the runs block (before the
-               divider), not inside it - its presence/absence (editable jobs vs started/auto-imported
-               ones) used to shift the runs block's own content width row to row, landing the run count
-               at a different x position depending on the job. It also used to live on the OTHER side
-               of the divider next to the status/time text, which read as "this edits the manufacturing
-               time" - wrong on both counts, since it edits run count. This slot is fixed-width whether
-               or not the icon renders, and sits with the runs number it actually belongs to. -->
-          <span class="flex-shrink-0" style="width:14px;" onclick="event.stopPropagation()">${(!job.isStarted && !job.autoImported) ? renderRunsEditIconHTML(job.id, editingRunsJobIds.has(job.id)) : ''}</span>
           <div class="lp-divider-col flex items-center gap-1.5 flex-shrink-0" style="width:260px;" title="Job status">
             <!-- Status icon (hourglass/stopwatch/check) gets the same fixed-slot treatment - it used to
                  be an emoji prefixed directly onto the status text, so its position (like the edit icon
@@ -1514,12 +1526,14 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
 
   // A stock-covered item used to just fade to 55% opacity in place and still print "0 ISK" - both
   // read as "this line is broken/loading", not "you already have this", especially at a glance
-  // scanning a long list. Now it's a hard split: still-need-to-buy items render first, full strength,
+  // scanning a long list. It's a hard split: still-need-to-buy items render first, full strength,
   // exactly as before; anything fully covered by stock drops into its own "Already in Stock" section
   // below a divider (same .lp-group-header treatment the job queue's own Pending/In Progress groups
-  // use, for a consistent visual vocabulary), with a green accent stripe standing in for the old fade
-  // and a plain "✔ In Stock" replacing the redundant "0 ISK" - the point isn't that it costs nothing,
-  // it's that there's nothing left to buy.
+  // use). A green accent used to stand in for the old fade, but that made stock you already own MORE
+  // visually prominent than what you actually need to buy - backwards, since the buy list is what
+  // matters. The divider + a collapsed-by-default section does the separating instead; items inside
+  // get no special color treatment at all now, just a plain "✔ In Stock" (muted, not green) replacing
+  // the redundant "0 ISK" - the point isn't that it costs nothing, it's that there's nothing to buy.
   const needToBuyItems = bomItems.filter(item => item.netMissingQty > 0);
   const acquiredItems = bomItems.filter(item => item.netMissingQty === 0);
 
@@ -1538,12 +1552,12 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
     // CORRECTION: Direct blueprint path safety check inside the consolidated BOM prevents any imageservers 400 errors [1.1.1, 1.1.4]
     const itemIconUrl = window.getItemIconUrl(item.typeId, window.TYPE_ID_TO_NAME[item.typeId] || item.name, 32);
     const costOrInStockHTML = isCompleted
-      ? `<span class="font-bold mono flex-shrink-0" style="color:var(--green);">✔ In Stock</span>`
+      ? `<span class="font-bold mono flex-shrink-0" style="color:var(--text-mute);">✔ In Stock</span>`
       : `<span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>`;
 
     if (isCompact) {
       return `
-        <div class="lp-list-item" style="padding-left:0; padding-right:0; ${isCompleted ? 'border-left:3px solid var(--green); background:rgba(var(--green-rgb),0.06);' : ''}">
+        <div class="lp-list-item" style="padding-left:0; padding-right:0;">
           <img src="${itemIconUrl}" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           ${strategyBadge}
           <span class="font-semibold truncate flex-1" style="color:var(--text-soft);"><span class="copy-name" data-copy-name="${window.esc(item.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(item.name)}">${window.esc(item.name)}</span></span>
@@ -1554,7 +1568,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
     }
 
     return `
-      <div class="lp-card p-2.5 transition" style="${isCompleted ? 'border-left:3px solid var(--green); background:rgba(var(--green-rgb),0.06);' : ''}">
+      <div class="lp-card p-2.5 transition">
         <div class="flex items-start gap-2.5">
           <img src="${itemIconUrl}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
           <div class="min-w-0 flex-1">
@@ -1574,12 +1588,14 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
   };
 
   const needToBuyHTML = needToBuyItems.map(item => renderItemHTML(item, false)).join('');
+  const chevronSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px; flex-shrink:0; transform:rotate(${isAcquiredBomSectionExpanded ? '0' : '-90'}deg); transition:transform 0.15s ease;"><polyline points="6 9 12 15 18 9"/></svg>`;
   const acquiredHTML = acquiredItems.length > 0 ? `
-    <div class="lp-group-header mt-2.5 mb-2.5" style="cursor:default;">
-      <span class="text-xs font-bold uppercase tracking-wide" style="color:var(--green);">✔ Already in Stock</span>
+    <div class="lp-group-header mt-2.5 mb-2.5" style="cursor:pointer;" onclick="toggleAcquiredBomSection()" title="${isAcquiredBomSectionExpanded ? 'Collapse' : 'Expand'}">
+      ${chevronSvg}
+      <span class="text-xs font-bold uppercase tracking-wide" style="color:var(--text-mute);">Already in Stock</span>
       <span class="text-xs font-bold mono ml-auto" style="color:var(--text-mute);">${acquiredItems.length.toLocaleString()}</span>
     </div>
-    ${acquiredItems.map(item => renderItemHTML(item, true)).join('')}
+    ${isAcquiredBomSectionExpanded ? acquiredItems.map(item => renderItemHTML(item, true)).join('') : ''}
   ` : '';
 
   container.innerHTML = needToBuyHTML + acquiredHTML;
