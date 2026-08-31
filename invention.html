@@ -87,6 +87,19 @@
           </div>
         </div>
 
+        <!-- This page has no system/structure/rig controls of its own (see js/invention.js's own
+             comment on the functions below) - it silently used whatever the Calculator last set, with
+             no way to see or change that here. This picker reuses the same saved presets the
+             Calculator/Ledger already offer; the label under it always shows what's actually active,
+             preset picked or not. -->
+        <div class="lp-row">
+          <label class="lp-label mb-2 block">Production Station</label>
+          <select id="invention-preset-select" onchange="applyInventionProductionPreset(this.value)" class="field-line w-full font-bold text-xs">
+            <option value="">— Load a saved production station —</option>
+          </select>
+          <div class="text-[10px] mono mt-1.5" style="color:var(--text-mute);">Currently: <span id="invention-active-station-label" style="color:var(--accent); font-weight:bold;">—</span></div>
+        </div>
+
         <!-- Deduct Stock + Material Pricing lead the sidebar, not bury it below skills/datacores -
              these two settings change every number below by a wide margin, so they get the same
              "impossible to miss" treatment the other two pages already give Deduct Stock, plus an
@@ -122,11 +135,8 @@
             <option value="industry_system">Current System Only (JITA)</option>
           </select>
           <div class="pt-2.5" style="border-top:1px solid rgba(255,255,255,0.06);">
-            <label class="lp-label mb-2 block" title="How input materials for manufacturing the resulting BPC are priced.">Material Pricing</label>
-            <select id="input-price-mode" onchange="recalculateInvention()" class="field-line w-full font-bold text-xs" style="color:var(--accent);">
-              <option value="sell" selected>Jita Sell (Instant Buy)</option>
-              <option value="buy">Jita Buy Order</option>
-            </select>
+            <label class="lp-label mb-2 block" title="How input materials/datacores/decryptor for this page's calculations are priced.">Material Pricing</label>
+            <button id="input-price-mode" value="sell" onclick="toggleMaterialPricingButton(this, 'recalculateInvention')" class="btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5" title="Materials/datacores/decryptor priced at the Jita sell/instant-buy price - what it actually costs to acquire them right now. Click to switch to buy order pricing.">💰 Jita Sell (Instant Buy)</button>
           </div>
         </div>
 
@@ -215,11 +225,11 @@
        serially blocking each download on the previous script finishing, while still guaranteeing
        they execute in this exact order once parsing completes - same behavior, faster to get there. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
-  <script src="js/config.js?v=8.0.15" defer></script>
+  <script src="js/config.js?v=8.0.16" defer></script>
   <script src="js/esi.js?v=8.0.10" defer></script>
   <script src="js/tree.js?v=8.0.1" defer></script>
   <script src="js/optimizers.js?v=8.0.4" defer></script>
-  <script src="js/invention.js?v=9.9.1" defer></script>
+  <script src="js/invention.js?v=9.10.0" defer></script>
   <script src="js/custom-select.js?v=1.4.0" defer></script>
 </body>
 </html>
