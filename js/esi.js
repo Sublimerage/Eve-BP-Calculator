@@ -1301,7 +1301,13 @@ async function fetchActiveIndustryJobs() {
   const accessToken = localStorage.getItem('esi_access_token');
   if (!charId || !accessToken) return null; // not logged in
   try {
-    const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/industry/jobs/?datasource=tranquility`, {}, accessToken, true);
+    // no-store - without it, a second click of "Sync EVE Jobs" within the browser's own HTTP cache
+    // window for this exact URL can be answered straight from that cache with zero network request,
+    // silently replaying the same stale response instead of even asking ESI again. This can't do
+    // anything about ESI's OWN server-side cache on this endpoint (CCP's, not this app's, and
+    // unavoidable by any client) - a freshly-started job can still take a few minutes to appear no
+    // matter what - but it guarantees a manual sync always at least ASKS ESI fresh.
+    const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/industry/jobs/?datasource=tranquility`, { cache: 'no-store' }, accessToken, true);
     if (!res || !res.ok) return null;
     return await res.json();
   } catch (e) {
@@ -1321,7 +1327,7 @@ async function fetchActiveCorpIndustryJobs() {
   const accessToken = localStorage.getItem('esi_access_token');
   if (!corpId || !accessToken) return [];
   try {
-    const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/industry/jobs/?datasource=tranquility`, {}, accessToken, true);
+    const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/industry/jobs/?datasource=tranquility`, { cache: 'no-store' }, accessToken, true);
     if (!res || !res.ok) return [];
     const data = await res.json();
     return Array.isArray(data) ? data : [];

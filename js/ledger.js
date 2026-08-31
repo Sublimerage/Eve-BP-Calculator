@@ -695,7 +695,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
         <img src="${jobIconUrl}" alt="${window.esc(jobDisplayName)}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
         <div class="min-w-0 flex-1">
           <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></div>
-          ${(job.isSubBuild && !depth) ? `<div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);">${window.svgIcon('gear')} Prereq for: ${window.esc(job.parentJobName || '?')}</div>` : ''}
+          <div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);${(job.isSubBuild && !depth) ? '' : 'visibility:hidden;'}">${window.svgIcon('gear')} Prereq for: ${window.esc((job.isSubBuild && !depth) ? (job.parentJobName || '?') : ' ')}</div>
           ${renderJobMetaChipHTML(job)}
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
