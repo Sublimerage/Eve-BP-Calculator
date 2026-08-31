@@ -695,10 +695,16 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
         <img src="${jobIconUrl}" alt="${window.esc(jobDisplayName)}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
         <div class="min-w-0 flex-1">
           <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span></div>
-          <div class="flex items-center gap-2 mt-1 min-w-0">
-            <span class="text-xs mono font-bold uppercase truncate min-w-0 flex-1" style="color:var(--text-mute);${(job.isSubBuild && !depth) ? '' : 'visibility:hidden;'}">${window.svgIcon('gear')} Prereq for: ${window.esc((job.isSubBuild && !depth) ? (job.parentJobName || '?') : ' ')}</span>
-            ${renderJobMetaChipHTML(job, true)}
-          </div>
+          <!-- Prereq caption ALWAYS renders (never omitted), toggling only visibility/content - see
+               the width-reservation comment on the runs-edit-icon slot below for why: without a
+               same-shape placeholder here, a job with no prereq caption is one line shorter than a
+               job with one, and every fixed-width column to the right (which centers against this
+               whole block via the row-level items-center) shifts up or down row to row depending on
+               which jobs happen to have it. The preset selector used to live on this same line too,
+               but that made its position drift with how wide this (flexible) name column happened to
+               be - it is now its own fixed-width column below, so it centers consistently regardless
+               of the name column width or how many lines this block has. -->
+          <div class="text-xs mono font-bold uppercase truncate" style="color:var(--text-mute);${(job.isSubBuild && !depth) ? '' : 'visibility:hidden;'}">${window.svgIcon('gear')} Prereq for: ${window.esc((job.isSubBuild && !depth) ? (job.parentJobName || '?') : ' ')}</div>
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
           <!-- Edit icon lives INSIDE this same items-baseline row, right after "runs" - not as a
@@ -739,6 +745,11 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
             <span class="text-[8px] uppercase tracking-wide font-bold" style="color:var(--text-mute);">Profit</span>
             <span class="text-xs font-bold mono whitespace-nowrap" style="color:${p !== undefined ? (p >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-mute)'};">${p !== undefined ? window.formatISKCompact(p) : '—'}</span>
           </div>
+          <!-- Its own fixed-width column, not tucked under the name - a job's production preset is
+               independent of how many lines the name column happens to render (item name alone vs.
+               item name + prereq caption), so pinning it here keeps it centered with runs/status/
+               cost/profit every time instead of drifting with the name column's height or width. -->
+          <div class="lp-divider-col flex-shrink-0" style="width:190px;" onclick="event.stopPropagation()">${renderJobMetaChipHTML(job, true)}</div>
           <div class="flex items-center gap-2 lp-divider-col flex-shrink-0" onclick="event.stopPropagation()">
           <button onclick="markJobAsBuilt(${job.id})" class="lp-chip-btn" title="Mark as built" aria-label="Mark as built">${window.svgIcon('check')}</button>
           <button onclick="deleteJobFromQueue(${job.id})" class="lp-badge lp-badge-danger" style="cursor:pointer;" title="Delete job" aria-label="Delete job">${window.svgIcon('x', { style: 'margin:0' })}</button>
