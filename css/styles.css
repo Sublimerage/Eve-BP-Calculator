@@ -703,6 +703,13 @@ select option:checked, select option:hover { background-color: var(--accent); co
    ABOVE .pill-check-face/.lp-chip-btn's own `svg` rules further down so those still win (12/11px)
    for their own contexts. */
 body.page-calc svg.ico {
+  display: inline-block; /* Tailwind's own preflight resets every <svg> to display:block (see
+    tailwind-build.css: "img,svg,video,...{display:block}") - harmless for an icon sitting alone
+    inside a flex row, but any icon written directly into a text string (e.g. `${svgIcon('x')} Label`
+    inside a plain <span>) got forced onto its own line, since a block-level box can't sit inline with
+    surrounding text. That's what made a whole run of icon+label pairs (group header dividers, the
+    prereq "gear" line, Invention's "Best Option" tile) stack the icon above the text instead of
+    beside it, and taller than intended as a result. */
   width: 1em;
   height: 1em;
   flex: 0 0 auto;
