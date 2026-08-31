@@ -782,21 +782,40 @@ function doesRigMatchProduct(parsed, typeId) {
   if (label.includes('drone') || label.includes('fighter')) return catId === 18 || catId === 87;
   if (label === 'equipment') return catId === 7 || catId === 66;
   if (label.includes('component') || label.includes('structure')) return catId === 65 || catId === 4 || catId === 17;
+  // Reaction rigs (Athanor/Tatara) match by the reaction PRODUCT's own item group, not category - the
+  // 3 named reaction material lines (Biochemical/Composite/Hybrid Polymer) are real SDE group names.
+  if (label.includes('reactor')) {
+    const groupName = window.EVE_GROUP_NAMES ? window.EVE_GROUP_NAMES[typeId] : null;
+    if (label === 'biochemical reactor') return groupName === 'Biochemical Material';
+    if (label === 'composite reactor') return groupName === 'Composite';
+    if (label === 'hybrid reactor') return groupName === 'Hybrid Polymers';
+    // Bare "Reactor" = the L-Set Tatara-tier rig, which has no per-category split - confirmed via
+    // in-game rig data to cover every reaction-adjacent material group at once, including the
+    // simple-reaction/moon-material chain that feeds the 3 named categories (Athanor's split M-Set
+    // rigs, above, only cover their own single named category - Intermediate/Molecular-Forged/
+    // Unrefined reactions have no Athanor-tier rig at all, only Tatara's).
+    if (label === 'reactor') {
+      return ['Biochemical Material', 'Composite', 'Hybrid Polymers', 'Intermediate Materials', 'Molecular-Forged Materials', 'Unrefined Mineral'].includes(groupName);
+    }
+  }
   return false;
 }
 window.doesRigMatchProduct = doesRigMatchProduct;
 
 let _rigItemCatalogCache = null;
-// Scans the actual generated database for every real Structure Engineering Rig item (identified by
-// its real in-game group name), parses each one, and returns the list - this is what populates the
-// rig search dropdowns, so the list always reflects what's really in the game data.
+// Scans the actual generated database for every real Structure Engineering Rig OR Reactor Rig item
+// (identified by its real in-game group name), parses each one, and returns the list - this is what
+// populates the rig search dropdowns, so the list always reflects what's really in the game data.
+// Reactor Rig is a separate group family from Engineering Rig (Athanor/Tatara's reaction ME/TE rigs
+// vs Raitaru/Azbel/Sotiyo's manufacturing ones) - omitting it here previously made every reaction rig,
+// including the real Tatara "Standup L-Set Reactor Efficiency" rig, unsearchable and unselectable.
 function getRigItemCatalog() {
   if (_rigItemCatalogCache) return _rigItemCatalogCache;
   const rigs = [];
   if (window.EVE_ITEMS && window.EVE_GROUP_NAMES) {
     for (const typeIdStr of Object.keys(window.EVE_ITEMS)) {
       const groupName = window.EVE_GROUP_NAMES[typeIdStr];
-      if (!groupName || !groupName.includes('Structure Engineering Rig')) continue;
+      if (!groupName || (!groupName.includes('Structure Engineering Rig') && !groupName.includes('Reactor Rig'))) continue;
       const name = window.EVE_ITEMS[typeIdStr];
       const parsed = parseRigName(name);
       if (!parsed) continue; // not a manufacturing/reaction efficiency rig (e.g. Invention/Copy/Reprocessing)
