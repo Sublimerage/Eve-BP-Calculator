@@ -924,8 +924,17 @@ async function rebuildTreeForSnapshot(blueprintTypeId, name, runs, productTypeId
     localStorage.setItem('eve_rig_slot_1', snapshot.rig1 || '');
     localStorage.setItem('eve_rig_slot_2', snapshot.rig2 || '');
     localStorage.setItem('eve_rig_slot_3', snapshot.rig3 || '');
+    // Also fetches when activeSystemSecurity is still unset, not just when the system id differs -
+    // this page (unlike the Calculator) never has its own "select a system" flow to populate it on
+    // load, so on a fresh Ledger page load it starts undefined. Skipping the fetch just because
+    // snapshot.systemId happens to equal eve_selected_system's id left it undefined all session,
+    // which getSecurityMultiplier() (config.js) silently reads as highsec (1.0x) - understating a
+    // low/null-sec rig's actual bonus and overstating every reaction material's requirement by
+    // however much that rig should have been discounting it (a rig-bearing job in lowsec/nullsec
+    // needs its real 1.9x/2.1x multiplier applied, not the highsec fallback).
     const currentSystemId = window.safeParseJSON(localStorage.getItem('eve_selected_system'), {}).id;
-    if (snapshot.systemId && snapshot.systemId !== currentSystemId && typeof window.fetchSystemSCIById === 'function') {
+    const securityUnknown = window.activeSystemSecurity === undefined || window.activeSystemSecurity === null;
+    if (snapshot.systemId && (snapshot.systemId !== currentSystemId || securityUnknown) && typeof window.fetchSystemSCIById === 'function') {
       await window.fetchSystemSCIById(snapshot.systemId, snapshot.systemName);
     }
 
