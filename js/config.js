@@ -187,7 +187,12 @@ const SVG_ICON_PATHS = {
   'chevrons-down': '<polyline points="7 13 12 18 17 13"/><polyline points="7 6 12 11 17 6"/>',
   grip: '<circle cx="9" cy="6" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="6" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="15" cy="18" r="1.3"/>',
   expand: '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>',
-  collapse: '<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>'
+  collapse: '<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>',
+  // Two small cards flowing down into one - "combine these duplicates into a single job", used on
+  // the Ledger's Combine Duplicates control (ledger.html hand-writes the same path inline there,
+  // same as every other static toolbar icon in that file - this registry entry is for JS-generated
+  // markup that wants the same glyph).
+  merge: '<rect x="2" y="3" width="8" height="6" rx="1.3"/><rect x="14" y="3" width="8" height="6" rx="1.3"/><path d="M6 9c0 3 3 3 6 5"/><path d="M18 9c0 3-3 3-6 5"/><rect x="6" y="16" width="12" height="6" rx="1.3"/>'
 };
 
 function svgIcon(name, opts) {
