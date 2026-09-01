@@ -719,7 +719,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
                row to row depending on which jobs happen to be editable. -->
           <div class="flex items-baseline justify-end gap-1.5 flex-shrink-0" style="width:155px;" onclick="event.stopPropagation()">
             ${editingRunsJobIds.has(job.id)
-              ? `<input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsNeeded}" onchange="changeJobRunCount(${job.id}, this.value)" class="field-line text-lg font-extrabold mono text-right" style="width:${Math.max(3, String(job.runsNeeded).length + 2)}ch; color:var(--accent);" title="Recalculates materials, cost, and time">`
+              ? `<input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsNeeded}" onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){toggleRunsEditMode(event, ${job.id});}" onblur="changeJobRunCount(${job.id}, this.value)" class="field-line text-lg font-extrabold mono text-right" style="width:${Math.max(3, String(job.runsNeeded).length + 2)}ch; color:var(--accent);" title="Recalculates materials, cost, and time - press Enter or click away to confirm, Esc to cancel">`
               : `<span class="text-lg font-extrabold mono whitespace-nowrap cursor-pointer" style="color:var(--accent);" onclick="copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">${job.runsNeeded.toLocaleString()}</span>`}
             <span class="text-xs mono whitespace-nowrap" style="color:var(--text-mute);">runs</span>
             <span class="flex-shrink-0" style="width:12px;${(!job.isStarted && !job.autoImported) ? '' : ' visibility:hidden;'}">${renderRunsEditIconHTML(job.id, editingRunsJobIds.has(job.id))}</span>
@@ -1016,6 +1016,7 @@ async function changeJobRunCount(jobId, newRuns) {
 
   const snapshot = job.productionSnapshot || getCurrentLiveProductionSnapshot();
   if (typeof window.showToast === 'function') window.showToast(`Recomputing "${window.esc(job.name)}" for ${runs} run${runs > 1 ? 's' : ''}...`, 'info');
+  const oldMaterials = Array.isArray(job.materials) ? job.materials : [];
   try {
     const result = await rebuildTreeForSnapshot(job.typeId, job.name + ' Blueprint', runs, job.productTypeId, snapshot);
     job.runsNeeded = runs;
@@ -1027,6 +1028,7 @@ async function changeJobRunCount(jobId, newRuns) {
     if (job.netProfit !== undefined) {
       job.netProfit = (job.unitSellPrice || 0) * job.qtyNeeded - job.calculatedCost;
     }
+    await cascadeRunChangeToChildren(job, oldMaterials);
     localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
     renderJournalPage();
     if (typeof window.showToast === 'function') window.showToast(`"${window.esc(job.name)}" now set to ${runs} run${runs > 1 ? 's' : ''}.`, 'success');
@@ -1037,6 +1039,49 @@ async function changeJobRunCount(jobId, newRuns) {
   }
 }
 window.changeJobRunCount = changeJobRunCount;
+
+// A queued prerequisite job was sized to cover a specific material need at the time it was created
+// (e.g. "build 3 runs to cover the 600 units still missing after stock") - left alone after the
+// PARENT's own run count changes, that sizing silently goes stale: the parent now needs a different
+// amount of that same material, but the prereq job just sits at its old run count. This rescales
+// every linked, not-yet-started prerequisite proportionally to how the parent's need for its
+// specific material changed (600 units -> 857 units scales a 3-run prereq up, not reset to whatever
+// the parent's FULL raw requirement is regardless of stock - that would silently throw away
+// whatever stock-aware sizing the user/the "+ Build" flow originally chose), then recurses into that
+// child's own prerequisites (if it has any) so a multi-level chain stays in sync top to bottom.
+// Best-effort per child - one child failing to recompute (e.g. a transient price-fetch error) is
+// logged and skipped, not fatal to the parent's own already-applied and already-saved run change.
+async function cascadeRunChangeToChildren(parentJob, oldMaterials) {
+  const children = activeJobs.filter(j => j && j.isSubBuild && !j.isStarted && !j.autoImported && j.productTypeId &&
+    (j.parentJobId !== undefined && j.parentJobId !== null ? j.parentJobId === parentJob.id : j.parentJobName === parentJob.name));
+  if (!children.length) return;
+  const newMaterials = Array.isArray(parentJob.materials) ? parentJob.materials : [];
+  for (const child of children) {
+    const oldMat = oldMaterials.find(m => m && m.typeId === child.productTypeId);
+    const newMat = newMaterials.find(m => m && m.typeId === child.productTypeId);
+    if (!oldMat || !newMat || !(oldMat.qtyNeeded > 0) || !(newMat.qtyNeeded > 0)) continue; // nothing to scale from/to
+    if (Math.abs(newMat.qtyNeeded - oldMat.qtyNeeded) < 1e-6) continue; // parent's need for this material didn't actually move
+    const scale = newMat.qtyNeeded / oldMat.qtyNeeded;
+    const targetQty = (child.qtyNeeded || 0) * scale;
+    const recipe = window.recipeMap ? window.recipeMap[child.typeId] : null;
+    const batchYield = typeof window.getBatchYield === 'function' ? window.getBatchYield(recipe, false) : 1;
+    const childRuns = Math.max(1, Math.ceil(targetQty / (batchYield || 1)));
+    if (childRuns === child.runsNeeded) continue; // rounds out to the same run count either way
+    const oldChildMaterials = Array.isArray(child.materials) ? child.materials : [];
+    try {
+      const childSnapshot = child.productionSnapshot || parentJob.productionSnapshot || getCurrentLiveProductionSnapshot();
+      const result = await rebuildTreeForSnapshot(child.typeId, child.name + ' Blueprint', childRuns, child.productTypeId, childSnapshot);
+      child.runsNeeded = childRuns;
+      child.qtyNeeded = result.root.qtyNeeded;
+      child.calculatedCost = result.calculatedCost;
+      child.materials = result.materials;
+      child.totalBuildSeconds = result.totalBuildSeconds;
+      await cascadeRunChangeToChildren(child, oldChildMaterials); // propagate further, if this child has prereqs of its own
+    } catch (e) {
+      console.warn('[Ledger] cascadeRunChangeToChildren failed for child job', child.id, e);
+    }
+  }
+}
 
 // Spins a buildable material off a job's own material list into its own queued prerequisite job,
 // linked exactly the way a Calculator-side sub-build already is (isSubBuild/parentJobName) - so it
@@ -1344,7 +1389,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
         <div class="flex items-center justify-between px-1" onclick="event.stopPropagation()">
           ${editingRunsJobIds.has(job.id) ? `
             <span class="flex items-baseline gap-1.5">
-              <input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsNeeded}" onchange="changeJobRunCount(${job.id}, this.value)" class="field-line text-xl font-extrabold mono" style="width:${Math.max(3, String(job.runsNeeded).length + 2)}ch; color:var(--accent);" title="Recalculates materials, cost, and time">
+              <input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsNeeded}" onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){toggleRunsEditMode(event, ${job.id});}" onblur="changeJobRunCount(${job.id}, this.value)" class="field-line text-xl font-extrabold mono" style="width:${Math.max(3, String(job.runsNeeded).length + 2)}ch; color:var(--accent);" title="Recalculates materials, cost, and time - press Enter or click away to confirm, Esc to cancel">
               <span class="text-sm mono" style="color:var(--text-mute);">Run${job.runsNeeded > 1 ? 's' : ''}</span>
               ${renderRunsEditIconHTML(job.id, true)}
             </span>
