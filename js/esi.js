@@ -539,7 +539,15 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
     let page = 1;
     let hasMore = true;
     while (hasMore) {
-      const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/assets/?datasource=tranquility&page=${page}`, {}, accessToken);
+      // no-store - same reasoning as the industry-jobs fetch below: without it, clicking "Refresh
+      // Assets" again within the browser's own HTTP cache window for this exact URL+page can be
+      // answered straight from that cache with zero network request, silently replaying the same
+      // stale item locations/quantities instead of even asking ESI again - exactly what makes newly
+      // hauled cargo (or anything else that moved) look like it never arrived. This can't do anything
+      // about ESI's OWN server-side cache on this endpoint (CCP's, not this app's, and unavoidable by
+      // any client - typically on the order of an hour) - a fresh haul can still take a while to show
+      // up no matter what - but it guarantees a manual refresh always at least ASKS ESI fresh.
+      const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/assets/?datasource=tranquility&page=${page}`, { cache: 'no-store' }, accessToken);
       if (res && res.ok) {
         assetsFetchOk = true;
         const data = await res.json();
@@ -572,7 +580,8 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       page = 1;
       hasMore = true;
       while (hasMore) {
-        const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/assets/?datasource=tranquility&page=${page}`, {}, accessToken, true);
+        // no-store - see the character assets fetch above for why.
+        const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/assets/?datasource=tranquility&page=${page}`, { cache: 'no-store' }, accessToken, true);
         if (res && res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
