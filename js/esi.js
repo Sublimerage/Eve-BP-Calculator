@@ -678,8 +678,34 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
         } catch (e) { console.warn('[ESI] Corp container custom-name fetch failed - those containers will show a generic name instead:', e); }
       }
     }
+    // Persisted here - BEFORE resolveAndPopulateLocationFilter, not after - because that call chain
+    // (via applyJournalStockFilter -> renderJournalPage) ends in loadJournalState(), which unconditionally
+    // reloads window.rawAssetItems FROM localStorage's 'eve_raw_assets' key. The Calculator page (app.js's
+    // recalculate()) already persists this same set of caches after every render, so it never noticed -
+    // but the Ledger page never loads app.js, and nothing here was writing this key at all. The result:
+    // the FIRST render right after a refresh looked correct (built from the still-fresh in-memory data,
+    // moments before loadJournalState overwrote it), but the very next thing that rebuilt stock - toggling
+    // Deduct Stock, changing the location/Personal/Corp filters - rebuilt it from whatever stale (often
+    // empty, or a leftover snapshot from a completely different session) data 'eve_raw_assets' actually
+    // held, silently corrupting the persisted stock map from then on - a page reload doesn't fix it either,
+    // since reloading hits the exact same stale key. Writing it here, before that chain ever runs, means
+    // loadJournalState reads back the SAME data that was just fetched, not something older.
+    try {
+      localStorage.setItem('eve_raw_assets', JSON.stringify(window.rawAssetItems || []));
+      localStorage.setItem('eve_resolved_location_names', JSON.stringify(window.resolvedLocationNames || {}));
+      localStorage.setItem('eve_corp_division_names', JSON.stringify(window.corpDivisionNames || {}));
+    } catch (e) { console.warn('[ESI] Failed to persist fetched assets to localStorage - stock will look correct this session but may revert to stale data on next reload:', e); }
+
     await resolveAndPopulateLocationFilter(accessToken);
     if (assetsFetchOk) {
+      // Re-persisted now that resolveAndPopulateLocationFilter has filled in resolved location names
+      // (and, via applyJournalStockFilter, the freshly-rebuilt userStockMap) that weren't available yet
+      // at the write above.
+      try {
+        localStorage.setItem('eve_resolved_location_names', JSON.stringify(window.resolvedLocationNames || {}));
+        localStorage.setItem('eve_corp_division_names', JSON.stringify(window.corpDivisionNames || {}));
+        localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap || {}));
+      } catch (e) { console.warn('[ESI] Failed to persist resolved location/stock data to localStorage:', e); }
       localStorage.setItem('eve_assets_last_synced', String(Date.now()));
       // Shared choke point for both the manual Refresh button AND the automatic re-fetch that
       // happens on every page load when already logged in - so the "Last synced" text on the
