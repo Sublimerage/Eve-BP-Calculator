@@ -59,6 +59,16 @@
       const item = document.createElement('div');
       item.className = 'csel-option' + (idx === select.selectedIndex ? ' is-selected' : '');
       item.textContent = opt.text;
+      // Carries over whatever inline color/background/weight the caller set directly on THIS option
+      // (e.g. the Ledger's location picker color-codes Upwell structures vs. NPC stations vs. corp
+      // hangar divisions per-option) - lost entirely before, since this row is a freshly-built <div>
+      // that only ever copied the option's text, never its style. Inline styles here still win over
+      // .csel-option.is-selected's own `color` rule (inline always beats a class in the cascade), so
+      // a selected row keeps reading as its own type's color rather than flattening to the generic
+      // selected-accent green - is-selected's font-weight still marks it out as the current pick.
+      if (opt.style.color) item.style.color = opt.style.color;
+      if (opt.style.backgroundColor) item.style.backgroundColor = opt.style.backgroundColor;
+      if (opt.style.fontWeight) item.style.fontWeight = opt.style.fontWeight;
       if (opt.disabled) item.setAttribute('aria-disabled', 'true');
       item.addEventListener('mousedown', (e) => {
         e.preventDefault();
@@ -97,6 +107,12 @@
     const label = trigger.querySelector('.csel-trigger-label');
     const opt = select.options[select.selectedIndex];
     label.textContent = opt ? opt.text : '';
+    // Same per-option color as buildOptionRows above, carried onto the trigger's own label so the
+    // CURRENTLY selected value (visible even with the panel closed) reads in its own type's color
+    // too, not just the panel row - cleared back to inherited (not just left over from whichever
+    // option was selected before) when the new selection doesn't set one of its own.
+    label.style.color = (opt && opt.style.color) ? opt.style.color : '';
+    label.style.fontWeight = (opt && opt.style.fontWeight) ? opt.style.fontWeight : '';
   }
 
   function openPanelFor(select, trigger) {
