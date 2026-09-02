@@ -148,11 +148,11 @@
     <!-- Consolidated BOM Sidebar (Right area) -->
     <aside id="bom-sidebar" class="lp-card w-80 md:w-96 flex flex-col overflow-hidden flex-shrink-0 z-20 m-4 ml-0 p-4">
       <div class="lp-row flex justify-between items-center" style="padding-top:0; margin-top:0; border-top:none;">
-        <div>
-          <h2 class="font-bold rajdhani tracking-wider text-lg" style="color:var(--text);">CONSOLIDATED BOM</h2>
-          <div class="text-[10px] mono" style="color:var(--text-mute);">COMBINED MISSING ITEMS ACROSS QUEUE</div>
+        <div class="min-w-0">
+          <h2 class="font-bold rajdhani tracking-wider text-sm uppercase truncate" style="color:var(--text);" title="Consolidated BOM: combined missing items across queue">CONSOLIDATED BOM</h2>
+          <div class="text-[9px] mono truncate" style="color:var(--text-mute);">COMBINED MISSING ITEMS ACROSS QUEUE</div>
         </div>
-        <div class="flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5 flex-shrink-0">
           <button id="btn-bom-view-mode" onclick="toggleBomViewMode()" class="btn-glass btn-glass-muted px-2.5 py-1.5 text-[10px]" title="Switch between detailed and compact list view">
             <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3.5" y1="6" x2="3.51" y2="6"/><line x1="3.5" y1="12" x2="3.51" y2="12"/><line x1="3.5" y1="18" x2="3.51" y2="18"/></svg> Compact
           </button>
@@ -186,7 +186,7 @@
           </div>
           <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterJournalLocationOptions()"
             class="field-line w-full text-[11px] mono" style="color:var(--text);">
-          <select id="stock-location-filter" onchange="applyJournalStockFilter()" class="field-line w-full font-bold text-[11px] truncate" style="color:var(--accent);">
+          <select id="stock-location-filter" onchange="applyJournalStockFilter()" class="field-line w-full font-bold text-xs truncate" style="color:var(--accent);">
             <option value="all" selected>All Locations (Combined Assets)</option>
           </select>
           <span id="stock-last-synced" class="text-[9.5px] mono block" style="color:var(--text-mute);">Never synced</span>
@@ -307,6 +307,6 @@
   <script src="js/tree.js?v=8.0.1" defer></script>
   <script src="js/optimizers.js?v=8.0.5" defer></script>
   <script src="js/ledger.js?v=9.48.0" defer></script>
-  <script src="js/custom-select.js?v=1.4.0" defer></script>
+  <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
