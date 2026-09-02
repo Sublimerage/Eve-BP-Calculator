@@ -2311,7 +2311,7 @@ function renderBuildHistoryLedger() {
   if (buildHistory.length === 0) {
     container.innerHTML = `
       <tr>
-        <td colspan="6" class="p-4 text-center mono italic" style="color:var(--text-mute);">
+        <td colspan="7" class="p-4 text-center mono italic" style="color:var(--text-mute);">
           No completed build records logged in ledger history database.
         </td>
       </tr>
@@ -2319,18 +2319,35 @@ function renderBuildHistoryLedger() {
     return;
   }
 
+  // Sales tax + broker fee for the break-even column below - read from the same shared
+  // 'eve_tax_settings' localStorage key the Calculator/Invention pages write to (see
+  // loadSharedTaxSettings there), not getActiveFeeInputs(), which reads DOM input fields this page
+  // doesn't have and would silently fall back to its own hardcoded defaults every time. Falls back
+  // to those same defaults (3.6%/1.0%) only when nothing's been configured anywhere yet.
+  const sharedTaxSettings = window.safeParseJSON(localStorage.getItem('eve_tax_settings'), {});
+  const salesTaxPct = parseFloat(sharedTaxSettings.salesTax) || 3.6;
+  const brokerFeePct = parseFloat(sharedTaxSettings.brokerFee) || 1.0;
+  const netSellFraction = 1 - (salesTaxPct + brokerFeePct) / 100;
+
   container.innerHTML = buildHistory.map(record => {
     if (!record) return '';
     const formattedDate = record.completedAt ? new Date(record.completedAt).toLocaleDateString() + ' ' + new Date(record.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
     const recordDisplayName = window.TYPE_ID_TO_NAME[record.productTypeId] || (record.name || '')
       .replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
+    // Minimum per-unit sell price that gets this job back to 0 profit: total manufacturing cost
+    // spread across every unit produced, grossed back up to cover sales tax + broker fee on the
+    // sale itself (selling at exactly cost/qty would still net a loss once those are taken out).
+    const qtyProduced = record.qtyNeeded || 0;
+    const breakEvenPrice = (qtyProduced > 0 && netSellFraction > 0) ? (record.calculatedCost || 0) / (qtyProduced * netSellFraction) : null;
+    const breakEvenHTML = breakEvenPrice !== null ? `${Math.round(breakEvenPrice).toLocaleString()} ISK` : '&mdash;';
     return `
       <tr style="color:var(--text-soft);">
         <td>${formattedDate}</td>
         <td class="font-bold" style="color:var(--text);">${window.esc(recordDisplayName)}${record.isSubBuild ? `<span class="ml-1.5 text-xs font-semibold normal-case" style="color:var(--text-mute);" title="Prerequisite for: ${window.esc(record.parentJobName || 'another job')}">${window.svgIcon('gear')} prereq</span>` : ''}</td>
         <td class="text-right">${record.runsNeeded.toLocaleString()}</td>
         <td class="text-right font-bold" style="color:var(--accent);">${record.qtyNeeded.toLocaleString()}</td>
-        <td class="text-right font-bold" style="color:var(--accent);">${Math.round(record.calculatedCost || 0).toLocaleString()} ISK</td>
+        <td class="text-right font-bold" style="color:var(--cost);">${Math.round(record.calculatedCost || 0).toLocaleString()} ISK</td>
+        <td class="text-right font-bold" style="color:var(--text);" title="Sell at or above this per unit to at least break even, after ${salesTaxPct}% sales tax + ${brokerFeePct}% broker fee">${breakEvenHTML}</td>
         <td>
           <div class="flex items-center space-x-1.5">
             <button onclick="requeueCompletedJob(${record.id})" class="lp-chip-btn">
