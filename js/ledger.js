@@ -1260,11 +1260,17 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
         : '';
 
       return `
-        <div class="flex justify-between items-center ${rowTextClass} mono ${rowPadClass} gap-2" style="color:${isAcquired ? 'var(--accent)' : 'var(--text-mute)'};">
+        <div class="lp-mat-row flex justify-between items-center ${rowTextClass} mono ${rowPadClass} gap-2 px-1.5 rounded" style="color:${isAcquired ? 'var(--accent)' : 'var(--text-mute)'};">
           ${iconHTML}
-          <span class="truncate pr-2 flex-1"><span class="copy-name" data-copy-name="${window.esc(mat.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(mat.name)}">${window.esc(mat.name)}</span></span>
+          <span class="truncate pr-2 flex-1 min-w-0"><span class="copy-name" data-copy-name="${window.esc(mat.name)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(mat.name)}">${window.esc(mat.name)}</span></span>
           <span class="flex-shrink-0 whitespace-nowrap">${isAcquired ? `${window.svgIcon('check')} ${mat.qtyNeeded.toLocaleString()}` : `x${mat.qtyNeeded.toLocaleString()} (Deficit: ${netMissing.toLocaleString()})`}</span>
-          ${buildActionHTML}
+          <!-- Always reserved at a fixed width, even when empty (isAcquired never sets buildActionHTML)
+               - otherwise the qty span just above drifts left/right row to row depending on whether
+               THIS particular row happens to show a "+ Build" button, a "Queued"/"In Progress" badge,
+               or nothing, since justify-between redistributes space across however many children a row
+               actually has. Right-aligned within the slot to match where a bare qty (no badge) already
+               sits flush to the row's own right edge. -->
+          <span class="flex-shrink-0 text-right" style="width:78px;">${buildActionHTML}</span>
         </div>
       `;
     }).join('') : '<div class="text-xs italic py-1" style="color:var(--text-mute);">No materials logged for this build.</div>';
