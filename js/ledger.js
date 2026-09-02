@@ -1239,11 +1239,13 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
       } else if (queuedForMat) {
         // A queued-but-not-started prerequisite reads "Queued" (accent green, matching the checkmark
         // - it exists, nothing left to do); once you actually start it in-game and mark it started
-        // here, it's no longer just sitting in the queue - same clock icon + blue used for an
-        // in-progress job's own row elsewhere in the Ledger, so this badge tracks that job's real
-        // state instead of freezing at "Queued" the moment it's added.
+        // here, it's no longer just sitting in the queue - same blue used for an in-progress job's
+        // own row elsewhere in the Ledger, so this badge tracks that job's real state instead of
+        // freezing at "Queued" the moment it's added. Text-only, no icon - the icon this used to pair
+        // with (renderJobStatusIconHTML) isn't tagged svg.ico, so it missed the inline-block fix every
+        // OTHER icon in this app gets and rendered on its own line above the text instead of beside it.
         buildActionHTML = queuedForMat.isStarted
-          ? `<span class="${queuedTextClass} font-bold flex-shrink-0" style="color:var(--blue-300);" title="A queued job for this is currently in progress">${renderJobStatusIconHTML('remaining')} In Progress</span>`
+          ? `<span class="${queuedTextClass} font-bold flex-shrink-0" style="color:var(--blue-300);" title="A queued job for this is currently in progress">In Progress</span>`
           : `<span class="${queuedTextClass} font-bold flex-shrink-0" style="color:var(--accent);" title="Already queued as its own job">${window.svgIcon('check')} Queued</span>`;
       } else {
         const bpId = (typeof window.findBlueprintTypeIdForProduct === 'function' ? window.findBlueprintTypeIdForProduct(mat.typeId) : null)
