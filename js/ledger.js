@@ -1540,83 +1540,129 @@ window.copyRunsToClipboard = copyRunsToClipboard;
 // already started. Jobs that differ in any of these (e.g. one set to build, one to buy; one selling
 // via buy order vs sell order) are deliberately left alone, since merging those would silently lose
 // information about which configuration applies to which materials.
+// Merging is a pure re-labeling of already-computed material lists (sum the qtyNeeded each ORIGINAL
+// job already worked out for its own run count) - it never rebuilds a tree for the new combined run
+// count. That matters: EVE applies ME rounding per job you actually run, so two separate jobs of, say,
+// 3 and 4 runs each round their own material lines up independently, and can need very slightly more
+// material in total than one single 7-run job would. Since you still run these as separate real EVE
+// jobs after combining here (this only merges the LEDGER's bookkeeping of them into one row), keeping
+// each original job's own already-rounded numbers and just adding them together is the correct match
+// for reality - recomputing as "1 job of 7 runs" would understate what you actually need.
 function combineDuplicateJobs() {
   loadJournalState();
-  const groups = {};
-  const order = [];
-  activeJobs.forEach(job => {
-    if (!job) return;
-    if (job.isStarted) { order.push({ key: null, job }); return; } // never combine started jobs
-    // Two sub-builds only combine if they're prerequisites for the SAME actual parent job - grouping
-    // by parentJobId (falling back to parentJobName only for a sub-build saved before that field
-    // existed) instead of name alone, or two different jobs' prerequisites could get merged together
-    // just because their parents happen to share a product name (see buildJobClusters' own comment).
-    const parentKey = job.isSubBuild
-      ? ((job.parentJobId !== undefined && job.parentJobId !== null) ? `id:${job.parentJobId}` : `name:${job.parentJobName || ''}`)
-      : '';
-    const key = [
-      job.productTypeId || job.typeId,
-      job.isSubBuild ? 'sub' : 'final',
-      parentKey,
-      job.sellStrategy || ''
-    ].join('|');
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(job);
-    order.push({ key, job });
-  });
-
-  const mergedByKey = {};
   let combinedCount = 0;
-  Object.keys(groups).forEach(key => {
-    const jobs = groups[key];
-    if (jobs.length < 2) return;
-    combinedCount += jobs.length - 1;
 
-    const materialsMap = {};
-    jobs.forEach(j => {
-      (j.materials || []).forEach(m => {
-        if (!m) return;
-        if (!materialsMap[m.typeId]) {
-          materialsMap[m.typeId] = { ...m, qtyNeeded: 0, stockQty: 0, netQtyNeeded: 0, lineCost: 0 };
+  // Runs the group-and-merge pass repeatedly instead of once. A sub-build's grouping key is keyed off
+  // its OWN parentJobId - so when two ROOT jobs for the same item merge into one, their respective
+  // prerequisite jobs still point at the two different (now one absorbed) original root ids and don't
+  // look like duplicates of each other yet, even though they're now prerequisites for what's become
+  // the exact same merged job. Each pass below repoints any job whose parent just got absorbed at the
+  // surviving parent's id before the next pass regroups - so root jobs merge on pass 1, their direct
+  // prerequisites merge on pass 2 (now sharing the same corrected parentJobId), a prerequisite's own
+  // prerequisite merges on pass 3, and so on to whatever depth the queue actually has. Capped well
+  // above any realistic nesting depth (this app's own recipe-tree walk caps at 6) purely as a safety
+  // net against an unexpected data shape looping forever, not because deep chains are expected.
+  for (let pass = 0; pass < 12; pass++) {
+    const groups = {};
+    const order = [];
+    activeJobs.forEach(job => {
+      if (!job) return;
+      if (job.isStarted) { order.push({ key: null, job }); return; } // never combine started jobs
+      // Two sub-builds only combine if they're prerequisites for the SAME actual parent job - grouping
+      // by parentJobId (falling back to parentJobName only for a sub-build saved before that field
+      // existed) instead of name alone, or two different jobs' prerequisites could get merged together
+      // just because their parents happen to share a product name (see buildJobClusters' own comment).
+      const parentKey = job.isSubBuild
+        ? ((job.parentJobId !== undefined && job.parentJobId !== null) ? `id:${job.parentJobId}` : `name:${job.parentJobName || ''}`)
+        : '';
+      const key = [
+        job.productTypeId || job.typeId,
+        job.isSubBuild ? 'sub' : 'final',
+        parentKey,
+        job.sellStrategy || ''
+      ].join('|');
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(job);
+      order.push({ key, job });
+    });
+
+    const mergedByKey = {};
+    let mergedAnyThisPass = false;
+    Object.keys(groups).forEach(key => {
+      const jobs = groups[key];
+      if (jobs.length < 2) return;
+      mergedAnyThisPass = true;
+      combinedCount += jobs.length - 1;
+
+      const materialsMap = {};
+      jobs.forEach(j => {
+        (j.materials || []).forEach(m => {
+          if (!m) return;
+          if (!materialsMap[m.typeId]) {
+            materialsMap[m.typeId] = { ...m, qtyNeeded: 0, stockQty: 0, netQtyNeeded: 0, lineCost: 0 };
+          }
+          materialsMap[m.typeId].qtyNeeded += m.qtyNeeded || 0;
+          materialsMap[m.typeId].stockQty += m.stockQty || 0;
+          materialsMap[m.typeId].netQtyNeeded += m.netQtyNeeded || 0;
+          materialsMap[m.typeId].lineCost += m.lineCost || 0;
+        });
+      });
+
+      const first = jobs[0];
+      const merged = {
+        ...first,
+        runsNeeded: jobs.reduce((s, j) => s + (j.runsNeeded || 0), 0),
+        qtyNeeded: jobs.reduce((s, j) => s + (j.qtyNeeded || 0), 0),
+        calculatedCost: jobs.reduce((s, j) => s + (j.calculatedCost || 0), 0),
+        netProfit: jobs.every(j => j.netProfit !== undefined) ? jobs.reduce((s, j) => s + j.netProfit, 0) : undefined,
+        totalBuildSeconds: jobs.reduce((s, j) => s + (j.totalBuildSeconds || 0), 0),
+        materials: Object.values(materialsMap),
+        addedAt: jobs.reduce((earliest, j) => (j.addedAt && j.addedAt < earliest) ? j.addedAt : earliest, first.addedAt)
+      };
+      mergedByKey[key] = merged;
+    });
+
+    if (!mergedAnyThisPass) break; // stable - nothing left to combine at any depth
+
+    const newQueue = [];
+    const emittedKeys = new Set();
+    order.forEach(({ key, job }) => {
+      if (key === null) { newQueue.push(job); return; }
+      if (mergedByKey[key]) {
+        if (!emittedKeys.has(key)) { newQueue.push(mergedByKey[key]); emittedKeys.add(key); }
+      } else {
+        newQueue.push(job);
+      }
+    });
+
+    // Re-point any job whose parent just got absorbed into a merged survivor, so the next pass (or the
+    // final render, if this was the last one needed) sees the corrected link instead of a reference to
+    // a job id that no longer exists in the queue.
+    Object.keys(groups).forEach(key => {
+      const jobs = groups[key];
+      if (jobs.length < 2) return;
+      const survivor = mergedByKey[key];
+      const absorbedIds = new Set(jobs.map(j => j.id));
+      absorbedIds.delete(survivor.id);
+      if (absorbedIds.size === 0) return;
+      newQueue.forEach(j => {
+        if (j && j.isSubBuild && j.parentJobId !== undefined && j.parentJobId !== null && absorbedIds.has(j.parentJobId)) {
+          j.parentJobId = survivor.id;
+          j.parentJobName = survivor.name;
         }
-        materialsMap[m.typeId].qtyNeeded += m.qtyNeeded || 0;
-        materialsMap[m.typeId].stockQty += m.stockQty || 0;
-        materialsMap[m.typeId].netQtyNeeded += m.netQtyNeeded || 0;
-        materialsMap[m.typeId].lineCost += m.lineCost || 0;
       });
     });
 
-    const first = jobs[0];
-    const merged = {
-      ...first,
-      runsNeeded: jobs.reduce((s, j) => s + (j.runsNeeded || 0), 0),
-      qtyNeeded: jobs.reduce((s, j) => s + (j.qtyNeeded || 0), 0),
-      calculatedCost: jobs.reduce((s, j) => s + (j.calculatedCost || 0), 0),
-      netProfit: jobs.every(j => j.netProfit !== undefined) ? jobs.reduce((s, j) => s + j.netProfit, 0) : undefined,
-      totalBuildSeconds: jobs.reduce((s, j) => s + (j.totalBuildSeconds || 0), 0),
-      materials: Object.values(materialsMap),
-      addedAt: jobs.reduce((earliest, j) => (j.addedAt && j.addedAt < earliest) ? j.addedAt : earliest, first.addedAt)
-    };
-    mergedByKey[key] = merged;
-  });
+    activeJobs = newQueue;
+  }
 
-  const newQueue = [];
-  const emittedKeys = new Set();
-  order.forEach(({ key, job }) => {
-    if (key === null) { newQueue.push(job); return; }
-    if (mergedByKey[key]) {
-      if (!emittedKeys.has(key)) { newQueue.push(mergedByKey[key]); emittedKeys.add(key); }
-    } else {
-      newQueue.push(job);
-    }
-  });
-
-  activeJobs = newQueue;
   localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
   renderJournalPage();
 
   if (combinedCount === 0) {
     if (typeof window.showToast === 'function') window.showToast('No combinable duplicate jobs found. Jobs only combine when they match on item, build/buy context, and sell strategy, and neither is already started.', 'info');
+  } else if (typeof window.showToast === 'function') {
+    window.showToast(`Combined ${combinedCount} duplicate job${combinedCount > 1 ? 's' : ''}.`, 'success');
   }
 }
 window.combineDuplicateJobs = combineDuplicateJobs;
@@ -1684,9 +1730,17 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
   const container = document.getElementById('journal-bom-items');
   const bomTypesEl = document.getElementById('journal-bom-types');
   const bomTotalEl = document.getElementById('journal-bom-total');
+  const bomVolumeEl = document.getElementById('journal-bom-volume');
 
   if (bomTypesEl) bomTypesEl.textContent = bomItems.length.toString();
   if (bomTotalEl) bomTotalEl.textContent = Math.round(totalMissingISK).toLocaleString() + ' ISK';
+  // item.lineVolume (set in renderJournalPage, right next to lineCost/netMissingQty) is already
+  // volume-of-what's-missing, not volume of the full requirement - same "missing after stock" scope
+  // as the ISK total right below this, just for m3 instead of ISK.
+  if (bomVolumeEl) {
+    const totalMissingVolume = bomItems.reduce((sum, item) => sum + (item.lineVolume || 0), 0);
+    bomVolumeEl.textContent = totalMissingVolume.toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' m3';
+  }
 
   if (!container) return;
   updateBomViewModeButtonLabel();
