@@ -728,7 +728,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth, 
                hover (title), same as a properly-nested (depth>0) sub-build already conveys via its own
                indentation + connector line - this just also covers an orphaned one (parent not present
                in the current filtered list) that has no indentation to lean on. -->
-          <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${job.isSubBuild ? `<span class="ml-1 text-xs align-middle" style="color:var(--text-mute);" title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}">${window.svgIcon('gear')}</span>` : ''}${(childCount > 0) ? `<button onclick="toggleClusterCollapse(event, ${job.id})" class="ml-1.5 lp-badge align-middle" style="cursor:pointer;" title="${collapsedClusterIds.has(job.id) ? `Show ${childCount} hidden prerequisite job${childCount > 1 ? 's' : ''}` : `Collapse ${childCount} prerequisite job${childCount > 1 ? 's' : ''} under this one`}">${window.svgIcon(collapsedClusterIds.has(job.id) ? 'chevron-right' : 'chevron-down')} ${childCount}</button>` : ''}</div>
+          <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${renderPrereqBadgeHTML(job, 'ml-1 text-xs align-middle')}${(childCount > 0) ? `<button onclick="toggleClusterCollapse(event, ${job.id})" class="ml-1.5 lp-badge align-middle" style="cursor:pointer;" title="${collapsedClusterIds.has(job.id) ? `Show ${childCount} hidden prerequisite job${childCount > 1 ? 's' : ''}` : `Collapse ${childCount} prerequisite job${childCount > 1 ? 's' : ''} under this one`}">${window.svgIcon(collapsedClusterIds.has(job.id) ? 'chevron-right' : 'chevron-down')} ${childCount}</button>` : ''}</div>
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
           <!-- Edit icon lives INSIDE this same items-baseline row, right after "runs" - not as a
@@ -1428,15 +1428,15 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
 
     return `
       <div class="job-card lp-job-card ${cardStateClass} p-3 flex flex-col justify-between transition space-y-2"
-           draggable="true" data-job-id="${job.id}" ${(job.isSubBuild && !isFocusMode) ? `title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}"` : ''}
+           draggable="true" data-job-id="${job.id}" ${(job.isSubBuild && !isFocusMode) ? `title="Prerequisite for: ${window.esc(getPrereqLabel(job))}"` : ''}
            ondragstart="handleJobDragStart(event, ${job.id})" ondragend="handleJobDragEnd(event)"
            ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
         <div class="flex items-start justify-between">
           <div class="flex items-start space-x-3 min-w-0 flex-1">
             <img src="${jobIconUrl}" alt="${window.esc(jobDisplayName)}" class="${isFocusMode ? 'w-20 h-20' : 'w-12 h-12'} rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
-              <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${(job.isSubBuild && !isFocusMode) ? `<span class="ml-1 text-xs align-middle" style="color:var(--text-mute);" title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}">${window.svgIcon('gear')}</span>` : ''}</h3>
-              ${(job.isSubBuild && isFocusMode) ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">${window.svgIcon('gear')} Prerequisite for: ${window.esc(job.parentJobName || 'another job')}</div>` : ''}
+              <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${!isFocusMode ? renderPrereqBadgeHTML(job, 'ml-1 text-xs align-middle') : ''}</h3>
+              ${(job.isSubBuild && isFocusMode) ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">${window.svgIcon('gear')} Prerequisite for: ${window.esc(getPrereqLabel(job))}</div>` : ''}
               ${renderJobMetaChipHTML(job)}
             </div>
           </div>
@@ -1548,112 +1548,226 @@ window.copyRunsToClipboard = copyRunsToClipboard;
 // jobs after combining here (this only merges the LEDGER's bookkeeping of them into one row), keeping
 // each original job's own already-rounded numbers and just adding them together is the correct match
 // for reality - recomputing as "1 job of 7 runs" would understate what you actually need.
+// Sums a group of 2+ duplicate jobs' already-computed numbers into one job carrying jobs[0]'s
+// identity - shared by both merge passes in combineDuplicateJobs below, since the actual summing math
+// (materials, cost, runs, time) is identical whether the group shared a parent or not.
+function mergeJobsInto(jobs) {
+  const materialsMap = {};
+  jobs.forEach(j => {
+    (j.materials || []).forEach(m => {
+      if (!m) return;
+      if (!materialsMap[m.typeId]) {
+        materialsMap[m.typeId] = { ...m, qtyNeeded: 0, stockQty: 0, netQtyNeeded: 0, lineCost: 0 };
+      }
+      materialsMap[m.typeId].qtyNeeded += m.qtyNeeded || 0;
+      materialsMap[m.typeId].stockQty += m.stockQty || 0;
+      materialsMap[m.typeId].netQtyNeeded += m.netQtyNeeded || 0;
+      materialsMap[m.typeId].lineCost += m.lineCost || 0;
+    });
+  });
+  const first = jobs[0];
+  return {
+    ...first,
+    runsNeeded: jobs.reduce((s, j) => s + (j.runsNeeded || 0), 0),
+    qtyNeeded: jobs.reduce((s, j) => s + (j.qtyNeeded || 0), 0),
+    calculatedCost: jobs.reduce((s, j) => s + (j.calculatedCost || 0), 0),
+    netProfit: jobs.every(j => j.netProfit !== undefined) ? jobs.reduce((s, j) => s + j.netProfit, 0) : undefined,
+    totalBuildSeconds: jobs.reduce((s, j) => s + (j.totalBuildSeconds || 0), 0),
+    materials: Object.values(materialsMap),
+    addedAt: jobs.reduce((earliest, j) => (j.addedAt && j.addedAt < earliest) ? j.addedAt : earliest, first.addedAt)
+  };
+}
+
+// Re-points any job whose parent was just absorbed into `survivor` at the survivor's id instead, so
+// the next merge pass (or the final render) sees the corrected link rather than a reference to a job
+// id that no longer exists in the queue. Shared by both merge passes below.
+function repointChildrenToSurvivor(queue, absorbedIds, survivor) {
+  if (absorbedIds.size === 0) return;
+  queue.forEach(j => {
+    if (j && j.isSubBuild && j.parentJobId !== undefined && j.parentJobId !== null && absorbedIds.has(j.parentJobId)) {
+      j.parentJobId = survivor.id;
+      j.parentJobName = survivor.name;
+    }
+  });
+}
+
+// A normal prerequisite's label is just its one parent's name (job.parentJobName). A pooled cross-
+// parent prerequisite (see combineDuplicateJobs' Pass B) doesn't have a single parent any more - it
+// lists every job it now feeds instead, resolving each id's current name from whichever list still has
+// it (an in-progress parent from activeJobs, or a completed one from buildHistory) rather than trusting
+// a name captured at pool time, which could go stale if that job is later renamed/requeued.
+function getPrereqLabel(job) {
+  if (Array.isArray(job.sharedParentIds) && job.sharedParentIds.length > 0) {
+    const names = job.sharedParentIds.map(id => {
+      const found = (activeJobs.find(j => j && j.id === id)) || (buildHistory.find(r => r && r.id === id));
+      return found ? found.name : null;
+    }).filter(Boolean);
+    return names.length ? names.join(', ') : `${job.sharedParentIds.length} job${job.sharedParentIds.length > 1 ? 's' : ''}`;
+  }
+  return job.parentJobName || 'another job';
+}
+
+// The small gear icon next to a prerequisite's name - a shared one gets a "xN" count alongside it so
+// it reads as "feeds several jobs" at a glance, not just on hover.
+function renderPrereqBadgeHTML(job, extraClass) {
+  if (!job.isSubBuild) return '';
+  const isShared = Array.isArray(job.sharedParentIds) && job.sharedParentIds.length > 1;
+  const label = getPrereqLabel(job);
+  const title = isShared ? `Shared prerequisite for: ${window.esc(label)}` : `Prerequisite for: ${window.esc(label)}`;
+  const countHTML = isShared ? ` &times;${job.sharedParentIds.length}` : '';
+  return `<span class="${extraClass || ''}" style="color:var(--text-mute);" title="${title}">${window.svgIcon('gear')}${countHTML}</span>`;
+}
+
+// One tight-merge pass: same item, same actual parent (or both roots). Mutates `activeJobs` and
+// returns how many duplicate jobs it eliminated (0 = nothing to merge). A cross-parent duplicate - the
+// SAME item, but for two genuinely different parents - deliberately does NOT merge here; that's what
+// poolCrossParentDuplicatesOnce below is for.
+function tightMergeSameParentOnce() {
+  const groups = {};
+  const order = [];
+  activeJobs.forEach(job => {
+    if (!job) return;
+    if (job.isStarted) { order.push({ key: null, job }); return; } // never combine started jobs
+    // Two sub-builds only tight-merge if they're prerequisites for the SAME actual parent job -
+    // grouping by parentJobId (falling back to parentJobName only for a sub-build saved before that
+    // field existed) instead of name alone, or two different jobs' prerequisites could get merged
+    // together just because their parents happen to share a product name (see buildJobClusters' own
+    // comment).
+    const parentKey = job.isSubBuild
+      ? ((job.parentJobId !== undefined && job.parentJobId !== null) ? `id:${job.parentJobId}` : `name:${job.parentJobName || ''}`)
+      : '';
+    const key = [
+      job.productTypeId || job.typeId,
+      job.isSubBuild ? 'sub' : 'final',
+      parentKey,
+      job.sellStrategy || ''
+    ].join('|');
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(job);
+    order.push({ key, job });
+  });
+
+  const mergedByKey = {};
+  let eliminated = 0;
+  Object.keys(groups).forEach(key => {
+    const jobs = groups[key];
+    if (jobs.length < 2) return;
+    eliminated += jobs.length - 1;
+    mergedByKey[key] = mergeJobsInto(jobs);
+  });
+  if (eliminated === 0) return 0;
+
+  const newQueue = [];
+  const emittedKeys = new Set();
+  order.forEach(({ key, job }) => {
+    if (key === null) { newQueue.push(job); return; }
+    if (mergedByKey[key]) {
+      if (!emittedKeys.has(key)) { newQueue.push(mergedByKey[key]); emittedKeys.add(key); }
+    } else {
+      newQueue.push(job);
+    }
+  });
+  Object.keys(groups).forEach(key => {
+    const jobs = groups[key];
+    if (jobs.length < 2) return;
+    const survivor = mergedByKey[key];
+    const absorbedIds = new Set(jobs.map(j => j.id));
+    absorbedIds.delete(survivor.id);
+    repointChildrenToSurvivor(newQueue, absorbedIds, survivor);
+  });
+  activeJobs = newQueue;
+  return eliminated;
+}
+
+// One cross-parent pooling pass: same item + sell strategy, but DIFFERENT parents. Only ever called
+// once tightMergeSameParentOnce has run to a full fixed point (see combineDuplicateJobs) - otherwise
+// two jobs that just became same-parent duplicates via a same-pass repoint, but haven't been
+// re-grouped by the tight pass yet, would look like a genuine cross-parent case here even though the
+// very next tight pass was about to merge them anyway. Once tight-merging is stable, anything still
+// duplicated by product+strategy is guaranteed to have genuinely different parents (or already be
+// shared/orphaned) - safe to pool. In EVE these can still be run as one bigger batch and used across
+// both final products - the only thing actually different between them is which job they're a
+// prerequisite FOR, not what they ARE. Pooled into one job with parentJobId cleared and
+// sharedParentIds listing every job it now feeds, instead of picking just one parent to keep - that
+// needs zero extra plumbing to render or shop correctly: buildJobClusters already treats a sub-build
+// with no resolvable parent as its own top-level entry (the same fallback an orphaned prerequisite -
+// e.g. its one parent got deleted - already used), and internallySuppliedTypeIds already suppresses a
+// covered material queue-wide by product rather than per-parent, so it still correctly keeps that
+// material off every parent's shopping list, not just one.
+function poolCrossParentDuplicatesOnce() {
+  const looseGroups = {};
+  const looseOrder = [];
+  activeJobs.forEach(job => {
+    if (!job || job.isStarted || !job.isSubBuild) { looseOrder.push({ key: null, job }); return; }
+    const key = [job.productTypeId || job.typeId, job.sellStrategy || ''].join('|');
+    if (!looseGroups[key]) looseGroups[key] = [];
+    looseGroups[key].push(job);
+    looseOrder.push({ key, job });
+  });
+
+  const pooledByKey = {};
+  let eliminated = 0;
+  Object.keys(looseGroups).forEach(key => {
+    const jobs = looseGroups[key];
+    if (jobs.length < 2) return;
+    eliminated += jobs.length - 1;
+    const merged = mergeJobsInto(jobs);
+    const contributedParentIds = new Set();
+    jobs.forEach(j => {
+      if (Array.isArray(j.sharedParentIds) && j.sharedParentIds.length) {
+        j.sharedParentIds.forEach(id => contributedParentIds.add(id));
+      } else if (j.parentJobId !== undefined && j.parentJobId !== null) {
+        contributedParentIds.add(j.parentJobId);
+      }
+    });
+    merged.parentJobId = null;
+    merged.parentJobName = null;
+    merged.sharedParentIds = Array.from(contributedParentIds);
+    pooledByKey[key] = merged;
+  });
+  if (eliminated === 0) return 0;
+
+  const newQueue = [];
+  const emittedPoolKeys = new Set();
+  looseOrder.forEach(({ key, job }) => {
+    if (key === null) { newQueue.push(job); return; }
+    if (pooledByKey[key]) {
+      if (!emittedPoolKeys.has(key)) { newQueue.push(pooledByKey[key]); emittedPoolKeys.add(key); }
+    } else {
+      newQueue.push(job);
+    }
+  });
+  Object.keys(looseGroups).forEach(key => {
+    const jobs = looseGroups[key];
+    if (jobs.length < 2) return;
+    const survivor = pooledByKey[key];
+    const absorbedIds = new Set(jobs.map(j => j.id));
+    absorbedIds.delete(survivor.id);
+    repointChildrenToSurvivor(newQueue, absorbedIds, survivor);
+  });
+  activeJobs = newQueue;
+  return eliminated;
+}
+
 function combineDuplicateJobs() {
   loadJournalState();
   let combinedCount = 0;
 
-  // Runs the group-and-merge pass repeatedly instead of once. A sub-build's grouping key is keyed off
-  // its OWN parentJobId - so when two ROOT jobs for the same item merge into one, their respective
-  // prerequisite jobs still point at the two different (now one absorbed) original root ids and don't
-  // look like duplicates of each other yet, even though they're now prerequisites for what's become
-  // the exact same merged job. Each pass below repoints any job whose parent just got absorbed at the
-  // surviving parent's id before the next pass regroups - so root jobs merge on pass 1, their direct
-  // prerequisites merge on pass 2 (now sharing the same corrected parentJobId), a prerequisite's own
-  // prerequisite merges on pass 3, and so on to whatever depth the queue actually has. Capped well
-  // above any realistic nesting depth (this app's own recipe-tree walk caps at 6) purely as a safety
-  // net against an unexpected data shape looping forever, not because deep chains are expected.
-  for (let pass = 0; pass < 12; pass++) {
-    const groups = {};
-    const order = [];
-    activeJobs.forEach(job => {
-      if (!job) return;
-      if (job.isStarted) { order.push({ key: null, job }); return; } // never combine started jobs
-      // Two sub-builds only combine if they're prerequisites for the SAME actual parent job - grouping
-      // by parentJobId (falling back to parentJobName only for a sub-build saved before that field
-      // existed) instead of name alone, or two different jobs' prerequisites could get merged together
-      // just because their parents happen to share a product name (see buildJobClusters' own comment).
-      const parentKey = job.isSubBuild
-        ? ((job.parentJobId !== undefined && job.parentJobId !== null) ? `id:${job.parentJobId}` : `name:${job.parentJobName || ''}`)
-        : '';
-      const key = [
-        job.productTypeId || job.typeId,
-        job.isSubBuild ? 'sub' : 'final',
-        parentKey,
-        job.sellStrategy || ''
-      ].join('|');
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(job);
-      order.push({ key, job });
-    });
-
-    const mergedByKey = {};
-    let mergedAnyThisPass = false;
-    Object.keys(groups).forEach(key => {
-      const jobs = groups[key];
-      if (jobs.length < 2) return;
-      mergedAnyThisPass = true;
-      combinedCount += jobs.length - 1;
-
-      const materialsMap = {};
-      jobs.forEach(j => {
-        (j.materials || []).forEach(m => {
-          if (!m) return;
-          if (!materialsMap[m.typeId]) {
-            materialsMap[m.typeId] = { ...m, qtyNeeded: 0, stockQty: 0, netQtyNeeded: 0, lineCost: 0 };
-          }
-          materialsMap[m.typeId].qtyNeeded += m.qtyNeeded || 0;
-          materialsMap[m.typeId].stockQty += m.stockQty || 0;
-          materialsMap[m.typeId].netQtyNeeded += m.netQtyNeeded || 0;
-          materialsMap[m.typeId].lineCost += m.lineCost || 0;
-        });
-      });
-
-      const first = jobs[0];
-      const merged = {
-        ...first,
-        runsNeeded: jobs.reduce((s, j) => s + (j.runsNeeded || 0), 0),
-        qtyNeeded: jobs.reduce((s, j) => s + (j.qtyNeeded || 0), 0),
-        calculatedCost: jobs.reduce((s, j) => s + (j.calculatedCost || 0), 0),
-        netProfit: jobs.every(j => j.netProfit !== undefined) ? jobs.reduce((s, j) => s + j.netProfit, 0) : undefined,
-        totalBuildSeconds: jobs.reduce((s, j) => s + (j.totalBuildSeconds || 0), 0),
-        materials: Object.values(materialsMap),
-        addedAt: jobs.reduce((earliest, j) => (j.addedAt && j.addedAt < earliest) ? j.addedAt : earliest, first.addedAt)
-      };
-      mergedByKey[key] = merged;
-    });
-
-    if (!mergedAnyThisPass) break; // stable - nothing left to combine at any depth
-
-    const newQueue = [];
-    const emittedKeys = new Set();
-    order.forEach(({ key, job }) => {
-      if (key === null) { newQueue.push(job); return; }
-      if (mergedByKey[key]) {
-        if (!emittedKeys.has(key)) { newQueue.push(mergedByKey[key]); emittedKeys.add(key); }
-      } else {
-        newQueue.push(job);
-      }
-    });
-
-    // Re-point any job whose parent just got absorbed into a merged survivor, so the next pass (or the
-    // final render, if this was the last one needed) sees the corrected link instead of a reference to
-    // a job id that no longer exists in the queue.
-    Object.keys(groups).forEach(key => {
-      const jobs = groups[key];
-      if (jobs.length < 2) return;
-      const survivor = mergedByKey[key];
-      const absorbedIds = new Set(jobs.map(j => j.id));
-      absorbedIds.delete(survivor.id);
-      if (absorbedIds.size === 0) return;
-      newQueue.forEach(j => {
-        if (j && j.isSubBuild && j.parentJobId !== undefined && j.parentJobId !== null && absorbedIds.has(j.parentJobId)) {
-          j.parentJobId = survivor.id;
-          j.parentJobName = survivor.name;
-        }
-      });
-    });
-
-    activeJobs = newQueue;
+  // Tight-merges always run to a full fixed point before EVER trying to pool - see
+  // poolCrossParentDuplicatesOnce's own comment for why that ordering matters. Pooling can itself
+  // unlock new tight-merge opportunities one level down (a grandchild whose parent just got pooled
+  // away now shares a corrected parentJobId with a sibling), so the two alternate - stabilize tight
+  // merges, try one pool pass, and if that pooled anything, go stabilize tight merges again - until a
+  // full round changes nothing. Capped well above any realistic nesting depth (this app's own recipe-
+  // tree walk caps at 6) purely as a safety net against an unexpected data shape looping forever, not
+  // because deep chains are expected.
+  for (let round = 0; round < 12; round++) {
+    let tightEliminatedThisRound = 0;
+    let eliminatedThisPass;
+    while ((eliminatedThisPass = tightMergeSameParentOnce()) > 0) tightEliminatedThisRound += eliminatedThisPass;
+    const looseEliminated = poolCrossParentDuplicatesOnce();
+    combinedCount += tightEliminatedThisRound + looseEliminated;
+    if (tightEliminatedThisRound === 0 && looseEliminated === 0) break;
   }
 
   localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
@@ -2404,6 +2518,31 @@ function deleteJobFromQueue(jobId) {
     .filter(({ job: j }) => j && toDelete.has(j.id))
     .sort((a, b) => a.i - b.i);
 
+  // If a SURVIVING job is a pooled cross-parent prerequisite (see combineDuplicateJobs' Pass B) that
+  // included one of the jobs being deleted among its sharedParentIds, scrub that reference - otherwise
+  // it would keep claiming to still feed a job that no longer exists. Down to exactly one remaining
+  // parent, it's no longer meaningfully "shared" any more, so it un-pools back into a normal single-
+  // parent prerequisite instead of staying a 1-item "shared" list forever. Each affected job's PRIOR
+  // state is captured alongside `removed` so Undo can restore it exactly, not just leave the scrub in
+  // place after bringing the deleted job(s) back.
+  const scrubbed = [];
+  activeJobs.forEach(j => {
+    if (!j || toDelete.has(j.id) || !Array.isArray(j.sharedParentIds) || j.sharedParentIds.length === 0) return;
+    const remainingParentIds = j.sharedParentIds.filter(id => !toDelete.has(id));
+    if (remainingParentIds.length === j.sharedParentIds.length) return; // none of its parents were deleted
+    scrubbed.push({ jobId: j.id, prevSharedParentIds: j.sharedParentIds, prevParentJobId: j.parentJobId, prevParentJobName: j.parentJobName });
+    if (remainingParentIds.length >= 2) {
+      j.sharedParentIds = remainingParentIds;
+    } else if (remainingParentIds.length === 1) {
+      const soleParent = activeJobs.find(x => x && x.id === remainingParentIds[0]);
+      j.parentJobId = remainingParentIds[0];
+      j.parentJobName = soleParent ? soleParent.name : j.parentJobName;
+      delete j.sharedParentIds;
+    } else {
+      j.sharedParentIds = []; // every job it served was deleted at once - left parent-less rather than inventing a fake link
+    }
+  });
+
   activeJobs = activeJobs.filter(j => !j || !toDelete.has(j.id));
   localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
   renderJournalPage();
@@ -2418,6 +2557,13 @@ function deleteJobFromQueue(jobId) {
       loadJournalState();
       removed.forEach(({ job: j, i }) => {
         activeJobs.splice(Math.min(i, activeJobs.length), 0, j);
+      });
+      scrubbed.forEach(({ jobId, prevSharedParentIds, prevParentJobId, prevParentJobName }) => {
+        const stillThere = activeJobs.find(x => x && x.id === jobId);
+        if (!stillThere) return;
+        stillThere.sharedParentIds = prevSharedParentIds;
+        stillThere.parentJobId = prevParentJobId;
+        stillThere.parentJobName = prevParentJobName;
       });
       localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
       renderJournalPage();
@@ -2488,7 +2634,7 @@ function renderBuildHistoryLedger() {
     return `
       <tr style="color:var(--text-soft);">
         <td>${formattedDate}</td>
-        <td class="font-bold" style="color:var(--text);">${window.esc(recordDisplayName)}${record.isSubBuild ? `<span class="ml-1.5 text-xs font-semibold normal-case" style="color:var(--text-mute);" title="Prerequisite for: ${window.esc(record.parentJobName || 'another job')}">${window.svgIcon('gear')} prereq</span>` : ''}</td>
+        <td class="font-bold" style="color:var(--text);">${window.esc(recordDisplayName)}${record.isSubBuild ? `<span class="ml-1.5 text-xs font-semibold normal-case" style="color:var(--text-mute);" title="Prerequisite for: ${window.esc(getPrereqLabel(record))}">${window.svgIcon('gear')} prereq</span>` : ''}</td>
         <td class="text-right">${record.runsNeeded.toLocaleString()}</td>
         <td class="text-right font-bold" style="color:var(--accent);">${record.qtyNeeded.toLocaleString()}</td>
         <td class="text-right font-bold" style="color:var(--cost);">${Math.round(record.calculatedCost || 0).toLocaleString()} ISK</td>
