@@ -1233,10 +1233,18 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
       // already hold gets built again on top of what you have instead of just topping up the deficit.
       // Only offered while there IS a deficit - nothing to build once stock already covers it.
       let buildActionHTML = '';
+      const queuedForMat = isAcquired ? null : activeJobs.find(j => j && j.productTypeId === mat.typeId);
       if (isAcquired) {
         buildActionHTML = '';
-      } else if (activeJobs.some(j => j && j.productTypeId === mat.typeId)) {
-        buildActionHTML = `<span class="${queuedTextClass} font-bold flex-shrink-0" style="color:var(--accent);" title="Already queued as its own job">${window.svgIcon('check')} Queued</span>`;
+      } else if (queuedForMat) {
+        // A queued-but-not-started prerequisite reads "Queued" (accent green, matching the checkmark
+        // - it exists, nothing left to do); once you actually start it in-game and mark it started
+        // here, it's no longer just sitting in the queue - same clock icon + blue used for an
+        // in-progress job's own row elsewhere in the Ledger, so this badge tracks that job's real
+        // state instead of freezing at "Queued" the moment it's added.
+        buildActionHTML = queuedForMat.isStarted
+          ? `<span class="${queuedTextClass} font-bold flex-shrink-0" style="color:var(--blue-300);" title="A queued job for this is currently in progress">${renderJobStatusIconHTML('remaining')} In Progress</span>`
+          : `<span class="${queuedTextClass} font-bold flex-shrink-0" style="color:var(--accent);" title="Already queued as its own job">${window.svgIcon('check')} Queued</span>`;
       } else {
         const bpId = (typeof window.findBlueprintTypeIdForProduct === 'function' ? window.findBlueprintTypeIdForProduct(mat.typeId) : null)
           || (typeof window.resolveBlueprintIdFromProductName === 'function' ? window.resolveBlueprintIdFromProductName(mat.name) : null);
