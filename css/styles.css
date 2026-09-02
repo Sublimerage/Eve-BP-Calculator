@@ -1422,6 +1422,10 @@ body.page-calc .lp-table th.sortable:hover { color: var(--accent); }
 body.page-calc .lp-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
 body.page-calc .lp-table tbody tr { transition: background 0.15s ease; }
 body.page-calc .lp-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+/* Same "which row am I actually on" purpose as the table hover just above, for the expanded Job
+   Materials list - a wide row (icon, name, qty/deficit, badge or Build button all on one line) is
+   easy to lose track of vertically once the list has more than a couple of entries. */
+body.page-calc .lp-mat-row:hover { background: rgba(255,255,255,0.05); }
 body.page-calc .lp-table tr.lp-table-best { background: rgba(var(--accent-rgb),0.08); }
 body.page-calc .lp-divider-col { padding-left: 24px; margin-left: 4px; border-left: 1px solid rgba(255,255,255,0.08); }
 body.page-calc .lp-job-card {
@@ -1430,6 +1434,13 @@ body.page-calc .lp-job-card {
   border-left: 3px solid transparent;
   transition: border-color 0.15s ease, background 0.2s ease;
 }
+/* Hover tint - a plain lighten, same value .lp-table rows already use for the same purpose, so a
+   long/wide card (list mode's own horizontally-scrolling row, or a wide grid card) reads as "this one"
+   at a glance without needing to track it against the ones above/below. Skips job-isolated, which
+   already owns a much stronger always-on highlight (a hover tint on top would just muddy it) - and
+   uses :not() rather than raising isolated's own specificity, so this stays a pure add-on that doesn't
+   touch job-isolated's existing rule at all. */
+body.page-calc .lp-job-card:not(.job-isolated):hover { background: rgba(255,255,255,0.045); }
 body.page-calc .lp-job-card.job-ready { border-left-color: var(--accent); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),0.18), 0 0 20px rgba(var(--accent-rgb),0.10); }
 body.page-calc .lp-job-card.job-started { border-left-color: rgba(var(--accent-rgb),0.45); }
 body.page-calc .lp-job-card.job-subbuild { border-left-color: var(--text-mute); }
