@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>EVE LP Store Calculator</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8ff4d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='5'/%3E%3Cpath d='M8.5 12.5L7 21l5-3 5 3-1.5-8.5'/%3E%3C/svg%3E">
+<link class="cache-bust" rel="stylesheet" href="css/tailwind-build.css?v=1.0.3">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.36.0">
+<script>(function(){try{var t=localStorage.getItem('eve_color_theme');if(t&&t!=='lime')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+</head>
+<body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
+
+  <!-- Header -->
+  <header class="px-5 flex flex-wrap justify-between items-center gap-2 z-30">
+    <div class="flex items-center gap-3 flex-shrink-0">
+      <div class="flex items-center space-x-3 flex-shrink-0 header-brand">
+        <div class="w-9 h-9 bg-purple-500 rounded-xl flex items-center justify-center flex-shrink-0" style="color:#0a1002;" title="EVE LP Store Calculator">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:19px;height:19px;">
+            <circle cx="12" cy="8" r="5"/><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5"/>
+          </svg>
+        </div>
+        <h1 class="text-[13px] font-semibold tracking-wide text-white rajdhani leading-none hidden lg:block">LP STORE CALCULATOR</h1>
+      </div>
+
+      <nav class="primary-tabs">
+        <a href="index.html" class="nav-tab"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.2"/><circle cx="6" cy="18.5" r="2.2"/><circle cx="12" cy="18.5" r="2.2"/><circle cx="18" cy="18.5" r="2.2"/><path d="M12 7.2v3M12 10.2L6 16.3M12 10.2v6.1M12 10.2l6 6.1"/></svg>Calculator</a>
+        <a href="ledger.html" class="nav-tab"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4.5" width="14" height="16" rx="2"/><path d="M9 3.5h6a1 1 0 011 1V6H8V4.5a1 1 0 011-1z"/><path d="M8.5 12.5l2 2 4.5-4.5"/><line x1="8" y1="17" x2="16" y2="17"/></svg>Ledger</a>
+        <a href="invention.html" class="nav-tab"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3h4"/><path d="M10.5 3v5.3L5.9 16.8A2 2 0 007.6 20h8.8a2 2 0 001.7-3.2L13.5 8.3V3"/><path d="M8.2 14.5h7.6"/></svg>Invention</a>
+        <div class="nav-tab nav-tab-active-violet"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5"/></svg>LP Store</div>
+      </nav>
+    </div>
+
+    <div class="flex items-center gap-3 mono flex-wrap flex-shrink-0">
+      <div class="theme-menu-wrap">
+        <button id="theme-menu-btn" onclick="toggleThemeMenu(event)" class="icon-btn" title="Change color theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="5"/><circle cx="15" cy="9" r="5"/><circle cx="12" cy="15" r="5"/></svg>
+        </button>
+        <div id="theme-menu" class="theme-menu hidden"></div>
+      </div>
+      <div id="esi-login-container">
+        <button onclick="startEsiSSOLogin()" class="btn-glass btn-glass-muted px-3.5 py-2 text-xs flex items-center gap-1.5" title="Login with EVE Online to auto-fill your real skill levels">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+          <span class="hidden sm:inline">EVE SSO Login</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="content-row flex-1 flex overflow-hidden relative">
+
+    <!-- Left: Warzone picker + settings -->
+    <aside id="lpstore-sidebar" class="lp-card w-full md:w-[380px] flex flex-col overflow-y-auto flex-shrink-0 p-4">
+
+      <div class="lp-row">
+        <div class="lp-label mb-2">Faction Warfare LP Store</div>
+        <select id="lpstore-corp-select" onchange="selectLPStoreCorp(this.value)" class="field-line w-full font-bold text-xs">
+          <option value="">— Choose a warzone LP store —</option>
+        </select>
+        <p class="text-[10px] mt-2 leading-relaxed" style="color:var(--text-mute);">
+          Ranked by <b>estimated ISK profit per LP spent</b>, regardless of your current standing or access - that's on you to sort out in-game. Prices assume Jita instant-sell.
+        </p>
+      </div>
+
+      <div class="lp-row">
+        <div class="text-[10px] mono" style="color:var(--text-mute);">Blueprint offers build under: <span id="lpstore-active-station-label" style="color:var(--accent); font-weight:bold;">—</span></div>
+        <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--text-mute);">Change this from the Calculator's Production Station picker - this page always uses whatever is currently active.</p>
+      </div>
+
+      <div class="lp-row">
+        <div class="lp-label mb-2">Offer Type</div>
+        <div class="flex gap-1.5">
+          <button onclick="setLPStoreTypeFilter('all')" class="btn-glass btn-glass-muted flex-1 px-2 py-1.5 text-[11px]">All</button>
+          <button onclick="setLPStoreTypeFilter('direct')" class="btn-glass btn-glass-muted flex-1 px-2 py-1.5 text-[11px]">Items</button>
+          <button onclick="setLPStoreTypeFilter('bpc')" class="btn-glass btn-glass-muted flex-1 px-2 py-1.5 text-[11px]">Blueprints</button>
+        </div>
+      </div>
+
+      <!-- Same .fo-group/.lp-inset/.fo-inline-* Taxes & Fees block as index.html/invention.html -
+           shared via the eve_tax_settings localStorage key, editing here updates it everywhere. -->
+      <div class="lp-row">
+        <div class="lp-label mb-2" title="Shared with the main calculator - editing here updates it there too.">Taxes &amp; Fees</div>
+        <div class="grid grid-cols-2 gap-1.5 text-[11px] mono">
+          <div class="lp-inset flex items-center gap-1.5" title="Facility/structure tax applied to every manufacturing job's installation cost.">
+            <span class="fo-inline-label">Fac</span>
+            <input type="text" inputmode="decimal" id="facility-tax" value="1.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettingsFromLPStore();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
+            <span class="fo-inline-suffix">%</span>
+          </div>
+          <div class="lp-inset flex items-center gap-1.5" title="SCC surcharge applied to every manufacturing job's installation cost.">
+            <span class="fo-inline-label">SCC</span>
+            <input type="text" inputmode="decimal" id="scc-surcharge" value="4.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettingsFromLPStore();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
+            <span class="fo-inline-suffix">%</span>
+          </div>
+          <div class="lp-inset flex items-center gap-1.5" title="Sales tax deducted when selling the item/manufactured output.">
+            <span class="fo-inline-label">Sales</span>
+            <input type="text" inputmode="decimal" id="sales-tax" value="3.6" oninput="sanitizeDecimalInput(event); saveSharedTaxSettingsFromLPStore();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
+            <span class="fo-inline-suffix">%</span>
+          </div>
+          <div class="lp-inset flex items-center gap-1.5" title="Broker fee, applied when selling AND when buying materials/required items via market orders.">
+            <span class="fo-inline-label">Broker</span>
+            <input type="text" inputmode="decimal" id="broker-fee" value="1.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettingsFromLPStore();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
+            <span class="fo-inline-suffix">%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="lp-row">
+        <p class="text-[10px] leading-relaxed" style="color:var(--text-mute);">
+          <b>Prototype note:</b> ESI doesn't report a Blueprint Copy offer's run count, so every BPC granted is assumed to be a single-run copy (the long-standing convention for FW store blueprints). Click any row for its full cost/value breakdown.
+        </p>
+      </div>
+
+    </aside>
+
+    <!-- Main: Ranked offer table -->
+    <main class="flex-1 overflow-y-auto p-4" id="lpstore-main-area">
+      <div id="lpstore-empty-state" class="flex items-center justify-center h-full text-slate-500 italic">
+        Choose a warzone LP store on the left to see its offers ranked by ISK/LP.
+      </div>
+      <div id="lpstore-loading-state" class="hidden flex items-center justify-center h-full text-slate-500 italic">
+        Loading offers and pricing every item…
+      </div>
+      <div id="lpstore-error-state" class="hidden flex items-center justify-center h-full" style="color:var(--red-400, #f87171);"></div>
+      <div id="lpstore-results-area" class="hidden space-y-4">
+        <div id="lpstore-summary-tiles" class="grid grid-cols-2 md:grid-cols-4 gap-2.5"></div>
+        <div class="lp-card p-4">
+          <h2 class="text-sm font-bold uppercase tracking-wider rajdhani mb-2" style="color:var(--accent);">Ranked Offers</h2>
+          <div id="lpstore-table-container" class="overflow-x-auto"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="eve_db.js?v=16.4.0" defer></script>
+  <script src="js/config.js?v=8.0.20" defer></script>
+  <script src="js/esi.js?v=8.0.15" defer></script>
+  <script src="js/tree.js?v=8.0.1" defer></script>
+  <script src="js/optimizers.js?v=8.0.5" defer></script>
+  <script src="js/lpstore.js?v=1.0.0" defer></script>
+  <script src="js/custom-select.js?v=1.5.0" defer></script>
+</body>
+</html>
