@@ -10,7 +10,7 @@
 <title>EVE Deep-Industry Engine</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d3915a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='5' r='2.6'/%3E%3Ccircle cx='6' cy='18.5' r='2.6'/%3E%3Ccircle cx='12' cy='18.5' r='2.6'/%3E%3Ccircle cx='18' cy='18.5' r='2.6'/%3E%3Cpath d='M12 7.6v2.6M12 10.2L6 15.9M12 10.2v5.7M12 10.2l6 5.7'/%3E%3C/svg%3E">
 <link class="cache-bust" rel="stylesheet" href="css/tailwind-build.css?v=1.0.3">
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.35.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.36.0">
 <script>(function(){try{var t=localStorage.getItem('eve_color_theme');if(t&&t!=='lime')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body class="page-calc flex flex-col min-h-screen text-slate-200">
@@ -410,11 +410,11 @@
     <!-- Bill of Materials (BOM) Sidebar -->
     <aside id="bom-sidebar" class="lp-card w-80 md:w-96 flex flex-col overflow-hidden flex-shrink-0 z-20 m-4 ml-0 p-4">
       <div class="lp-row flex justify-between items-center" style="padding-top:0; margin-top:0; border-top:none;">
-        <div>
-          <h2 class="font-bold rajdhani tracking-wider text-lg" style="color:var(--text);">Bill of Materials</h2>
-          <div class="text-[10px] mono" style="color:var(--text-mute);">Click row to focus card in diagram</div>
+        <div class="min-w-0">
+          <h2 class="font-bold rajdhani tracking-wider text-sm uppercase truncate" style="color:var(--text);" title="Bill of Materials: click a row to focus its card in the diagram">Bill of Materials</h2>
+          <div class="text-[9px] mono truncate" style="color:var(--text-mute);">CLICK ROW TO FOCUS CARD IN DIAGRAM</div>
         </div>
-        <div class="flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5 flex-shrink-0">
           <button id="btn-bom-view-mode" onclick="toggleBomViewMode()" class="btn-glass btn-glass-muted px-2.5 py-1.5 text-[10px]" title="Switch between detailed and compact list view">
             <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3.5" y1="6" x2="3.51" y2="6"/><line x1="3.5" y1="12" x2="3.51" y2="12"/><line x1="3.5" y1="18" x2="3.51" y2="18"/></svg> Compact
           </button>
@@ -456,7 +456,19 @@
 
       <!-- Sidebar BOM Filter controls -->
       <div class="lp-row space-y-2.5 flex flex-col">
-        <button id="deduct-stock-mode" value="true" onclick="toggleDeductStockButton(this, 'recalculate')" class="btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5" title="Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg> Deducting Stock</button>
+        <!-- Same layout as the Ledger's matching row: Deduct Stock gives up its full-row width (via
+             this wrapper, not its own classes - toggleDeductStockButton/updateDeductStockButtonVisual
+             is shared with the Ledger's copy of this button and always re-applies w-full on toggle) so
+             a quick Refresh Assets sits right beside it instead of only being reachable from the header
+             icon row above. -->
+        <div class="flex items-center gap-1.5">
+          <div class="flex-1 min-w-0">
+            <button id="deduct-stock-mode" value="true" onclick="toggleDeductStockButton(this, 'recalculate')" class="btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5" title="Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg> Deducting Stock</button>
+          </div>
+          <button onclick="refreshLiveAssets()" class="btn-glass btn-glass-muted px-2.5 py-1.5 flex items-center justify-center flex-shrink-0" style="height:30px;" title="Refresh Assets: fetch your latest live character and corp assets from EVE Online" aria-label="Refresh Assets">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 4 21 9 16 9"/></svg>
+          </button>
+        </div>
         <!-- Order Type Strategy Filter -->
         <div class="flex items-center justify-between text-[11px] mono">
           <span class="font-bold" style="color:var(--text-mute);">Order Type:</span>
