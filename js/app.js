@@ -722,10 +722,17 @@ function renderBlueprintBrowserList(list, stackEnabled, sortByProfit) {
       const members = bp.memberItemIds || [{ itemId: bp.item_id, count: (bp.quantity > 0) ? bp.quantity : 1 }];
       const runsPerCopy = bp.runs || 1;
       const totalRuns = members.reduce((sum, m) => sum + m.count, 0) * runsPerCopy;
-      const queuedRuns = members.reduce((sum, m) => {
-        const memberTotalRuns = m.count * runsPerCopy;
-        return sum + Math.min(queuedRunsByItemId.get(m.itemId) || 0, memberTotalRuns);
-      }, 0);
+      // Summed raw across every member FIRST, capped only once against the whole stack's total - not
+      // capped per-member before summing. "Load" only ever tags ONE specific physical copy's item_id
+      // (see setLastLoadedBlueprintSource) - clicking "Add to Job Queue" more than once without re-
+      // Loading a different copy in between (the normal way to queue several separate batches against
+      // the same BPC's run pool) tags every one of those jobs to that SAME single item_id. Capping
+      // per-member at that one copy's own runsPerCopy (its old behavior) silently threw away
+      // everything past the first copy's worth - e.g. two separate 4-run adds against one 4-run BPC
+      // read back as "4/12 queued" forever, no matter how many more times you added, since each add
+      // individually still fit under that one member's own 4-run cap.
+      const queuedRunsRaw = members.reduce((sum, m) => sum + (queuedRunsByItemId.get(m.itemId) || 0), 0);
+      const queuedRuns = Math.min(queuedRunsRaw, totalRuns);
       queuedBadge = queuedRuns > 0
         ? `<span class="lp-badge lp-badge-danger flex-shrink-0" title="${queuedRuns} of ${totalRuns} run${totalRuns > 1 ? 's' : ''} already sitting in a queued ledger job">${window.svgIcon('lock')} ${queuedRuns}/${totalRuns} runs queued</span>`
         : '';
