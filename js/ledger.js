@@ -103,6 +103,24 @@ function toggleJobGroupCollapse(groupKey) {
 }
 window.toggleJobGroupCollapse = toggleJobGroupCollapse;
 
+// Which cluster ROOTS (list mode only - see buildJobClusters/renderJobClusterHTML) have their
+// nested prerequisite jobs folded away - keyed by the root job's own id, persisted the same way as
+// the status groups above so a folded cluster stays folded across reloads.
+let collapsedClusterIds = new Set(window.safeParseJSON(localStorage.getItem('eve_collapsed_job_clusters'), []));
+
+function saveCollapsedClusterIds() {
+  localStorage.setItem('eve_collapsed_job_clusters', JSON.stringify([...collapsedClusterIds]));
+}
+
+function toggleClusterCollapse(e, jobId) {
+  if (e) e.stopPropagation();
+  if (collapsedClusterIds.has(jobId)) collapsedClusterIds.delete(jobId);
+  else collapsedClusterIds.add(jobId);
+  saveCollapsedClusterIds();
+  renderJournalPage();
+}
+window.toggleClusterCollapse = toggleClusterCollapse;
+
 function loadJournalState() {
   try {
     const savedJobs = localStorage.getItem('eve_ledger_jobs');
@@ -488,9 +506,13 @@ function buildJobClusters(jobs) {
 // renderJobListRowHTML/renderJobCardHTML the caller is using for the current view mode. Keyed by
 // the job's own unique id (see buildJobClusters above), not its name.
 function renderJobClusterHTML(job, childrenOf, depth, renderJob) {
-  const ownHTML = renderJob(job, depth);
   const kids = childrenOf.get(job.id) || [];
+  const ownHTML = renderJob(job, depth, kids.length);
   if (kids.length === 0) return ownHTML;
+  // Collapsed: the root's own row still renders (with its toggle showing the folded count), the
+  // nested children just don't - same "always show the row, vary what's inside/beneath it" approach
+  // used everywhere else in this file, rather than hiding the whole cluster.
+  if (collapsedClusterIds.has(job.id)) return ownHTML;
   const kidsHTML = kids.map(k => renderJobClusterHTML(k, childrenOf, depth + 1, renderJob)).join('');
   return `<div class="job-cluster">${ownHTML}<div class="job-cluster-children">${kidsHTML}</div></div>`;
 }
@@ -556,7 +578,7 @@ function renderActiveJobsList(allocatedStock) {
     if (!isListMode) {
       return jobs.map(job => renderJobCardHTML(job, allocatedStock, isStockDeductEnabled)).join('');
     }
-    const renderJob = (job, depth) => renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth);
+    const renderJob = (job, depth, childCount) => renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth, childCount);
     // Only the ROOTS of each cluster (see buildJobClusters) become items of the outer list - a
     // cluster with children renders as one self-contained block (row, then its nested children
     // indented underneath), so the list never sees individual parent/child rows separately.
@@ -616,7 +638,7 @@ window.toggleQueueViewMode = toggleQueueViewMode;
 // Compact single-line-per-job view. Shows the essentials (icon/name, runs, status, cost, profit,
 // actions) with a chevron to expand the same BOM/details block used in grid view, reusing the same
 // collapse state so switching views doesn't lose whether you had a job's details open.
-function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) {
+function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth, childCount) {
   const iconTypeId = job.productTypeId || job.typeId;
   const isJobReady = job.isStarted && job.startedAt && ((Date.now() - job.startedAt) / 1000 >= (job.totalBuildSeconds || 0));
   const jobIconUrl = window.getItemIconUrl(iconTypeId, window.TYPE_ID_TO_NAME[iconTypeId] || job.name, 64);
@@ -706,7 +728,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth) 
                hover (title), same as a properly-nested (depth>0) sub-build already conveys via its own
                indentation + connector line - this just also covers an orphaned one (parent not present
                in the current filtered list) that has no indentation to lean on. -->
-          <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${job.isSubBuild ? `<span class="ml-1 text-xs align-middle" style="color:var(--text-mute);" title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}">${window.svgIcon('gear')}</span>` : ''}</div>
+          <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${job.isSubBuild ? `<span class="ml-1 text-xs align-middle" style="color:var(--text-mute);" title="Prerequisite for: ${window.esc(job.parentJobName || 'another job')}">${window.svgIcon('gear')}</span>` : ''}${(childCount > 0) ? `<button onclick="toggleClusterCollapse(event, ${job.id})" class="ml-1.5 lp-badge align-middle" style="cursor:pointer;" title="${collapsedClusterIds.has(job.id) ? `Show ${childCount} hidden prerequisite job${childCount > 1 ? 's' : ''}` : `Collapse ${childCount} prerequisite job${childCount > 1 ? 's' : ''} under this one`}">${window.svgIcon(collapsedClusterIds.has(job.id) ? 'chevron-right' : 'chevron-down')} ${childCount}</button>` : ''}</div>
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
           <!-- Edit icon lives INSIDE this same items-baseline row, right after "runs" - not as a
@@ -907,7 +929,14 @@ function renderJobPresetRowHTML(job) {
 // applies a productionSnapshot's facility/rig/system globals, rebuilds a fresh ME/TE-adjusted tree
 // for the given blueprint+runs (same bridge buildAutoImportedJob already uses to do this outside the
 // Calculator page), and ALWAYS restores every touched global afterward regardless of success/failure.
-async function rebuildTreeForSnapshot(blueprintTypeId, name, runs, productTypeId, snapshot) {
+// `buildConfig` (optional - a job's own buildConfigSnapshot, set at add-time in app.js) covers the
+// OTHER thing that's live global state on the Calculator but starts empty on this page every load:
+// which sub-assemblies were toggled to "Build" vs "Buy", any per-component buy-order override, and
+// any custom ME/TE override. Without restoring these too, a fresh tree rebuilt here would silently
+// default every sub-component below the root back to "buy at market price" - overstating cost for
+// anything the user had actually chosen to build cheaper themselves (as its own separate queued
+// sub-build job), even though the numbers shown at the moment the job was first added were correct.
+async function rebuildTreeForSnapshot(blueprintTypeId, name, runs, productTypeId, snapshot, buildConfig) {
   if (typeof window.buildRecursiveRecipeTree !== 'function') throw new Error('Recipe tree builder not available.');
 
   const prevFacilityKey = localStorage.getItem('eve_active_facility_key');
@@ -918,8 +947,18 @@ async function rebuildTreeForSnapshot(blueprintTypeId, name, runs, productTypeId
   const prevMfgSCI = window.activeMfgSCI;
   const prevReactSCI = window.activeReactSCI;
   const prevInventionSCI = window.activeInventionSCI;
+  const prevBuildSelfOverrides = window.buildSelfOverrides;
+  const prevCustomBuyModes = window.customBuyModes;
+  const prevCustomMEOverrides = window.customMEOverrides;
+  const prevCustomTEOverrides = window.customTEOverrides;
 
   try {
+    if (buildConfig) {
+      window.buildSelfOverrides = { ...(buildConfig.buildSelfOverrides || {}) };
+      window.customBuyModes = { ...(buildConfig.customBuyModes || {}) };
+      window.customMEOverrides = { ...(buildConfig.customMEOverrides || {}) };
+      window.customTEOverrides = { ...(buildConfig.customTEOverrides || {}) };
+    }
     localStorage.setItem('eve_active_facility_key', snapshot.facilityKey || 'sotiyo');
     localStorage.setItem('eve_rig_slot_1', snapshot.rig1 || '');
     localStorage.setItem('eve_rig_slot_2', snapshot.rig2 || '');
@@ -972,6 +1011,10 @@ async function rebuildTreeForSnapshot(blueprintTypeId, name, runs, productTypeId
     window.activeMfgSCI = prevMfgSCI;
     window.activeReactSCI = prevReactSCI;
     window.activeInventionSCI = prevInventionSCI;
+    window.buildSelfOverrides = prevBuildSelfOverrides;
+    window.customBuyModes = prevCustomBuyModes;
+    window.customMEOverrides = prevCustomMEOverrides;
+    window.customTEOverrides = prevCustomTEOverrides;
   }
 }
 
@@ -984,7 +1027,7 @@ async function changeJobProductionPreset(jobId, presetName) {
 
   if (typeof window.showToast === 'function') window.showToast(`Recomputing "${window.esc(job.name)}" for "${window.esc(presetName)}"...`, 'info');
   try {
-    const result = await rebuildTreeForSnapshot(job.typeId, job.name + ' Blueprint', job.runsNeeded, job.productTypeId, preset);
+    const result = await rebuildTreeForSnapshot(job.typeId, job.name + ' Blueprint', job.runsNeeded, job.productTypeId, preset, job.buildConfigSnapshot);
     job.calculatedCost = result.calculatedCost;
     job.qtyNeeded = result.root.qtyNeeded;
     job.materials = result.materials;
@@ -1027,7 +1070,7 @@ async function changeJobRunCount(jobId, newRuns) {
   if (typeof window.showToast === 'function') window.showToast(`Recomputing "${window.esc(job.name)}" for ${runs} run${runs > 1 ? 's' : ''}...`, 'info');
   const oldMaterials = Array.isArray(job.materials) ? job.materials : [];
   try {
-    const result = await rebuildTreeForSnapshot(job.typeId, job.name + ' Blueprint', runs, job.productTypeId, snapshot);
+    const result = await rebuildTreeForSnapshot(job.typeId, job.name + ' Blueprint', runs, job.productTypeId, snapshot, job.buildConfigSnapshot);
     job.runsNeeded = runs;
     job.qtyNeeded = result.root.qtyNeeded;
     job.calculatedCost = result.calculatedCost;
@@ -1079,7 +1122,8 @@ async function cascadeRunChangeToChildren(parentJob, oldMaterials) {
     const oldChildMaterials = Array.isArray(child.materials) ? child.materials : [];
     try {
       const childSnapshot = child.productionSnapshot || parentJob.productionSnapshot || getCurrentLiveProductionSnapshot();
-      const result = await rebuildTreeForSnapshot(child.typeId, child.name + ' Blueprint', childRuns, child.productTypeId, childSnapshot);
+      const childBuildConfig = child.buildConfigSnapshot || parentJob.buildConfigSnapshot;
+      const result = await rebuildTreeForSnapshot(child.typeId, child.name + ' Blueprint', childRuns, child.productTypeId, childSnapshot, childBuildConfig);
       child.runsNeeded = childRuns;
       child.qtyNeeded = result.root.qtyNeeded;
       child.calculatedCost = result.calculatedCost;
@@ -1124,9 +1168,14 @@ async function addMaterialAsPrerequisiteJob(jobId, typeId, missingQty) {
   // parent predates preset tracking), so a prerequisite spun off from a job stays consistent with
   // it instead of silently picking up whatever the Calculator happens to be set to right now.
   const snapshot = parentJob.productionSnapshot || getCurrentLiveProductionSnapshot();
+  // Same reasoning as the preset - inherit the parent's build/buy choices (which of ITS OWN sub-
+  // components were toggled to build vs. buy, any buy-order/ME/TE overrides) rather than whatever's
+  // live on this page (nothing, on a fresh Ledger load), and carry it forward on the new job so ITS
+  // own future recomputes stay consistent too.
+  const buildConfig = parentJob.buildConfigSnapshot;
 
   try {
-    const result = await rebuildTreeForSnapshot(blueprintTypeId, mat.name + ' Blueprint', runs, typeId, snapshot);
+    const result = await rebuildTreeForSnapshot(blueprintTypeId, mat.name + ' Blueprint', runs, typeId, snapshot, buildConfig);
     const newJob = {
       id: Date.now() + Math.floor(Math.random() * 1000),
       typeId: blueprintTypeId,
@@ -1141,6 +1190,7 @@ async function addMaterialAsPrerequisiteJob(jobId, typeId, missingQty) {
       parentJobId: jobId,
       parentJobName: parentJob.name, // display-only (the "⚙ Prereq for: X" label) - parentJobId is the real link
       productionSnapshot: snapshot,
+      buildConfigSnapshot: buildConfig,
       addedAt: new Date().toISOString()
     };
     const parentIndex = activeJobs.findIndex(j => j && j.id === jobId);
@@ -2224,6 +2274,11 @@ function markJobAsBuilt(jobId) {
     eveJobId: job.eveJobId,
     baseTime: job.baseTime,
     totalBuildSeconds: job.totalBuildSeconds,
+    // Carried through so a re-queued job (see requeueCompletedJob) still knows what preset/build-vs-
+    // buy configuration produced these numbers, instead of silently falling back to "whatever's live
+    // right now" the moment it's ever recomputed (run count/preset change) after being re-queued.
+    productionSnapshot: job.productionSnapshot,
+    buildConfigSnapshot: job.buildConfigSnapshot,
     completedAt: new Date().toISOString()
   };
 
@@ -2253,6 +2308,8 @@ function requeueCompletedJob(recordId) {
     materials: record.materials || [],
     baseTime: record.baseTime,
     totalBuildSeconds: record.totalBuildSeconds,
+    productionSnapshot: record.productionSnapshot,
+    buildConfigSnapshot: record.buildConfigSnapshot,
     addedAt: new Date().toISOString()
   };
 
@@ -2267,13 +2324,47 @@ function deleteJobFromQueue(jobId) {
   const index = activeJobs.findIndex(j => j && j.id === jobId);
   if (index === -1) return;
   const job = activeJobs[index];
-  activeJobs.splice(index, 1);
+
+  // Cascade: delete this job AND every prerequisite job queued under it, recursively (a prereq can
+  // itself have its own prereq) - left behind, they became orphaned jobs with nothing to belong to
+  // instead of actually going away with the job they were queued for. parentJobId (the real per-job
+  // link) is checked first; the name-based fallback only matters for a sub-build saved before that
+  // field existed.
+  const toDelete = new Set([jobId]);
+  let addedMore = true;
+  while (addedMore) {
+    addedMore = false;
+    activeJobs.forEach(j => {
+      if (!j || toDelete.has(j.id) || !j.isSubBuild) return;
+      const belongsToDeleted = (j.parentJobId !== undefined && j.parentJobId !== null)
+        ? toDelete.has(j.parentJobId)
+        : Array.from(toDelete).some(id => activeJobs.find(x => x && x.id === id)?.name === j.parentJobName);
+      if (belongsToDeleted) { toDelete.add(j.id); addedMore = true; }
+    });
+  }
+
+  // Snapshot each removed job with its original index so Undo can restore the exact original
+  // ordering, not just re-append everything at the end of the queue.
+  const removed = activeJobs
+    .map((j, i) => ({ job: j, i }))
+    .filter(({ job: j }) => j && toDelete.has(j.id))
+    .sort((a, b) => a.i - b.i);
+
+  activeJobs = activeJobs.filter(j => !j || !toDelete.has(j.id));
   localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
   renderJournalPage();
+
+  const prereqCount = removed.length - 1;
+  const message = prereqCount > 0
+    ? `Removed "${job.name}" and ${prereqCount} prerequisite job${prereqCount > 1 ? 's' : ''} from the queue.`
+    : `Removed "${job.name}" from the queue.`;
+
   if (typeof window.showToast === 'function') {
-    window.showToast(`Removed "${job.name}" from the queue.`, 'info', { action: { label: 'Undo', onClick: () => {
+    window.showToast(message, 'info', { action: { label: 'Undo', onClick: () => {
       loadJournalState();
-      activeJobs.splice(index, 0, job);
+      removed.forEach(({ job: j, i }) => {
+        activeJobs.splice(Math.min(i, activeJobs.length), 0, j);
+      });
       localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
       renderJournalPage();
     } } });

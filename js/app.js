@@ -2197,6 +2197,18 @@ function addCurrentJobToLedger(e) {
     rig2: localStorage.getItem('eve_rig_slot_2') || '',
     rig3: localStorage.getItem('eve_rig_slot_3') || ''
   };
+  // Same idea as productionSnapshot, but for the OTHER thing that's live global state here and
+  // nowhere near persisted on the Ledger page: which sub-assemblies are toggled to build vs. buy,
+  // any per-component buy-order override, and any custom ME/TE override. The Ledger recomputes a
+  // job's tree fresh (run count changes, preset changes) using window.buildRecursiveRecipeTree, which
+  // reads these same maps - without carrying a copy along, that recompute would start from all-empty
+  // and silently price every sub-component as "buy at market" regardless of what was chosen here.
+  const buildConfigSnapshot = {
+    buildSelfOverrides: { ...(window.buildSelfOverrides || {}) },
+    customBuyModes: { ...(window.customBuyModes || {}) },
+    customMEOverrides: { ...(window.customMEOverrides || {}) },
+    customTEOverrides: { ...(window.customTEOverrides || {}) }
+  };
 
   // Generated up front (not inline in the job object below) so subBuildJobs can link to it - a
   // sub-build needs to know its parent's actual unique id, not just its NAME, or the Ledger's list-
@@ -2226,6 +2238,7 @@ function addCurrentJobToLedger(e) {
     parentJobId: rootJobId,
     parentJobName: rootJobName, // display-only now (the "⚙ Prereq for: X" label) - parentJobId is the real link
     productionSnapshot: productionSnapshot,
+    buildConfigSnapshot: buildConfigSnapshot,
     addedAt: new Date().toISOString()
   }));
 
@@ -2253,6 +2266,7 @@ function addCurrentJobToLedger(e) {
     materials: materials,
     sourceBlueprintItemId: sourceBlueprintItemId,
     productionSnapshot: productionSnapshot,
+    buildConfigSnapshot: buildConfigSnapshot,
     addedAt: new Date().toISOString()
   };
 
@@ -2262,6 +2276,11 @@ function addCurrentJobToLedger(e) {
   localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap || {}));
 
   updateHeaderLedgerCount();
+  // The "My Blueprints" panel's own "N/M runs queued" badge (renderBlueprintBrowserList, above) reads
+  // fresh from eve_ledger_jobs on every render already - it was never stale data, just nothing here
+  // was telling it to re-render after adding a job. filterBlueprintBrowser() is a no-op if the panel
+  // was never opened this session (_blueprintBrowserData starts empty) or isn't currently in the DOM.
+  if (typeof window.filterBlueprintBrowser === 'function') window.filterBlueprintBrowser();
 
   // A toast (not the clicked button's own text, which the recalculate() call above already
   // replaced by re-rendering the whole tree diagram - by the time execution gets here, e.target is
