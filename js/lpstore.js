@@ -47,6 +47,37 @@ let _lpTypeFilter = 'all';    // 'all' | 'direct' | 'bpc'
 let _lpSortKey = 'iskPerLp';
 let _lpSortDir = -1;          // -1 desc, 1 asc
 let _lpExpandedOfferIds = new Set();
+let _lpResolvedNames = {};    // typeId -> name, for anything eve_db.js's EVE_ITEMS doesn't have
+let _lpShoppingList = [];     // {typeId, name, qty, mode: 'sell'|'buy'} - required items the player still needs to go acquire
+
+// --- Item names -----------------------------------------------------------------------------
+// eve_db.js's local EVE_ITEMS snapshot doesn't cover every type in the game (SOE/vanity clothing,
+// some deadspace variants, etc.) - real LP store offers can and do reference those. Rather than
+// showing "Item 4158" forever, anything missing gets resolved live via ESI's /universe/names/
+// (works for any category, not just items - one POST per store, id -> name only, no icon/market
+// data) and cached here for the rest of the session.
+
+function getLPItemName(typeId) {
+  return (window.EVE_ITEMS && window.EVE_ITEMS[typeId]) || _lpResolvedNames[typeId] || `Item ${typeId}`;
+}
+window.getLPItemName = getLPItemName;
+
+async function resolveMissingItemNames(typeIds) {
+  const missing = [...new Set(typeIds)].filter(id => !(window.EVE_ITEMS && window.EVE_ITEMS[id]) && !_lpResolvedNames[id]);
+  if (!missing.length) return;
+  const chunks = [];
+  for (let i = 0; i < missing.length; i += 500) chunks.push(missing.slice(i, i + 500));
+  await Promise.all(chunks.map(async (chunk) => {
+    try {
+      const res = await fetch('https://esi.evetech.net/latest/universe/names/?datasource=tranquility', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(chunk)
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      (data || []).forEach(entry => { _lpResolvedNames[entry.id] = entry.name; });
+    } catch (e) { console.warn('[LP Store] Failed to resolve names for', chunk, e); }
+  }));
+}
 
 // --- Offer fetch --------------------------------------------------------------------------
 
@@ -74,8 +105,18 @@ async function evaluateDirectSellOffer(offer) {
   const ids = [offer.type_id, ...offer.required_items.map(r => r.type_id)];
   await window.fetchMarketPrices(ids);
 
+  // Cost side: what it takes to ACQUIRE the required items right now - the Jita sell/instant-buy
+  // price, same convention the rest of the app uses for "cost to get a material in hand".
+  // Revenue side: Jita sell price too (this app's existing convention for "what an output is
+  // worth" - see js/invention.js's bpcValue calc, matched here rather than diverging), net of
+  // sales tax and broker fee so it's an apples-to-apples number with the BPC path below, which
+  // already deducts both. Both sides assume you're buying/selling at Jita specifically (same
+  // station fetchMarketPrices always uses) - not wherever you'd actually be standing in the
+  // warzone.
+  const { salesTax, brokerFee } = window.getActiveFeeInputs ? window.getActiveFeeInputs() : { salesTax: 0.036, brokerFee: 0.01 };
   const outputPrice = (window.priceCache[offer.type_id] || {}).sell || 0;
-  const revenue = outputPrice * offer.quantity;
+  const grossRevenue = outputPrice * offer.quantity;
+  const revenue = grossRevenue * (1 - salesTax - brokerFee);
 
   let requiredItemsCost = 0;
   offer.required_items.forEach(r => {
@@ -87,7 +128,7 @@ async function evaluateDirectSellOffer(offer) {
 
   return {
     offer, offerType: 'direct',
-    outputTypeId: offer.type_id, outputName: window.EVE_ITEMS[offer.type_id] || `Item ${offer.type_id}`,
+    outputTypeId: offer.type_id, outputName: getLPItemName(offer.type_id),
     outputQty: offer.quantity,
     revenue, cost, requiredItemsCost, profit,
     lpCost: offer.lp_cost, iskCost: offer.isk_cost,
@@ -110,7 +151,7 @@ async function evaluateBpcOffer(offer) {
   window.recipeTreeRootProductTypeId = productTypeId;
   let root;
   try {
-    root = await window.buildRecursiveRecipeTree(parseInt(offer.type_id), window.EVE_ITEMS[offer.type_id] || 'Blueprint', runs, 0, 6, new Set(), null);
+    root = await window.buildRecursiveRecipeTree(parseInt(offer.type_id), getLPItemName(offer.type_id), runs, 0, 6, new Set(), null);
   } finally {
     window.recipeTreeRootProductTypeId = priorRootProduct;
   }
@@ -154,7 +195,7 @@ async function evaluateBpcOffer(offer) {
 
   return {
     offer, offerType: 'bpc',
-    outputTypeId: productTypeId, outputName: window.EVE_ITEMS[productTypeId] || `Item ${productTypeId}`,
+    outputTypeId: productTypeId, outputName: getLPItemName(productTypeId),
     outputQty: root.qtyNeeded,
     revenue, cost, requiredItemsCost, materialCost, jobFee, profit,
     lpCost: offer.lp_cost, iskCost: offer.isk_cost,
@@ -179,10 +220,15 @@ async function loadAndRankLPStore(corpId) {
     // Cheap upfront pre-warm: every flat (non-recursive) type_id every offer touches, in one
     // batched call, before any per-offer work starts. fetchMarketPrices no-ops on already-cached
     // ids, so the per-offer eval calls below effectively become free for anything covered here -
-    // this just avoids one round trip per offer for prices every offer needs anyway.
+    // this just avoids one round trip per offer for prices every offer needs anyway. Name
+    // resolution rides along the same collected id set, so anything eve_db.js doesn't know (see
+    // resolveMissingItemNames above) gets a real name before a single row renders.
     const flatIds = new Set();
     offers.forEach(o => { flatIds.add(o.type_id); (o.required_items || []).forEach(r => flatIds.add(r.type_id)); });
-    await window.fetchMarketPrices(Array.from(flatIds));
+    await Promise.all([
+      window.fetchMarketPrices(Array.from(flatIds)),
+      resolveMissingItemNames(Array.from(flatIds))
+    ]);
 
     // buildRecursiveRecipeTree is fully local (recipeMap/EVE_RECIPES, already loaded from
     // eve_db.js - see js/tree.js fetchBlueprintData) - no network happens inside it, so building
@@ -239,6 +285,130 @@ function toggleLPOfferExpanded(offerId) {
 }
 window.toggleLPOfferExpanded = toggleLPOfferExpanded;
 
+// --- Send a BPC offer to the Calculator's own tree ---------------------------------------------
+// Reuses the Calculator's existing ?build= shared-link format (js/app.js applySharedBuildFromUrl)
+// rather than inventing a second hand-off mechanism - this is the exact same link the Invention
+// page's "send to Calculator" button already builds (js/invention.js sendInventionRowToCalculator).
+// No me/te means the Calculator opens the blueprint as an unresearched ME0/TE0 copy, which is what
+// an LP store BPC actually is - the player can dial in real ME/TE themselves once there if their
+// eventual redeemed copy differs. Runs come from this offer's own quantity (assumed 1 run/BPC -
+// see evaluateBpcOffer's own note on that assumption), so the Calculator opens already scaled to
+// what THIS offer would actually produce, not a default of 1.
+function sendLPOfferToCalculator(offerId) {
+  const result = _lpRankedResults.find(r => r.offer.offer_id === offerId);
+  if (!result || result.offerType !== 'bpc') return;
+  const state = { id: result.blueprintTypeId, name: getLPItemName(result.blueprintTypeId), runs: result.bpcCopies };
+  const encoded = btoa(encodeURIComponent(JSON.stringify(state)));
+  window.location.href = `index.html?build=${encoded}`;
+}
+window.sendLPOfferToCalculator = sendLPOfferToCalculator;
+
+// --- Shopping list (required items still needing to be acquired) --------------------------------
+// A deliberately lightweight, standalone list - NOT a Ledger job. These are plain market purchases
+// with no build step of their own, so folding them into the Ledger's job model (which assumes a
+// blueprint/materials/runs) would mean teaching that already-intricate system a whole new kind of
+// "job" for no real benefit. This lives entirely on this page, persisted so it survives a reload.
+
+function loadLPShoppingList() {
+  _lpShoppingList = window.safeParseJSON(localStorage.getItem('eve_lpstore_shopping_list'), []);
+}
+
+function saveLPShoppingList() {
+  localStorage.setItem('eve_lpstore_shopping_list', JSON.stringify(_lpShoppingList));
+}
+
+function addOfferRequiredItemsToShoppingList(offerId) {
+  const result = _lpRankedResults.find(r => r.offer.offer_id === offerId);
+  if (!result || !result.offer.required_items.length) return;
+  result.offer.required_items.forEach(ri => {
+    const existing = _lpShoppingList.find(x => x.typeId === ri.type_id);
+    if (existing) existing.qty += ri.quantity;
+    else _lpShoppingList.push({ typeId: ri.type_id, name: getLPItemName(ri.type_id), qty: ri.quantity, mode: 'sell' });
+  });
+  saveLPShoppingList();
+  renderLPShoppingList();
+  if (typeof window.showToast === 'function') window.showToast('Added to shopping list.', 'success');
+}
+window.addOfferRequiredItemsToShoppingList = addOfferRequiredItemsToShoppingList;
+
+function setLPShoppingItemMode(typeId, mode) {
+  const item = _lpShoppingList.find(x => x.typeId === typeId);
+  if (!item) return;
+  item.mode = mode;
+  saveLPShoppingList();
+  renderLPShoppingList();
+}
+window.setLPShoppingItemMode = setLPShoppingItemMode;
+
+function setLPShoppingItemQty(typeId, qty) {
+  const item = _lpShoppingList.find(x => x.typeId === typeId);
+  if (!item) return;
+  item.qty = Math.max(1, parseInt(qty) || 1);
+  saveLPShoppingList();
+  renderLPShoppingList();
+}
+window.setLPShoppingItemQty = setLPShoppingItemQty;
+
+function removeLPShoppingItem(typeId) {
+  _lpShoppingList = _lpShoppingList.filter(x => x.typeId !== typeId);
+  saveLPShoppingList();
+  renderLPShoppingList();
+}
+window.removeLPShoppingItem = removeLPShoppingItem;
+
+function clearLPShoppingList() {
+  _lpShoppingList = [];
+  saveLPShoppingList();
+  renderLPShoppingList();
+}
+window.clearLPShoppingList = clearLPShoppingList;
+
+function copyLPShoppingListMultibuy(btn) {
+  const text = _lpShoppingList.map(i => `${i.name}\t${i.qty}`).join('\n');
+  if (typeof window.copyToClipboardWithFeedback === 'function') window.copyToClipboardWithFeedback(text, btn);
+}
+window.copyLPShoppingListMultibuy = copyLPShoppingListMultibuy;
+
+function renderLPShoppingList() {
+  const badge = document.getElementById('lpstore-shopping-count');
+  if (badge) badge.textContent = String(_lpShoppingList.length);
+
+  const el = document.getElementById('lpstore-shopping-list-body');
+  if (!el) return;
+
+  if (!_lpShoppingList.length) {
+    el.innerHTML = `<div class="text-[11px] italic py-3 text-center" style="color:var(--text-mute);">Nothing yet - expand an offer below and add its required items.</div>`;
+    return;
+  }
+
+  let total = 0;
+  const rows = _lpShoppingList.map(item => {
+    const priceEntry = window.priceCache && window.priceCache[item.typeId];
+    const unitPrice = priceEntry ? (item.mode === 'buy' ? (priceEntry.buy || 0) : (priceEntry.sell || 0)) : 0;
+    const lineTotal = unitPrice * item.qty;
+    total += lineTotal;
+    return `
+      <div class="flex items-center gap-2 py-1.5 text-[11px] mono" style="border-bottom:1px solid rgba(255,255,255,0.05);">
+        <span class="truncate flex-1 min-w-0" style="color:var(--text);">${window.esc(item.name)}</span>
+        <input type="number" min="1" value="${item.qty}" onchange="setLPShoppingItemQty(${item.typeId}, this.value)" class="field-line w-16 text-center p-1 text-[11px]">
+        <div class="flex rounded overflow-hidden flex-shrink-0" style="border:1px solid rgba(255,255,255,0.1);">
+          <button onclick="setLPShoppingItemMode(${item.typeId}, 'sell')" class="px-1.5 py-1 text-[10px]" style="background:${item.mode === 'sell' ? 'var(--accent)' : 'transparent'}; color:${item.mode === 'sell' ? '#0a1002' : 'var(--text-mute)'};" title="Price at Jita sell/instant-buy">Sell</button>
+          <button onclick="setLPShoppingItemMode(${item.typeId}, 'buy')" class="px-1.5 py-1 text-[10px]" style="background:${item.mode === 'buy' ? 'var(--accent)' : 'transparent'}; color:${item.mode === 'buy' ? '#0a1002' : 'var(--text-mute)'};" title="Price at Jita highest buy order (patient buy order, not instant)">Buy</button>
+        </div>
+        <span class="text-right flex-shrink-0" style="width:80px; color:var(--text-mute);">${Math.round(lineTotal).toLocaleString()}</span>
+        <button onclick="removeLPShoppingItem(${item.typeId})" class="flex-shrink-0" style="color:var(--text-mute);" title="Remove">${window.svgIcon ? window.svgIcon('x') : '×'}</button>
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    ${rows}
+    <div class="flex items-center justify-between pt-2 mt-1 text-[11px] mono font-bold">
+      <span style="color:var(--text-mute);">Total</span>
+      <span style="color:var(--accent);">${Math.round(total).toLocaleString()} ISK</span>
+    </div>`;
+}
+window.renderLPShoppingList = renderLPShoppingList;
+
 // --- Rendering -------------------------------------------------------------------------------
 
 function getLPStoreIconUrl(typeId, isBpc) {
@@ -268,6 +438,10 @@ function renderLPStoreState(err) {
 
   renderLPStoreSummaryTiles();
   renderLPStoreTable();
+  // Shopping list prices come from window.priceCache, which just got a fresh batch of entries from
+  // this same load - re-render so list items added before this store's prices arrived (or added from
+  // a previous corp) don't keep showing a stale/zero price.
+  renderLPShoppingList();
 }
 
 function renderLPStoreSummaryTiles() {
@@ -328,17 +502,31 @@ function renderLPStoreTable() {
     const profitColor = r.profit > 0 ? 'var(--accent)' : 'var(--red-400, #f87171)';
     const iskPerLpDisplay = r.iskPerLp === null ? '—' : Math.round(r.iskPerLp).toLocaleString();
     const expanded = _lpExpandedOfferIds.has(offer.offer_id);
+    // onerror is chained twice: /icon -> /render (covers most things, e.g. blueprints only have a
+    // render, not an icon) -> finally hide the broken-image box entirely rather than show it, for
+    // the handful of type_ids (SOE/vanity clothing, oddities) with neither.
+    const iconFallback = `this.onerror=function(){this.style.visibility='hidden';}; this.src='https://images.evetech.net/types/${r.outputTypeId}/render?size=32';`;
 
     const typeBadge = isBpc
-      ? `<span class="text-[9px] mono px-1.5 py-0.5 rounded" style="background:rgba(192,132,252,0.15); color:#c084fc;" title="Redeeming this offer grants a Blueprint Copy - value shown is what building it out nets, not the BPC's own resale value.">BPC</span>`
-      : `<span class="text-[9px] mono px-1.5 py-0.5 rounded" style="background:rgba(56,189,248,0.15); color:#38bdf8;">ITEM</span>`;
+      ? `<span class="text-[9px] mono px-1.5 py-0.5 rounded flex-shrink-0" style="background:rgba(192,132,252,0.15); color:#c084fc;" title="Redeeming this offer grants a Blueprint Copy - value shown is what building it out nets, not the BPC's own resale value.">BPC</span>`
+      : `<span class="text-[9px] mono px-1.5 py-0.5 rounded flex-shrink-0" style="background:rgba(56,189,248,0.15); color:#38bdf8;">ITEM</span>`;
 
+    // Visible without expanding - the actual reason two rows can share an item name (CCP offers
+    // the same reward through several different LP/ISK/item combinations; each is a distinct
+    // offer_id, not a data glitch - see resolveMissingItemNames's neighbor note in js/lpstore.js
+    // dev notes). Previously only visible after a click, which read as duplicate junk.
     const requiredItemsSummary = offer.required_items.length
-      ? offer.required_items.map(r2 => `${r2.quantity}x ${window.esc(window.EVE_ITEMS[r2.type_id] || `Item ${r2.type_id}`)}`).join(', ')
-      : 'None';
+      ? offer.required_items.map(r2 => `${r2.quantity}x ${window.esc(getLPItemName(r2.type_id))}`).join(', ')
+      : (offer.isk_cost > 0 ? 'ISK + LP only' : 'LP only');
 
     let detailHTML = '';
     if (expanded) {
+      const addToListBtn = offer.required_items.length
+        ? `<button onclick="event.stopPropagation(); addOfferRequiredItemsToShoppingList(${offer.offer_id});" class="btn-glass btn-glass-muted px-2.5 py-1 text-[10px]">+ Add Required Items to Shopping List</button>`
+        : '';
+      const buildBtn = isBpc
+        ? `<button onclick="event.stopPropagation(); sendLPOfferToCalculator(${offer.offer_id});" class="btn-glass px-2.5 py-1 text-[10px]" title="Opens this blueprint in the main Calculator's tree, scaled to ${r.bpcCopies} run${r.bpcCopies === 1 ? '' : 's'}, so you can optimize the build and Add to Ledger from there.">Build This BPC →</button>`
+        : '';
       detailHTML = `
         <tr class="lp-detail-row">
           <td colspan="7" class="px-3 pb-3">
@@ -346,16 +534,17 @@ function renderLPStoreTable() {
               <div class="grid grid-cols-2 gap-x-6 gap-y-1.5">
                 <div><span style="color:var(--text-mute);">ISK Cost:</span> ${Math.round(offer.isk_cost).toLocaleString()} ISK</div>
                 <div><span style="color:var(--text-mute);">LP Cost:</span> ${offer.lp_cost.toLocaleString()} LP</div>
-                <div><span style="color:var(--text-mute);">Required Items (market cost):</span> ${Math.round(r.requiredItemsCost).toLocaleString()} ISK</div>
+                <div><span style="color:var(--text-mute);">Required Items (at Jita sell):</span> ${Math.round(r.requiredItemsCost).toLocaleString()} ISK</div>
                 <div><span style="color:var(--text-mute);">Grants:</span> ${r.outputQty.toLocaleString()}x ${window.esc(r.outputName)}</div>
                 ${isBpc ? `<div><span style="color:var(--text-mute);">Material Cost to Build:</span> ${Math.round(r.materialCost).toLocaleString()} ISK</div>` : ''}
                 ${isBpc ? `<div><span style="color:var(--text-mute);">Job Install Fee:</span> ${Math.round(r.jobFee).toLocaleString()} ISK</div>` : ''}
                 ${isBpc ? `<div><span style="color:var(--text-mute);">Build Time:</span> ${r.buildSeconds > 0 ? window.formatDurationCompact(r.buildSeconds) : 'no time data'}</div>` : ''}
-                ${isBpc ? `<div><span style="color:var(--text-mute);">BPCs Granted:</span> ${r.bpcCopies} (assumed 1 run each)</div>` : ''}
+                ${isBpc ? `<div><span style="color:var(--text-mute);">BPCs Granted:</span> ${r.bpcCopies} (assumed 1 run each - see note below)</div>` : ''}
               </div>
               <div class="mt-2 pt-2" style="border-top:1px solid rgba(255,255,255,0.06); color:var(--text-mute);">
                 Turned in: ${requiredItemsSummary}
               </div>
+              ${(addToListBtn || buildBtn) ? `<div class="mt-2.5 pt-2.5 flex gap-2" style="border-top:1px solid rgba(255,255,255,0.06);">${buildBtn}${addToListBtn}</div>` : ''}
             </div>
           </td>
         </tr>`;
@@ -365,9 +554,14 @@ function renderLPStoreTable() {
       <tr class="lp-store-row cursor-pointer" onclick="toggleLPOfferExpanded(${offer.offer_id})" title="Click for a full cost/value breakdown">
         <td class="py-1.5">
           <div class="flex items-center gap-2 min-w-0">
-            <img src="${iconUrl}" alt="" class="w-6 h-6 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${r.outputTypeId}/render?size=32';">
-            <span class="truncate font-semibold text-white">${window.esc(r.outputName)}</span>
-            ${typeBadge}
+            <img src="${iconUrl}" alt="" class="w-6 h-6 rounded flex-shrink-0" loading="lazy" onerror="${iconFallback}">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1.5">
+                <span class="truncate font-semibold text-white">${window.esc(r.outputName)}</span>
+                ${typeBadge}
+              </div>
+              <div class="truncate text-[10px]" style="color:var(--text-mute);">${requiredItemsSummary}</div>
+            </div>
           </div>
         </td>
         <td class="text-right mono">${offer.lp_cost.toLocaleString()}</td>
@@ -386,8 +580,8 @@ function renderLPStoreTable() {
         <tr>
           <th>Item</th>
           <th class="text-right cursor-pointer" onclick="setLPStoreSort('lpCost')">LP Cost${sortIndicator('lpCost')}</th>
-          <th class="text-right cursor-pointer" onclick="setLPStoreSort('cost')">Total Cost${sortIndicator('cost')}</th>
-          <th class="text-right cursor-pointer" onclick="setLPStoreSort('revenue')">Est. Value${sortIndicator('revenue')}</th>
+          <th class="text-right cursor-pointer" onclick="setLPStoreSort('cost')" title="ISK cost + required items, all priced at Jita sell/instant-buy - plus material cost and job install fee for BPC offers.">Total Cost${sortIndicator('cost')}</th>
+          <th class="text-right cursor-pointer" onclick="setLPStoreSort('revenue')" title="Output priced at Jita sell, net of your Sales Tax and Broker Fee settings (left sidebar).">Est. Value${sortIndicator('revenue')}</th>
           <th class="text-right cursor-pointer" onclick="setLPStoreSort('profit')">Est. Profit${sortIndicator('profit')}</th>
           <th class="text-right cursor-pointer" onclick="setLPStoreSort('iskPerLp')" title="Estimated ISK profit per LP spent - the ranking metric.">ISK / LP${sortIndicator('iskPerLp')}</th>
           <th class="text-right">Build Time</th>
@@ -460,6 +654,8 @@ window.onload = async () => {
   populateLPStoreCorpSelect();
   loadSharedTaxSettingsForLPStore();
   renderLPStoreActiveStationLabel();
+  loadLPShoppingList();
+  renderLPShoppingList();
   renderLPStoreState();
 
   if (typeof window.handleEsiSSOCallback === 'function') {
