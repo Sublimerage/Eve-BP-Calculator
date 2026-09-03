@@ -2042,6 +2042,12 @@ function createNodeCard(node) {
                   <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l3 3v15H6z"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/></svg>
                   Buy
                 </button>
+                ${(window.__lpOfferByOutputTypeId && window.__lpOfferByOutputTypeId[productTypeId]) ? `
+                  <button onclick="setComponentBuyMode(event, ${node.typeId}, 'lp')" class="toggle-btn ${currentBuyStrategy === 'lp' ? 'toggle-btn-active-accent' : ''}" style="${currentBuyStrategy === 'lp' ? 'color:#c084fc;border-color:#c084fc;' : ''}" title="Acquire via this LP store's own offer instead of buying it on the market">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5"/></svg>
+                    LP
+                  </button>
+                ` : ''}
               </div>
             </div>
           ` : ''}
@@ -2080,7 +2086,7 @@ function createNodeCard(node) {
           <div class="text-[#e85555] font-semibold">+${Math.round(node.jobFee).toLocaleString()} ISK</div>
         </div>` : ''}
         <div class="border-t border-[#3a3025] pt-2">
-          <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">${isRoot ? 'Total Production Cost' : node.isBuildingSelf ? 'Calculated Build Cost' : 'Market Buy Cost'}</div>
+          <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">${isRoot ? 'Total Production Cost' : node.isBuildingSelf ? 'Calculated Build Cost' : node._lpAcquiredOffer ? 'LP Redemption Cost' : 'Market Buy Cost'}</div>
           <div class="font-bold" style="color:var(--cost);">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</div>
         </div>
         ${isRoot ? `
@@ -2731,7 +2737,11 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
     if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
       const typeId = node.displayTypeId || node.typeId;
       const strategy = window.getNodePriceStrategy(node);
-      
+      // An 'lp' component is redeemed from an LP store, not bought on the market - it has no place
+      // in a market shopping list/Copy Multibuy, so it's left out of the BOM entirely (its own cost
+      // is tracked separately, see js/lpstore.js's LP-specific stat strip).
+      if (strategy === 'lp') return;
+
       const productTypeId = node.productTypeId || node.typeId;
       const availableStock = isStockDeductEnabled ? (allocatedStockPool[productTypeId] || allocatedStockPool[node.typeId] || 0) : 0;
       const consumedFromStock = Math.min(node.qtyNeeded, availableStock);
@@ -3042,7 +3052,11 @@ window.resolveProductIdFromBlueprintNameAsync = resolveProductIdFromBlueprintNam
 // Generates a radial halftone of triangles: large/dense near the edges, shrinking and fading
 // toward the center. A true radial halftone can't be done with repeating CSS patterns alone
 // (they're uniform, not distance-varying), so this computes it directly in JS.
-window.onload = async () => {
+// addEventListener rather than a plain `window.onload =` assignment - lpstore.html loads this file
+// alongside js/lpstore.js, which needs its own load handler to run too. A raw assignment would have
+// whichever script loads second silently clobber the other's init entirely; addEventListener lets
+// both coexist and fire in load order, with no change in behavior on pages that only load one.
+window.addEventListener('load', async () => {
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
@@ -3087,7 +3101,7 @@ window.onload = async () => {
   }
 
   window.addEventListener('resize', drawConnectingLines);
-};
+});
 
 // "F" key: center/focus on the selected card, or the final output card when nothing is selected.
 // centerOnSelectedNode() already falls back to window.recipeTreeRoot when nothing is selected.

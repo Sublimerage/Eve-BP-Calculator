@@ -295,6 +295,34 @@ function calculateTreeNodeCost(node) {
 
   if (!node.isBuildingSelf || !node.children || node.children.length === 0) {
     const strategy = getNodePriceStrategy(node);
+
+    // 'lp' only ever gets set by the LP Store page's own pill (js/app.js createNodeCard), which
+    // only renders when window.__lpOfferByOutputTypeId already has a match for this component - so
+    // this branch is unreachable on every other page. Prices this leaf from the matching LP offer
+    // (cheapest-LP one, if more than one exists) instead of the market: the ISK portion (isk_cost +
+    // required_items, both priced at Jita sell) becomes this node's calculatedCost same as any other
+    // leaf, while the LP portion has nowhere to live in this ISK-only tree, so it's tallied on a
+    // page-global accumulator the LP Store page reads after recalculate() finishes.
+    if (strategy === 'lp') {
+      const offers = window.__lpOfferByOutputTypeId && window.__lpOfferByOutputTypeId[productTypeId];
+      if (offers && offers.length) {
+        const offer = offers.slice().sort((a, b) => a.lp_cost - b.lp_cost)[0];
+        const batches = Math.ceil(node.qtyNeeded / (offer.quantity || 1));
+        let requiredItemsCost = 0;
+        (offer.required_items || []).forEach(r => {
+          requiredItemsCost += ((window.priceCache[r.type_id] || {}).sell || 0) * r.quantity;
+        });
+        window.__lpSpentThisRecalc = (window.__lpSpentThisRecalc || 0) + batches * offer.lp_cost;
+        node._lpAcquiredOffer = offer;
+        node._lpAcquiredBatches = batches;
+        node.calculatedCost = batches * (offer.isk_cost + requiredItemsCost);
+        return node.calculatedCost;
+      }
+      // No matching offer found (shouldn't normally happen - the pill that sets this only ever
+      // renders when one exists) - fall through to sell pricing rather than silently costing 0.
+    }
+    node._lpAcquiredOffer = null;
+
     const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
     let unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
     if (strategy === 'buy') {

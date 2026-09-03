@@ -23,6 +23,13 @@
 // data during development, not assumed. That's why standing is never factored in here: it doesn't
 // change the price, only whether you're currently allowed to buy it, which is the player's own
 // problem to solve in-game.
+//
+// A BPC offer's "Isolate" button hands off to the Calculator's OWN tree canvas and Bill of
+// Materials sidebar (js/app.js, also loaded on this page) rather than a lookalike rebuild - see
+// isolateOffer() below and the plan this was built from for why. The one new capability that adds
+// - acquiring a component via this store's own LP offer instead of building or buying it - is a
+// small guarded addition to js/app.js's createNodeCard and js/optimizers.js's
+// calculateTreeNodeCost, inert everywhere except when window.__lpOfferByOutputTypeId has a match.
 // =============================================================================================
 
 // Verified directly against ESI (GET /corporations/{id}/, one at a time) during development - NOT
@@ -48,17 +55,11 @@ let _lpSortKey = 'iskPerLp';
 let _lpSortDir = -1;          // -1 desc, 1 asc
 let _lpExpandedOfferIds = new Set();
 let _lpResolvedNames = {};    // typeId -> name, for anything eve_db.js's EVE_ITEMS doesn't have
-let _lpShoppingList = [];     // {typeId, name, qty, mode: 'sell'|'buy'} - required items the player still needs to go acquire
-let _lpOfferByOutputTypeId = {}; // typeId -> [offers], built per corp load, drives the inspector's "Acquire via LP" option
-
-// --- Build inspector state (isolate an offer -> live interactive tree/list, replacing the ranked
-//     list - see the plan's "Why not reuse the Calculator's card canvas directly" for why this is
-//     a purpose-built renderer rather than a straight reuse of js/app.js's card canvas) ----------
-let _lpInspectedResult = null;      // the ranked-result object currently isolated, or null (list view when null)
-let _lpInspectedRoot = null;        // live tree root (real for BPC offers, synthetic flat root for direct-sell offers)
-let _lpInspectedTargetQty = 1;      // adjustable run/acquisition count, defaults to the offer's own quantity
-let _lpAcquireViaLPTypeIds = new Set(); // typeIds currently set to "acquire via LP" instead of build/buy
-let _lpInspectorCollapsedIds = new Set(); // instanceIds of nodes whose children are hidden in the inspector list
+let _lpOfferByOutputTypeId = {}; // typeId -> [offers], built per corp load - also mirrored onto
+                                  // window.__lpOfferByOutputTypeId so js/app.js and js/optimizers.js
+                                  // (loaded before this file, no direct access to this module's own
+                                  // variables) can see it too.
+let _lpIsolatedResult = null; // the ranked-result currently isolated in the canvas view, or null
 
 // --- Item names -----------------------------------------------------------------------------
 // eve_db.js's local EVE_ITEMS snapshot doesn't cover every type in the game (SOE/vanity clothing,
@@ -102,8 +103,8 @@ async function fetchLPStoreOffers(corpId) {
 window.fetchLPStoreOffers = fetchLPStoreOffers;
 
 // Sum of an offer's required_items priced at Jita sell (cost to acquire them right now) - shared
-// by the two eval functions below AND the inspector's "Acquire via LP" cost walk, so there's one
-// place this convention lives.
+// by the ranked-list evaluation below AND the isolated-canvas LP stat strip, so there's one place
+// this convention lives.
 function requiredItemsMarketCost(offer) {
   let total = 0;
   (offer.required_items || []).forEach(r => {
@@ -111,6 +112,7 @@ function requiredItemsMarketCost(offer) {
   });
   return total;
 }
+window.requiredItemsMarketCost = requiredItemsMarketCost;
 
 // An offer is a BPC offer when its own type_id resolves to a recipe AND that recipe's
 // blueprintTypeID is the offer's type_id itself (recipeMap is keyed by BOTH blueprint and product
@@ -120,7 +122,7 @@ function isBlueprintOffer(offer) {
   return !!(recipe && parseInt(recipe.blueprintTypeID) === parseInt(offer.type_id));
 }
 
-// --- Per-offer evaluation ------------------------------------------------------------------
+// --- Per-offer evaluation (drives the ranked list) ------------------------------------------
 
 async function evaluateDirectSellOffer(offer) {
   const ids = [offer.type_id, ...offer.required_items.map(r => r.type_id)];
@@ -160,8 +162,8 @@ async function evaluateBpcOffer(offer) {
   const batchYield = recipe.productQtyPerRun || 1;
   // ESI's offer schema has no field for the granted BPC's run count - FW LP store blueprints are,
   // as a long-standing EVE mechanic, always single-run copies, so each unit of offer.quantity is
-  // treated as exactly 1 run. Called out in the UI (see renderLPStoreResults) rather than silently
-  // assumed, since it's the one number here ESI itself can't confirm.
+  // treated as exactly 1 run. Called out in the UI rather than silently assumed, since it's the
+  // one number here ESI itself can't confirm.
   const runs = offer.quantity;
 
   const priorRootProduct = window.recipeTreeRootProductTypeId;
@@ -231,14 +233,18 @@ async function loadAndRankLPStore(corpId) {
   try {
     const offers = await fetchLPStoreOffers(corpId);
 
-    // Index every offer by what it grants - drives the inspector's "Acquire via LP" option (a
-    // component is offerable that way only if it matches something THIS store actually sells;
-    // see the plan's scope note on why cross-corp matching isn't done here).
+    // Index every offer by what it grants - drives the isolated canvas's "Acquire via LP" option
+    // (js/app.js createNodeCard / js/optimizers.js calculateTreeNodeCost read this via
+    // window.__lpOfferByOutputTypeId, since they're loaded before this file and can't see its
+    // module-local variables directly). A component is offerable that way only if it matches
+    // something THIS store actually sells - cross-corp matching is a possible future enhancement,
+    // not done here.
     _lpOfferByOutputTypeId = {};
     offers.forEach(o => {
       if (!_lpOfferByOutputTypeId[o.type_id]) _lpOfferByOutputTypeId[o.type_id] = [];
       _lpOfferByOutputTypeId[o.type_id].push(o);
     });
+    window.__lpOfferByOutputTypeId = _lpOfferByOutputTypeId;
 
     // Cheap upfront pre-warm: every flat (non-recursive) type_id every offer touches, in one
     // batched call, before any per-offer work starts. fetchMarketPrices no-ops on already-cached
@@ -309,517 +315,119 @@ function toggleLPOfferExpanded(offerId) {
 window.toggleLPOfferExpanded = toggleLPOfferExpanded;
 
 // =================================================================================================
-// Build Inspector - isolate one offer into a live, interactive tree/list that replaces the ranked
-// list entirely. Every toggle below (build/buy/LP-acquire per component, buy channel, target qty)
-// recomputes and re-renders instantly with no network beyond what a newly-revealed subtree needs.
-//
-// Deliberately NOT a reuse of the Calculator's own pan-zoom card canvas (js/app.js
-// renderTreeDiagram/createNodeCard) - that system is driven by recalculate() (js/app.js:1591),
-// which reads/writes ~15 index.html-specific DOM ids and is triggered by handlers wired to that
-// exact DOM, and both js/app.js and js/lpstore.js assign window.onload directly, so loading both
-// scripts on one page would have the second clobber the first's init outright. What IS reused: the
-// underlying tree/pricing primitives (buildRecursiveRecipeTree, scaleTreeQuantities,
-// calculateTreeNodeCost's sibling functions calculateNodeJobFee/calculateTotalBuildSeconds) and the
-// exact same override objects the Calculator itself uses (buildSelfOverrides, customBuyModes,
-// customMEOverrides/TEOverrides - js/config.js) - a component toggled here behaves identically to
-// toggling it in the Calculator, just rendered into a nested list instead of a card canvas.
+// Isolate: hand off to the Calculator's own tree canvas + Bill of Materials sidebar (js/app.js,
+// also loaded on this page) rather than a separate lookalike UI - the exact same floating cards
+// connected by lines, the exact same BOM panel, that the Calculator already has. Only BPC offers
+// have a tree to isolate; a direct-sell offer keeps its existing click-to-expand row detail as its
+// only interaction (see renderLPStoreTable).
 // =================================================================================================
-
-let _lpLeafInstanceCounter = 0;
-
-// A required_item (direct-sell offer) or turn-in item has no blueprint of its own to build in the
-// vast majority of real cases (tags, insignias, decoder-style items) - these render as buy/LP-only
-// leaves. isBuildingSelf is always false; there's deliberately no Build option wired for them (see
-// the plan's scope note - a fast-follow, not core to what was asked for).
-function buildLPLeafNode(typeId, qtyNeeded) {
-  return {
-    instanceId: `lp-leaf-${++_lpLeafInstanceCounter}`, typeId, productTypeId: typeId,
-    name: getLPItemName(typeId), productName: getLPItemName(typeId),
-    qtyNeeded, runsNeeded: 1, batchYield: 1, depth: 1,
-    isBuildingSelf: false, isReaction: false, recipe: null, children: [],
-    customME: 0, customTE: 0, jobEIV: 0, unitEIV: 0
-  };
-}
 
 function isolateOffer(offerId) {
   const result = _lpRankedResults.find(r => r.offer.offer_id === offerId);
-  if (!result) return;
+  if (!result || result.offerType !== 'bpc') return;
+  if (typeof window.selectItem !== 'function') {
+    console.error('[LP Store] window.selectItem is unavailable - is js/app.js loaded on this page?');
+    return;
+  }
 
-  _lpInspectedResult = result;
-  _lpInspectedTargetQty = result.offerType === 'bpc' ? (result.bpcCopies || 1) : (result.offer.quantity || 1);
+  _lpIsolatedResult = result;
 
-  // Fresh inspection - clear every per-component override so nothing bleeds in from a previously
-  // isolated offer that happened to share a component typeId (mirrors js/app.js selectItem's own
-  // reset when loading a genuinely new item, preserveView=false branch).
-  window.buildSelfOverrides = {};
-  window.customBuyModes = {};
-  window.customMEOverrides = {};
-  window.customTEOverrides = {};
-  _lpAcquireViaLPTypeIds = new Set();
-  _lpInspectorCollapsedIds = new Set();
+  // #lpstore-main-area is hidden as a whole (not just its inner results div) - it's a flex sibling
+  // of #viewport in .content-row, and leaving it visible-but-empty would still claim flex-1 space
+  // alongside the canvas.
+  document.getElementById('lpstore-main-area')?.classList.add('hidden');
+  ['viewport', 'bom-sidebar', 'lpstore-calc-stat-strip', 'lpstore-inspector-extra-stats'].forEach(id => document.getElementById(id)?.classList.remove('hidden'));
 
-  const listArea = document.getElementById('lpstore-results-area');
-  const inspector = document.getElementById('lpstore-inspector');
-  if (listArea) listArea.classList.add('hidden');
-  if (inspector) inspector.classList.remove('hidden');
+  const nameEl = document.getElementById('lpstore-inspector-name');
+  if (nameEl) nameEl.textContent = result.outputName;
 
-  rebuildLPInspectorTree();
+  // selectItem (js/app.js) is the Calculator's own "load this blueprint" entry point - it resets
+  // every build/buy/ME/TE override, builds the real recipe tree, fetches prices, and calls
+  // recalculate() itself (cards + connecting lines + BOM sidebar, all existing code). Runs are set
+  // to this offer's own quantity afterward, same pattern js/app.js's own
+  // loadBlueprintIntoCalculator uses for a real owned BPC.
+  window.selectItem(result.blueprintTypeId, getLPItemName(result.blueprintTypeId), false).then(() => {
+    window.globalRuns = result.bpcCopies || 1;
+    const runsInput = document.getElementById('bp-runs');
+    if (runsInput) runsInput.value = window.globalRuns;
+    if (typeof window.recalculate === 'function') window.recalculate();
+  });
 }
 window.isolateOffer = isolateOffer;
 
 function exitLPInspector() {
-  _lpInspectedResult = null;
-  _lpInspectedRoot = null;
-  const listArea = document.getElementById('lpstore-results-area');
-  const inspector = document.getElementById('lpstore-inspector');
-  if (inspector) inspector.classList.add('hidden');
-  if (listArea) listArea.classList.remove('hidden');
+  _lpIsolatedResult = null;
+  ['viewport', 'bom-sidebar', 'lpstore-calc-stat-strip', 'lpstore-inspector-extra-stats'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+  document.getElementById('lpstore-main-area')?.classList.remove('hidden');
 }
 window.exitLPInspector = exitLPInspector;
 
-// Full rebuild pass - needed whenever the target quantity changes or a Build toggle reveals a
-// subtree that hasn't been fetched yet. Cheap per-component toggles (buy channel, Acquire via LP)
-// skip this entirely and just recompute+rerender - see setLPNodeSource.
-async function rebuildLPInspectorTree() {
-  const result = _lpInspectedResult;
-  if (!result) return;
+// Wraps the Calculator's own recalculate() ONCE, on this page only, to also refresh the LP-specific
+// extra stat strip after every recompute - every existing trigger for recalculate (Build/Buy/LP
+// toggles, runs change, ME/TE edits, tax/fee edits) picks this up automatically, with no new wiring
+// needed at any of those call sites.
+function installLPRecalculateHook() {
+  if (typeof window.recalculate !== 'function' || window.recalculate.__lpWrapped) return;
+  const original = window.recalculate;
+  const wrapped = function (...args) {
+    window.__lpSpentThisRecalc = 0; // calculateTreeNodeCost (js/optimizers.js) accumulates into this
+    const result = original.apply(this, args);
+    renderLPExtraStats();
+    return result;
+  };
+  wrapped.__lpWrapped = true;
+  window.recalculate = wrapped;
+}
+
+// The Calculator's own stat strip has no concept of LP - this adds the numbers unique to this page
+// (the offer's own redemption cost, total LP spent including any in-tree "Acquire via LP" picks,
+// and ISK-per-LP) alongside it, without touching the Calculator's own stats at all.
+function renderLPExtraStats() {
+  const el = document.getElementById('lpstore-inspector-extra-stats');
+  if (!el) return;
+  if (!_lpIsolatedResult || !window.recipeTreeRoot) { el.innerHTML = ''; return; }
+
+  const result = _lpIsolatedResult;
   const offer = result.offer;
+  const runs = window.globalRuns || 1;
+  const batches = Math.ceil(runs / (offer.quantity || 1));
+  // The offer's OWN redemption cost (getting the BPC in hand at all) - not part of the material
+  // tree, which only represents what's needed to BUILD the product once the BPC is in hand.
+  const redemptionIskCost = batches * offer.isk_cost + batches * requiredItemsMarketCost(offer);
+  const redemptionLpCost = batches * offer.lp_cost;
 
-  if (result.offerType === 'bpc') {
-    const recipe = window.recipeMap[offer.type_id];
-    const batchYield = recipe.productQtyPerRun || 1;
-    const runs = Math.max(1, _lpInspectedTargetQty);
+  const materialIskCost = window.recipeTreeRoot.calculatedCost || 0;
+  const acquiredLpCost = window.__lpSpentThisRecalc || 0;
 
-    const priorRootProduct = window.recipeTreeRootProductTypeId;
-    window.recipeTreeRootProductTypeId = result.outputTypeId;
-    let root;
-    try {
-      root = await window.buildRecursiveRecipeTree(parseInt(offer.type_id), getLPItemName(offer.type_id), runs, 0, 6, new Set(), null);
-    } finally {
-      window.recipeTreeRootProductTypeId = priorRootProduct;
-    }
-    if (!root) { _lpInspectedRoot = null; renderLPInspector(); return; }
+  const totalIskCost = materialIskCost + redemptionIskCost;
+  const totalLpCost = acquiredLpCost + redemptionLpCost;
 
-    root.runsNeeded = runs;
-    root.qtyNeeded = runs * batchYield;
-    const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { meBonus: 1.0, costBonus: 5.0 };
-    const facility = structureType.meBonus / 100;
-    if (typeof window.scaleTreeQuantities === 'function') window.scaleTreeQuantities(root, facility);
-
-    const allTypeIds = new Set();
-    if (typeof window.collectAllTypeIds === 'function') window.collectAllTypeIds(root, allTypeIds);
-    allTypeIds.add(result.outputTypeId);
-    await window.fetchMarketPrices(Array.from(allTypeIds));
-
-    _lpInspectedRoot = root;
-  } else {
-    // Direct-sell offer - nothing to build, just what you turn in to redeem it. A synthetic flat
-    // root lets the same row renderer and cost walk handle both offer types with no fork.
-    const qty = Math.max(1, _lpInspectedTargetQty);
-    const batches = Math.ceil(qty / (offer.quantity || 1));
-    const children = (offer.required_items || []).map(ri => buildLPLeafNode(ri.type_id, ri.quantity * batches));
-    await window.fetchMarketPrices(children.map(c => c.typeId));
-    _lpInspectedRoot = {
-      instanceId: 'lp-root', typeId: offer.type_id, productTypeId: offer.type_id,
-      name: result.outputName, productName: result.outputName,
-      qtyNeeded: qty, runsNeeded: batches, batchYield: offer.quantity || 1,
-      depth: 0, isBuildingSelf: true, isReaction: false, recipe: null,
-      children, customME: 0, customTE: 0, jobEIV: 0, unitEIV: 0, isDirectSellRoot: true
-    };
-  }
-
-  renderLPInspector();
-}
-window.rebuildLPInspectorTree = rebuildLPInspectorTree;
-
-function setLPInspectorTargetQty(value) {
-  const qty = Math.max(1, parseInt(value) || 1);
-  _lpInspectedTargetQty = qty;
-  rebuildLPInspectorTree();
-}
-window.setLPInspectorTargetQty = setLPInspectorTargetQty;
-
-// One handler for every component's source toggle - 'build' needs a real rebuild (to fetch that
-// node's own children); the other three are pure local state changes, so they skip straight to a
-// synchronous recompute+rerender with no network at all.
-function setLPNodeSource(typeId, source) {
-  delete window.buildSelfOverrides[typeId];
-  delete window.customBuyModes[typeId];
-  _lpAcquireViaLPTypeIds.delete(typeId);
-
-  if (source === 'build') {
-    window.buildSelfOverrides[typeId] = true;
-    rebuildLPInspectorTree();
-    return;
-  }
-
-  window.buildSelfOverrides[typeId] = false;
-  if (source === 'buy-sell') window.customBuyModes[typeId] = 'sell';
-  else if (source === 'buy-buy') window.customBuyModes[typeId] = 'buy';
-  else if (source === 'lp') _lpAcquireViaLPTypeIds.add(typeId);
-
-  if (_lpInspectedRoot && typeof window.syncTreeBuildStates === 'function') {
-    window.syncTreeBuildStates(_lpInspectedRoot);
-  }
-  renderLPInspector();
-}
-window.setLPNodeSource = setLPNodeSource;
-
-function toggleLPInspectorNodeCollapse(instanceId) {
-  if (_lpInspectorCollapsedIds.has(instanceId)) _lpInspectorCollapsedIds.delete(instanceId);
-  else _lpInspectorCollapsedIds.add(instanceId);
-  renderLPInspector();
-}
-window.toggleLPInspectorNodeCollapse = toggleLPInspectorNodeCollapse;
-
-// The one genuinely new calculation this feature needs - no existing function knows about
-// "acquire via LP" as a third cost source alongside build/buy. Job fees and build time are NOT
-// computed here; they're read off the existing shared functions once, on the whole tree, after
-// this walk has set isBuildingSelf=false on any LP-acquired node (calculateNodeJobFee/
-// calculateTotalBuildSeconds both already bail out immediately for a non-building node - config.js/
-// optimizers.js - so that exclusion falls out for free instead of needing to be reimplemented).
-function computeLPInspectorCost(node) {
-  if (!node) return { iskCost: 0, lpCost: 0 };
-
-  const matchOffers = _lpOfferByOutputTypeId[node.productTypeId || node.typeId];
-  if (_lpAcquireViaLPTypeIds.has(node.typeId) && matchOffers && matchOffers.length) {
-    const offer = matchOffers.slice().sort((a, b) => a.lp_cost - b.lp_cost)[0];
-    const batches = Math.ceil(node.qtyNeeded / (offer.quantity || 1));
-    node.isBuildingSelf = false;
-    node._lpAcquiredOffer = offer;
-    node._lpAcquiredBatches = batches;
-    node._lpCost = { iskCost: batches * (offer.isk_cost + requiredItemsMarketCost(offer)), lpCost: batches * offer.lp_cost };
-    return node._lpCost;
-  }
-  node._lpAcquiredOffer = null;
-
-  if (node.isBuildingSelf && node.children && node.children.length > 0) {
-    let iskCost = 0, lpCost = 0;
-    node.children.forEach(child => {
-      const c = computeLPInspectorCost(child);
-      iskCost += c.iskCost; lpCost += c.lpCost;
-    });
-    node._lpCost = { iskCost, lpCost };
-    return node._lpCost;
-  }
-
-  // Market buy - same convention calculateTreeNodeCost (js/optimizers.js) uses, reused via
-  // getNodePriceStrategy so a per-node buy-order override behaves identically to the Calculator.
-  const strategy = window.getNodePriceStrategy ? window.getNodePriceStrategy(node) : 'sell';
-  const productTypeId = node.productTypeId || node.typeId;
-  const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
-  const { brokerFee } = window.getActiveFeeInputs ? window.getActiveFeeInputs() : { brokerFee: 0.01 };
-  let unitPrice = strategy === 'sell' ? (prices.sell || 0) : (prices.buy || 0);
-  if (strategy === 'buy') unitPrice = unitPrice * (1 + brokerFee);
-  node._lpCost = { iskCost: unitPrice * node.qtyNeeded, lpCost: 0 };
-  return node._lpCost;
-}
-
-// Flattens every current leaf (market-bought or LP-acquired) for the "Components Needed" panel and
-// for feeding the existing Shopping List with what a live-configured build actually still needs.
-function getLPInspectorComponentsList(node, out) {
-  out = out || [];
-  if (!node) return out;
-  if (node._lpAcquiredOffer || !node.isBuildingSelf || !node.children || !node.children.length) {
-    if (node.depth > 0) out.push(node);
-    return out;
-  }
-  node.children.forEach(child => getLPInspectorComponentsList(child, out));
-  return out;
-}
-
-// One pill-row source toggle, reused for every non-root node. Options offered depend on what's
-// actually available for this component: Build only if it has a real recipe (node.recipe, already
-// resolved by buildRecursiveRecipeTree - synthetic leaves never get one, see buildLPLeafNode's own
-// note on why), LP only if this exact typeId is sold by the currently-loaded store.
-function renderLPNodeSourceToggle(node) {
-  const typeId = node.typeId;
-  const canBuild = !!node.recipe;
-  const canLP = !!(_lpOfferByOutputTypeId[node.productTypeId || typeId] && _lpOfferByOutputTypeId[node.productTypeId || typeId].length);
-  const isBuild = node.isBuildingSelf && !node._lpAcquiredOffer;
-  const isLP = !!node._lpAcquiredOffer;
-  const isBuy = !isBuild && !isLP;
-  const buyStrategy = window.getNodePriceStrategy ? window.getNodePriceStrategy(node) : 'sell';
-
-  const pill = (active, label, onclick, title) =>
-    `<button onclick="${onclick}" title="${title || ''}" class="px-1.5 py-0.5 text-[9px] font-bold" style="background:${active ? 'var(--accent)' : 'transparent'}; color:${active ? '#0a1002' : 'var(--text-mute)'};">${label}</button>`;
-
-  let html = `<div class="flex rounded overflow-hidden flex-shrink-0" style="border:1px solid rgba(255,255,255,0.1);">`;
-  if (canBuild) html += pill(isBuild, 'Build', `setLPNodeSource(${typeId}, 'build')`, 'Manufacture this component');
-  html += pill(isBuy, 'Buy', `setLPNodeSource(${typeId}, '${buyStrategy === 'buy' ? 'buy-buy' : 'buy-sell'}')`, 'Buy on the market');
-  if (canLP) html += pill(isLP, 'LP', `setLPNodeSource(${typeId}, 'lp')`, 'Acquire via this store\'s own LP offer instead of building or buying it');
-  html += `</div>`;
-
-  if (isBuy) {
-    html += `
-      <div class="flex rounded overflow-hidden flex-shrink-0 ml-1" style="border:1px solid rgba(255,255,255,0.1);">
-        ${pill(buyStrategy === 'sell', 'S', `setLPNodeSource(${typeId}, 'buy-sell')`, 'Jita sell / instant-buy price')}
-        ${pill(buyStrategy === 'buy', 'B', `setLPNodeSource(${typeId}, 'buy-buy')`, 'Jita highest buy order (patient, not instant)')}
-      </div>`;
-  }
-  return html;
-}
-
-function renderLPInspectorNode(node) {
-  if (!node) return '';
-  const isRoot = node.depth === 0;
-  const hasChildren = node.isBuildingSelf && !node._lpAcquiredOffer && node.children && node.children.length > 0;
-  const collapsed = _lpInspectorCollapsedIds.has(node.instanceId);
-  const productTypeId = node.productTypeId || node.typeId;
-  const cost = node._lpCost || { iskCost: 0, lpCost: 0 };
-  const isBpc = node.recipe && parseInt(node.recipe.blueprintTypeID) === parseInt(node.typeId);
-  const iconUrl = getLPStoreIconUrl(productTypeId, false);
-
-  const collapseToggle = hasChildren
-    ? `<button onclick="toggleLPInspectorNodeCollapse('${node.instanceId}')" class="flex-shrink-0" style="color:var(--text-mute); width:14px;" title="${collapsed ? 'Expand' : 'Collapse'}">${collapsed ? '▸' : '▾'}</button>`
-    : `<span style="width:14px;" class="flex-shrink-0"></span>`;
-
-  const costLabel = cost.lpCost > 0
-    ? `${Math.round(cost.lpCost).toLocaleString()} LP${cost.iskCost > 0 ? ` + ${Math.round(cost.iskCost).toLocaleString()} ISK` : ''}`
-    : `${Math.round(cost.iskCost).toLocaleString()} ISK`;
-
-  let html = `
-    <div class="lp-mat-row flex items-center gap-2 mono text-[11px] py-1 px-1.5 rounded" style="padding-left:${8 + node.depth * 18}px;">
-      ${collapseToggle}
-      <img src="${iconUrl}" alt="" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="window.handleLPIconLoadError(this);">
-      <span class="truncate flex-1 min-w-0" style="color:${isRoot ? 'var(--accent)' : 'var(--text);'} ${isRoot ? 'font-weight:bold;' : ''}">${window.esc(node.productName || node.name)}</span>
-      <span class="flex-shrink-0" style="color:var(--text-mute); width:70px; text-align:right;">×${Math.round(node.qtyNeeded).toLocaleString()}</span>
-      ${!isRoot ? renderLPNodeSourceToggle(node) : (isBpc ? `<span class="text-[9px] mono px-1.5 py-0.5 rounded flex-shrink-0" style="background:rgba(192,132,252,0.15); color:#c084fc;">BPC</span>` : '')}
-      <span class="flex-shrink-0 text-right font-bold" style="width:150px; color:${node._lpAcquiredOffer ? '#c084fc' : 'var(--text);'}">${costLabel}</span>
-    </div>`;
-
-  if (hasChildren && !collapsed) {
-    html += node.children.map(renderLPInspectorNode).join('');
-  }
-  return html;
-}
-
-function renderLPInspector() {
-  const header = document.getElementById('lpstore-inspector-header');
-  const summaryEl = document.getElementById('lpstore-inspector-summary');
-  const rowsEl = document.getElementById('lpstore-inspector-rows');
-  const result = _lpInspectedResult;
-  if (!header || !summaryEl || !rowsEl || !result) return;
-
-  const isBpc = result.offerType === 'bpc';
-  const iconUrl = getLPStoreIconUrl(result.outputTypeId, isBpc);
-  header.innerHTML = `
-    <button onclick="exitLPInspector()" class="btn-glass btn-glass-muted px-2.5 py-1.5 text-[11px] flex items-center gap-1.5 flex-shrink-0">${window.svgIcon ? window.svgIcon('collapse') : '←'} Back to List</button>
-    <img src="${iconUrl}" alt="" class="w-8 h-8 rounded flex-shrink-0" loading="lazy" onerror="window.handleLPIconLoadError(this);">
-    <span class="font-bold text-white truncate flex-1 min-w-0">${window.esc(result.outputName)}</span>
-    ${isBpc ? `<button onclick="sendLPOfferToCalculator(${result.offer.offer_id})" class="btn-glass px-2.5 py-1.5 text-[11px] flex-shrink-0" title="Open this blueprint in the main Calculator's own tree for full optimization and Add to Ledger.">Open in Calculator →</button>` : ''}
-  `;
-
-  const root = _lpInspectedRoot;
-  if (!root) {
-    summaryEl.innerHTML = '';
-    rowsEl.innerHTML = `<div class="text-center py-10 italic" style="color:var(--text-mute);">Could not build this item's recipe tree.</div>`;
-    return;
-  }
-
-  const { iskCost: treeIskCost, lpCost: acquiredLpCost } = computeLPInspectorCost(root);
-
-  if (typeof window.calculateNodeEIV === 'function') window.calculateNodeEIV(root);
-  const { facilityTax, sccSurcharge, salesTax, brokerFee } = window.getActiveFeeInputs ? window.getActiveFeeInputs() : { facilityTax: 0.01, sccSurcharge: 0.04, salesTax: 0.036, brokerFee: 0.01 };
-  const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { costBonus: 5.0 };
-  const structureRoleBonus = structureType.costBonus / 100;
-  const jobFee = (isBpc && typeof window.calculateNodeJobFee === 'function') ? window.calculateNodeJobFee(root, facilityTax, sccSurcharge, structureRoleBonus) : 0;
-  const buildSeconds = (isBpc && typeof window.calculateTotalBuildSeconds === 'function') ? window.calculateTotalBuildSeconds(root) : 0;
-
-  const offer = result.offer;
-  const batches = Math.ceil(_lpInspectedTargetQty / (offer.quantity || 1));
-  // The root offer's OWN redemption cost (getting the BPC, or the direct-sell item, in hand at
-  // all) - not part of the material tree, since the tree only represents what's needed to BUILD a
-  // BPC's product. For a direct-sell offer the required_items ARE the tree (see
-  // rebuildLPInspectorTree's synthetic root), so only the flat isk_cost portion is added here for
-  // that case, to avoid double-counting.
-  const rootIskCost = batches * offer.isk_cost + (isBpc ? batches * requiredItemsMarketCost(offer) : 0);
-  const rootLpCost = batches * offer.lp_cost;
-
-  const totalIskCost = treeIskCost + jobFee + rootIskCost;
-  const totalLpCost = acquiredLpCost + rootLpCost;
-
-  const outputPrice = (window.priceCache[result.outputTypeId] || {}).sell || 0;
-  const outputQty = isBpc ? (root.qtyNeeded || 0) : _lpInspectedTargetQty;
-  const grossRevenue = outputPrice * outputQty;
-  const revenue = grossRevenue * (1 - salesTax - brokerFee);
-  const profit = revenue - totalIskCost;
+  // recalculate() already computed net sell revenue net of tax/broker (outputMarketValue is the
+  // gross figure it derived that from) - profit is redone here against totalIskCost (which the
+  // Calculator's own netProfitSell doesn't know about) rather than reused directly.
+  const { salesTax, brokerFee } = window.getActiveFeeInputs ? window.getActiveFeeInputs() : { salesTax: 0.036, brokerFee: 0.01 };
+  const grossRevenue = window.recipeTreeRoot.outputMarketValue || 0;
+  const netRevenue = grossRevenue * (1 - salesTax - brokerFee);
+  const profit = netRevenue - totalIskCost;
   const iskPerLp = totalLpCost > 0 ? profit / totalLpCost : null;
   const profitColor = profit > 0 ? 'var(--accent)' : 'var(--red-400, #f87171)';
 
-  const tile = (label, value, color) => `
-    <div class="lp-card p-3">
+  const tile = (label, value, color, title) => `
+    <div class="lp-card p-3" ${title ? `title="${window.esc(title)}"` : ''}>
       <div class="text-[10px] uppercase tracking-wider" style="color:var(--text-mute);">${label}</div>
       <div class="text-lg font-bold mono" style="color:${color || 'var(--text)'};">${value}</div>
     </div>`;
 
-  summaryEl.innerHTML = `
-    <div class="lp-row flex items-end gap-2">
-      <div class="flex-1">
-        <label class="lp-label mb-1 block">Target Quantity</label>
-        <input type="number" min="1" value="${_lpInspectedTargetQty}" onchange="setLPInspectorTargetQty(this.value)" class="field-line field-editable w-full text-center font-bold mono">
-      </div>
-      <button onclick="addLPInspectorComponentsToShoppingList()" class="btn-glass btn-glass-muted px-2.5 py-2 text-[11px] flex-shrink-0">+ Add Components to Shopping List</button>
-    </div>
-    <div class="grid grid-cols-2 md:grid-cols-3 gap-2.5">
-      ${tile('Total ISK Cost', Math.round(totalIskCost).toLocaleString())}
-      ${tile('Total LP Cost', totalLpCost.toLocaleString())}
-      ${tile('Est. Revenue', Math.round(revenue).toLocaleString())}
-      ${tile('Est. Profit', Math.round(profit).toLocaleString(), profitColor)}
-      ${tile('ISK / LP', iskPerLp === null ? '—' : Math.round(iskPerLp).toLocaleString(), profitColor)}
-      ${tile('Est. Build Time', buildSeconds > 0 ? window.formatDurationCompact(buildSeconds) : '—')}
-    </div>`;
-
-  rowsEl.innerHTML = renderLPInspectorNode(root);
-}
-window.renderLPInspector = renderLPInspector;
-
-// Reuses the existing standalone Shopping List (see its own section below) - the components list
-// is derived from the LIVE tree (whatever's currently toggled to buy or LP), not the raw offer
-// data, so it reflects exactly what the current configuration actually still needs to acquire.
-function addLPInspectorComponentsToShoppingList() {
-  if (!_lpInspectedRoot) return;
-  const leaves = getLPInspectorComponentsList(_lpInspectedRoot);
-  let added = 0;
-  leaves.forEach(node => {
-    if (node._lpAcquiredOffer) return; // LP-acquired components are redeemed, not market-bought
-    const typeId = node.productTypeId || node.typeId;
-    const existing = _lpShoppingList.find(x => x.typeId === typeId);
-    if (existing) existing.qty += node.qtyNeeded;
-    else _lpShoppingList.push({ typeId, name: getLPItemName(typeId), qty: node.qtyNeeded, mode: 'sell' });
-    added++;
-  });
-  saveLPShoppingList();
-  renderLPShoppingList();
-  if (typeof window.showToast === 'function') window.showToast(added ? 'Components added to shopping list.' : 'Nothing to add - every component is set to Build or Acquire via LP.', added ? 'success' : 'info');
-}
-window.addLPInspectorComponentsToShoppingList = addLPInspectorComponentsToShoppingList;
-
-// --- Send a BPC offer to the Calculator's own tree ---------------------------------------------
-// Reuses the Calculator's existing ?build= shared-link format (js/app.js applySharedBuildFromUrl)
-// rather than inventing a second hand-off mechanism - this is the exact same link the Invention
-// page's "send to Calculator" button already builds (js/invention.js sendInventionRowToCalculator).
-// No me/te means the Calculator opens the blueprint as an unresearched ME0/TE0 copy, which is what
-// an LP store BPC actually is - the player can dial in real ME/TE themselves once there if their
-// eventual redeemed copy differs. Runs come from this offer's own quantity (assumed 1 run/BPC -
-// see evaluateBpcOffer's own note on that assumption), so the Calculator opens already scaled to
-// what THIS offer would actually produce, not a default of 1.
-function sendLPOfferToCalculator(offerId) {
-  const result = _lpRankedResults.find(r => r.offer.offer_id === offerId);
-  if (!result || result.offerType !== 'bpc') return;
-  const state = { id: result.blueprintTypeId, name: getLPItemName(result.blueprintTypeId), runs: result.bpcCopies };
-  const encoded = btoa(encodeURIComponent(JSON.stringify(state)));
-  window.location.href = `index.html?build=${encoded}`;
-}
-window.sendLPOfferToCalculator = sendLPOfferToCalculator;
-
-// --- Shopping list (required items still needing to be acquired) --------------------------------
-// A deliberately lightweight, standalone list - NOT a Ledger job. These are plain market purchases
-// with no build step of their own, so folding them into the Ledger's job model (which assumes a
-// blueprint/materials/runs) would mean teaching that already-intricate system a whole new kind of
-// "job" for no real benefit. This lives entirely on this page, persisted so it survives a reload.
-
-function loadLPShoppingList() {
-  _lpShoppingList = window.safeParseJSON(localStorage.getItem('eve_lpstore_shopping_list'), []);
-}
-
-function saveLPShoppingList() {
-  localStorage.setItem('eve_lpstore_shopping_list', JSON.stringify(_lpShoppingList));
-}
-
-function addOfferRequiredItemsToShoppingList(offerId) {
-  const result = _lpRankedResults.find(r => r.offer.offer_id === offerId);
-  if (!result || !result.offer.required_items.length) return;
-  result.offer.required_items.forEach(ri => {
-    const existing = _lpShoppingList.find(x => x.typeId === ri.type_id);
-    if (existing) existing.qty += ri.quantity;
-    else _lpShoppingList.push({ typeId: ri.type_id, name: getLPItemName(ri.type_id), qty: ri.quantity, mode: 'sell' });
-  });
-  saveLPShoppingList();
-  renderLPShoppingList();
-  if (typeof window.showToast === 'function') window.showToast('Added to shopping list.', 'success');
-}
-window.addOfferRequiredItemsToShoppingList = addOfferRequiredItemsToShoppingList;
-
-function setLPShoppingItemMode(typeId, mode) {
-  const item = _lpShoppingList.find(x => x.typeId === typeId);
-  if (!item) return;
-  item.mode = mode;
-  saveLPShoppingList();
-  renderLPShoppingList();
-}
-window.setLPShoppingItemMode = setLPShoppingItemMode;
-
-function setLPShoppingItemQty(typeId, qty) {
-  const item = _lpShoppingList.find(x => x.typeId === typeId);
-  if (!item) return;
-  item.qty = Math.max(1, parseInt(qty) || 1);
-  saveLPShoppingList();
-  renderLPShoppingList();
-}
-window.setLPShoppingItemQty = setLPShoppingItemQty;
-
-function removeLPShoppingItem(typeId) {
-  _lpShoppingList = _lpShoppingList.filter(x => x.typeId !== typeId);
-  saveLPShoppingList();
-  renderLPShoppingList();
-}
-window.removeLPShoppingItem = removeLPShoppingItem;
-
-function clearLPShoppingList() {
-  _lpShoppingList = [];
-  saveLPShoppingList();
-  renderLPShoppingList();
-}
-window.clearLPShoppingList = clearLPShoppingList;
-
-function copyLPShoppingListMultibuy(btn) {
-  const text = _lpShoppingList.map(i => `${i.name}\t${i.qty}`).join('\n');
-  if (typeof window.copyToClipboardWithFeedback === 'function') window.copyToClipboardWithFeedback(text, btn);
-}
-window.copyLPShoppingListMultibuy = copyLPShoppingListMultibuy;
-
-function renderLPShoppingList() {
-  const badge = document.getElementById('lpstore-shopping-count');
-  if (badge) badge.textContent = String(_lpShoppingList.length);
-
-  const el = document.getElementById('lpstore-shopping-list-body');
-  if (!el) return;
-
-  if (!_lpShoppingList.length) {
-    el.innerHTML = `<div class="text-[11px] italic py-3 text-center" style="color:var(--text-mute);">Nothing yet - expand an offer below and add its required items.</div>`;
-    return;
-  }
-
-  let total = 0;
-  const rows = _lpShoppingList.map(item => {
-    const priceEntry = window.priceCache && window.priceCache[item.typeId];
-    const unitPrice = priceEntry ? (item.mode === 'buy' ? (priceEntry.buy || 0) : (priceEntry.sell || 0)) : 0;
-    const lineTotal = unitPrice * item.qty;
-    total += lineTotal;
-    return `
-      <div class="flex items-center gap-2 py-1.5 text-[11px] mono" style="border-bottom:1px solid rgba(255,255,255,0.05);">
-        <span class="truncate flex-1 min-w-0" style="color:var(--text);">${window.esc(item.name)}</span>
-        <input type="number" min="1" value="${item.qty}" onchange="setLPShoppingItemQty(${item.typeId}, this.value)" class="field-line w-16 text-center p-1 text-[11px]">
-        <div class="flex rounded overflow-hidden flex-shrink-0" style="border:1px solid rgba(255,255,255,0.1);">
-          <button onclick="setLPShoppingItemMode(${item.typeId}, 'sell')" class="px-1.5 py-1 text-[10px]" style="background:${item.mode === 'sell' ? 'var(--accent)' : 'transparent'}; color:${item.mode === 'sell' ? '#0a1002' : 'var(--text-mute)'};" title="Price at Jita sell/instant-buy">Sell</button>
-          <button onclick="setLPShoppingItemMode(${item.typeId}, 'buy')" class="px-1.5 py-1 text-[10px]" style="background:${item.mode === 'buy' ? 'var(--accent)' : 'transparent'}; color:${item.mode === 'buy' ? '#0a1002' : 'var(--text-mute)'};" title="Price at Jita highest buy order (patient buy order, not instant)">Buy</button>
-        </div>
-        <span class="text-right flex-shrink-0" style="width:80px; color:var(--text-mute);">${Math.round(lineTotal).toLocaleString()}</span>
-        <button onclick="removeLPShoppingItem(${item.typeId})" class="flex-shrink-0" style="color:var(--text-mute);" title="Remove">${window.svgIcon ? window.svgIcon('x') : '×'}</button>
-      </div>`;
-  }).join('');
-
   el.innerHTML = `
-    ${rows}
-    <div class="flex items-center justify-between pt-2 mt-1 text-[11px] mono font-bold">
-      <span style="color:var(--text-mute);">Total</span>
-      <span style="color:var(--accent);">${Math.round(total).toLocaleString()} ISK</span>
-    </div>`;
+    ${tile('Redeem This BPC', `${Math.round(redemptionIskCost).toLocaleString()} ISK + ${redemptionLpCost.toLocaleString()} LP`, null, `Cost to acquire ${batches} cop${batches === 1 ? 'y' : 'ies'} of this BPC from the store (${runs} runs @ ${offer.quantity} run(s)/redemption)`)}
+    ${tile('Total LP Spent', totalLpCost.toLocaleString(), null, 'Redemption LP + any component set to "Acquire via LP" in the tree below')}
+    ${tile('LP-Aware Profit', Math.round(profit).toLocaleString(), profitColor, 'Net sell revenue minus material cost, job fee, AND this BPC\'s own redemption cost')}
+    ${tile('ISK / LP', iskPerLp === null ? '—' : Math.round(iskPerLp).toLocaleString(), profitColor)}
+  `;
 }
-window.renderLPShoppingList = renderLPShoppingList;
+window.renderLPExtraStats = renderLPExtraStats;
 
-// --- Rendering -------------------------------------------------------------------------------
+// --- Rendering: ranked list -------------------------------------------------------------------
 
 function getLPStoreIconUrl(typeId, isBpc) {
   return `https://images.evetech.net/types/${typeId}/${isBpc ? 'bpc' : 'icon'}?size=32`;
@@ -858,14 +466,12 @@ function renderLPStoreState(err) {
     if (emptyState) emptyState.classList.remove('hidden');
     return;
   }
-  if (resultsArea) resultsArea.classList.remove('hidden');
+  // Don't re-show the list if an offer is currently isolated (the canvas view stays up, e.g. across
+  // a tax/fee edit that re-triggers loadAndRankLPStore).
+  if (resultsArea && !_lpIsolatedResult) resultsArea.classList.remove('hidden');
 
   renderLPStoreSummaryTiles();
   renderLPStoreTable();
-  // Shopping list prices come from window.priceCache, which just got a fresh batch of entries from
-  // this same load - re-render so list items added before this store's prices arrived (or added from
-  // a previous corp) don't keep showing a stale/zero price.
-  renderLPShoppingList();
 }
 
 function renderLPStoreSummaryTiles() {
@@ -942,20 +548,20 @@ function renderLPStoreTable() {
 
     // Visible without expanding - the actual reason two rows can share an item name (CCP offers
     // the same reward through several different LP/ISK/item combinations; each is a distinct
-    // offer_id, not a data glitch - see resolveMissingItemNames's neighbor note in js/lpstore.js
-    // dev notes). Previously only visible after a click, which read as duplicate junk.
+    // offer_id, not a data glitch). Previously only visible after a click, which read as duplicate
+    // junk.
     const requiredItemsSummary = offer.required_items.length
       ? offer.required_items.map(r2 => `${r2.quantity}x ${window.esc(getLPItemName(r2.type_id))}`).join(', ')
       : (offer.isk_cost > 0 ? 'ISK + LP only' : 'LP only');
 
+    // Isolate (the real Calculator canvas) only applies to BPC offers - a direct-sell offer has no
+    // blueprint/material tree to show, so it keeps its detail row as its only interaction.
+    const isolateBtn = isBpc
+      ? `<button onclick="event.stopPropagation(); isolateOffer(${offer.offer_id});" class="icon-btn flex-shrink-0" style="width:26px;height:26px;" title="Isolate: open this blueprint in the Calculator's own tree view">${window.svgIcon ? window.svgIcon('expand', { style: 'width:13px;height:13px;' }) : '⤢'}</button>`
+      : '';
+
     let detailHTML = '';
     if (expanded) {
-      const addToListBtn = offer.required_items.length
-        ? `<button onclick="event.stopPropagation(); addOfferRequiredItemsToShoppingList(${offer.offer_id});" class="btn-glass btn-glass-muted px-2.5 py-1 text-[10px]">+ Add Required Items to Shopping List</button>`
-        : '';
-      const buildBtn = isBpc
-        ? `<button onclick="event.stopPropagation(); sendLPOfferToCalculator(${offer.offer_id});" class="btn-glass btn-glass-muted px-2.5 py-1 text-[10px]" title="Opens this blueprint in the main Calculator's tree for full optimization and Add to Ledger.">Open in Calculator →</button>`
-        : '';
       detailHTML = `
         <tr class="lp-detail-row">
           <td colspan="7" class="px-3 pb-3">
@@ -968,15 +574,18 @@ function renderLPStoreTable() {
                 ${isBpc ? `<div><span style="color:var(--text-mute);">Material Cost to Build:</span> ${Math.round(r.materialCost).toLocaleString()} ISK</div>` : ''}
                 ${isBpc ? `<div><span style="color:var(--text-mute);">Job Install Fee:</span> ${Math.round(r.jobFee).toLocaleString()} ISK</div>` : ''}
                 ${isBpc ? `<div><span style="color:var(--text-mute);">Build Time:</span> ${r.buildSeconds > 0 ? window.formatDurationCompact(r.buildSeconds) : 'no time data'}</div>` : ''}
-                ${isBpc ? `<div><span style="color:var(--text-mute);">BPCs Granted:</span> ${r.bpcCopies} (assumed 1 run each - see note below)</div>` : ''}
+                ${isBpc ? `<div><span style="color:var(--text-mute);">BPCs Granted:</span> ${r.bpcCopies} (assumed 1 run each - see sidebar note)</div>` : ''}
               </div>
               <div class="mt-2 pt-2" style="border-top:1px solid rgba(255,255,255,0.06); color:var(--text-mute);">
                 Turned in: ${requiredItemsSummary}
               </div>
-              <div class="mt-2.5 pt-2.5 flex gap-2" style="border-top:1px solid rgba(255,255,255,0.06);">
-                <button onclick="event.stopPropagation(); isolateOffer(${offer.offer_id});" class="btn-glass px-2.5 py-1 text-[10px]" title="Isolate this offer into a full interactive tree - toggle build/buy/LP per component and see ISK/LP update live.">Isolate →</button>
-                ${buildBtn}${addToListBtn}
-              </div>
+              ${isBpc ? `
+                <div class="mt-2.5 pt-2.5" style="border-top:1px solid rgba(255,255,255,0.06);">
+                  <button onclick="event.stopPropagation(); isolateOffer(${offer.offer_id});" class="btn-glass px-2.5 py-1 text-[10px]">Isolate this BPC →</button>
+                </div>
+              ` : `
+                <div class="mt-2 italic" style="color:var(--text-mute);">Direct-sell item - no blueprint tree to open.</div>
+              `}
             </div>
           </td>
         </tr>`;
@@ -994,7 +603,7 @@ function renderLPStoreTable() {
               </div>
               <div class="truncate text-[10px]" style="color:var(--text-mute);">${requiredItemsSummary}</div>
             </div>
-            <button onclick="event.stopPropagation(); isolateOffer(${offer.offer_id});" class="icon-btn flex-shrink-0" style="width:26px;height:26px;" title="Isolate: open a full interactive build tree for this offer">${window.svgIcon ? window.svgIcon('expand', { style: 'width:13px;height:13px;' }) : '⤢'}</button>
+            ${isolateBtn}
           </div>
         </td>
         <td class="text-right mono">${offer.lp_cost.toLocaleString()}</td>
@@ -1025,8 +634,7 @@ function renderLPStoreTable() {
   `;
 }
 
-// --- Shared tax/fee settings (same pattern + localStorage key as js/invention.js, kept in sync
-//     across pages since app.js isn't loaded here) --------------------------------------------
+// --- Shared tax/fee settings (same pattern + localStorage key as js/invention.js) --------------
 
 function loadSharedTaxSettingsForLPStore() {
   try {
@@ -1051,14 +659,17 @@ function saveSharedTaxSettingsFromLPStore() {
     existing.brokerFee = document.getElementById('broker-fee')?.value;
     localStorage.setItem('eve_tax_settings', JSON.stringify(existing));
   } catch (e) { console.warn('[LP Store] Failed to save tax/fee settings - they will reset on next reload:', e); }
+  // Re-rank the list against the new fees, AND live-refresh the isolated canvas (if any) - the
+  // Calculator's own recalculate() already reads these same #facility-tax/etc. ids directly.
   if (_lpActiveCorpId) loadAndRankLPStore(_lpActiveCorpId);
+  if (_lpIsolatedResult && typeof window.recalculate === 'function') window.recalculate();
 }
 window.saveSharedTaxSettingsFromLPStore = saveSharedTaxSettingsFromLPStore;
 
 // Same "currently active station" label pattern as js/invention.js - synthesized from whatever
 // system/structure/rigs are currently active in localStorage, since this page has no picker of its
-// own (BPC offers are valued under the currently active production preset, matching decision made
-// with the user - change it from the Calculator, not here).
+// own (BPC offers are valued under the currently active production preset - change it from the
+// Calculator's own Structure controls, which now also live right here since js/app.js is loaded).
 function renderLPStoreActiveStationLabel() {
   const el = document.getElementById('lpstore-active-station-label');
   if (!el) return;
@@ -1082,25 +693,18 @@ function populateLPStoreCorpSelect() {
     FW_WARZONE_CORPS.map(c => `<option value="${c.corpId}" style="color:${c.color}; font-weight:bold;">${window.esc(c.faction)} — ${window.esc(c.corpName)}</option>`).join('');
 }
 
-window.onload = async () => {
-  if (typeof window.buildPrepackedIndexes === 'function') window.buildPrepackedIndexes();
+// addEventListener rather than a plain `window.onload =` assignment - js/app.js (also loaded on
+// this page, for the real tree canvas/BOM sidebar) registers its own load handler the same way;
+// a raw assignment here would silently clobber it. js/app.js's own onload already covers
+// buildPrepackedIndexes, handleEsiSSOCallback, loadSavedSystem, and fetchAdjustedPrices (its
+// listener registers first, since app.js's <script> tag comes before this one) - only this page's
+// own setup is repeated here.
+window.addEventListener('load', async () => {
   populateLPStoreCorpSelect();
   loadSharedTaxSettingsForLPStore();
   renderLPStoreActiveStationLabel();
-  loadLPShoppingList();
-  renderLPShoppingList();
   renderLPStoreState();
-
-  if (typeof window.handleEsiSSOCallback === 'function') {
-    try { await window.handleEsiSSOCallback(); } catch (e) { console.error('SSO callback error:', e); }
-  }
-  if (typeof window.loadSavedSystem === 'function') {
-    try { await window.loadSavedSystem(); } catch (e) { console.warn('[LP Store] SCI load failed:', e); }
-  }
-  if (typeof window.fetchAdjustedPrices === 'function') {
-    try { await window.fetchAdjustedPrices(); } catch (e) { console.warn('[LP Store] Adjusted prices fetch error:', e); }
-  }
-  renderLPStoreActiveStationLabel();
+  installLPRecalculateHook();
 
   const lastCorp = localStorage.getItem('eve_lpstore_last_corp');
   const select = document.getElementById('lpstore-corp-select');
@@ -1108,4 +712,4 @@ window.onload = async () => {
     select.value = lastCorp;
     loadAndRankLPStore(lastCorp);
   }
-};
+});
