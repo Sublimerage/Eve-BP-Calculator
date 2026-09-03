@@ -147,6 +147,17 @@
           <div id="lpstore-table-container" class="overflow-x-auto"></div>
         </div>
       </div>
+
+      <!-- Build Inspector - replaces the ranked list entirely while an offer is isolated (see
+           isolateOffer/exitLPInspector, js/lpstore.js). Every control inside recomputes and
+           re-renders live; nothing here triggers a page navigation except "Open in Calculator". -->
+      <div id="lpstore-inspector" class="hidden space-y-4">
+        <div id="lpstore-inspector-header" class="lp-card p-3 flex items-center gap-2.5"></div>
+        <div id="lpstore-inspector-summary" class="space-y-2.5"></div>
+        <div class="lp-card p-2">
+          <div id="lpstore-inspector-rows" class="overflow-x-auto"></div>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -155,7 +166,7 @@
   <script src="js/esi.js?v=8.0.15" defer></script>
   <script src="js/tree.js?v=8.0.1" defer></script>
   <script src="js/optimizers.js?v=8.0.5" defer></script>
-  <script src="js/lpstore.js?v=1.2.1" defer></script>
+  <script src="js/lpstore.js?v=2.0.1" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
