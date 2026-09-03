@@ -332,7 +332,11 @@ async function evaluateBpcOffer(offer) {
   window.recipeTreeRootProductTypeId = productTypeId;
   let root;
   try {
-    root = await window.buildRecursiveRecipeTree(parseInt(offer.type_id), getLPItemName(offer.type_id), runs, 0, 6, new Set(), null);
+    // splitRunsForOwnMaterials: true - LP store BPCs are always single-run copies (see this
+    // function's own comment on `runs` above), so `runs` copies means `runs` separate real jobs, not
+    // one `runs`-run job. See buildRecursiveRecipeTree's own comment on this flag for why that changes
+    // the material math.
+    root = await window.buildRecursiveRecipeTree(parseInt(offer.type_id), getLPItemName(offer.type_id), runs, 0, 6, new Set(), null, true);
   } finally {
     window.recipeTreeRootProductTypeId = priorRootProduct;
   }
@@ -545,6 +549,14 @@ function isolateOffer(offerId) {
     // quantity blueprint runs), same pattern js/app.js's own loadBlueprintIntoCalculator uses for a
     // real owned BPC.
     window.selectItem(result.blueprintTypeId, getLPItemName(result.blueprintTypeId), false).then(async () => {
+      // LP store BPCs are always single-run copies (a real EVE mechanic - see evaluateBpcOffer's own
+      // comment), so redeeming N times always means N separate real jobs, never one N-run job.
+      // selectItem() itself always builds at runs=1 (see its own code), where this distinction is
+      // moot - stamping it directly onto the resulting root here is what makes every SUBSEQUENT
+      // recalculate() (the redemption-count input changing calls this via onLPRedemptionCountChange,
+      // every time) apply the correct per-run-rounded material math instead of rounding once on the
+      // combined total. See buildRecursiveRecipeTree's node.splitRunsForOwnMaterials comment for why.
+      if (window.recipeTreeRoot) window.recipeTreeRoot.splitRunsForOwnMaterials = true;
       window.globalRuns = result.bpcCopies || 1;
       await window.fetchMarketPrices((result.offer.required_items || []).map(r => r.type_id));
       if (typeof window.recalculate === 'function') window.recalculate();
@@ -598,6 +610,17 @@ function exitLPInspector() {
   ['viewport', 'bom-sidebar', 'lpstore-calc-stat-strip'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
   document.getElementById('lp-info-card-col')?.remove();
   document.getElementById('lpstore-main-area')?.classList.remove('hidden');
+  // #lpstore-main-area is only the outer wrapper - the actual list (#lpstore-results-area, inside
+  // it) is a SEPARATE element that renderLPStoreState() manages, and it deliberately stays hidden
+  // across any loadAndRankLPStore() call that fires WHILE isolated (e.g. editing a tax/fee field -
+  // see saveSharedTaxSettingsFromLPStore, which reloads unconditionally, isolated or not) so a
+  // background refresh doesn't yank the canvas away. That guard means the list's hidden class can
+  // still be set from one of those background refreshes at the moment isolation actually ends - just
+  // unhiding the outer wrapper above isn't enough, and without this call the list stays invisible
+  // (looks like "nothing loads") until something else happens to call renderLPStoreState() again,
+  // e.g. a full page reload. Re-running it here re-evaluates that same guard now that
+  // _lpIsolatedResult is null, so the list correctly reappears instead of needing a reload.
+  renderLPStoreState();
 }
 window.exitLPInspector = exitLPInspector;
 
