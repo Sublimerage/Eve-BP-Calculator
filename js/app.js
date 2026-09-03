@@ -2286,6 +2286,14 @@ function addCurrentJobToLedger(e) {
   const bpSource = getLastLoadedBlueprintSource();
   const sourceBlueprintItemId = (bpSource && bpSource.typeId === window.recipeTreeRoot.typeId) ? bpSource.itemId : undefined;
 
+  // True only for an LP Store BPC's isolated root (see js/tree.js's own comment on
+  // splitRunsForOwnMaterials) - runsNeeded here is real, but it does NOT mean "one job with this many
+  // runs" the way it does for every other job: LP store BPCs are always single-run copies, so this
+  // represents that many SEPARATE real jobs, each needing its own installation in EVE. Recorded on
+  // the job so the Ledger can show that distinction visually instead of a bare "N Runs" that reads
+  // identically to a normal combined multi-run job.
+  const isLPSplitRunJob = !!(window.recipeTreeRoot.isLPIsolatedRoot && window.recipeTreeRoot.splitRunsForOwnMaterials);
+
   const job = {
     id: rootJobId,
     typeId: window.recipeTreeRoot.typeId,
@@ -2303,6 +2311,7 @@ function addCurrentJobToLedger(e) {
     sourceBlueprintItemId: sourceBlueprintItemId,
     productionSnapshot: productionSnapshot,
     buildConfigSnapshot: buildConfigSnapshot,
+    isLPSplitRunJob: isLPSplitRunJob,
     addedAt: new Date().toISOString()
   };
 

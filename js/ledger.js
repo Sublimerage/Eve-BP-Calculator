@@ -728,7 +728,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth, 
                hover (title), same as a properly-nested (depth>0) sub-build already conveys via its own
                indentation + connector line - this just also covers an orphaned one (parent not present
                in the current filtered list) that has no indentation to lean on. -->
-          <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${renderPrereqBadgeHTML(job, 'ml-1 text-xs align-middle')}${(childCount > 0) ? `<button onclick="toggleClusterCollapse(event, ${job.id})" class="ml-1.5 lp-badge align-middle" style="cursor:pointer;" title="${collapsedClusterIds.has(job.id) ? `Show ${childCount} hidden prerequisite job${childCount > 1 ? 's' : ''}` : `Collapse ${childCount} prerequisite job${childCount > 1 ? 's' : ''} under this one`}">${window.svgIcon(collapsedClusterIds.has(job.id) ? 'chevron-right' : 'chevron-down')} ${childCount}</button>` : ''}</div>
+          <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${renderPrereqBadgeHTML(job, 'ml-1 text-xs align-middle')}${renderSplitRunBadgeHTML(job, 'ml-1 text-xs align-middle')}${(childCount > 0) ?`<button onclick="toggleClusterCollapse(event, ${job.id})" class="ml-1.5 lp-badge align-middle" style="cursor:pointer;" title="${collapsedClusterIds.has(job.id) ? `Show ${childCount} hidden prerequisite job${childCount > 1 ? 's' : ''}` : `Collapse ${childCount} prerequisite job${childCount > 1 ? 's' : ''} under this one`}">${window.svgIcon(collapsedClusterIds.has(job.id) ? 'chevron-right' : 'chevron-down')} ${childCount}</button>` : ''}</div>
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
           <!-- Edit icon lives INSIDE this same items-baseline row, right after "runs" - not as a
@@ -1451,7 +1451,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
           <div class="flex items-start space-x-3 min-w-0 flex-1">
             <img src="${jobIconUrl}" alt="${window.esc(jobDisplayName)}" class="${isFocusMode ? 'w-20 h-20' : 'w-12 h-12'} rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
-              <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${!isFocusMode ? renderPrereqBadgeHTML(job, 'ml-1 text-xs align-middle') : ''}</h3>
+              <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${!isFocusMode ? renderPrereqBadgeHTML(job, 'ml-1 text-xs align-middle') + renderSplitRunBadgeHTML(job, 'ml-1 text-xs align-middle') : ''}</h3>
               ${(job.isSubBuild && isFocusMode) ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">${window.svgIcon('gear')} Prerequisite for: ${window.esc(getPrereqLabel(job))}</div>` : ''}
               ${renderJobMetaChipHTML(job)}
             </div>
@@ -1465,7 +1465,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
           ${editingRunsJobIds.has(job.id) ? `
             <span class="flex items-baseline gap-1.5">
               <input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsNeeded}" onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){toggleRunsEditMode(event, ${job.id});}" onblur="changeJobRunCount(${job.id}, this.value)" class="field-line text-xl font-extrabold mono" style="width:${Math.max(3, String(job.runsNeeded).length + 2)}ch; color:var(--accent);" title="Recalculates materials, cost, and time - press Enter or click away to confirm, Esc to cancel">
-              <span class="text-sm mono" style="color:var(--text-mute);">Run${job.runsNeeded > 1 ? 's' : ''}</span>
+              <span class="text-sm mono" style="color:var(--text-mute);">${runsUnitLabel(job)}</span>
               ${renderRunsEditIconHTML(job.id, true)}
             </span>
           ` : `
@@ -1475,7 +1475,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
                 style="color:var(--accent);"
                 onclick="copyRunsToClipboard(event, ${job.runsNeeded})"
                 title="Click to copy the run count to clipboard">
-                ${job.runsNeeded.toLocaleString()} Run${job.runsNeeded > 1 ? 's' : ''}
+                ${job.runsNeeded.toLocaleString()} ${runsUnitLabel(job)}
               </span>
               ${(!job.isStarted && !job.autoImported) ? renderRunsEditIconHTML(job.id, false) : ''}
             </span>
@@ -1621,6 +1621,26 @@ function getPrereqLabel(job) {
     return names.length ? names.join(', ') : `${job.sharedParentIds.length} job${job.sharedParentIds.length > 1 ? 's' : ''}`;
   }
   return job.parentJobName || 'another job';
+}
+
+// Distinguishes an LP Store BPC redemption's job from a normal combined multi-run job - same
+// runsNeeded field, completely different real-world meaning (see js/tree.js's own comment on
+// splitRunsForOwnMaterials, and js/app.js's on isLPSplitRunJob). Without this, "5,000 Runs" reads
+// identically whether it's one real 5,000-run job or - as it actually is here - 5,000 separate
+// single-run jobs that each need their own install in EVE, since LP store blueprints are always
+// single-run copies.
+function runsUnitLabel(job) {
+  // "Copies" instead of "Runs" (not "N x 1-Run Jobs" - tried that, it wrapped badly in the ~260px
+  // grid card at the same large font-size real run counts already use) - same length as "Runs" so
+  // the layout is unaffected, but it's a different word specifically so it doesn't read as "one
+  // combined N-run job" the way repeating "Runs" here would. The layers badge (icon + full-sentence
+  // tooltip) right next to it carries the complete explanation for anyone who wants it.
+  return job.isLPSplitRunJob ? (job.runsNeeded === 1 ? 'Copy' : 'Copies') : `Run${job.runsNeeded > 1 ? 's' : ''}`;
+}
+
+function renderSplitRunBadgeHTML(job, extraClass) {
+  if (!job.isLPSplitRunJob) return '';
+  return `<span class="${extraClass || 'flex-shrink-0'}" style="color:var(--accent);" title="LP Store redemption: this job's ${job.runsNeeded.toLocaleString()} Copies are ${job.runsNeeded.toLocaleString()} SEPARATE single-run jobs, not one combined ${job.runsNeeded.toLocaleString()}-run job - LP store blueprints are always single-run copies, so each one needs its own install in EVE.">${window.svgIcon('layers')}</span>`;
 }
 
 // The small gear icon next to a prerequisite's name - a shared one gets a "xN" count alongside it so
