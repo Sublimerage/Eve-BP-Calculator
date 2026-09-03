@@ -1669,8 +1669,8 @@ body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var
 }
 .lp-market-drawer-tab svg { width: 13px; height: 13px; stroke: currentColor; flex-shrink: 0; }
 .lp-market-drawer-tab:hover { color: var(--accent); border-color: rgba(var(--accent-rgb),0.35); }
-.lp-market-drawer-tab.open { bottom: 436px; color: var(--accent); }
-.lp-market-drawer-tab.open.expanded { bottom: 656px; }
+.lp-market-drawer-tab.open { bottom: 516px; color: var(--accent); }
+.lp-market-drawer-tab.open.expanded { bottom: 736px; }
 .lp-market-drawer-tab.open #lp-market-drawer-tab-chevron { transform: rotate(180deg); }
 .lp-market-drawer-tab-chevron, #lp-market-drawer-tab-chevron { transition: transform 0.2s ease; }
 
@@ -1680,8 +1680,13 @@ body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var
 .lp-market-drawer {
   position: absolute;
   left: 0; right: 0; bottom: 0;
-  height: 420px;
-  max-height: 70%;
+  /* Sized to its actual content (stat tiles + both charts), not a guessed fixed px number - a
+     fixed height was landing the volume chart below the fold on anything shorter than a tall
+     desktop window, since #viewport's own available height varies with the browser/OS chrome
+     around it. max-height is still a hard cap for genuinely short viewports, where content
+     naturally becomes scrollable instead of overflowing. */
+  height: auto;
+  max-height: 84%;
   z-index: 65;
   display: flex;
   flex-direction: column;
@@ -1693,11 +1698,12 @@ body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: transform 0.25s ease, opacity 0.2s ease, height 0.2s ease;
+  transition: transform 0.25s ease, opacity 0.2s ease;
 }
-/* Expanded state - toggled by the drawer header's own expand button, for anyone who wants more
-   room to actually read the chart detail rather than the default compact height. */
-.lp-market-drawer.expanded { height: 640px; max-height: 85%; }
+/* Expanded state - toggled by the drawer header's own expand button. The charts themselves grow
+   (see _lpMarketExpanded in js/lpstore.js), which combined with height:auto above is what actually
+   makes the drawer taller - this just raises how much room they're allowed to grow into. */
+.lp-market-drawer.expanded { max-height: 93%; }
 .lp-market-drawer.open {
   transform: translateY(0);
   opacity: 1;
@@ -1717,33 +1723,55 @@ body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 14px 16px 16px;
+  padding: 14px 16px 18px;
 }
 
-/* Stat tiles row at the top of the drawer body - same visual weight as .lp-card p-3 elsewhere on
-   this page, just declared once here since there are always exactly 4. */
+/* Stat tiles row at the top of the drawer body - an icon + left accent bar per tile (not just a
+   label/value pair on a flat rectangle) so each one reads as a distinct shape instead of empty
+   background on wide screens, and a subtler value color than the app's default near-white text
+   token, matched below in .lp-market-stat-tile .stat-value. */
 .lp-market-stat-tile {
+  position: relative;
   background: var(--glass-fill);
   border-radius: var(--radius-card);
-  padding: 9px 12px;
+  padding: 10px 12px 10px 15px;
+  overflow: hidden;
 }
-.lp-market-stat-tile .stat-label { font-size: 9.5px; }
-.lp-market-stat-tile .stat-value { font-size: 16px; }
+.lp-market-stat-tile::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 10px; bottom: 10px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.55;
+}
+.lp-market-stat-tile .stat-label { font-size: 9.5px; display: flex; align-items: center; gap: 5px; }
+.lp-market-stat-tile .stat-label svg { width: 11px; height: 11px; stroke: var(--text-mute); flex-shrink: 0; }
+.lp-market-stat-tile .stat-value { font-size: 17px; font-weight: 600; color: var(--text-soft); margin-top: 2px; }
 
-/* Charts: thin marks, hairline recessive gridlines, a 2px surface ring around the hover dot so it
-   stays legible crossing the line - per the dataviz skill's mark specs. */
-.lp-market-chart-grid line { stroke: rgba(255,255,255,0.07); stroke-width: 1; shape-rendering: crispEdges; }
+/* Charts - gradients/glow filter are declared once per SVG in its own <defs> (js/lpstore.js), these
+   classes cover everything that doesn't need per-render color math. Hairline recessive gridlines
+   (both axes now - a light vertical rhythm reads as more considered than horizontal-only), a
+   Catmull-Rom-smoothed line instead of straight segments between points, and a 2px surface ring
+   around the hover dot so it stays legible crossing the line - per the dataviz mark specs. */
+.lp-market-chart-grid line { stroke: rgba(255,255,255,0.06); stroke-width: 1; shape-rendering: crispEdges; }
+.lp-market-chart-grid line.v { stroke: rgba(255,255,255,0.035); }
 .lp-market-chart-axis-label { font-size: 10px; fill: var(--text-soft); font-family: 'IBM Plex Mono', monospace; }
-.lp-market-price-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.lp-market-price-area { fill: var(--accent); opacity: 0.1; }
+.lp-market-avg-line { stroke: var(--text-mute); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.8; }
+.lp-market-avg-label { font-size: 9px; fill: var(--text-mute); font-family: 'IBM Plex Mono', monospace; font-style: italic; }
+.lp-market-price-line { fill: none; stroke: var(--accent); stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
+.lp-market-price-glow { fill: none; stroke: var(--accent); stroke-width: 6; stroke-linejoin: round; stroke-linecap: round; opacity: 0.22; filter: blur(3px); }
 .lp-market-hover-dot { fill: var(--accent); stroke: var(--bg-0); stroke-width: 2; }
-.lp-market-crosshair { stroke: rgba(255,255,255,0.18); stroke-width: 1; shape-rendering: crispEdges; }
-/* --text-mute (#6b6b70 in the dark theme) at 0.5 opacity on a near-black surface was effectively
-   invisible - --text-soft is the app's own lighter secondary-ink token, at a much higher opacity,
-   so the bars are actually readable while still staying clearly de-emphasized next to the accent
-   price line above them. */
-.lp-market-volume-bar { fill: var(--text-soft); opacity: 0.65; transition: opacity 0.1s ease, fill 0.1s ease; }
-.lp-market-volume-bar:hover, .lp-market-volume-bar.hover { fill: var(--accent); opacity: 0.95; }
+.lp-market-end-pulse { fill: none; stroke: var(--accent); stroke-width: 1.5; opacity: 0.55; animation: lp-market-pulse 2.2s ease-out infinite; transform-origin: center; transform-box: fill-box; }
+@media (prefers-reduced-motion: reduce) { .lp-market-end-pulse { animation: none; opacity: 0; } }
+@keyframes lp-market-pulse {
+  0% { transform: scale(1); opacity: 0.55; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.lp-market-crosshair { stroke: rgba(255,255,255,0.2); stroke-width: 1; shape-rendering: crispEdges; }
+.lp-market-volume-bar { transition: opacity 0.1s ease; }
+.lp-market-volume-bar:hover, .lp-market-volume-bar.hover { opacity: 0.85; }
 .lp-market-chart-tooltip {
   position: absolute;
   pointer-events: none;
