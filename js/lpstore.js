@@ -60,6 +60,37 @@ let _lpOfferByOutputTypeId = {}; // typeId -> [offers], built per corp load - al
                                   // (loaded before this file, no direct access to this module's own
                                   // variables) can see it too.
 let _lpIsolatedResult = null; // the ranked-result currently isolated in the canvas view, or null
+let _lpSavedCalculatorState = null; // snapshot of the Calculator's own last-saved state - see the
+                                     // isolate-state-bleed note below.
+
+// --- Don't let isolating an offer here overwrite what the Calculator restores on ITS OWN next
+//     load ---------------------------------------------------------------------------------------
+// js/app.js's recalculate() unconditionally calls its own saveActiveState() at the end, which
+// persists window.currentProduct/globalRuns/buildSelfOverrides/etc. to a handful of localStorage
+// keys - that's exactly right on index.html (the Calculator IS supposed to remember what you were
+// last building), but recalculate() is the same shared function this page calls too, so isolating
+// an LP offer here was silently overwriting the Calculator's own saved session with this page's own
+// temporary one. saveActiveState isn't window-bound (a bare in-module call inside recalculate()),
+// so it can't be intercepted directly - instead, the Calculator's real values are snapshotted once
+// on load (before this page ever isolates anything) and re-written back immediately after every
+// recalculate() this page triggers, undoing that particular side effect without touching app.js at
+// all. The live, in-memory session (window.recipeTreeRoot etc.) is completely unaffected - only
+// what a FUTURE fresh load of index.html would read back.
+const CALCULATOR_STATE_KEYS = ['eve_active_product', 'eve_build_self_overrides', 'eve_custom_buy_modes', 'eve_custom_me_overrides', 'eve_custom_te_overrides', 'eve_global_runs', 'eve_root_sell_strategy', 'eve_root_custom_price'];
+
+function snapshotCalculatorState() {
+  const snap = {};
+  CALCULATOR_STATE_KEYS.forEach(k => { snap[k] = localStorage.getItem(k); });
+  return snap;
+}
+
+function restoreCalculatorState(snap) {
+  if (!snap) return;
+  CALCULATOR_STATE_KEYS.forEach(k => {
+    if (snap[k] === null) localStorage.removeItem(k);
+    else localStorage.setItem(k, snap[k]);
+  });
+}
 
 // --- Item names -----------------------------------------------------------------------------
 // eve_db.js's local EVE_ITEMS snapshot doesn't cover every type in the game (SOE/vanity clothing,
@@ -344,7 +375,7 @@ function isolateOffer(offerId) {
   // of #viewport in .content-row, and leaving it visible-but-empty would still claim flex-1 space
   // alongside the canvas.
   document.getElementById('lpstore-main-area')?.classList.add('hidden');
-  ['viewport', 'bom-sidebar', 'lpstore-calc-stat-strip', 'lpstore-inspector-extra-stats'].forEach(id => document.getElementById(id)?.classList.remove('hidden'));
+  ['viewport', 'bom-sidebar', 'lpstore-calc-stat-strip'].forEach(id => document.getElementById(id)?.classList.remove('hidden'));
 
   const nameEl = document.getElementById('lpstore-inspector-name');
   if (nameEl) nameEl.textContent = result.outputName;
@@ -405,7 +436,8 @@ async function isolateDirectSellOffer(result) {
 
 function exitLPInspector() {
   _lpIsolatedResult = null;
-  ['viewport', 'bom-sidebar', 'lpstore-calc-stat-strip', 'lpstore-inspector-extra-stats'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+  ['viewport', 'bom-sidebar', 'lpstore-calc-stat-strip'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+  document.getElementById('lp-info-card')?.remove();
   document.getElementById('lpstore-main-area')?.classList.remove('hidden');
 }
 window.exitLPInspector = exitLPInspector;
@@ -463,6 +495,7 @@ function installLPRecalculateHook() {
     window.__lpSpentThisRecalc = 0; // calculateTreeNodeCost (js/optimizers.js) accumulates into this
     syncLPRedemptionNodes();
     const result = original.apply(this, args);
+    restoreCalculatorState(_lpSavedCalculatorState); // undo this call's own saveActiveState() - see the note above CALCULATOR_STATE_KEYS
     renderLPExtraStats();
     return result;
   };
@@ -470,15 +503,20 @@ function installLPRecalculateHook() {
   window.recalculate = wrapped;
 }
 
-// The Calculator's own stat strip has no concept of LP - this adds the numbers unique to this page
-// alongside it, without touching the Calculator's own stats at all. Only the offer's flat isk_cost/
-// lp_cost (no typeId, can't be a tree node) needs adding on top here now - required_items are real
-// tree children at this point, so window.recipeTreeRoot.calculatedCost (materials + job fee, the
-// Calculator's own unmodified figure) already includes them.
+// The Calculator's own stat strip has no concept of LP. Rather than a separate strip of big boxes
+// competing for space at the top of the page, this renders as ONE compact card - same glass-card/
+// diagram-node styling real tree cards use - inserted right next to the root card itself, so it
+// reads as part of the tree rather than a bolted-on dashboard. Only the offer's flat isk_cost/
+// lp_cost (no typeId, can't be a tree node) needs adding on top of the Calculator's own figure -
+// required_items are real tree children at this point, so window.recipeTreeRoot.calculatedCost
+// (materials + job fee, the Calculator's own unmodified number) already includes them.
 function renderLPExtraStats() {
-  const el = document.getElementById('lpstore-inspector-extra-stats');
-  if (!el) return;
-  if (!_lpIsolatedResult || !window.recipeTreeRoot) { el.innerHTML = ''; return; }
+  document.getElementById('lp-info-card')?.remove();
+  if (!_lpIsolatedResult || !window.recipeTreeRoot) return;
+
+  const root = window.recipeTreeRoot;
+  const rootCardEl = document.getElementById(`node-card-${root.instanceId}`);
+  if (!rootCardEl || !rootCardEl.parentElement) return; // tree hasn't rendered yet this pass
 
   const result = _lpIsolatedResult;
   const offer = result.offer;
@@ -487,32 +525,51 @@ function renderLPExtraStats() {
   const flatLpCost = batches * offer.lp_cost;
   const acquiredLpCost = window.__lpSpentThisRecalc || 0;
 
-  const totalIskCost = (window.recipeTreeRoot.calculatedCost || 0) + flatIskCost;
+  const totalIskCost = (root.calculatedCost || 0) + flatIskCost;
   const totalLpCost = acquiredLpCost + flatLpCost;
 
   // recalculate() already computed net sell revenue net of tax/broker (outputMarketValue is the
   // gross figure it derived that from) - profit is redone here against totalIskCost (which the
   // Calculator's own netProfitSell doesn't know about) rather than reused directly.
   const { salesTax, brokerFee } = window.getActiveFeeInputs ? window.getActiveFeeInputs() : { salesTax: 0.036, brokerFee: 0.01 };
-  const grossRevenue = window.recipeTreeRoot.outputMarketValue || 0;
+  const grossRevenue = root.outputMarketValue || 0;
   const netRevenue = grossRevenue * (1 - salesTax - brokerFee);
   const profit = netRevenue - totalIskCost;
   const iskPerLp = totalLpCost > 0 ? profit / totalLpCost : null;
   const profitColor = profit > 0 ? 'var(--accent)' : 'var(--red-400, #f87171)';
+  const iskPerLpDisplay = iskPerLp === null ? '—' : Math.round(iskPerLp).toLocaleString();
 
-  const tile = (label, value, color, title) => `
-    <div class="lp-card p-3" ${title ? `title="${window.esc(title)}"` : ''}>
-      <div class="text-[10px] uppercase tracking-wider" style="color:var(--text-mute);">${label}</div>
-      <div class="text-lg font-bold mono" style="color:${color || 'var(--text)'};">${value}</div>
+  const row = (label, value, color, title) => `
+    <div class="flex justify-between items-center gap-2" ${title ? `title="${window.esc(title)}"` : ''}>
+      <span class="text-slate-400">${label}</span>
+      <span class="font-bold text-right" style="color:${color || 'var(--text)'};">${value}</span>
     </div>`;
 
-  el.innerHTML = `
-    ${tile('Total ISK Cost', Math.round(totalIskCost).toLocaleString(), null, 'Build materials + required redemption items (both shown as cards below) + job install fee + the flat ISK portion of redeeming this offer')}
-    ${tile('Redemption Fee (flat)', `${Math.round(flatIskCost).toLocaleString()} ISK + ${flatLpCost.toLocaleString()} LP`, null, 'The pure ISK/LP portion of redeeming this offer, on top of the required items shown as purple cards in the tree below (those are already counted in Total ISK Cost).')}
-    ${tile('Total LP Spent', totalLpCost.toLocaleString(), null, 'Redemption LP + any component set to "Acquire via LP" in the tree')}
-    ${tile('LP-Aware Profit', Math.round(profit).toLocaleString(), profitColor, 'Net sell revenue minus build materials, required redemption items, job fee, and the flat redemption fee')}
-    ${tile('ISK / LP', iskPerLp === null ? '—' : Math.round(iskPerLp).toLocaleString(), profitColor)}
+  const card = document.createElement('div');
+  card.id = 'lp-info-card';
+  card.className = 'diagram-node glass-card p-3 w-72';
+  card.style.borderTopColor = '#c084fc';
+  card.innerHTML = `
+    <div class="flex items-center gap-1.5 border-b border-[#3a3025] pb-2 mb-2.5">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0;"><circle cx="12" cy="8" r="5"/><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5"/></svg>
+      <span class="font-bold text-sm text-white">LP Store Economics</span>
+    </div>
+    <div class="text-xs mono space-y-1.5">
+      ${row('Total ISK Cost', Math.round(totalIskCost).toLocaleString(), null, 'Build materials + required redemption items (purple cards) + job install fee + the flat ISK portion of redeeming this offer')}
+      ${row('Redemption Fee', `${Math.round(flatIskCost).toLocaleString()} + ${flatLpCost.toLocaleString()} LP`, '#c084fc', 'The flat ISK/LP portion of redeeming this offer - on top of the required items already counted in Total ISK Cost above')}
+      ${row('Total LP Spent', `${totalLpCost.toLocaleString()} LP`, '#c084fc', 'Redemption LP + any component set to "Acquire via LP" in the tree')}
+    </div>
+    <div class="border-t border-[#3a3025] mt-2.5 pt-2.5">
+      <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;" title="Net sell revenue minus build materials, required redemption items, job fee, and the flat redemption fee">LP-Aware Profit</div>
+      <div class="hero-num ${profit >= 0 ? 'profit' : 'loss'}">${Math.round(profit).toLocaleString()} ISK</div>
+    </div>
+    <div class="border-t border-[#3a3025] mt-2 pt-2 flex justify-between items-center" title="Estimated ISK profit per LP spent">
+      <span class="text-slate-300 font-bold text-xs">ISK / LP</span>
+      <span class="font-bold text-lg mono" style="color:${profitColor};">${iskPerLpDisplay}</span>
+    </div>
   `;
+
+  rootCardEl.insertAdjacentElement('afterend', card);
 }
 window.renderLPExtraStats = renderLPExtraStats;
 
@@ -784,6 +841,13 @@ function populateLPStoreCorpSelect() {
 // listener registers first, since app.js's <script> tag comes before this one) - only this page's
 // own setup is repeated here.
 window.addEventListener('load', async () => {
+  // Snapshot BEFORE anything on this page can touch it (app.js's own onload has already run its
+  // synchronous restore of whatever the Calculator last had, since its listener registers first -
+  // see the CALCULATOR_STATE_KEYS note above) - this is what gets written back after every
+  // recalculate() this page triggers, so isolating an LP offer never survives into index.html's own
+  // next load.
+  _lpSavedCalculatorState = snapshotCalculatorState();
+
   populateLPStoreCorpSelect();
   loadSharedTaxSettingsForLPStore();
   renderLPStoreActiveStationLabel();
