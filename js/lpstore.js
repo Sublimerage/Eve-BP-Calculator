@@ -141,6 +141,21 @@ let _lpIsolatedResult = null; // the ranked-result currently isolated in the can
 let _lpSavedCalculatorState = null; // snapshot of the Calculator's own last-saved state - see the
                                      // isolate-state-bleed note below.
 
+// The "Times Redeemed" multiplier for whatever's currently isolated - the ONE stable source of truth
+// for "how many copies does the player want", set only by isolateOffer (reset to 1) and
+// onLPRedemptionCountChange (the input itself). Never derived FROM window.globalRuns/the tree - it's
+// the other way around (see ensureLPRedemptionNodesPresent, which forces globalRuns from this on
+// every recalculate). This exists because window.globalRuns and the tree itself get silently reset
+// by code this page doesn't control: toggleBuildSelf (js/optimizers.js) rebuilds the whole tree via
+// selectItem() whenever Build/Buy is toggled on ANY component, and selectHomeMarket (js/app.js) does
+// the same when the market station changes - both unconditionally reset globalRuns to 1 and produce a
+// fresh root with no memory of what redemption count or split-run-material behavior applied before.
+// Keeping the real "how many copies" number OUTSIDE that disposable tree, and re-deriving everything
+// from it after every recalculate, is what survives those resets instead of silently reverting to
+// "treated as 1 run" (or whatever stale value was left behind) the way a single previous attempt at
+// tracking this via window.globalRuns and a node-property copy of it both failed to.
+let _lpRedemptionCount = 1;
+
 // --- Don't let isolating an offer here overwrite what the Calculator restores on ITS OWN next
 //     load ---------------------------------------------------------------------------------------
 // js/app.js's recalculate() unconditionally calls its own saveActiveState() at the end, which
@@ -528,6 +543,7 @@ function isolateOffer(offerId) {
   }
 
   _lpIsolatedResult = result;
+  _lpRedemptionCount = 1; // don't carry the previous offer's redemption count into this one
   resetMarketDrawer(); // don't carry the previous offer's drawer data/open-state into this one
   window.__lpRequiredItemBuildOverrides = {}; // don't carry the previous offer's "build this required item" choices into this one
   localStorage.setItem('eve_lpstore_last_isolated_offer', String(offerId)); // restored on next page load - see the load listener below
@@ -549,15 +565,14 @@ function isolateOffer(offerId) {
     // quantity blueprint runs), same pattern js/app.js's own loadBlueprintIntoCalculator uses for a
     // real owned BPC.
     window.selectItem(result.blueprintTypeId, getLPItemName(result.blueprintTypeId), false).then(async () => {
-      // LP store BPCs are always single-run copies (a real EVE mechanic - see evaluateBpcOffer's own
-      // comment), so redeeming N times always means N separate real jobs, never one N-run job.
-      // selectItem() itself always builds at runs=1 (see its own code), where this distinction is
-      // moot - stamping it directly onto the resulting root here is what makes every SUBSEQUENT
-      // recalculate() (the redemption-count input changing calls this via onLPRedemptionCountChange,
-      // every time) apply the correct per-run-rounded material math instead of rounding once on the
-      // combined total. See buildRecursiveRecipeTree's node.splitRunsForOwnMaterials comment for why.
-      if (window.recipeTreeRoot) window.recipeTreeRoot.splitRunsForOwnMaterials = true;
-      window.globalRuns = result.bpcCopies || 1;
+      // window.globalRuns and node.splitRunsForOwnMaterials (LP store BPCs are always single-run
+      // copies - see evaluateBpcOffer's own comment on why that needs special material-rounding
+      // handling) are NOT set here - ensureLPRedemptionNodesPresent (run by the recalculate hook,
+      // right below) derives both fresh from _lpRedemptionCount on every single recalculate, not just
+      // this first one. Setting them only here was the previous version of this code, and it broke
+      // the moment anything rebuilt the tree afterward (toggling Build/Buy on any component, or
+      // changing the home market station both call selectItem() again and silently drop it) - see
+      // _lpRedemptionCount's own comment for the full story.
       await window.fetchMarketPrices((result.offer.required_items || []).map(r => r.type_id));
       if (typeof window.recalculate === 'function') window.recalculate();
     });
@@ -624,19 +639,15 @@ function exitLPInspector() {
 }
 window.exitLPInspector = exitLPInspector;
 
-// How many separate times the isolated offer is being redeemed, given the current run count. The
-// relationship between "runs" (window.globalRuns, what the Calculator's own machinery actually
-// scales the tree by) and "redemptions" (the number the player actually cares about and edits, see
-// onLPRedemptionCountChange) differs by offer type: a BPC redemption grants offer.quantity separate
-// 1-run BPCs at once (runs = redemptions * offer.quantity), while a direct-sell redemption's
-// synthetic root already treats "runs" as directly meaning "redemptions" (see
-// isolateDirectSellOffer). Kept as one exact division (not the old ceil-based guess) because
-// onLPRedemptionCountChange is now the only thing that ever sets globalRuns for an isolated offer,
-// so it's always an exact multiple.
+// How many separate times the isolated offer is being redeemed - just _lpRedemptionCount, the one
+// stable source of truth for this (see its own comment). Used to be reverse-derived from
+// window.globalRuns instead (runs / offer.quantity for a BPC) - which broke the moment anything reset
+// globalRuns out from under it (toggling Build/Buy on any component, changing the home market
+// station), since the reverse-derivation would just confidently recompute the WRONG redemption count
+// from whatever globalRuns had been reset to, with nothing to catch it. _lpRedemptionCount never gets
+// touched by any of that, so this is now always right regardless of what the tree/globalRuns just did.
 function getLPRedemptionBatches(result) {
-  const runs = window.globalRuns || 1;
-  if (result.offerType === 'bpc') return Math.max(1, Math.round(runs / (result.offer.quantity || 1)));
-  return runs;
+  return _lpRedemptionCount;
 }
 
 // The root card's own "Times Redeemed" input (js/app.js createNodeCard, isLPIsolatedRoot branch)
@@ -644,9 +655,10 @@ function getLPRedemptionBatches(result) {
 // player actually edits, translated to the runs count the rest of the Calculator's machinery expects.
 function onLPRedemptionCountChange(e) {
   if (!_lpIsolatedResult) return;
-  const redemptions = Math.max(1, parseInt(e.target.value) || 1);
-  const offer = _lpIsolatedResult.offer;
-  window.globalRuns = _lpIsolatedResult.offerType === 'bpc' ? redemptions * (offer.quantity || 1) : redemptions;
+  // Just set the one stable number - ensureLPRedemptionNodesPresent (run by the recalculate hook,
+  // right below) derives window.globalRuns from this fresh on every recalculate, not the other way
+  // around. See _lpRedemptionCount's own comment for why that direction matters.
+  _lpRedemptionCount = Math.max(1, parseInt(e.target.value) || 1);
   if (typeof window.recalculate === 'function') window.recalculate();
 }
 window.onLPRedemptionCountChange = onLPRedemptionCountChange;
@@ -733,18 +745,24 @@ async function injectLPRedemptionNodes(root, offer, batches) {
 // correctly. This also covers the case the old once-only injection was written for: js/app.js
 // rebuilding the tree from scratch whenever "Build" is toggled on ANY component (optimizers.js
 // toggleBuildSelf calls selectItem() again, which silently drops anything not part of its own
-// recursive walk) - these synthetic nodes just get re-added afterward either way. Also re-stamps
-// isLPIsolatedRoot/_lpRedemptionCount on the root for the same reason (createNodeCard's "Times
-// Redeemed" branch needs them present on whatever the CURRENT root object is, not just the first
-// one selectItem() ever built).
+// recursive walk) - these synthetic nodes just get re-added afterward either way. For the exact same
+// reason, this is ALSO the one place that forces window.globalRuns and (for a BPC) the root's
+// splitRunsForOwnMaterials flag back to what they should be, derived fresh from _lpRedemptionCount,
+// on every single pass - not just isLPIsolatedRoot/_lpRedemptionCount as before. Both of those are
+// exactly the fields a destructive selectItem() rebuild resets/drops, and the redemption count input
+// (createNodeCard's "Times Redeemed" branch) needs them present and correct on whatever the CURRENT
+// root object is, not just the first one selectItem() ever built - see _lpRedemptionCount's own
+// comment for the full story of why this needed to change.
 async function ensureLPRedemptionNodesPresent() {
   if (!_lpIsolatedResult || !window.recipeTreeRoot) return;
   const root = window.recipeTreeRoot;
   const result = _lpIsolatedResult;
 
   root.isLPIsolatedRoot = true;
+  root._lpRedemptionCount = _lpRedemptionCount;
+  window.globalRuns = result.offerType === 'bpc' ? _lpRedemptionCount * (result.offer.quantity || 1) : _lpRedemptionCount;
+  if (result.offerType === 'bpc') root.splitRunsForOwnMaterials = true;
   const batches = getLPRedemptionBatches(result);
-  root._lpRedemptionCount = batches;
 
   const redemptionChildren = await injectLPRedemptionNodes(root, result.offer, batches);
   // Keep any REAL children already there (a BPC-isolated root's own build materials) - only the
