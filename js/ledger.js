@@ -50,10 +50,11 @@ function toggleRunsEditMode(e, jobId) {
   else editingRunsJobIds.add(jobId);
   renderJournalPage();
   if (editingRunsJobIds.has(jobId)) {
-    // Focus the input right after it appears - re-rendering just replaced the DOM node, so this has
-    // to happen on the next frame, not synchronously here.
+    // Focus the FIRST (Jobs) input right after it appears, matching its left-to-right reading order -
+    // re-rendering just replaced the DOM node, so this has to happen on the next frame, not
+    // synchronously here.
     requestAnimationFrame(() => {
-      const input = document.getElementById(`runs-edit-input-${jobId}`);
+      const input = document.getElementById(`jobs-edit-input-${jobId}`);
       if (input) { input.focus(); input.select(); }
     });
   }
@@ -739,11 +740,13 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth, 
                visibility:hidden, not by omitting the element - same technique the Shop pill above uses)
                for started/auto-imported jobs, so the run count's own x position still doesn't drift
                row to row depending on which jobs happen to be editable. -->
-          <div class="flex items-baseline justify-end gap-1.5 flex-shrink-0" style="width:155px;" onclick="event.stopPropagation()">
+          <div class="flex items-baseline justify-end gap-1 flex-shrink-0" style="width:155px;" onclick="event.stopPropagation()">
             ${editingRunsJobIds.has(job.id)
-              ? `<input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsNeeded}" onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){toggleRunsEditMode(event, ${job.id});}" onblur="changeJobRunCount(${job.id}, this.value)" class="field-line text-lg font-extrabold mono text-right" style="width:${Math.max(3, String(job.runsNeeded).length + 2)}ch; color:var(--accent);" title="Recalculates materials, cost, and time - press Enter or click away to confirm, Esc to cancel">`
-              : `<span class="text-lg font-extrabold mono whitespace-nowrap cursor-pointer" style="color:var(--accent);" onclick="copyRunsToClipboard(event, ${job.runsNeeded})" title="${(job.jobCount || 1) > 1 ? `${job.jobCount.toLocaleString()} separate jobs × ${(job.runsPerJob || 1).toLocaleString()} runs each - click to copy the total run count` : 'Click to copy run count'}">${job.runsNeeded.toLocaleString()}</span>`}
-            <span class="text-xs mono whitespace-nowrap" style="color:var(--text-mute);">${(job.jobCount || 1) > 1 ? `runs (${job.jobCount.toLocaleString()}×)` : 'runs'}</span>
+              ? `<input type="number" id="jobs-edit-input-${job.id}" min="1" value="${job.jobCount || 1}" onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){toggleRunsEditMode(event, ${job.id});}" onblur="handleJobsRunsBlur(${job.id})" class="field-line text-sm font-extrabold mono text-right" style="width:${Math.max(2, String(job.jobCount || 1).length + 1)}ch; color:var(--accent);" title="Jobs - how many separate real jobs">
+                 <span class="text-xs mono" style="color:var(--text-mute);">×</span>
+                 <input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsPerJob || job.runsNeeded}" onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){toggleRunsEditMode(event, ${job.id});}" onblur="handleJobsRunsBlur(${job.id})" class="field-line text-sm font-extrabold mono text-right" style="width:${Math.max(2, String(job.runsPerJob || job.runsNeeded).length + 1)}ch; color:var(--accent);" title="Runs per job - recalculates materials, cost, and time on commit">`
+              : `<span class="text-lg font-extrabold mono whitespace-nowrap cursor-pointer" style="color:var(--accent);" onclick="copyRunsToClipboard(event, ${job.runsNeeded})" title="${(job.jobCount || 1) > 1 ? `${job.jobCount.toLocaleString()} separate jobs × ${(job.runsPerJob || 1).toLocaleString()} runs each - click to copy the total run count` : 'Click to copy run count'}">${(job.jobCount || 1) > 1 ? `${job.jobCount.toLocaleString()}×${(job.runsPerJob || 1).toLocaleString()}` : job.runsNeeded.toLocaleString()}</span>`}
+            <span class="text-xs mono whitespace-nowrap" style="color:var(--text-mute);">runs</span>
             <span class="flex-shrink-0" style="width:12px;${(!job.isStarted && !job.autoImported) ? '' : ' visibility:hidden;'}">${renderRunsEditIconHTML(job.id, editingRunsJobIds.has(job.id))}</span>
           </div>
           <div class="lp-divider-col flex items-center gap-1.5 flex-shrink-0" style="width:260px;" title="Job status">
@@ -936,7 +939,7 @@ function renderJobPresetRowHTML(job) {
 // default every sub-component below the root back to "buy at market price" - overstating cost for
 // anything the user had actually chosen to build cheaper themselves (as its own separate queued
 // sub-build job), even though the numbers shown at the moment the job was first added were correct.
-async function rebuildTreeForSnapshot(blueprintTypeId, name, runs, productTypeId, snapshot, buildConfig) {
+async function rebuildTreeForSnapshot(blueprintTypeId, name, runs, productTypeId, snapshot, buildConfig, jobCount = 1) {
   if (typeof window.buildRecursiveRecipeTree !== 'function') throw new Error('Recipe tree builder not available.');
 
   const prevFacilityKey = localStorage.getItem('eve_active_facility_key');
@@ -980,7 +983,7 @@ async function rebuildTreeForSnapshot(blueprintTypeId, name, runs, productTypeId
     window.recipeTreeRootProductTypeId = productTypeId;
     let root;
     try {
-      root = await window.buildRecursiveRecipeTree(blueprintTypeId, name, runs, 0, 6, new Set(), null);
+      root = await window.buildRecursiveRecipeTree(blueprintTypeId, name, runs, 0, 6, new Set(), null, jobCount);
     } finally {
       window.recipeTreeRootProductTypeId = null;
     }
@@ -988,6 +991,7 @@ async function rebuildTreeForSnapshot(blueprintTypeId, name, runs, productTypeId
 
     root.runsNeeded = runs;
     root.qtyNeeded = runs * (root.batchYield || 1);
+    root.jobCount = Math.max(1, jobCount || 1);
     const facility = (window.getActiveStructureType ? window.getActiveStructureType().meBonus : 1.0) / 100;
     if (typeof window.scaleTreeQuantities === 'function') window.scaleTreeQuantities(root, facility);
 
@@ -1027,7 +1031,7 @@ async function changeJobProductionPreset(jobId, presetName) {
 
   if (typeof window.showToast === 'function') window.showToast(`Recomputing "${window.esc(job.name)}" for "${window.esc(presetName)}"...`, 'info');
   try {
-    const result = await rebuildTreeForSnapshot(job.typeId, job.name + ' Blueprint', job.runsNeeded, job.productTypeId, preset, job.buildConfigSnapshot);
+    const result = await rebuildTreeForSnapshot(job.typeId, job.name + ' Blueprint', job.runsNeeded, job.productTypeId, preset, job.buildConfigSnapshot, job.jobCount || 1);
     job.calculatedCost = result.calculatedCost;
     job.qtyNeeded = result.root.qtyNeeded;
     job.materials = result.materials;
@@ -1052,26 +1056,42 @@ async function changeJobProductionPreset(jobId, presetName) {
 }
 window.changeJobProductionPreset = changeJobProductionPreset;
 
-// Lets a not-yet-started job's total run count be edited directly, instead of having to delete it and
-// re-add it from the Calculator at the right quantity. Full rebuild (not a linear qty/cost scale) for
-// the same reason changeJobProductionPreset does one - batch yields and sub-component rounding don't
-// scale proportionally with run count, so only a real rebuild keeps materials/cost/time accurate.
-// Blocked for a started job (EVE itself won't let you change a job's runs once it's actually running -
-// see startJobRuns for the real mechanic, splitting off a subset before starting) and for an auto-
-// imported job (its run count is real ESI data, not something to overwrite with a guess).
-async function changeJobRunCount(jobId, newRuns) {
+// Lets a not-yet-started job's Jobs and Runs-per-job be edited directly, instead of having to delete
+// it and re-add it from the Calculator at the right quantity. Full rebuild (not a linear qty/cost
+// scale) for the same reason changeJobProductionPreset does one - batch yields and sub-component
+// rounding don't scale proportionally with run count, so only a real rebuild keeps materials/cost/
+// time accurate, AND correctly re-applies the jobCount split-rounding (see js/tree.js's own comment
+// on node.jobCount) for whatever the new Jobs count is. Blocked for a started job (EVE itself won't
+// let you change a job's runs once it's actually running - see startJobRuns for the real mechanic,
+// splitting off a subset before starting) and for an auto-imported job (its run count is real ESI
+// data, not something to overwrite with a guess).
+//
+// Both the Jobs and Runs inputs share this one commit function (called from each one's onblur, via
+// handleJobsRunsBlur below) - reading whichever value is CURRENTLY in each field at commit time,
+// not "the one that just blurred", so tabbing from Jobs into Runs (or the reverse) always commits
+// both fields together in one rebuild rather than committing Jobs alone first with a stale Runs value.
+async function commitJobsRunsEdit(jobId) {
   const job = activeJobs.find(j => j && j.id === jobId);
-  if (!job || job.isStarted || job.autoImported) return;
-  const runs = Math.max(1, Math.floor(Number(newRuns)) || 1);
+  if (!job || job.isStarted || job.autoImported) { editingRunsJobIds.delete(jobId); renderJournalPage(); return; }
+
+  const jobsInput = document.getElementById(`jobs-edit-input-${jobId}`);
+  const runsInput = document.getElementById(`runs-edit-input-${jobId}`);
+  const jobCount = Math.max(1, Math.floor(Number(jobsInput ? jobsInput.value : job.jobCount || 1)) || 1);
+  const runsPerJob = Math.max(1, Math.floor(Number(runsInput ? runsInput.value : job.runsPerJob || job.runsNeeded)) || 1);
+  const runs = jobCount * runsPerJob;
+
   editingRunsJobIds.delete(jobId); // editing is done either way (committed or a no-op) - back to plain display
-  if (runs === job.runsNeeded) { renderJournalPage(); return; } // no-op (e.g. re-typed the same value) - just redraw to restore the input's displayed value
+  if (runs === job.runsNeeded && jobCount === (job.jobCount || 1)) { renderJournalPage(); return; } // no-op (e.g. re-typed the same values) - just redraw to restore the inputs' displayed values
 
   const snapshot = job.productionSnapshot || getCurrentLiveProductionSnapshot();
-  if (typeof window.showToast === 'function') window.showToast(`Recomputing "${window.esc(job.name)}" for ${runs} run${runs > 1 ? 's' : ''}...`, 'info');
+  const label = jobCount > 1 ? `${jobCount} jobs × ${runsPerJob} run${runsPerJob > 1 ? 's' : ''}` : `${runs} run${runs > 1 ? 's' : ''}`;
+  if (typeof window.showToast === 'function') window.showToast(`Recomputing "${window.esc(job.name)}" for ${label}...`, 'info');
   const oldMaterials = Array.isArray(job.materials) ? job.materials : [];
   try {
-    const result = await rebuildTreeForSnapshot(job.typeId, job.name + ' Blueprint', runs, job.productTypeId, snapshot, job.buildConfigSnapshot);
+    const result = await rebuildTreeForSnapshot(job.typeId, job.name + ' Blueprint', runs, job.productTypeId, snapshot, job.buildConfigSnapshot, jobCount);
     job.runsNeeded = runs;
+    job.jobCount = jobCount;
+    job.runsPerJob = runsPerJob;
     job.qtyNeeded = result.root.qtyNeeded;
     job.calculatedCost = result.calculatedCost;
     job.materials = result.materials;
@@ -1083,14 +1103,29 @@ async function changeJobRunCount(jobId, newRuns) {
     await cascadeRunChangeToChildren(job, oldMaterials);
     localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
     renderJournalPage();
-    if (typeof window.showToast === 'function') window.showToast(`"${window.esc(job.name)}" now set to ${runs} run${runs > 1 ? 's' : ''}.`, 'success');
+    if (typeof window.showToast === 'function') window.showToast(`"${window.esc(job.name)}" now set to ${label}.`, 'success');
   } catch (e) {
-    console.warn('[Ledger] changeJobRunCount failed:', e);
-    if (typeof window.showToast === 'function') window.showToast('Failed to recompute this job for the new run count - it was left unchanged.', 'error');
-    renderJournalPage(); // restore the input to the job's actual (unchanged) run count
+    console.warn('[Ledger] commitJobsRunsEdit failed:', e);
+    if (typeof window.showToast === 'function') window.showToast('Failed to recompute this job for the new Jobs/Runs - it was left unchanged.', 'error');
+    renderJournalPage(); // restore the inputs to the job's actual (unchanged) values
   }
 }
-window.changeJobRunCount = changeJobRunCount;
+window.commitJobsRunsEdit = commitJobsRunsEdit;
+
+// Shared onblur for the Jobs/Runs input PAIR - Tab moving focus from one to the sibling fires this
+// input's blur BEFORE the sibling gains focus, so committing immediately on every blur would commit
+// Jobs alone (with a not-yet-edited Runs value) the moment focus leaves it while tabbing through, not
+// just when the user is actually done with both. Deferring one tick and checking where focus actually
+// landed - the sibling input (still mid-edit, don't commit yet) or genuinely elsewhere (commit now,
+// reading both fields' latest values) - makes tabbing through both feel like one edit, not two.
+function handleJobsRunsBlur(jobId) {
+  setTimeout(() => {
+    const active = document.activeElement;
+    if (active && (active.id === `jobs-edit-input-${jobId}` || active.id === `runs-edit-input-${jobId}`)) return;
+    commitJobsRunsEdit(jobId);
+  }, 0);
+}
+window.handleJobsRunsBlur = handleJobsRunsBlur;
 
 // A queued prerequisite job was sized to cover a specific material need at the time it was created
 // (e.g. "build 3 runs to cover the 600 units still missing after stock") - left alone after the
@@ -1464,8 +1499,11 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
         <div class="flex items-center justify-between px-1" onclick="event.stopPropagation()">
           ${editingRunsJobIds.has(job.id) ? `
             <span class="flex items-baseline gap-1.5">
-              <input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsNeeded}" onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){toggleRunsEditMode(event, ${job.id});}" onblur="changeJobRunCount(${job.id}, this.value)" class="field-line text-xl font-extrabold mono" style="width:${Math.max(3, String(job.runsNeeded).length + 2)}ch; color:var(--accent);" title="Recalculates materials, cost, and time - press Enter or click away to confirm, Esc to cancel">
-              <span class="text-sm mono" style="color:var(--text-mute);">Run${job.runsNeeded > 1 ? 's' : ''}${(job.jobCount || 1) > 1 ? ` total (${job.jobCount.toLocaleString()} Jobs × ${(job.runsPerJob || 1).toLocaleString()})` : ''}</span>
+              <span class="text-xs mono" style="color:var(--text-mute);">Jobs</span>
+              <input type="number" id="jobs-edit-input-${job.id}" min="1" value="${job.jobCount || 1}" onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){toggleRunsEditMode(event, ${job.id});}" onblur="handleJobsRunsBlur(${job.id})" class="field-line text-xl font-extrabold mono" style="width:${Math.max(2, String(job.jobCount || 1).length + 1)}ch; color:var(--accent);" title="How many separate real jobs - each one rounds its own materials up independently, same as several physical BPC copies would in EVE">
+              <span class="text-sm mono" style="color:var(--text-mute);">×</span>
+              <input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsPerJob || job.runsNeeded}" onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){toggleRunsEditMode(event, ${job.id});}" onblur="handleJobsRunsBlur(${job.id})" class="field-line text-xl font-extrabold mono" style="width:${Math.max(2, String(job.runsPerJob || job.runsNeeded).length + 1)}ch; color:var(--accent);" title="Runs per job - recalculates materials, cost, and time on commit">
+              <span class="text-sm mono" style="color:var(--text-mute);">Run${(job.runsPerJob || job.runsNeeded) > 1 ? 's' : ''}</span>
               ${renderRunsEditIconHTML(job.id, true)}
             </span>
           ` : `
