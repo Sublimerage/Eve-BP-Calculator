@@ -102,18 +102,91 @@
         </select>
       </div>
 
+      <!-- Production Station - same preset picker + Structure select the Calculator itself uses
+           (js/app.js loadProductionPreset/saveProductionPreset/deleteProductionPreset,
+           onStructureTypeChange), reused as-is rather than a lookalike. #facility-tax above already
+           doubles as the SAME field these functions read/write (both persist to eve_tax_settings). -->
       <div class="lp-row">
-        <div class="text-[10px] mono" style="color:var(--text-mute);">Blueprint offers build under: <span id="lpstore-active-station-label" style="color:var(--accent); font-weight:bold;">—</span></div>
-        <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--text-mute);">Change this from the Calculator's Production Station picker - this page always uses whatever is currently active.</p>
+        <label class="lp-label mb-2 block" for="production-preset-select">Production Station</label>
+        <div class="lp-inset space-y-1.5">
+          <div class="flex items-center gap-1.5">
+            <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="field-line flex-1 min-w-0 font-bold text-xs">
+              <option value="">— Load a saved production station —</option>
+            </select>
+            <button onclick="deleteProductionPreset()" class="toggle-btn" title="Delete the currently-selected preset">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            </button>
+          </div>
+          <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); if(typeof recalculate==='function') recalculate();" class="field-line w-full text-white font-semibold text-xs" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
+            <option value="npc">NPC Station (0% ME / 0% TE / 0% Fee)</option>
+            <option value="raitaru">Raitaru - M EC (1% ME / 15% TE / 3% Fee)</option>
+            <option value="azbel">Azbel - L EC (1% ME / 20% TE / 4% Fee)</option>
+            <option value="sotiyo" selected>Sotiyo - XL EC (1% ME / 30% TE / 5% Fee)</option>
+            <option value="athanor">Athanor - M Refinery (0% ME / 20% TE / 3% Fee)</option>
+            <option value="tatara">Tatara - L Refinery (0% ME / 30% TE / 5% Fee)</option>
+          </select>
+          <button onclick="saveProductionPreset()" class="btn-glass w-full py-1.5 text-xs flex items-center justify-center gap-1.5" title="Saves your current system, structure type, rig fitting, and facility tax as a named preset you can switch back to instantly">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
+            Save Current as Preset
+          </button>
+        </div>
+        <div class="text-[10px] mono mt-1.5" style="color:var(--text-mute);">Currently: <span id="lpstore-active-station-label" style="color:var(--accent); font-weight:bold;">—</span></div>
+        <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--text-mute);">System and rig fitting still follow whatever's active from the Calculator (no search box for those here yet) - loading a preset that has them saved applies them correctly regardless.</p>
+      </div>
+
+      <!-- Build Optimizers - same Actions/Auto-Build/Smart Optimizer controls as the Calculator's
+           own Build flyout (js/optimizers.js), operating on whatever's currently isolated below. -->
+      <div class="lp-row">
+        <div class="lp-label mb-2">Build Optimizers (isolated tree)</div>
+        <div class="grid grid-cols-2 gap-1.5 mb-1.5">
+          <button onclick="buildAllComponents()" class="btn-glass py-2 px-3 text-xs">Build All</button>
+          <button onclick="buyAllSubComponents()" class="btn-glass btn-glass-muted py-2 px-3 text-xs">Buy All</button>
+        </div>
+        <div class="lp-inset flex items-center gap-1.5 mb-1.5" title="Build Margin Threshold">
+          <span class="fo-inline-label">Min Profit</span>
+          <input type="text" inputmode="decimal" id="build-profit-threshold" value="5.0" oninput="sanitizeDecimalInput(event)" class="field-line w-14 text-center font-bold p-1 text-xs">
+          <span class="fo-inline-suffix">%</span>
+          <button onclick="applyBuildProfitOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] mono flex-shrink-0">Optimize</button>
+        </div>
+        <div class="lp-inset flex items-center gap-1.5 mb-1.5" title="Component Market Spread Threshold">
+          <span class="fo-inline-label">Spread</span>
+          <input type="text" inputmode="decimal" id="buy-savings-threshold" value="5.0" oninput="sanitizeDecimalInput(event)" class="field-line w-14 text-center font-bold p-1 text-xs">
+          <span class="fo-inline-suffix">%</span>
+          <button onclick="applyComponentSpreadOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] flex-shrink-0">Optimize</button>
+        </div>
+        <div class="lp-inset flex items-center gap-1.5 mb-1.5" title="Build Cost Savings Impact Threshold">
+          <span class="fo-inline-label">Budget</span>
+          <input type="text" inputmode="decimal" id="total-cost-savings-threshold" value="1.0" oninput="sanitizeDecimalInput(event)" class="field-line w-14 text-center font-bold p-1 text-xs">
+          <span class="fo-inline-suffix">%</span>
+          <button onclick="applyBudgetImpactOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] flex-shrink-0">Optimize</button>
+        </div>
+        <button onclick="resetSmartBuyModes()" class="btn-glass btn-glass-muted w-full py-1.5 text-[11px] mono">Reset Buy Modes</button>
       </div>
 
       <div class="lp-row">
         <div class="lp-label mb-2">Offer Type</div>
         <div class="flex gap-1.5">
-          <button onclick="setLPStoreTypeFilter('all')" class="btn-glass btn-glass-muted flex-1 px-2 py-1.5 text-[11px]">All</button>
-          <button onclick="setLPStoreTypeFilter('direct')" class="btn-glass btn-glass-muted flex-1 px-2 py-1.5 text-[11px]">Items</button>
-          <button onclick="setLPStoreTypeFilter('bpc')" class="btn-glass btn-glass-muted flex-1 px-2 py-1.5 text-[11px]">Blueprints</button>
+          <button id="btn-lpstore-type-all" onclick="setLPStoreTypeFilter('all')" class="lp-pill active flex-1 text-center" style="padding:5px 12px;">All</button>
+          <button id="btn-lpstore-type-direct" onclick="setLPStoreTypeFilter('direct')" class="lp-pill flex-1 text-center" style="padding:5px 12px;">Items</button>
+          <button id="btn-lpstore-type-bpc" onclick="setLPStoreTypeFilter('bpc')" class="lp-pill flex-1 text-center" style="padding:5px 12px;">Blueprints</button>
         </div>
+      </div>
+
+      <div class="lp-row">
+        <label class="lp-label mb-2 block" for="lpstore-category-filter">Category</label>
+        <select id="lpstore-category-filter" onchange="setLPStoreCategoryFilter(this.value)" class="field-line w-full font-bold text-xs">
+          <option value="all">All Categories</option>
+          <option value="6">Ships</option>
+          <option value="7">Modules</option>
+          <option value="8">Ammo &amp; Charges</option>
+          <option value="18">Drones</option>
+          <option value="20">Implants</option>
+          <option value="16">Skillbooks</option>
+          <option value="91">SKINs</option>
+          <option value="9">Blueprints (other)</option>
+          <option value="other">Other</option>
+        </select>
+        <p class="text-[10px] mt-1.5 leading-relaxed" style="color:var(--text-mute);">Categories load in the background right after a store's offers do - the list may take a moment to fully sort by category the first time.</p>
       </div>
 
       <!-- Same .fo-group/.lp-inset/.fo-inline-* Taxes & Fees block as index.html/invention.html -
@@ -315,8 +388,8 @@
   <script src="js/esi.js?v=8.0.15" defer></script>
   <script src="js/tree.js?v=8.0.1" defer></script>
   <script src="js/optimizers.js?v=8.0.6" defer></script>
-  <script src="js/app.js?v=15.34.2" defer></script>
-  <script src="js/lpstore.js?v=3.0.0" defer></script>
+  <script src="js/app.js?v=15.35.0" defer></script>
+  <script src="js/lpstore.js?v=4.0.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
