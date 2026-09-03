@@ -1659,7 +1659,7 @@ body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'IBM Plex Mono', monospace;
   color: var(--text-soft);
   background: var(--glass-fill);
   border: 1px solid var(--glass-border);
@@ -1669,7 +1669,8 @@ body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var
 }
 .lp-market-drawer-tab svg { width: 13px; height: 13px; stroke: currentColor; flex-shrink: 0; }
 .lp-market-drawer-tab:hover { color: var(--accent); border-color: rgba(var(--accent-rgb),0.35); }
-.lp-market-drawer-tab.open { bottom: 396px; color: var(--accent); }
+.lp-market-drawer-tab.open { bottom: 436px; color: var(--accent); }
+.lp-market-drawer-tab.open.expanded { bottom: 656px; }
 .lp-market-drawer-tab.open #lp-market-drawer-tab-chevron { transform: rotate(180deg); }
 .lp-market-drawer-tab-chevron, #lp-market-drawer-tab-chevron { transition: transform 0.2s ease; }
 
@@ -1679,8 +1680,8 @@ body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var
 .lp-market-drawer {
   position: absolute;
   left: 0; right: 0; bottom: 0;
-  height: 380px;
-  max-height: 65%;
+  height: 420px;
+  max-height: 70%;
   z-index: 65;
   display: flex;
   flex-direction: column;
@@ -1692,8 +1693,11 @@ body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: transform 0.25s ease, opacity 0.2s ease;
+  transition: transform 0.25s ease, opacity 0.2s ease, height 0.2s ease;
 }
+/* Expanded state - toggled by the drawer header's own expand button, for anyone who wants more
+   room to actually read the chart detail rather than the default compact height. */
+.lp-market-drawer.expanded { height: 640px; max-height: 85%; }
 .lp-market-drawer.open {
   transform: translateY(0);
   opacity: 1;
@@ -1729,13 +1733,17 @@ body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var
 /* Charts: thin marks, hairline recessive gridlines, a 2px surface ring around the hover dot so it
    stays legible crossing the line - per the dataviz skill's mark specs. */
 .lp-market-chart-grid line { stroke: rgba(255,255,255,0.07); stroke-width: 1; shape-rendering: crispEdges; }
-.lp-market-chart-axis-label { font-size: 9.5px; fill: var(--text-mute); font-family: 'JetBrains Mono', monospace; }
+.lp-market-chart-axis-label { font-size: 10px; fill: var(--text-soft); font-family: 'IBM Plex Mono', monospace; }
 .lp-market-price-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .lp-market-price-area { fill: var(--accent); opacity: 0.1; }
 .lp-market-hover-dot { fill: var(--accent); stroke: var(--bg-0); stroke-width: 2; }
 .lp-market-crosshair { stroke: rgba(255,255,255,0.18); stroke-width: 1; shape-rendering: crispEdges; }
-.lp-market-volume-bar { fill: var(--text-mute); opacity: 0.5; transition: opacity 0.1s ease; }
-.lp-market-volume-bar:hover, .lp-market-volume-bar.hover { fill: var(--accent); opacity: 0.85; }
+/* --text-mute (#6b6b70 in the dark theme) at 0.5 opacity on a near-black surface was effectively
+   invisible - --text-soft is the app's own lighter secondary-ink token, at a much higher opacity,
+   so the bars are actually readable while still staying clearly de-emphasized next to the accent
+   price line above them. */
+.lp-market-volume-bar { fill: var(--text-soft); opacity: 0.65; transition: opacity 0.1s ease, fill 0.1s ease; }
+.lp-market-volume-bar:hover, .lp-market-volume-bar.hover { fill: var(--accent); opacity: 0.95; }
 .lp-market-chart-tooltip {
   position: absolute;
   pointer-events: none;
@@ -1749,7 +1757,7 @@ body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var
   white-space: nowrap;
 }
 .lp-market-chart-tooltip .lbl { color: var(--text-mute); font-size: 9.5px; }
-.lp-market-chart-tooltip .val { color: var(--text); font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.lp-market-chart-tooltip .val { color: var(--text); font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
 
 /* ============================================================
    Narrow-viewport fallback - .content-row (shared by all 3 pages) is a fixed-width side-by-side
