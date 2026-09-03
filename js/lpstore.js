@@ -61,6 +61,7 @@ let _lpActiveCorpId = null;
 let _lpIsLoading = false;
 let _lpTypeFilter = 'all';    // 'all' | 'direct' | 'bpc'
 let _lpCategoryFilter = 'all'; // 'all' | a numeric SDE category id (string) | 'other'
+let _lpSearchQuery = '';      // free-text filter against the offer's own output item name
 let _lpItemCategoryCache = {}; // typeId -> category id, resolved live (see resolveLPItemCategories)
 let _lpSortKey = 'iskPerLp';
 let _lpSortDir = -1;          // -1 desc, 1 asc
@@ -407,6 +408,12 @@ function setLPStoreCategoryFilter(catId) {
 }
 window.setLPStoreCategoryFilter = setLPStoreCategoryFilter;
 
+function setLPStoreSearch(query) {
+  _lpSearchQuery = (query || '').trim();
+  renderLPStoreTable(); // filtering only - no need to re-render the summary tiles above it
+}
+window.setLPStoreSearch = setLPStoreSearch;
+
 function setLPStoreSort(key) {
   if (_lpSortKey === key) {
     _lpSortDir *= -1;
@@ -656,15 +663,40 @@ function renderLPExtraStats() {
   const profitColor = profit > 0 ? 'var(--accent)' : 'var(--red-400, #f87171)';
   const iskPerLpDisplay = iskPerLp === null ? '—' : Math.round(iskPerLp).toLocaleString();
 
-  const row = (label, value, color, title) => `
-    <div class="flex justify-between items-center gap-3" ${title ? `title="${window.esc(title)}"` : ''}>
-      <span class="text-slate-400 flex-shrink-0">${label}</span>
-      <span class="font-bold text-right whitespace-nowrap" style="color:${color || 'var(--text)'};">${value}</span>
-    </div>`;
+  // A row stacks its value onto its own line (instead of sitting beside the label) once the two
+  // combined would realistically overflow this card's width at text-sm mono - keeps the common
+  // case (short values) compact while big ISK/LP totals (this is EVE, they get big) never clip
+  // past the card edge regardless of magnitude, without ever truncating precision.
+  const row = (label, value, color, title) => {
+    const stacked = (label.length + value.length) > 34;
+    const titleAttr = title ? `title="${window.esc(title)}"` : '';
+    const valueSpan = `<span class="font-bold whitespace-nowrap" style="color:${color || 'var(--text)'};">${value}</span>`;
+    return stacked
+      ? `<div ${titleAttr}>
+          <div class="text-slate-400">${label}</div>
+          <div class="text-right">${valueSpan}</div>
+        </div>`
+      : `<div class="flex justify-between items-center gap-3" ${titleAttr}>
+          <span class="text-slate-400 flex-shrink-0">${label}</span>
+          ${valueSpan}
+        </div>`;
+  };
+
+  // Same overflow logic as row() above, applied to the two standalone hero numbers: shrink the
+  // font in steps as the string gets longer instead of letting it run past the card edge.
+  const fitFontSize = (text, sizes) => {
+    for (const [maxLen, size] of sizes) {
+      if (text.length <= maxLen) return size;
+    }
+    return sizes[sizes.length - 1][1];
+  };
+  const profitText = Math.round(profit).toLocaleString() + ' ISK';
+  const heroFontSize = fitFontSize(profitText, [[15, '32px'], [18, '26px'], [22, '21px'], [99, '17px']]);
+  const iskPerLpFontSize = fitFontSize(iskPerLpDisplay, [[9, '20px'], [13, '16px'], [99, '13px']]);
 
   const card = document.createElement('div');
   card.id = 'lp-info-card';
-  card.className = 'diagram-node glass-card p-3.5 w-96';
+  card.className = 'diagram-node glass-card p-3.5 w-[26rem]';
   card.style.borderTopColor = '#c084fc';
   card.innerHTML = `
     <div class="flex items-center gap-1.5 border-b border-[#3a3025] pb-2 mb-2.5">
@@ -678,11 +710,11 @@ function renderLPExtraStats() {
     </div>
     <div class="border-t border-[#3a3025] mt-2.5 pt-2.5">
       <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;" title="Net sell revenue minus build materials, required redemption items, job fee, and the flat redemption fee">LP-Aware Profit</div>
-      <div class="hero-num ${profit >= 0 ? 'profit' : 'loss'}">${Math.round(profit).toLocaleString()} ISK</div>
+      <div class="hero-num ${profit >= 0 ? 'profit' : 'loss'}" style="font-size:${heroFontSize}; white-space:nowrap;">${profitText}</div>
     </div>
     <div class="border-t border-[#3a3025] mt-2 pt-2 flex justify-between items-center" title="Estimated ISK profit per LP spent">
-      <span class="text-slate-300 font-bold text-sm">ISK / LP</span>
-      <span class="font-bold text-xl mono" style="color:${profitColor};">${iskPerLpDisplay}</span>
+      <span class="text-slate-300 font-bold text-sm flex-shrink-0">ISK / LP</span>
+      <span class="font-bold mono whitespace-nowrap" style="color:${profitColor}; font-size:${iskPerLpFontSize};">${iskPerLpDisplay}</span>
     </div>
   `;
 
@@ -780,6 +812,10 @@ function renderLPStoreTable() {
 
   let rows = _lpRankedResults.slice();
   if (_lpTypeFilter !== 'all') rows = rows.filter(r => r.offerType === _lpTypeFilter);
+  if (_lpSearchQuery) {
+    const q = _lpSearchQuery.toLowerCase();
+    rows = rows.filter(r => r.outputName && r.outputName.toLowerCase().includes(q));
+  }
   if (_lpCategoryFilter !== 'all') {
     rows = rows.filter(r => {
       const cat = getLPItemCategory(r.outputTypeId);
