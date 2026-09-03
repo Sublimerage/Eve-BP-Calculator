@@ -540,7 +540,17 @@ function extractJobMaterialsForNode(startNode) {
       }
       const netQtyNeeded = Math.max(0, node.qtyNeeded - consumedFromStock);
       const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
-      const unitPrice = strategy === 'sell' ? prices.sell : prices.buy;
+      // 'lp' (acquired via an LP Store redemption instead of the market - js/optimizers.js
+      // calculateTreeNodeCost) falling into the sell/buy binary below used to silently price it at
+      // market BUY, which is a different number from what it actually costs (isk_cost + required
+      // items, not a market order) - the same recalculate() pass that ran right before this function
+      // was called already priced this exact node correctly via calculateTreeNodeCost and stamped
+      // the real total on node.calculatedCost, so deriving a per-unit price from that keeps this
+      // consistent with the isolated canvas/BOM sidebar's own cost figure for the same component
+      // instead of quietly recomputing a different, wrong one.
+      const unitPrice = (strategy === 'lp' && node.qtyNeeded > 0 && typeof node.calculatedCost === 'number')
+        ? node.calculatedCost / node.qtyNeeded
+        : (strategy === 'sell' ? prices.sell : prices.buy);
       materials.push({
         typeId: productTypeId,
         name: node.name.replace(' Blueprint', ''),

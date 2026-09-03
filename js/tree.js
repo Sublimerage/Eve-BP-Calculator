@@ -341,7 +341,7 @@ function hasExplicitBatchYield(recipe) {
 window.hasExplicitBatchYield = hasExplicitBatchYield;
 
 // Parallel Multi-Layer SDE Blueprint-Centric Tree Generator
-async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, currentDepth, maxDepth, visitedPath = new Set(), parentNode = null, splitRunsForOwnMaterials = false) {
+async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, currentDepth, maxDepth, visitedPath = new Set(), parentNode = null, jobCount = 1) {
   // NOTE: window.recipeTreeRootProductTypeId is only valid for the ROOT node (depth 0) - it is
   // set once per selectItem() call for the item the user searched for. It must never be consulted
   // on recursive sub-component calls, or a child material would silently inherit the ROOT's
@@ -374,16 +374,20 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
     unitEIV: 0,
     jobEIV: 0,
     jobFee: 0,
-    // True only for the actual root call (currentDepth 0) of a tree that's known to be physically
-    // impossible to build as one combined multi-run job - LP Store BPC redemptions are the case this
-    // was built for (see the isolateOffer/evaluateBpcOffer call sites): every copy an offer grants is
-    // its own separate single-run blueprint copy, a real EVE mechanic, so N copies always means N
-    // separate real jobs, never one N-run job. Read by this node's own material-quantity math right
-    // below AND by scaleTreeQuantities (on every later recalculate, e.g. the redemption-count input
-    // changing) - never propagated to children, so it only ever affects a root's own direct materials,
-    // never how those materials' own sub-components get sourced (which have no such constraint and
-    // are still costed as one combined batch, same as everywhere else in the app).
-    splitRunsForOwnMaterials: currentDepth === 0 && !!splitRunsForOwnMaterials
+    // How many separate real jobs the actual root (currentDepth 0) represents - default 1, meaning
+    // "one job, all these runs", today's ordinary behavior with zero change. Above 1 means this
+    // node's OWN direct materials get costed as that many separate jobs of (runsNeeded / jobCount)
+    // runs each, rather than one combined runsNeeded-run job - each real job rounds its own material
+    // need up independently in EVE, which can need MORE material than one bigger combined job would.
+    // Two real cases: an LP Store BPC redemption (every copy an offer grants is its own separate
+    // single-run blueprint copy, a real EVE mechanic - see isolateOffer/evaluateBpcOffer/
+    // ensureLPRedemptionNodesPresent, all of which set this), and a normal Calculator plan for several
+    // physical BPC copies with a per-copy run cap (the "Jobs" field on the root card, recalculate()).
+    // Read by this node's own material-quantity math right below AND by scaleTreeQuantities (on every
+    // later recalculate) - never propagated to children, so it only ever affects a root's own direct
+    // materials, never how those materials' own sub-components get sourced (which have no such
+    // constraint and are still costed as one combined batch, same as everywhere else in the app).
+    jobCount: currentDepth === 0 ? Math.max(1, jobCount || 1) : 1
   };
 
   try {
@@ -501,12 +505,13 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
         if (currentDepth < maxDepth && !isCircular && isBuildingSelf) {
           const childPromises = activeMaterials.map(async mat => {
             try {
-              // See node.splitRunsForOwnMaterials's own comment above: N separate single-run jobs each
-              // round their own material need up independently, which can need MORE than one combined
-              // N-run job would (ceil(a)+ceil(b)+... >= ceil(a+b+...)) - so for a node with this flag,
-              // round per run and multiply, rather than rounding once on the combined runsNeeded total.
-              const childQty = node.splitRunsForOwnMaterials
-                ? runsNeeded * calculateInputQuantity(mat.baseQty, 1, me, facility, isReaction, rigMEBonus)
+              // See node.jobCount's own comment above: jobCount separate jobs each round their own
+              // material need up independently, which can need MORE than one combined runsNeeded-run
+              // job would (ceil(a)+ceil(b)+... >= ceil(a+b+...)) - so for jobCount > 1, round per job
+              // and multiply, rather than rounding once on the combined runsNeeded total. jobCount is
+              // always 1 by default, where this is exactly the original single computation.
+              const childQty = node.jobCount > 1
+                ? node.jobCount * calculateInputQuantity(mat.baseQty, runsNeeded / node.jobCount, me, facility, isReaction, rigMEBonus)
                 : calculateInputQuantity(mat.baseQty, runsNeeded, me, facility, isReaction, rigMEBonus);
               // findBlueprintTypeIdForProduct relies on the recipe map already being reverse-indexed by
               // product id - which fails for materials whose SDE/Fuzzwork entry never populated a usable
@@ -584,11 +589,12 @@ function scaleTreeQuantities(node, facility) {
     const childProductTypeId = child.productTypeId || child.typeId;
     const mat = Array.isArray(node.recipe.materials) ? node.recipe.materials.find(m => m.typeId === childProductTypeId) : null;
     if (mat) {
-      // See node.splitRunsForOwnMaterials in buildRecursiveRecipeTree for why this branches - this is
-      // what actually runs on every later recalculate() (e.g. the LP Store's "Times Redeemed" input
-      // changing), not just the initial tree build, so it needs the same split-vs-combined logic.
-      child.qtyNeeded = node.splitRunsForOwnMaterials
-        ? runsNeeded * calculateInputQuantity(mat.baseQty, 1, effectiveME, facility, node.isReaction, rigMEBonus)
+      // See node.jobCount in buildRecursiveRecipeTree for why this branches - this is what actually
+      // runs on every later recalculate() (the root card's Jobs/Runs inputs changing, or the LP
+      // Store's "Times Redeemed" input), not just the initial tree build, so it needs the same
+      // split-vs-combined logic.
+      child.qtyNeeded = node.jobCount > 1
+        ? node.jobCount * calculateInputQuantity(mat.baseQty, runsNeeded / node.jobCount, effectiveME, facility, node.isReaction, rigMEBonus)
         : calculateInputQuantity(mat.baseQty, runsNeeded, effectiveME, facility, node.isReaction, rigMEBonus);
     }
     scaleTreeQuantities(child, facility);

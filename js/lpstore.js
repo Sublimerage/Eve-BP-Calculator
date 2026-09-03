@@ -347,11 +347,11 @@ async function evaluateBpcOffer(offer) {
   window.recipeTreeRootProductTypeId = productTypeId;
   let root;
   try {
-    // splitRunsForOwnMaterials: true - LP store BPCs are always single-run copies (see this
-    // function's own comment on `runs` above), so `runs` copies means `runs` separate real jobs, not
-    // one `runs`-run job. See buildRecursiveRecipeTree's own comment on this flag for why that changes
-    // the material math.
-    root = await window.buildRecursiveRecipeTree(parseInt(offer.type_id), getLPItemName(offer.type_id), runs, 0, 6, new Set(), null, true);
+    // jobCount: runs - LP store BPCs are always single-run copies (see this function's own comment on
+    // `runs` above), so `runs` copies means `runs` SEPARATE real jobs of 1 run each, not one
+    // `runs`-run job. See buildRecursiveRecipeTree's own comment on node.jobCount for why that
+    // changes the material math.
+    root = await window.buildRecursiveRecipeTree(parseInt(offer.type_id), getLPItemName(offer.type_id), runs, 0, 6, new Set(), null, runs);
   } finally {
     window.recipeTreeRootProductTypeId = priorRootProduct;
   }
@@ -567,14 +567,15 @@ async function isolateOffer(offerId) {
     // .then(), because every await below depends on selectItem's own tree/DOM actually being
     // finished, not just started.
     //
-    // window.globalRuns and node.splitRunsForOwnMaterials (LP store BPCs are always single-run
-    // copies - see evaluateBpcOffer's own comment on why that needs special material-rounding
-    // handling) are NOT set here - ensureLPRedemptionNodesPresent (run by the recalculate hook below)
-    // derives both fresh from _lpRedemptionCount on every single recalculate, not just this first
-    // one. Setting them only here was a previous version of this code, and it broke the moment
-    // anything rebuilt the tree afterward (toggling Build/Buy on any component, or changing the home
-    // market station both call selectItem() again and silently drop it) - see _lpRedemptionCount's
-    // own comment for the full story.
+    // window.globalRuns/window.globalJobs (LP store BPCs are always single-run copies - see
+    // evaluateBpcOffer's own comment on why that needs special material-rounding handling, via the
+    // general node.jobCount mechanic - see buildRecursiveRecipeTree's own comment) are NOT set here -
+    // ensureLPRedemptionNodesPresent (run by the recalculate hook below) derives both fresh from
+    // _lpRedemptionCount on every single recalculate, not just this first one. Setting them only here
+    // was a previous version of this code, and it broke the moment anything rebuilt the tree
+    // afterward (toggling Build/Buy on any component, or changing the home market station both call
+    // selectItem() again and silently drop it) - see _lpRedemptionCount's own comment for the full
+    // story.
     await window.selectItem(result.blueprintTypeId, getLPItemName(result.blueprintTypeId), false);
     await window.fetchMarketPrices((result.offer.required_items || []).map(r => r.type_id));
   } else {
@@ -764,13 +765,13 @@ async function injectLPRedemptionNodes(root, offer, batches) {
 // rebuilding the tree from scratch whenever "Build" is toggled on ANY component (optimizers.js
 // toggleBuildSelf calls selectItem() again, which silently drops anything not part of its own
 // recursive walk) - these synthetic nodes just get re-added afterward either way. For the exact same
-// reason, this is ALSO the one place that forces window.globalRuns and (for a BPC) the root's
-// splitRunsForOwnMaterials flag back to what they should be, derived fresh from _lpRedemptionCount,
-// on every single pass - not just isLPIsolatedRoot/_lpRedemptionCount as before. Both of those are
-// exactly the fields a destructive selectItem() rebuild resets/drops, and the redemption count input
-// (createNodeCard's "Times Redeemed" branch) needs them present and correct on whatever the CURRENT
-// root object is, not just the first one selectItem() ever built - see _lpRedemptionCount's own
-// comment for the full story of why this needed to change.
+// reason, this is ALSO the one place that forces window.globalRuns/window.globalJobs back to what
+// they should be, derived fresh from _lpRedemptionCount, on every single pass - not just
+// isLPIsolatedRoot/_lpRedemptionCount as before. All of those are exactly the fields a destructive
+// selectItem() rebuild resets/drops, and the redemption count input (createNodeCard's "Times
+// Redeemed" branch) needs them present and correct on whatever the CURRENT root object is, not just
+// the first one selectItem() ever built - see _lpRedemptionCount's own comment for the full story of
+// why this needed to change.
 async function ensureLPRedemptionNodesPresent() {
   if (!_lpIsolatedResult || !window.recipeTreeRoot) return;
   const root = window.recipeTreeRoot;
@@ -778,8 +779,19 @@ async function ensureLPRedemptionNodesPresent() {
 
   root.isLPIsolatedRoot = true;
   root._lpRedemptionCount = _lpRedemptionCount;
-  window.globalRuns = result.offerType === 'bpc' ? _lpRedemptionCount * (result.offer.quantity || 1) : _lpRedemptionCount;
-  if (result.offerType === 'bpc') root.splitRunsForOwnMaterials = true;
+  // A BPC redemption's runs-per-job is ALWAYS 1 (LP store blueprints are always single-run copies -
+  // see evaluateBpcOffer's own comment), so the general node.jobCount mechanic (buildRecursiveRecipeTree's
+  // own comment) applies with jobCount = every copy this many redemptions grants and runsPerJob = 1.
+  // Direct-sell has no such concept (its synthetic root's recipe stays null, so scaleTreeQuantities
+  // never even reaches the jobCount branch for it) - globalRuns there just directly means redemptions,
+  // same as isolateDirectSellOffer already assumed.
+  if (result.offerType === 'bpc') {
+    window.globalJobs = _lpRedemptionCount * (result.offer.quantity || 1);
+    window.globalRuns = 1;
+  } else {
+    window.globalJobs = 1;
+    window.globalRuns = _lpRedemptionCount;
+  }
   const batches = getLPRedemptionBatches(result);
 
   const redemptionChildren = await injectLPRedemptionNodes(root, result.offer, batches);

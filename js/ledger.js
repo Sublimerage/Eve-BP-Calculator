@@ -728,7 +728,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth, 
                hover (title), same as a properly-nested (depth>0) sub-build already conveys via its own
                indentation + connector line - this just also covers an orphaned one (parent not present
                in the current filtered list) that has no indentation to lean on. -->
-          <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${renderPrereqBadgeHTML(job, 'ml-1 text-xs align-middle')}${renderSplitRunBadgeHTML(job, 'ml-1 text-xs align-middle')}${(childCount > 0) ?`<button onclick="toggleClusterCollapse(event, ${job.id})" class="ml-1.5 lp-badge align-middle" style="cursor:pointer;" title="${collapsedClusterIds.has(job.id) ? `Show ${childCount} hidden prerequisite job${childCount > 1 ? 's' : ''}` : `Collapse ${childCount} prerequisite job${childCount > 1 ? 's' : ''} under this one`}">${window.svgIcon(collapsedClusterIds.has(job.id) ? 'chevron-right' : 'chevron-down')} ${childCount}</button>` : ''}</div>
+          <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${renderPrereqBadgeHTML(job, 'ml-1 text-xs align-middle')}${(childCount > 0) ?`<button onclick="toggleClusterCollapse(event, ${job.id})" class="ml-1.5 lp-badge align-middle" style="cursor:pointer;" title="${collapsedClusterIds.has(job.id) ? `Show ${childCount} hidden prerequisite job${childCount > 1 ? 's' : ''}` : `Collapse ${childCount} prerequisite job${childCount > 1 ? 's' : ''} under this one`}">${window.svgIcon(collapsedClusterIds.has(job.id) ? 'chevron-right' : 'chevron-down')} ${childCount}</button>` : ''}</div>
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
           <!-- Edit icon lives INSIDE this same items-baseline row, right after "runs" - not as a
@@ -742,8 +742,8 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth, 
           <div class="flex items-baseline justify-end gap-1.5 flex-shrink-0" style="width:155px;" onclick="event.stopPropagation()">
             ${editingRunsJobIds.has(job.id)
               ? `<input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsNeeded}" onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){toggleRunsEditMode(event, ${job.id});}" onblur="changeJobRunCount(${job.id}, this.value)" class="field-line text-lg font-extrabold mono text-right" style="width:${Math.max(3, String(job.runsNeeded).length + 2)}ch; color:var(--accent);" title="Recalculates materials, cost, and time - press Enter or click away to confirm, Esc to cancel">`
-              : `<span class="text-lg font-extrabold mono whitespace-nowrap cursor-pointer" style="color:var(--accent);" onclick="copyRunsToClipboard(event, ${job.runsNeeded})" title="Click to copy run count">${job.runsNeeded.toLocaleString()}</span>`}
-            <span class="text-xs mono whitespace-nowrap" style="color:var(--text-mute);">runs</span>
+              : `<span class="text-lg font-extrabold mono whitespace-nowrap cursor-pointer" style="color:var(--accent);" onclick="copyRunsToClipboard(event, ${job.runsNeeded})" title="${(job.jobCount || 1) > 1 ? `${job.jobCount.toLocaleString()} separate jobs × ${(job.runsPerJob || 1).toLocaleString()} runs each - click to copy the total run count` : 'Click to copy run count'}">${job.runsNeeded.toLocaleString()}</span>`}
+            <span class="text-xs mono whitespace-nowrap" style="color:var(--text-mute);">${(job.jobCount || 1) > 1 ? `runs (${job.jobCount.toLocaleString()}×)` : 'runs'}</span>
             <span class="flex-shrink-0" style="width:12px;${(!job.isStarted && !job.autoImported) ? '' : ' visibility:hidden;'}">${renderRunsEditIconHTML(job.id, editingRunsJobIds.has(job.id))}</span>
           </div>
           <div class="lp-divider-col flex items-center gap-1.5 flex-shrink-0" style="width:260px;" title="Job status">
@@ -1451,7 +1451,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
           <div class="flex items-start space-x-3 min-w-0 flex-1">
             <img src="${jobIconUrl}" alt="${window.esc(jobDisplayName)}" class="${isFocusMode ? 'w-20 h-20' : 'w-12 h-12'} rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
-              <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${!isFocusMode ? renderPrereqBadgeHTML(job, 'ml-1 text-xs align-middle') + renderSplitRunBadgeHTML(job, 'ml-1 text-xs align-middle') : ''}</h3>
+              <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${!isFocusMode ? renderPrereqBadgeHTML(job, 'ml-1 text-xs align-middle') : ''}</h3>
               ${(job.isSubBuild && isFocusMode) ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">${window.svgIcon('gear')} Prerequisite for: ${window.esc(getPrereqLabel(job))}</div>` : ''}
               ${renderJobMetaChipHTML(job)}
             </div>
@@ -1465,7 +1465,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
           ${editingRunsJobIds.has(job.id) ? `
             <span class="flex items-baseline gap-1.5">
               <input type="number" id="runs-edit-input-${job.id}" min="1" value="${job.runsNeeded}" onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){toggleRunsEditMode(event, ${job.id});}" onblur="changeJobRunCount(${job.id}, this.value)" class="field-line text-xl font-extrabold mono" style="width:${Math.max(3, String(job.runsNeeded).length + 2)}ch; color:var(--accent);" title="Recalculates materials, cost, and time - press Enter or click away to confirm, Esc to cancel">
-              <span class="text-sm mono" style="color:var(--text-mute);">${runsUnitLabel(job)}</span>
+              <span class="text-sm mono" style="color:var(--text-mute);">Run${job.runsNeeded > 1 ? 's' : ''}${(job.jobCount || 1) > 1 ? ` total (${job.jobCount.toLocaleString()} Jobs × ${(job.runsPerJob || 1).toLocaleString()})` : ''}</span>
               ${renderRunsEditIconHTML(job.id, true)}
             </span>
           ` : `
@@ -1475,7 +1475,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
                 style="color:var(--accent);"
                 onclick="copyRunsToClipboard(event, ${job.runsNeeded})"
                 title="Click to copy the run count to clipboard">
-                ${job.runsNeeded.toLocaleString()} ${runsUnitLabel(job)}
+                ${runsDisplayHTML(job)}
               </span>
               ${(!job.isStarted && !job.autoImported) ? renderRunsEditIconHTML(job.id, false) : ''}
             </span>
@@ -1623,24 +1623,23 @@ function getPrereqLabel(job) {
   return job.parentJobName || 'another job';
 }
 
-// Distinguishes an LP Store BPC redemption's job from a normal combined multi-run job - same
-// runsNeeded field, completely different real-world meaning (see js/tree.js's own comment on
-// splitRunsForOwnMaterials, and js/app.js's on isLPSplitRunJob). Without this, "5,000 Runs" reads
-// identically whether it's one real 5,000-run job or - as it actually is here - 5,000 separate
-// single-run jobs that each need their own install in EVE, since LP store blueprints are always
-// single-run copies.
-function runsUnitLabel(job) {
-  // "Copies" instead of "Runs" (not "N x 1-Run Jobs" - tried that, it wrapped badly in the ~260px
-  // grid card at the same large font-size real run counts already use) - same length as "Runs" so
-  // the layout is unaffected, but it's a different word specifically so it doesn't read as "one
-  // combined N-run job" the way repeating "Runs" here would. The layers badge (icon + full-sentence
-  // tooltip) right next to it carries the complete explanation for anyone who wants it.
-  return job.isLPSplitRunJob ? (job.runsNeeded === 1 ? 'Copy' : 'Copies') : `Run${job.runsNeeded > 1 ? 's' : ''}`;
-}
-
-function renderSplitRunBadgeHTML(job, extraClass) {
-  if (!job.isLPSplitRunJob) return '';
-  return `<span class="${extraClass || 'flex-shrink-0'}" style="color:var(--accent);" title="LP Store redemption: this job's ${job.runsNeeded.toLocaleString()} Copies are ${job.runsNeeded.toLocaleString()} SEPARATE single-run jobs, not one combined ${job.runsNeeded.toLocaleString()}-run job - LP store blueprints are always single-run copies, so each one needs its own install in EVE.">${window.svgIcon('layers')}</span>`;
+// Distinguishes a multi-job plan from a normal combined multi-run job - same runsNeeded field,
+// completely different real-world meaning (see js/tree.js's own comment on node.jobCount, and
+// js/app.js's on job.jobCount/job.runsPerJob). Without this, "5,000
+// Runs" reads identically whether it's one real 5,000-run job or - as it can actually be, an LP
+// Store redemption or several physical copies of a limited-run BPC planned via the root card's own
+// "Jobs" field - 5,000 separate single-run jobs that each need their own install in EVE.
+//
+// Plain text ("N Jobs x R Runs"), not an icon+tooltip badge (an earlier version of this used a
+// layers icon next to the job name for exactly this) - a glance at the number itself is clearer than
+// a separate symbol you have to already know the meaning of, and it generalizes past LP Store
+// offers (always 1 run per job) to any jobCount/runsPerJob combination the Calculator's own "Jobs"
+// field can produce.
+function runsDisplayHTML(job) {
+  if ((job.jobCount || 1) <= 1) {
+    return `${job.runsNeeded.toLocaleString()} Run${job.runsNeeded > 1 ? 's' : ''}`;
+  }
+  return `${job.jobCount.toLocaleString()} Job${job.jobCount > 1 ? 's' : ''} <span style="opacity:0.6;">&times;</span> ${(job.runsPerJob || 1).toLocaleString()} Run${(job.runsPerJob || 1) > 1 ? 's' : ''}`;
 }
 
 // The small gear icon next to a prerequisite's name - a shared one gets a "xN" count alongside it so
@@ -1844,6 +1843,7 @@ function copyIndividualJobMultibuy(e, jobId) {
   const textList = job.materials
     .filter(m => {
       if (!m) return false;
+      if (m.strategy === 'lp') return false; // acquired via an LP Store redemption, not a market purchase
       const availableInStock = isStockDeductEnabled ? (allocatedStock[m.typeId] || 0) : 0;
       return (m.qtyNeeded - availableInStock) > 0;
     })
@@ -1926,8 +1926,14 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
 
     // Buy stays lime (matches the buy/sell toggle buttons, where buy is highlighted as "usually
     // more profitable"); sell gets a distinct blue so the two read apart at a glance instead of
-    // both being the same green.
-    const strategyBadge = item.strategy === 'sell'
+    // both being the same green. 'lp' (acquired via an LP Store redemption, not the market at all -
+    // see js/optimizers.js calculateTreeNodeCost) used to fall through to this same BUY badge, which
+    // actively said the wrong thing about how to actually get this material - it gets its own
+    // violet tag instead, matching the same violet already used for redemption-requirement cards
+    // elsewhere in the LP Store.
+    const strategyBadge = item.strategy === 'lp'
+      ? `<span class="lp-badge lp-badge-violet" title="Acquired via an LP Store redemption, not bought on the market">LP</span>`
+      : item.strategy === 'sell'
       ? `<span class="lp-badge lp-badge-blue">SELL</span>`
       : `<span class="lp-badge lp-badge-accent">BUY</span>`;
 
@@ -1983,7 +1989,7 @@ function renderConsolidatedBOMList(bomItems, totalMissingISK) {
   container.innerHTML = needToBuyHTML + acquiredHTML;
 
   window.journalMultibuyText = bomItems
-    .filter(i => i.netMissingQty > 0)
+    .filter(i => i.netMissingQty > 0 && i.strategy !== 'lp') // LP-acquired materials aren't a market purchase - don't paste them into a multibuy order
     .map(i => `${i.name} x${i.netMissingQty}`)
     .join('\n');
 }
@@ -2022,17 +2028,31 @@ function startJobRuns(jobId) {
   const remainingRuns = totalRuns - startRuns;
   const remainingRatio = remainingRuns / totalRuns;
 
-  const scaleMaterials = (r) => Array.isArray(job.materials) ? job.materials.map(m => {
-    const scaledQty = Math.ceil(m.qtyNeeded * r);
-    const scaledStock = Math.min(m.stockQty || 0, scaledQty);
-    return {
-      ...m,
-      qtyNeeded: scaledQty,
-      stockQty: scaledStock,
-      netQtyNeeded: Math.max(0, scaledQty - scaledStock),
-      lineCost: (m.unitPrice || 0) * Math.max(0, scaledQty - scaledStock)
-    };
-  }) : [];
+  // Split each material's total between the two fragments WITHOUT rounding each side independently.
+  // m.qtyNeeded already went through Math.ceil once (calculateInputQuantity, for the full totalRuns) -
+  // re-ceiling BOTH ratio*qtyNeeded and (1-ratio)*qtyNeeded separately can round up twice on the same
+  // total, but the real danger is the STARTED side specifically: it can come out LOWER than a fresh
+  // single-run calculation would give (provably, ceil(ceil(n*x)*r) <= ceil(x) for r=1/n). The started
+  // side is what gets subtracted from the shared stock pool as "already consumed" when the BOM
+  // renders - an under-counted started side leaves MORE apparent stock for every job rendered after it
+  // than physically exists, which is exactly "the ledger looked fine, then I ran out in game." Ceiling
+  // only the started side (conservative: assume at least this much was really consumed) and deriving
+  // the remaining side as the exact complement guarantees the two fragments always sum back to the
+  // trusted original total - no material invented or lost in the split, and no phantom stock leaking
+  // into later jobs. (Same fix as syncWithEveIndustryJobs' own splitMaterials.)
+  const splitMaterials = () => {
+    const started = [], remaining = [];
+    (Array.isArray(job.materials) ? job.materials : []).forEach(m => {
+      const startedQty = Math.min(m.qtyNeeded, Math.ceil(m.qtyNeeded * ratio));
+      const remainingQty = Math.max(0, m.qtyNeeded - startedQty);
+      const startedStock = Math.min(m.stockQty || 0, startedQty);
+      const remainingStock = (m.stockQty || 0) - startedStock;
+      started.push({ ...m, qtyNeeded: startedQty, stockQty: startedStock, netQtyNeeded: Math.max(0, startedQty - startedStock), lineCost: (m.unitPrice || 0) * Math.max(0, startedQty - startedStock) });
+      remaining.push({ ...m, qtyNeeded: remainingQty, stockQty: remainingStock, netQtyNeeded: Math.max(0, remainingQty - remainingStock), lineCost: (m.unitPrice || 0) * Math.max(0, remainingQty - remainingStock) });
+    });
+    return { started, remaining };
+  };
+  const { started: startedMaterials, remaining: remainingMaterials } = splitMaterials();
 
   const activeFragment = {
     ...job,
@@ -2042,7 +2062,7 @@ function startJobRuns(jobId) {
     calculatedCost: (job.calculatedCost || 0) * ratio,
     netProfit: job.netProfit !== undefined ? job.netProfit * ratio : undefined,
     totalBuildSeconds: (job.totalBuildSeconds || 0) * ratio,
-    materials: scaleMaterials(ratio),
+    materials: startedMaterials,
     startedAt: Date.now(),
     isStarted: true,
     splitFromId: job.id
@@ -2056,7 +2076,7 @@ function startJobRuns(jobId) {
     calculatedCost: (job.calculatedCost || 0) * remainingRatio,
     netProfit: job.netProfit !== undefined ? job.netProfit * remainingRatio : undefined,
     totalBuildSeconds: (job.totalBuildSeconds || 0) * remainingRatio,
-    materials: scaleMaterials(remainingRatio),
+    materials: remainingMaterials,
     startedAt: undefined,
     isStarted: false,
     splitFromId: job.id

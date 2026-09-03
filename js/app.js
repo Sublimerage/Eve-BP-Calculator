@@ -3,6 +3,9 @@
 if (window.rootSellStrategy === undefined) window.rootSellStrategy = 'market-sell';
 if (window.rootCustomPrice === undefined) window.rootCustomPrice = 0;
 if (window.globalRuns === undefined) window.globalRuns = 1;
+// How many separate real jobs window.globalRuns (runs PER job) represents - default 1, meaning
+// "one job, this many runs", exactly today's behavior. See recalculate()'s own comment.
+if (window.globalJobs === undefined) window.globalJobs = 1;
 
 // (extractBuildTime, calculateAdjustedJobSeconds, calculateTotalBuildSeconds moved to config.js so
 // the calculator, ledger, and invention pages can all share the same real time calculation)
@@ -1506,6 +1509,7 @@ async function selectItem(typeId, name, preserveView = false) {
     window.rootSellStrategy = 'market-sell';
     window.rootCustomPrice = 0;
     window.globalRuns = 1;
+    window.globalJobs = 1;
     const globalInput = document.getElementById('bp-runs');
     if (globalInput) globalInput.value = 1;
 
@@ -1564,6 +1568,7 @@ function saveActiveState() {
     localStorage.setItem('eve_custom_me_overrides', JSON.stringify(window.customMEOverrides));
     localStorage.setItem('eve_custom_te_overrides', JSON.stringify(window.customTEOverrides));
     localStorage.setItem('eve_global_runs', window.globalRuns);
+    localStorage.setItem('eve_global_jobs', window.globalJobs);
     localStorage.setItem('eve_root_sell_strategy', window.rootSellStrategy);
     localStorage.setItem('eve_root_custom_price', window.rootCustomPrice);
   } catch (e) { console.warn('[App] Failed to save the current build state - it will be lost on reload:', e); }
@@ -1576,6 +1581,7 @@ function loadSavedState() {
     window.customMEOverrides = window.safeParseJSON(localStorage.getItem('eve_custom_me_overrides'), {});
     window.customTEOverrides = window.safeParseJSON(localStorage.getItem('eve_custom_te_overrides'), {});
     window.globalRuns = parseInt(localStorage.getItem('eve_global_runs')) || 1;
+    window.globalJobs = parseInt(localStorage.getItem('eve_global_jobs')) || 1;
     window.rootSellStrategy = localStorage.getItem('eve_root_sell_strategy') || 'market-sell';
     window.rootCustomPrice = parseFloat(localStorage.getItem('eve_root_custom_price')) || 0;
 
@@ -1594,7 +1600,15 @@ function recalculate() {
   const activeId = activeEl ? activeEl.id : null;
 
   syncTreeOverrides(window.recipeTreeRoot);
-  const inputVal = Math.max(1, window.globalRuns || 1);
+  // globalRuns is runs PER JOB; globalJobs is how many separate real jobs that represents (default
+  // 1, so inputVal === globalRuns for every root that isn't using this - zero behavior change for
+  // the vast majority of cards). See buildRecursiveRecipeTree's own comment on node.jobCount for why
+  // this distinction exists: N separate jobs each round their own materials up independently, which
+  // needs MORE material than one combined N*runsPerJob-run job would - relevant for a limited-run
+  // BPC (redeemed from LP, or just several physical copies of a max-run BPC you're planning around).
+  const runsPerJob = Math.max(1, window.globalRuns || 1);
+  const jobCount = Math.max(1, window.globalJobs || 1);
+  const inputVal = jobCount * runsPerJob;
 
   const { salesTax, brokerFee, facilityTax, sccSurcharge } = window.getActiveFeeInputs();
   const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { costBonus: 5.0, meBonus: 1.0 };
@@ -1614,6 +1628,7 @@ function recalculate() {
 
   window.recipeTreeRoot.qtyNeeded = totalRootOutputQty;
   window.recipeTreeRoot.runsNeeded = rootRunsNeeded;
+  window.recipeTreeRoot.jobCount = jobCount;
 
   window.scaleTreeQuantities(window.recipeTreeRoot, facility);
   window.calculateNodeEIV(window.recipeTreeRoot);
@@ -2008,7 +2023,7 @@ function createNodeCard(node) {
 
     <div class="space-y-2.5">
       ${isRoot ? `
-        <div class="border-t border-[#3a3025] pt-2.5 flex items-center justify-between text-sm mono" onclick="event.stopPropagation()">
+        <div class="border-t border-[#3a3025] pt-2.5 flex items-center ${node.isLPIsolatedRoot ? 'justify-between' : 'gap-3'} text-sm mono" onclick="event.stopPropagation()">
           ${node.isLPIsolatedRoot ? `
             <span class="text-slate-300 font-bold" title="How many separate times you redeem this LP store offer - NOT blueprint runs. Each redemption grants a fixed amount (shown above), so everything scales as this count times that fixed amount.">Times Redeemed:</span>
             <div class="flex items-center space-x-1">
@@ -2016,10 +2031,13 @@ function createNodeCard(node) {
               <span class="text-slate-400 text-xs">time${(node._lpRedemptionCount || 1) === 1 ? '' : 's'}</span>
             </div>
           ` : `
-            <span class="text-slate-300 font-bold">Runs:</span>
-            <div class="flex items-center space-x-1">
-              <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" onchange="syncCardRunsToGlobal(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-16 bg-black/40 rounded text-center font-bold p-1 outline-none" style="border:1px solid rgba(var(--accent-rgb),0.5); color:var(--accent);">
-              <span class="text-slate-400 text-xs">Runs</span>
+            <div class="flex items-center gap-1.5">
+              <span class="text-slate-300 font-bold" title="How many separate real jobs to plan for - each one rounds its own materials up independently, same as several physical copies of a max-run BPC would in EVE. Leave at 1 for a single normal job.">Jobs:</span>
+              <input type="number" id="card-bp-jobs" value="${node.jobCount || 1}" min="1" max="1000000" onchange="syncCardJobsToGlobal(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-14 bg-black/40 rounded text-center font-bold p-1 outline-none" style="border:1px solid rgba(var(--accent-rgb),0.5); color:var(--accent);">
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-slate-300 font-bold" title="Runs per job.">Runs:</span>
+              <input type="number" id="card-bp-runs" value="${Math.max(1, Math.round(node.runsNeeded / (node.jobCount || 1)))}" min="1" max="1000000" onchange="syncCardRunsToGlobal(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-14 bg-black/40 rounded text-center font-bold p-1 outline-none" style="border:1px solid rgba(var(--accent-rgb),0.5); color:var(--accent);">
             </div>
           `}
         </div>
@@ -2156,6 +2174,14 @@ function syncCardRunsToGlobal(e) {
   recalculate();
 }
 
+// Companion to syncCardRunsToGlobal - see recalculate()'s own comment on globalJobs/globalRuns.
+function syncCardJobsToGlobal(e) {
+  const val = Math.max(1, parseInt(e.target.value) || 1);
+  window.globalJobs = val;
+  recalculate();
+}
+window.syncCardJobsToGlobal = syncCardJobsToGlobal;
+
 function syncCustomPrice(e) {
   const val = parseFloat(e.target.value) || 0;
   window.rootCustomPrice = val >= 0 ? val : 0;
@@ -2286,13 +2312,14 @@ function addCurrentJobToLedger(e) {
   const bpSource = getLastLoadedBlueprintSource();
   const sourceBlueprintItemId = (bpSource && bpSource.typeId === window.recipeTreeRoot.typeId) ? bpSource.itemId : undefined;
 
-  // True only for an LP Store BPC's isolated root (see js/tree.js's own comment on
-  // splitRunsForOwnMaterials) - runsNeeded here is real, but it does NOT mean "one job with this many
-  // runs" the way it does for every other job: LP store BPCs are always single-run copies, so this
-  // represents that many SEPARATE real jobs, each needing its own installation in EVE. Recorded on
-  // the job so the Ledger can show that distinction visually instead of a bare "N Runs" that reads
-  // identically to a normal combined multi-run job.
-  const isLPSplitRunJob = !!(window.recipeTreeRoot.isLPIsolatedRoot && window.recipeTreeRoot.splitRunsForOwnMaterials);
+  // jobCount > 1 means runsNeeded does NOT mean "one job with this many runs" the way it does for
+  // every other job - it's jobCount SEPARATE real jobs of (runsNeeded/jobCount) runs each, each
+  // needing its own installation in EVE (an LP Store BPC redemption, or several physical copies of a
+  // limited-run BPC planned via the root card's own "Jobs" field - see js/tree.js's own comment on
+  // node.jobCount). Recorded on the job so the Ledger can show that distinction as "N Jobs x R Runs"
+  // instead of a bare "N Runs" that reads identically to one real combined multi-run job.
+  const jobCount = window.recipeTreeRoot.jobCount || 1;
+  const runsPerJob = window.globalRuns || 1;
 
   const job = {
     id: rootJobId,
@@ -2311,7 +2338,8 @@ function addCurrentJobToLedger(e) {
     sourceBlueprintItemId: sourceBlueprintItemId,
     productionSnapshot: productionSnapshot,
     buildConfigSnapshot: buildConfigSnapshot,
-    isLPSplitRunJob: isLPSplitRunJob,
+    jobCount: jobCount,
+    runsPerJob: runsPerJob,
     addedAt: new Date().toISOString()
   };
 
