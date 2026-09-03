@@ -525,6 +525,8 @@ function isolateOffer(offerId) {
 
   _lpIsolatedResult = result;
   resetMarketDrawer(); // don't carry the previous offer's drawer data/open-state into this one
+  window.__lpRequiredItemBuildOverrides = {}; // don't carry the previous offer's "build this required item" choices into this one
+  localStorage.setItem('eve_lpstore_last_isolated_offer', String(offerId)); // restored on next page load - see the load listener below
 
   // #lpstore-main-area is hidden as a whole (not just its inner results div) - it's a flex sibling
   // of #viewport in .content-row, and leaving it visible-but-empty would still claim flex-1 space
@@ -592,6 +594,7 @@ async function isolateDirectSellOffer(result) {
 function exitLPInspector() {
   _lpIsolatedResult = null;
   resetMarketDrawer();
+  localStorage.removeItem('eve_lpstore_last_isolated_offer'); // explicit "Back to List" - don't re-isolate this on the next load
   ['viewport', 'bom-sidebar', 'lpstore-calc-stat-strip'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
   document.getElementById('lp-info-card-col')?.remove();
   document.getElementById('lpstore-main-area')?.classList.remove('hidden');
@@ -625,63 +628,120 @@ function onLPRedemptionCountChange(e) {
 }
 window.onLPRedemptionCountChange = onLPRedemptionCountChange;
 
+// Per-required-item "build this instead of buying it" choice, separate from the Calculator's own
+// buildSelfOverrides (js/optimizers.js) - kept as its own map, keyed by the required item's PRODUCT
+// typeId, rather than reusing buildSelfOverrides' existing blueprint-typeId convention, so there's
+// no risk of this feature's key shape drifting out of sync with what the rest of the app expects
+// there. Reset per-offer in isolateOffer.
+window.__lpRequiredItemBuildOverrides = window.__lpRequiredItemBuildOverrides || {};
+
+function toggleLPRequiredItemBuild(e, typeId) {
+  if (e) e.stopPropagation();
+  const next = !window.__lpRequiredItemBuildOverrides[typeId];
+  window.__lpRequiredItemBuildOverrides[typeId] = next;
+  // __lpRequiredItemBuildOverrides above only gates whether injectLPRedemptionNodes attempts the
+  // real sub-tree build at all - buildRecursiveRecipeTree (js/tree.js) itself decides a node's own
+  // isBuildingSelf from window.buildSelfOverrides, keyed by BLUEPRINT id (the app-wide convention
+  // every other node uses), which is a different key than typeId here (the product id). Without
+  // this, the built node comes back correctly manufacturable but still flagged as "buy" - present
+  // with a real recipe attached, just not actually expanded into its own materials.
+  const recipe = window.recipeMap && window.recipeMap[typeId];
+  if (recipe && recipe.blueprintTypeID) {
+    window.buildSelfOverrides[parseInt(recipe.blueprintTypeID)] = next;
+  }
+  if (typeof window.recalculate === 'function') window.recalculate();
+}
+window.toggleLPRequiredItemBuild = toggleLPRequiredItemBuild;
+
 // Adds one child node per required_item, in the same shape a real tree node has (so createNodeCard/
 // calculateTreeNodeCost/etc. handle them with zero special-casing beyond the isRedemptionRequirement
 // flag) - instanceId comes from the SAME global counter tree.js/app.js use for their own nodes
-// (config.js's `var instanceCounter` is a live global, not a snapshot), so there's no collision risk.
-function injectLPRedemptionNodes(root, offer) {
-  if (!root) return;
-  root.children = root.children || [];
-  (offer.required_items || []).forEach(ri => {
-    root.children.push({
-      instanceId: ++window.instanceCounter, parentInstanceId: root.instanceId,
-      typeId: ri.type_id, displayTypeId: ri.type_id, productTypeId: ri.type_id,
-      name: getLPItemName(ri.type_id), productName: getLPItemName(ri.type_id),
-      qtyNeeded: ri.quantity, depth: (root.depth || 0) + 1, recipe: null, children: [],
-      isManufacturable: false, isReaction: false, batchYield: 1, runsNeeded: 1,
-      isBuildingSelf: false, customME: 0, customTE: 0, unitEIV: 0, jobEIV: 0, jobFee: 0,
-      isRedemptionRequirement: true, _perBatchQty: ri.quantity
-    });
-  });
+// (config.js's `var instanceCounter` is a live global, not a snapshot), so there's no collision
+// risk. A required item that has a REAL recipe in recipeMap (most don't - most LP redemption items
+// are loot-only ammo/implants/boosters with no player blueprint, but some genuinely are ordinary
+// buildable items, e.g. base-variant ammo turned in for a faction-flavor reward) gets marked
+// isManufacturable so its card shows the normal Build/Buy toggle; if the player has toggled it to
+// Build (window.__lpRequiredItemBuildOverrides), its own real sub-tree is built via
+// buildRecursiveRecipeTree instead of a flat non-buildable stub, exactly like any other tree
+// material.
+async function injectLPRedemptionNodes(root, offer, batches) {
+  const items = offer.required_items || [];
+  const children = await Promise.all(items.map(async (ri) => {
+    const totalQty = ri.quantity * batches;
+    const recipe = window.recipeMap && window.recipeMap[ri.type_id];
+    const isRealRecipe = !!(recipe && parseInt(recipe.productTypeID) === ri.type_id);
+    const wantsBuild = isRealRecipe && !!window.__lpRequiredItemBuildOverrides[ri.type_id];
+
+    let child = null;
+    if (wantsBuild) {
+      try {
+        child = await window.buildRecursiveRecipeTree(parseInt(recipe.blueprintTypeID), getLPItemName(recipe.blueprintTypeID), totalQty, (root.depth || 0) + 1, 6, new Set(), root);
+      } catch (e) {
+        console.warn('[LP Store] Failed to build required-item sub-tree, falling back to a plain stub:', ri.type_id, e);
+        child = null;
+      }
+    }
+    if (!child) {
+      child = {
+        instanceId: ++window.instanceCounter, parentInstanceId: root.instanceId,
+        typeId: ri.type_id, displayTypeId: ri.type_id, productTypeId: ri.type_id,
+        name: getLPItemName(ri.type_id), productName: getLPItemName(ri.type_id),
+        qtyNeeded: totalQty, depth: (root.depth || 0) + 1, recipe: null, children: [],
+        isManufacturable: isRealRecipe, isReaction: false, batchYield: 1, runsNeeded: 1,
+        isBuildingSelf: false, customME: 0, customTE: 0, unitEIV: 0, jobEIV: 0, jobFee: 0
+      };
+    }
+    child.isRedemptionRequirement = true;
+    child._perBatchQty = ri.quantity;
+    // A stable key for toggleLPRequiredItemBuild, independent of build state: node.typeId itself
+    // is ri.type_id (the product) for the flat stub but the BLUEPRINT's id once actually built via
+    // buildRecursiveRecipeTree above - using node.typeId directly in the pill's onclick would toggle
+    // a different window.__lpRequiredItemBuildOverrides key each time the node's own build state
+    // changes, which would never turn back off correctly. This field stays ri.type_id always.
+    child._lpRequiredItemProductTypeId = ri.type_id;
+    return child;
+  }));
+  return children;
 }
 
-// Run before every recalculate() this page triggers (see installLPRecalculateHook) - handles BOTH
-// keeping the redemption nodes' quantities in sync with the current redemption count AND
-// re-injecting them if they're missing. They go missing whenever js/app.js rebuilds the tree from
-// scratch, which happens more often than just the initial isolate: toggling "Build" on ANY
-// component deep in the tree (optimizers.js toggleBuildSelf) re-runs selectItem() to fetch that
-// component's own children, which throws away and rebuilds the WHOLE tree including the root -
-// silently dropping these synthetic nodes if they aren't re-added here every time. Also re-stamps
+// Run before every recalculate() this page triggers (see installLPRecalculateHook) - rebuilds the
+// redemption-requirement children fresh every time (not just once) so a required item's own Build/
+// Buy toggle (toggleLPRequiredItemBuild above) and the current redemption count both stay reflected
+// correctly. This also covers the case the old once-only injection was written for: js/app.js
+// rebuilding the tree from scratch whenever "Build" is toggled on ANY component (optimizers.js
+// toggleBuildSelf calls selectItem() again, which silently drops anything not part of its own
+// recursive walk) - these synthetic nodes just get re-added afterward either way. Also re-stamps
 // isLPIsolatedRoot/_lpRedemptionCount on the root for the same reason (createNodeCard's "Times
 // Redeemed" branch needs them present on whatever the CURRENT root object is, not just the first
 // one selectItem() ever built).
-function ensureLPRedemptionNodesPresent() {
+async function ensureLPRedemptionNodesPresent() {
   if (!_lpIsolatedResult || !window.recipeTreeRoot) return;
   const root = window.recipeTreeRoot;
   const result = _lpIsolatedResult;
 
   root.isLPIsolatedRoot = true;
-  root.children = root.children || [];
-  const alreadyInjected = root.children.some(c => c.isRedemptionRequirement);
-  if (!alreadyInjected) injectLPRedemptionNodes(root, result.offer);
-
   const batches = getLPRedemptionBatches(result);
   root._lpRedemptionCount = batches;
-  root.children.forEach(child => {
-    if (child.isRedemptionRequirement) child.qtyNeeded = child._perBatchQty * batches;
-  });
+
+  const redemptionChildren = await injectLPRedemptionNodes(root, result.offer, batches);
+  // Keep any REAL children already there (a BPC-isolated root's own build materials) - only the
+  // previous pass's redemption nodes get replaced.
+  root.children = (root.children || []).filter(c => !c.isRedemptionRequirement).concat(redemptionChildren);
 }
 
 // Wraps the Calculator's own recalculate() ONCE, on this page only, to sync the redemption nodes
 // first and refresh the LP-specific extra stat strip after - every existing trigger for recalculate
 // (Build/Buy/LP toggles, runs change, ME/TE edits, tax/fee edits) picks both up automatically, with
-// no new wiring needed at any of those call sites.
+// no new wiring needed at any of those call sites. async now (ensureLPRedemptionNodesPresent awaits
+// buildRecursiveRecipeTree for any required item toggled to Build) - every existing caller on this
+// page already treats recalculate() as fire-and-forget (onclick="recalculate()" etc.), so returning
+// a Promise instead of undefined changes nothing observable for them.
 function installLPRecalculateHook() {
   if (typeof window.recalculate !== 'function' || window.recalculate.__lpWrapped) return;
   const original = window.recalculate;
-  const wrapped = function (...args) {
+  const wrapped = async function (...args) {
     window.__lpSpentThisRecalc = 0; // calculateTreeNodeCost (js/optimizers.js) accumulates into this
-    ensureLPRedemptionNodesPresent();
+    await ensureLPRedemptionNodesPresent();
     const result = original.apply(this, args);
     restoreCalculatorState(_lpSavedCalculatorState); // undo this call's own saveActiveState() - see the note above CALCULATOR_STATE_KEYS
     renderLPExtraStats();
@@ -974,7 +1034,7 @@ function renderMarketDrawerContent() {
     </div>`;
 
   buildPriceLineChart(sliced, document.getElementById('lp-market-price-chart-wrap'));
-  buildVolumeLineChart(sliced, document.getElementById('lp-market-volume-chart-wrap'));
+  buildVolumeCandlestickChart(sliced, document.getElementById('lp-market-volume-chart-wrap'));
   positionMarketDrawerTab();
 }
 window.renderMarketDrawerContent = renderMarketDrawerContent;
@@ -1143,18 +1203,13 @@ function buildPriceLineChart(rows, container) {
 
 // Single series (units traded per day) - its own chart/axis, stacked below the price chart with
 // the same padL/padR/date domain so the two visually align without being one dual-axis plot. Bars
-// capped at 24px, rounded top / square baseline per the mark spec (a plain <rect rx> would round
-// all four corners, so this is a hand-built path instead). Each bar is filled from one of two
-// shared gradients depending on whether that day's volume is above or below the period average -
-// a day busier than usual actually looks different from a quiet one, rather than every bar being
-// an identical flat gray block, and it's a real read on the data (see the dashed average line
-// echoing the price chart's own), not decoration for its own sake.
-// Single series (units traded per day) - now a plain line, matching the price chart's own
-// treatment rather than a bar chart: same smoothed-path technique, same flat (no gradient) low-
-// opacity fill, same dashed average reference line. Drawn in the app's neutral secondary-ink token
-// rather than the accent color, so it stays visually distinct from the price line above it without
-// introducing a second competing hue.
-function buildVolumeLineChart(rows, container) {
+// Single series (units traded per day) - candlestick-style: one thin, sharp-edged vertical stick
+// per day (not the earlier chunky rounded bars, not a continuous line). There's no real open/high/
+// low/close for a daily trade count, so this isn't literal OHLC - each stick is colored by that
+// day's PRICE direction versus the day before (the same green/red convention a real candlestick
+// price chart uses), which is honest to data this endpoint actually has and gives the sticks real
+// meaning instead of being one flat color. Flat fills throughout, no gradients.
+function buildVolumeCandlestickChart(rows, container) {
   if (!container) return;
   const W = Math.max(280, Math.round(container.clientWidth || container.getBoundingClientRect().width || 640));
   const H = _lpMarketExpanded ? 160 : 85;
@@ -1162,23 +1217,28 @@ function buildVolumeLineChart(rows, container) {
   const innerW = W - padL - padR, innerH = H - padT - padB;
   const n = rows.length;
   const volumes = rows.map(r => r.volume || 0);
+  const prices = rows.map(r => r.average);
   const avgV = volumes.reduce((s, v) => s + v, 0) / n;
   const maxV = Math.max(...volumes, 1) * 1.1;
 
-  const xForIndex = (i) => n === 1 ? padL + innerW / 2 : padL + (i / (n - 1)) * innerW;
+  const slotW = innerW / n;
+  const stickW = Math.max(2, Math.min(9, slotW * 0.55));
+  const xForIndex = (i) => padL + i * slotW + (slotW - stickW) / 2;
   const yForVol = (v) => padT + innerH - (v / maxV) * innerH;
   const baseline = padT + innerH;
   const avgY = yForVol(avgV);
-
-  const points = volumes.map((v, i) => [xForIndex(i), yForVol(v)]);
-  const linePath = smoothPathD(points);
-  const areaPath = `${linePath} L${points[n - 1][0].toFixed(1)},${baseline.toFixed(1)} L${points[0][0].toFixed(1)},${baseline.toFixed(1)} Z`;
-  const lastX = points[n - 1][0], lastY = points[n - 1][1];
 
   const vLineCount = Math.min(4, n - 1);
   const vLines = Array.from({ length: vLineCount + 1 }, (_, i) => {
     const x = (padL + (i / vLineCount) * innerW).toFixed(1);
     return `<line class="v" x1="${x}" y1="${padT}" x2="${x}" y2="${baseline.toFixed(1)}"/>`;
+  }).join('');
+
+  const sticks = volumes.map((v, i) => {
+    const x = xForIndex(i), y = yForVol(v);
+    const up = i === 0 ? true : prices[i] >= prices[i - 1];
+    const color = up ? 'var(--accent)' : 'var(--red-400, #f87171)';
+    return `<rect data-idx="${i}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${stickW.toFixed(1)}" height="${Math.max(0.5, baseline - y).toFixed(1)}" fill="${color}" opacity="0.8"/>`;
   }).join('');
 
   container.innerHTML = `
@@ -1189,34 +1249,33 @@ function buildVolumeLineChart(rows, container) {
       <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${Math.round(padT + 6)}" text-anchor="end">${formatCompactMarketUnits(maxV)}</text>
       <text class="lp-market-chart-axis-label" x="${padL}" y="${Math.round(H - 6)}" text-anchor="start">${formatMarketDate(rows[0].date)}</text>
       <text class="lp-market-chart-axis-label" x="${W - padR}" y="${Math.round(H - 6)}" text-anchor="end">${formatMarketDate(rows[n - 1].date)}</text>
-      <path style="fill:var(--text-soft); opacity:0.06;" d="${areaPath}"/>
-      <path class="lp-market-volume-line" d="${linePath}"/>
-      <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="4" class="lp-market-hover-dot muted"/>
-      <line id="lp-market-volume-crosshair" class="lp-market-crosshair" x1="0" y1="${padT}" x2="0" y2="${baseline.toFixed(1)}" style="display:none;"/>
-      <circle id="lp-market-volume-hoverdot" r="5" class="lp-market-hover-dot muted" style="display:none;"/>
+      ${sticks}
     </svg>`;
 
   const svgEl = document.getElementById('lp-market-volume-svg');
   const tooltip = getOrCreateMarketTooltip(container);
-  const crosshair = document.getElementById('lp-market-volume-crosshair');
-  const hoverDot = document.getElementById('lp-market-volume-hoverdot');
+  let hoveredIdx = null;
 
   svgEl.addEventListener('pointermove', (e) => {
     const rect = svgEl.getBoundingClientRect();
     const relX = ((e.clientX - rect.left) / rect.width) * W;
-    let idx = Math.round(((relX - padL) / innerW) * (n - 1));
+    let idx = Math.floor((relX - padL) / slotW);
     idx = Math.max(0, Math.min(n - 1, idx));
-    const x = xForIndex(idx), y = yForVol(volumes[idx]);
-    crosshair.setAttribute('x1', x); crosshair.setAttribute('x2', x); crosshair.style.display = '';
-    hoverDot.setAttribute('cx', x); hoverDot.setAttribute('cy', y); hoverDot.style.display = '';
+    if (idx !== hoveredIdx) {
+      svgEl.querySelectorAll('rect[data-idx]').forEach(el => el.style.opacity = '0.8');
+      const el = svgEl.querySelector(`rect[data-idx="${idx}"]`);
+      if (el) el.style.opacity = '1';
+      hoveredIdx = idx;
+    }
+    const x = xForIndex(idx) + stickW / 2, y = yForVol(volumes[idx]);
     tooltip.style.display = '';
     tooltip.style.left = `${(x / W) * 100}%`;
     tooltip.style.top = `${(y / H) * 100}%`;
     tooltip.innerHTML = `<div class="lbl">${formatMarketDate(rows[idx].date)}</div><div class="val">${volumes[idx].toLocaleString()} units</div>`;
   });
   svgEl.addEventListener('pointerleave', () => {
-    crosshair.style.display = 'none';
-    hoverDot.style.display = 'none';
+    svgEl.querySelectorAll('rect[data-idx]').forEach(el => el.style.opacity = '0.8');
+    hoveredIdx = null;
     tooltip.style.display = 'none';
   });
 }
@@ -1565,7 +1624,12 @@ window.addEventListener('load', async () => {
   const select = document.getElementById('lpstore-corp-select');
   if (lastCorp && select) {
     select.value = lastCorp;
-    loadAndRankLPStore(lastCorp);
+    await loadAndRankLPStore(lastCorp);
+    // If an offer was isolated when the page was last closed, re-isolate it now that
+    // _lpRankedResults is populated - isolateOffer() itself no-ops harmlessly if the saved id
+    // isn't found (a different corp now, or the offer's gone from the store).
+    const lastOfferId = localStorage.getItem('eve_lpstore_last_isolated_offer');
+    if (lastOfferId) isolateOffer(parseInt(lastOfferId));
   } else {
     openFlyoutSection('store');
   }

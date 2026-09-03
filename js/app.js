@@ -2032,14 +2032,24 @@ function createNodeCard(node) {
             <div class="flex items-center justify-between text-xs mono">
               <span class="text-slate-400 font-semibold">Mode:</span>
               <div class="flex space-x-1">
-                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="toggle-btn ${node.isBuildingSelf ? 'toggle-btn-active-accent' : ''}">
+                ${(() => {
+                  // A redemption-requirement node (LP Store, js/lpstore.js) toggles through its own
+                  // handler keyed by a stable product typeId, not the shared toggleBuildSelf - see
+                  // toggleBuildSelf's own guard note and injectLPRedemptionNodes' _lpRequiredItemProductTypeId
+                  // comment for why. Every other node (index.html included) is unaffected.
+                  const fn = node.isRedemptionRequirement
+                    ? `toggleLPRequiredItemBuild(event, ${node._lpRequiredItemProductTypeId})`
+                    : `toggleBuildSelf(event, ${node.typeId})`;
+                  return `
+                <button onclick="${fn}" class="toggle-btn ${node.isBuildingSelf ? 'toggle-btn-active-accent' : ''}">
                   <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l4 4-8.5 8.5a2 2 0 01-2.8 0v0a2 2 0 010-2.8L15.2 7.2"/><path d="M12 8l4-4 4 4-4 4"/></svg>
                   Build
                 </button>
-                <button onclick="toggleBuildSelf(event, ${node.typeId})" class="toggle-btn ${!node.isBuildingSelf ? 'toggle-btn-active-buy' : ''}">
+                <button onclick="${fn}" class="toggle-btn ${!node.isBuildingSelf ? 'toggle-btn-active-buy' : ''}">
                   <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M2 4h2l2.4 12.4a2 2 0 002 1.6h8.4a2 2 0 002-1.6L21 8H6"/></svg>
                   Buy
-                </button>
+                </button>`;
+                })()}
               </div>
             </div>
           ` : ''}

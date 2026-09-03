@@ -20,6 +20,23 @@ async function toggleBuildSelf(e, typeId) {
   if (e) e.stopPropagation();
   const currentState = (window.buildSelfOverrides[typeId] !== undefined) ? window.buildSelfOverrides[typeId] : false;
   window.buildSelfOverrides[typeId] = !currentState;
+
+  const root = window.recipeTreeRoot;
+  // An LP Store isolated direct-sell offer's root is a hand-built synthetic node with no real
+  // recipe of its own (see isolateDirectSellOffer, js/lpstore.js) - selectItem() below would try
+  // to rebuild the WHOLE tree from that typeId via the real recipe walk, find nothing manufacturable
+  // there, and replace the entire hand-built root/redemption-item structure with a bare leaf. Toggling
+  // Build/Buy on any node while that kind of root is active - a redemption-requirement item's own
+  // toggle included - only ever needs a recalculate (js/lpstore.js's own recalculate hook re-derives
+  // every node under that root from the current override state on every call), never a rebuild from
+  // window.currentProduct.id. A BPC-isolated offer's root DOES have a real recipe (it came from
+  // selectItem() in the first place), so it's untouched by this guard and keeps working exactly as
+  // before.
+  if (root && root.isLPIsolatedRoot && !root.recipe) {
+    if (typeof window.recalculate === 'function') await window.recalculate();
+    return;
+  }
+
   if (window.currentProduct) {
     await window.selectItem(window.currentProduct.id, window.currentProduct.name, true);
   }
