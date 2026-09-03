@@ -1322,6 +1322,24 @@ async function fetchMarketHistoryRaw(regionId, typeId) {
 }
 window.fetchMarketHistoryRaw = fetchMarketHistoryRaw;
 
+// A real region name ("The Forge") for the Market Economics drawer's own "which market is this"
+// label - not guessed/hardcoded, since a player's Home Market can be set to any station.
+let _regionNameCache = {};
+async function fetchRegionName(regionId) {
+  if (_regionNameCache[regionId] !== undefined) return _regionNameCache[regionId];
+  try {
+    const res = await fetch(`https://esi.evetech.net/latest/universe/regions/${regionId}/?datasource=tranquility`);
+    if (!res.ok) { _regionNameCache[regionId] = null; return null; }
+    const data = await res.json();
+    _regionNameCache[regionId] = data.name || null;
+    return _regionNameCache[regionId];
+  } catch (e) {
+    _regionNameCache[regionId] = null;
+    return null;
+  }
+}
+window.fetchRegionName = fetchRegionName;
+
 // Fetches price + liquidity for one item across every tracked market in parallel, for the Compare
 // Markets panel. Price comes from Fuzzwork (per-station), volume from ESI history (per-region) -
 // deliberately returned side by side rather than collapsed into a single "best" score, since the

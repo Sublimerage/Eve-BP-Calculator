@@ -802,11 +802,13 @@ window.renderLPExtraStats = renderLPExtraStats;
 // has no charting library, so both are hand-rolled inline SVG with their own hover crosshair/
 // tooltip, matching how the tree canvas's own connecting lines are hand-drawn SVG too.
 let _lpMarketDrawerOpen = false;
+let _lpMarketExpanded = false;
 let _lpMarketRangeDays = 30;
 let _lpMarketTableView = false;
 let _lpMarketLoadedTypeId = null;
 let _lpMarketHistoryRows = null; // full ~year of ESI history for the currently-loaded typeId, ascending by date
 let _lpMarketRegionId = null;    // resolved once from the Home Market station, then cached for the session
+let _lpMarketRegionName = null;  // resolved alongside the region id, for the drawer's "which market" label
 
 const LP_MARKET_RANGES = [30, 90, 180];
 
@@ -818,14 +820,27 @@ function toggleMarketDrawer() {
 }
 window.toggleMarketDrawer = toggleMarketDrawer;
 
+// A taller drawer for anyone who wants more room to actually read the chart detail, rather than
+// the compact default. Re-renders the charts too (not just a CSS height change) since their own
+// SVG height is a function of this state - see buildPriceLineChart/buildVolumeBarChart.
+function toggleMarketExpanded() {
+  _lpMarketExpanded = !_lpMarketExpanded;
+  document.getElementById('lp-market-drawer')?.classList.toggle('expanded', _lpMarketExpanded);
+  document.getElementById('lp-market-drawer-tab')?.classList.toggle('expanded', _lpMarketExpanded);
+  document.getElementById('lp-market-expand-toggle')?.classList.toggle('icon-rail-btn-active', _lpMarketExpanded);
+  if (!_lpMarketTableView) renderMarketDrawerContent();
+}
+window.toggleMarketExpanded = toggleMarketExpanded;
+
 // Called whenever a different offer gets isolated (or the inspector is exited entirely) so a
-// previous item's data and open/closed state never carries over into the next one.
+// previous item's data and open/closed/expanded state never carries over into the next one.
 function resetMarketDrawer() {
   _lpMarketDrawerOpen = false;
+  _lpMarketExpanded = false;
   _lpMarketLoadedTypeId = null;
   _lpMarketHistoryRows = null;
-  document.getElementById('lp-market-drawer')?.classList.remove('open');
-  document.getElementById('lp-market-drawer-tab')?.classList.remove('open');
+  document.getElementById('lp-market-drawer')?.classList.remove('open', 'expanded');
+  document.getElementById('lp-market-drawer-tab')?.classList.remove('open', 'expanded');
 }
 window.resetMarketDrawer = resetMarketDrawer;
 
@@ -868,6 +883,12 @@ async function loadAndRenderMarketDrawer() {
     const homeStationId = localStorage.getItem('eve_home_station_id') || '60003760';
     const resolved = typeof window.resolveStationRegion === 'function' ? await window.resolveStationRegion(homeStationId) : null;
     _lpMarketRegionId = (resolved && resolved.regionId) || 10000002; // The Forge (Jita) fallback
+    _lpMarketRegionName = typeof window.fetchRegionName === 'function' ? await window.fetchRegionName(_lpMarketRegionId) : null;
+  }
+  const marketLabelEl = document.getElementById('lp-market-region-label');
+  if (marketLabelEl) {
+    const stationName = localStorage.getItem('eve_home_station_name') || 'Jita IV - Moon 4';
+    marketLabelEl.textContent = _lpMarketRegionName ? `${stationName} · ${_lpMarketRegionName}` : stationName;
   }
 
   const rows = await window.fetchMarketHistoryRaw(_lpMarketRegionId, typeId);
@@ -990,9 +1011,19 @@ function getOrCreateMarketTooltip(container) {
 // overlaid with volume on a second scale. 2px line, ~10%-opacity area wash, an end-dot with a
 // surface-color ring (.lp-market-hover-dot in styles.css), and a crosshair+tooltip that snaps to
 // the nearest day under the pointer.
+//
+// The viewBox width matches the container's REAL measured pixel width (not a fixed arbitrary
+// number like 640 stretched via preserveAspectRatio="none") - that stretch was the actual cause of
+// the blurry line, mis-shapen text, and general "not enough detail" look reported against the
+// first version: a 640-unit-wide coordinate system rendered at ~2000 real pixels wide scales X and
+// Y non-uniformly, which distorts stroke widths and squashes/stretches every glyph in the SVG
+// <text> labels. Measuring the container first and using that as W keeps the scale 1:1 in both
+// axes, so strokes/text render crisp exactly like ordinary HTML text would.
 function buildPriceLineChart(rows, container) {
   if (!container) return;
-  const W = 640, H = 150, padL = 46, padR = 10, padT = 10, padB = 20;
+  const W = Math.max(280, Math.round(container.clientWidth || container.getBoundingClientRect().width || 640));
+  const H = _lpMarketExpanded ? 260 : 150;
+  const padL = 52, padR = 12, padT = 12, padB = 22;
   const innerW = W - padL - padR, innerH = H - padT - padB;
   const n = rows.length;
   const prices = rows.map(r => r.average);
@@ -1000,6 +1031,7 @@ function buildPriceLineChart(rows, container) {
   const range = (maxP - minP) || Math.max(minP, 1) * 0.1 || 1;
   const padRange = range * 0.12;
   const yMin = Math.max(0, minP - padRange), yMax = maxP + padRange;
+  const yMid = (yMin + yMax) / 2;
   const yDen = (yMax - yMin) || 1;
 
   const xForIndex = (i) => n === 1 ? padL + innerW / 2 : padL + (i / (n - 1)) * innerW;
@@ -1009,18 +1041,20 @@ function buildPriceLineChart(rows, container) {
   const baseline = (padT + innerH).toFixed(1);
   const areaPoints = `${xForIndex(0).toFixed(1)},${baseline} ${linePoints} ${xForIndex(n - 1).toFixed(1)},${baseline}`;
   const lastX = xForIndex(n - 1), lastY = yForPrice(prices[n - 1]);
-  const gridY1 = padT, gridY2 = padT + innerH;
+  const gridY1 = padT, gridYMid = yForPrice(yMid), gridY2 = padT + innerH;
 
   container.innerHTML = `
-    <svg id="lp-market-price-svg" viewBox="0 0 ${W} ${H}" style="width:100%; height:${H}px; display:block; cursor:crosshair;" preserveAspectRatio="none">
+    <svg id="lp-market-price-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%; height:${H}px; display:block; cursor:crosshair;">
       <g class="lp-market-chart-grid">
         <line x1="${padL}" y1="${gridY1}" x2="${W - padR}" y2="${gridY1}"/>
+        <line x1="${padL}" y1="${gridYMid.toFixed(1)}" x2="${W - padR}" y2="${gridYMid.toFixed(1)}"/>
         <line x1="${padL}" y1="${gridY2}" x2="${W - padR}" y2="${gridY2}"/>
       </g>
-      <text class="lp-market-chart-axis-label" x="${padL - 6}" y="${gridY1 + 4}" text-anchor="end">${window.formatISKCompact(yMax)}</text>
-      <text class="lp-market-chart-axis-label" x="${padL - 6}" y="${gridY2 + 4}" text-anchor="end">${window.formatISKCompact(yMin)}</text>
-      <text class="lp-market-chart-axis-label" x="${padL}" y="${H - 4}" text-anchor="start">${formatMarketDate(rows[0].date)}</text>
-      <text class="lp-market-chart-axis-label" x="${W - padR}" y="${H - 4}" text-anchor="end">${formatMarketDate(rows[n - 1].date)}</text>
+      <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${gridY1 + 4}" text-anchor="end">${window.formatISKCompact(yMax)}</text>
+      <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${(gridYMid + 3.5).toFixed(1)}" text-anchor="end">${window.formatISKCompact(yMid)}</text>
+      <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${gridY2 + 4}" text-anchor="end">${window.formatISKCompact(yMin)}</text>
+      <text class="lp-market-chart-axis-label" x="${padL}" y="${H - 6}" text-anchor="start">${formatMarketDate(rows[0].date)}</text>
+      <text class="lp-market-chart-axis-label" x="${W - padR}" y="${H - 6}" text-anchor="end">${formatMarketDate(rows[n - 1].date)}</text>
       <polygon class="lp-market-price-area" points="${areaPoints}"/>
       <polyline class="lp-market-price-line" points="${linePoints}"/>
       <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="4" class="lp-market-hover-dot"/>
@@ -1059,7 +1093,9 @@ function buildPriceLineChart(rows, container) {
 // all four corners, so this is a hand-built path instead).
 function buildVolumeBarChart(rows, container) {
   if (!container) return;
-  const W = 640, H = 90, padL = 46, padR = 10, padT = 8, padB = 20;
+  const W = Math.max(280, Math.round(container.clientWidth || container.getBoundingClientRect().width || 640));
+  const H = _lpMarketExpanded ? 150 : 90;
+  const padL = 52, padR = 12, padT = 10, padB = 22;
   const innerW = W - padL - padR, innerH = H - padT - padB;
   const n = rows.length;
   const volumes = rows.map(r => r.volume || 0);
@@ -1081,11 +1117,11 @@ function buildVolumeBarChart(rows, container) {
   }).join('');
 
   container.innerHTML = `
-    <svg id="lp-market-volume-svg" viewBox="0 0 ${W} ${H}" style="width:100%; height:${H}px; display:block; cursor:crosshair;" preserveAspectRatio="none">
+    <svg id="lp-market-volume-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%; height:${H}px; display:block; cursor:crosshair;">
       <g class="lp-market-chart-grid"><line x1="${padL}" y1="${baseline}" x2="${W - padR}" y2="${baseline}"/></g>
-      <text class="lp-market-chart-axis-label" x="${padL - 6}" y="${padT + 6}" text-anchor="end">${formatCompactMarketUnits(maxV)}</text>
-      <text class="lp-market-chart-axis-label" x="${padL}" y="${H - 4}" text-anchor="start">${formatMarketDate(rows[0].date)}</text>
-      <text class="lp-market-chart-axis-label" x="${W - padR}" y="${H - 4}" text-anchor="end">${formatMarketDate(rows[n - 1].date)}</text>
+      <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${padT + 6}" text-anchor="end">${formatCompactMarketUnits(maxV)}</text>
+      <text class="lp-market-chart-axis-label" x="${padL}" y="${H - 6}" text-anchor="start">${formatMarketDate(rows[0].date)}</text>
+      <text class="lp-market-chart-axis-label" x="${W - padR}" y="${H - 6}" text-anchor="end">${formatMarketDate(rows[n - 1].date)}</text>
       ${bars}
     </svg>`;
 
@@ -1115,6 +1151,18 @@ function buildVolumeBarChart(rows, container) {
     tooltip.style.display = 'none';
   });
 }
+
+// Both chart builders size their viewBox to the container's REAL measured width rather than
+// scaling a fixed one to fit (see buildPriceLineChart's own comment on why) - that measurement
+// goes stale if the browser window is resized while the drawer is open, so re-render on resize
+// (debounced - a resize fires continuously while dragging) keeps the charts crisp instead of
+// stretched/squished at the old width.
+let _lpMarketResizeTimer = null;
+window.addEventListener('resize', () => {
+  if (!_lpMarketDrawerOpen || _lpMarketTableView) return;
+  clearTimeout(_lpMarketResizeTimer);
+  _lpMarketResizeTimer = setTimeout(() => renderMarketDrawerContent(), 150);
+});
 
 // --- Rendering: ranked list -------------------------------------------------------------------
 
