@@ -1093,92 +1093,27 @@ const BUILTIN_RECIPES = {
   },
   4248: {
     blueprintTypeID: 4248, productTypeID: 4247, productName: "Hydrogen Fuel Block", mfgQtyPerRun: 40, productQtyPerRun: 40, portionSize: 40, qty: 40, time: 15
-  },
-  // Gila's blueprintTypeID was 17714 here for both keys - that's actually Stabber Fleet Issue
-  // Blueprint's real typeId (confirmed via ESI /universe/ids/), not Gila's (17716). Since the
-  // buildPrepackedIndexes loop below applies BUILTIN_RECIPES unconditionally (unlike the main
-  // recipesObj loop, which guards against overwriting a real recipe - see setRecipeMapEntry), this
-  // was silently clobbering the correct Stabber Fleet Issue Blueprint -> Stabber Fleet Issue
-  // mapping in recipeMap with this Gila recipe every time the app loaded, making any Stabber Fleet
-  // Issue BPC display/build as a Gila everywhere in the app, not just the LP Store.
-  17715: {
-    blueprintTypeID: 17716, productTypeID: 17715, productName: "Gila", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 24000,
-    mfgMaterials: [
-      { typeId: 621, name: "Caracal", baseQty: 1 },
-      { typeId: 57478, name: "Auto-Integrity Preservation Seal", baseQty: 60 },
-      { typeId: 57486, name: "Life Support Backup Unit", baseQty: 30 },
-      { typeId: 57479, name: "Core Temperature Regulator", baseQty: 1 }
-    ]
-  },
-  17716: {
-    blueprintTypeID: 17716, productTypeID: 17715, productName: "Gila", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 24000,
-    mfgMaterials: [
-      { typeId: 621, name: "Caracal", baseQty: 1 },
-      { typeId: 57478, name: "Auto-Integrity Preservation Seal", baseQty: 60 },
-      { typeId: 57486, name: "Life Support Backup Unit", baseQty: 30 },
-      { typeId: 57479, name: "Core Temperature Regulator", baseQty: 1 }
-    ]
-  },
-  57478: {
-    blueprintTypeID: 57515, productTypeID: 57478, productName: "Auto-Integrity Preservation Seal", mfgQtyPerRun: 3, productQtyPerRun: 3, portionSize: 3, qty: 3, time: 240,
-    mfgMaterials: [
-      { typeId: 2312, name: "Supertensile Plastics", baseQty: 4 },
-      { typeId: 2463, name: "Nanites", baseQty: 4 },
-      { typeId: 57457, name: "Reinforced Carbon Fiber", baseQty: 10 }
-    ]
-  },
-  57515: {
-    blueprintTypeID: 57515, productTypeID: 57478, productName: "Auto-Integrity Preservation Seal", mfgQtyPerRun: 3, productQtyPerRun: 3, portionSize: 3, qty: 3, time: 240,
-    mfgMaterials: [
-      { typeId: 2312, name: "Supertensile Plastics", baseQty: 4 },
-      { typeId: 2463, name: "Nanites", baseQty: 4 },
-      { typeId: 57457, name: "Reinforced Carbon Fiber", baseQty: 10 }
-    ]
-  },
-  57486: {
-    blueprintTypeID: 57523, productTypeID: 57486, productName: "Life Support Backup Unit", mfgQtyPerRun: 3, productQtyPerRun: 3, portionSize: 3, qty: 3, time: 240,
-    mfgMaterials: [
-      { typeId: 2319, name: "Test Cultures", baseQty: 8 },
-      { typeId: 3775, name: "Viral Agent", baseQty: 8 },
-      { typeId: 57457, name: "Reinforced Carbon Fiber", baseQty: 10 }
-    ]
-  },
-  57523: {
-    blueprintTypeID: 57523, productTypeID: 57486, productName: "Life Support Backup Unit", mfgQtyPerRun: 3, productQtyPerRun: 3, portionSize: 3, qty: 3, time: 240,
-    mfgMaterials: [
-      { typeId: 2319, name: "Test Cultures", baseQty: 8 },
-      { typeId: 3775, name: "Viral Agent", baseQty: 8 },
-      { typeId: 57457, name: "Reinforced Carbon Fiber", baseQty: 10 }
-    ]
-  },
-  57479: {
-    blueprintTypeID: 57516, productTypeID: 57479, productName: "Core Temperature Regulator", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 1200,
-    mfgMaterials: [
-      { typeId: 57453, name: "Pressurized Oxidizers", baseQty: 100 },
-      { typeId: 2401, name: "Chiral Structures", baseQty: 100 },
-      { typeId: 57457, name: "Reinforced Carbon Fiber", baseQty: 500 }
-    ]
-  },
-  57516: {
-    blueprintTypeID: 57516, productTypeID: 57479, productName: "Core Temperature Regulator", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 1200,
-    mfgMaterials: [
-      { typeId: 57453, name: "Pressurized Oxidizers", baseQty: 100 },
-      { typeId: 2401, name: "Chiral Structures", baseQty: 100 },
-      { typeId: 57457, name: "Reinforced Carbon Fiber", baseQty: 500 }
-    ]
-  },
-  621: {
-    blueprintTypeID: 622, productTypeID: 621, productName: "Caracal", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 6000,
-    mfgMaterials: [
-      { typeId: 34, name: "Tritanium", baseQty: 540000 },
-      { typeId: 35, name: "Pyerite", baseQty: 180000 },
-      { typeId: 36, name: "Mexallon", baseQty: 36000 },
-      { typeId: 37, name: "Isogen", baseQty: 10000 },
-      { typeId: 38, name: "Nocxium", baseQty: 1500 },
-      { typeId: 39, name: "Zydrine", baseQty: 350 },
-      { typeId: 40, name: "Megacyte", baseQty: 140 }
-    ]
   }
+  // A hand-built Gila -> Auto-Integrity Preservation Seal / Life Support Backup Unit / Core
+  // Temperature Regulator / Caracal recipe chain (typeIds 17715, 17716, 57478, 57515, 57486, 57523,
+  // 57479, 57516, 621) used to live here, added back when the SDE recipe scrape apparently didn't
+  // carry Gila's own recipe correctly. Checked it against eve_db.js's real EVE_RECIPES data (the
+  // actual source of truth) after a report that Gila's materials didn't match in-game, and every
+  // entry in the chain was stale/wrong in some way: Gila's own real blueprint needs the 7 raw
+  // minerals directly (Tritanium through Megacyte, scaled way up) plus Auto-Integrity Preservation
+  // Seal x60 and Life Support Backup Unit x30 exactly as this chain had - but its third component
+  // is really Guristas NET Resonator (typeId 83469) x60, not "Core Temperature Regulator" x1, and
+  // there's no Caracal input at all (real faction-ship blueprints consume the hull's mineral profile
+  // directly, not an actual built hull item - same reason 621's own presence here was never doing
+  // anything useful). The three sub-component entries were each stale too (build times 240/1200
+  // vs. the SDE's real 1800/8000, and Core Temperature Regulator's own material list had a
+  // mislabeled typeId - 57453 "Carbon Fiber" tagged as "Pressurized Oxidizers", which is really
+  // 57456 - and was missing a Water input entirely). Since the SDE data has a correct, complete
+  // recipe for all of these already, and buildPrepackedIndexes below applies BUILTIN_RECIPES
+  // unconditionally (unlike the main recipesObj loop, which guards against overwriting a real
+  // recipe - see setRecipeMapEntry), this whole chain was silently clobbering good data with wrong
+  // data every time the app loaded. Removed rather than corrected in place, since nothing here
+  // still needs a hand-maintained stand-in once the real source has it right.
 };
 window.BUILTIN_RECIPES = BUILTIN_RECIPES;
 
