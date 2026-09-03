@@ -534,7 +534,7 @@ window.toggleLPOfferExpanded = toggleLPOfferExpanded;
 // this in".
 // =================================================================================================
 
-function isolateOffer(offerId) {
+async function isolateOffer(offerId) {
   const result = _lpRankedResults.find(r => r.offer.offer_id === offerId);
   if (!result) return;
   if (typeof window.selectItem !== 'function') {
@@ -561,24 +561,37 @@ function isolateOffer(offerId) {
     // selectItem (js/app.js) is the Calculator's own "load this blueprint" entry point - it resets
     // every build/buy/ME/TE override, builds the real recipe tree, fetches prices, and calls
     // recalculate() itself (which runs ensureLPRedemptionNodesPresent below via the recalculate
-    // hook - nothing else needs doing here). Runs start at exactly 1 redemption's worth (offer.
-    // quantity blueprint runs), same pattern js/app.js's own loadBlueprintIntoCalculator uses for a
-    // real owned BPC.
-    window.selectItem(result.blueprintTypeId, getLPItemName(result.blueprintTypeId), false).then(async () => {
-      // window.globalRuns and node.splitRunsForOwnMaterials (LP store BPCs are always single-run
-      // copies - see evaluateBpcOffer's own comment on why that needs special material-rounding
-      // handling) are NOT set here - ensureLPRedemptionNodesPresent (run by the recalculate hook,
-      // right below) derives both fresh from _lpRedemptionCount on every single recalculate, not just
-      // this first one. Setting them only here was the previous version of this code, and it broke
-      // the moment anything rebuilt the tree afterward (toggling Build/Buy on any component, or
-      // changing the home market station both call selectItem() again and silently drop it) - see
-      // _lpRedemptionCount's own comment for the full story.
-      await window.fetchMarketPrices((result.offer.required_items || []).map(r => r.type_id));
-      if (typeof window.recalculate === 'function') window.recalculate();
-    });
+    // hook). Runs start at exactly 1 redemption's worth (offer.quantity blueprint runs), same
+    // pattern js/app.js's own loadBlueprintIntoCalculator uses for a real owned BPC - awaited here
+    // (this whole function is async specifically so it can be) rather than the old fire-and-forget
+    // .then(), because every await below depends on selectItem's own tree/DOM actually being
+    // finished, not just started.
+    //
+    // window.globalRuns and node.splitRunsForOwnMaterials (LP store BPCs are always single-run
+    // copies - see evaluateBpcOffer's own comment on why that needs special material-rounding
+    // handling) are NOT set here - ensureLPRedemptionNodesPresent (run by the recalculate hook below)
+    // derives both fresh from _lpRedemptionCount on every single recalculate, not just this first
+    // one. Setting them only here was a previous version of this code, and it broke the moment
+    // anything rebuilt the tree afterward (toggling Build/Buy on any component, or changing the home
+    // market station both call selectItem() again and silently drop it) - see _lpRedemptionCount's
+    // own comment for the full story.
+    await window.selectItem(result.blueprintTypeId, getLPItemName(result.blueprintTypeId), false);
+    await window.fetchMarketPrices((result.offer.required_items || []).map(r => r.type_id));
   } else {
-    isolateDirectSellOffer(result);
+    await isolateDirectSellOffer(result);
   }
+
+  // One recalculate() here, AWAITED, gets the tree to its true final shape - redemption-requirement
+  // nodes injected, correct redemption count applied - which selectItem's OWN internal recalculate
+  // (mid-build, still at the default 1 run, no redemption nodes yet) never sees. Centering BEFORE
+  // this point (the previous version of this code did, inside selectItem itself, via its own
+  // non-preserveView resetPanZoom() call) centers on a tree that's about to change shape and size,
+  // which is what was actually behind "isolating doesn't center the card" - not a missing center
+  // call, a mistimed one. window.recalculate is async on this page specifically (see
+  // installLPRecalculateHook) - every other bare, un-awaited call to it elsewhere in this file
+  // relies on nothing needing to happen right after it returns, which isn't true here.
+  if (typeof window.recalculate === 'function') await window.recalculate();
+  if (typeof window.resetPanZoom === 'function') window.resetPanZoom();
 }
 window.isolateOffer = isolateOffer;
 
@@ -615,7 +628,12 @@ async function isolateDirectSellOffer(result) {
   };
 
   await window.fetchMarketPrices([offer.type_id, ...(offer.required_items || []).map(r => r.type_id)]);
-  if (typeof window.recalculate === 'function') window.recalculate();
+  // No recalculate() call here - isolateOffer (the only caller) does exactly one, awaited, right
+  // after this returns. An un-awaited call here used to race that one: both are async (see
+  // installLPRecalculateHook), so firing this one and then immediately awaiting another from the
+  // caller meant two overlapping recalculates - redundant work at best, a real source of the "page
+  // hangs for a second" reports at worst (each one rebuilds the redemption-requirement nodes via
+  // injectLPRedemptionNodes, which isn't cheap when required items are toggled to Build).
 }
 
 function exitLPInspector() {
