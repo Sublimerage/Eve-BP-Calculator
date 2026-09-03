@@ -1039,82 +1039,31 @@ function extractRecipeYield(recipe) {
 }
 window.extractRecipeYield = extractRecipeYield;
 
-const BUILTIN_RECIPES = {
-  16681: {
-    blueprintTypeID: 17730, productTypeID: 16681, productName: "Tungsten Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000, time: 600,
-    reactionMaterials: [
-      { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
-      { typeId: 16672, name: "Rolled Tungsten Alloy", baseQty: 100 },
-      { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
-    ]
-  },
-  17730: {
-    blueprintTypeID: 17730, productTypeID: 16681, productName: "Tungsten Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000, time: 600,
-    reactionMaterials: [
-      { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
-      { typeId: 16672, name: "Rolled Tungsten Alloy", baseQty: 100 },
-      { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
-    ]
-  },
-  16680: {
-    blueprintTypeID: 17729, productTypeID: 16680, productName: "Titanium Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000, time: 600,
-    reactionMaterials: [
-      { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
-      { typeId: 16671, name: "Titanium Alloy", baseQty: 100 },
-      { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
-    ]
-  },
-  17729: {
-    blueprintTypeID: 17729, productTypeID: 16680, productName: "Titanium Carbide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000, time: 600,
-    reactionMaterials: [
-      { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
-      { typeId: 16671, name: "Titanium Alloy", baseQty: 100 },
-      { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
-    ]
-  },
-  16679: {
-    blueprintTypeID: 17728, productTypeID: 16679, productName: "Crystalline Carbonide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000, time: 600,
-    reactionMaterials: [
-      { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
-      { typeId: 16669, name: "Crystalline 3-M4", baseQty: 100 },
-      { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
-    ]
-  },
-  17728: {
-    blueprintTypeID: 17728, productTypeID: 16679, productName: "Crystalline Carbonide", mfgQtyPerRun: 10000, productQtyPerRun: 10000, reactionQtyPerRun: 10000, portionSize: 10000, qty: 10000, time: 600,
-    reactionMaterials: [
-      { typeId: 4247, name: "Nitrogen Fuel Block", baseQty: 5 },
-      { typeId: 16669, name: "Crystalline 3-M4", baseQty: 100 },
-      { typeId: 16670, name: "Sulfuric Acid", baseQty: 100 }
-    ]
-  },
-  4247: {
-    blueprintTypeID: 4248, productTypeID: 4247, productName: "Hydrogen Fuel Block", mfgQtyPerRun: 40, productQtyPerRun: 40, portionSize: 40, qty: 40, time: 15
-  },
-  4248: {
-    blueprintTypeID: 4248, productTypeID: 4247, productName: "Hydrogen Fuel Block", mfgQtyPerRun: 40, productQtyPerRun: 40, portionSize: 40, qty: 40, time: 15
-  }
-  // A hand-built Gila -> Auto-Integrity Preservation Seal / Life Support Backup Unit / Core
-  // Temperature Regulator / Caracal recipe chain (typeIds 17715, 17716, 57478, 57515, 57486, 57523,
-  // 57479, 57516, 621) used to live here, added back when the SDE recipe scrape apparently didn't
-  // carry Gila's own recipe correctly. Checked it against eve_db.js's real EVE_RECIPES data (the
-  // actual source of truth) after a report that Gila's materials didn't match in-game, and every
-  // entry in the chain was stale/wrong in some way: Gila's own real blueprint needs the 7 raw
-  // minerals directly (Tritanium through Megacyte, scaled way up) plus Auto-Integrity Preservation
-  // Seal x60 and Life Support Backup Unit x30 exactly as this chain had - but its third component
-  // is really Guristas NET Resonator (typeId 83469) x60, not "Core Temperature Regulator" x1, and
-  // there's no Caracal input at all (real faction-ship blueprints consume the hull's mineral profile
-  // directly, not an actual built hull item - same reason 621's own presence here was never doing
-  // anything useful). The three sub-component entries were each stale too (build times 240/1200
-  // vs. the SDE's real 1800/8000, and Core Temperature Regulator's own material list had a
-  // mislabeled typeId - 57453 "Carbon Fiber" tagged as "Pressurized Oxidizers", which is really
-  // 57456 - and was missing a Water input entirely). Since the SDE data has a correct, complete
-  // recipe for all of these already, and buildPrepackedIndexes below applies BUILTIN_RECIPES
-  // unconditionally (unlike the main recipesObj loop, which guards against overwriting a real
-  // recipe - see setRecipeMapEntry), this whole chain was silently clobbering good data with wrong
-  // data every time the app loaded. Removed rather than corrected in place, since nothing here
-  // still needs a hand-maintained stand-in once the real source has it right.
-};
+// Emptied out 2026-09-03 after a full audit (triggered by a report that Gila's materials didn't
+// match in-game - see git history / session notes for the Gila-specific writeup) found every single
+// entry this object had ever held was wrong in some way, and eve_db.js's own EVE_RECIPES table
+// (the real SDE data this app ships) already has a correct, complete recipe for every real item
+// involved. Two different failure modes, both silent (buildPrepackedIndexes below applies this
+// object unconditionally - no guard against overwriting good data with bad, unlike the main
+// recipesObj/setRecipeMapEntry pass):
+//   1. Stale-but-right-id (the Gila entry): id was correct, but the hand-typed materials/time were
+//      wrong or outdated versus the current SDE data.
+//   2. Wrong-id entirely (the reaction-formula entries: Tungsten/Titanium Carbide, Crystalline
+//      Carbonide, Hydrogen Fuel Block): the ids used didn't even belong to the items the entries
+//      claimed to be. 16681 was labeled "Tungsten Carbide" but is really Nanotransistors (real
+//      Tungsten Carbide is 16672); 16680 "Titanium Carbide" is really Phenolic Composites (real one
+//      is 16671); 16679 "Crystalline Carbonide" is really Fullerides (real one is 16670); 17728/17729
+//      "Crystalline Carbonide"/its blueprint are really Megathron Navy Issue and its blueprint - a
+//      completely unrelated faction battleship; 4247/4248 "Hydrogen Fuel Block" are really Helium
+//      Fuel Block and Warp Disruption Field Generator II. Every one of those wrong ids was silently
+//      clobbering recipeMap for a real, unrelated item every time the app loaded (e.g. any Megathron
+//      Navy Issue BPC anywhere in the app would have displayed/built as fictional "Crystalline
+//      Carbonide" instead of the real battleship) - worse than the Gila case, since it corrupted
+//      items that had nothing to do with what this object was trying to add.
+// If a genuine SDE gap ever shows up again (a real item with no usable recipeMap entry at all, not
+// just one that "looks wrong"), verify the correct id/materials against eve_db.js's own EVE_RECIPES
+// and real EVE data before adding anything back here - don't restore any of the above from history.
+const BUILTIN_RECIPES = {};
 window.BUILTIN_RECIPES = BUILTIN_RECIPES;
 
 window.buildPrepackedIndexes = function() {
