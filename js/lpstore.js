@@ -834,7 +834,7 @@ window.toggleMarketDrawer = toggleMarketDrawer;
 
 // A taller drawer for anyone who wants more room to actually read the chart detail, rather than
 // the compact default. Re-renders the charts too (not just a CSS height change) since their own
-// SVG height is a function of this state - see buildPriceLineChart/buildVolumeBarChart.
+// SVG height is a function of this state - see buildPriceLineChart/buildVolumeLineChart.
 function toggleMarketExpanded() {
   _lpMarketExpanded = !_lpMarketExpanded;
   document.getElementById('lp-market-drawer')?.classList.toggle('expanded', _lpMarketExpanded);
@@ -940,18 +940,21 @@ function renderMarketDrawerContent() {
   const changeColor = priceChangePct > 0 ? 'var(--accent)' : (priceChangePct < 0 ? 'var(--red-400, #f87171)' : 'var(--text-mute)');
   const changeSign = priceChangePct > 0 ? '+' : '';
 
-  const statTile = (icon, label, value, color, title) => `
-    <div class="lp-market-stat-tile" ${title ? `title="${window.esc(title)}"` : ''}>
-      <div class="stat-label">${window.svgIcon(icon)}${label}</div>
+  // One thin strip, four cells - not four separate boxy cards. No icons, no per-cell background,
+  // no accent bars - a hairline divider between cells is the only structure, closer to a stock
+  // ticker readout than a dashboard of KPI cards.
+  const statCell = (label, value, color, title) => `
+    <div class="lp-market-stat-cell" ${title ? `title="${window.esc(title)}"` : ''}>
+      <div class="stat-label">${label}</div>
       <div class="stat-value" style="${color ? `color:${color};` : ''}">${value}</div>
     </div>`;
 
   const statsHTML = `
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-2.5">
-      ${statTile('activity', 'Avg Daily Volume', formatCompactMarketUnits(avgDailyVolume) + '/day', null, 'Average units traded per day over the last 7 trading days')}
-      ${statTile('trending', `Price Change (${_lpMarketRangeDays}D)`, `${changeSign}${priceChangePct.toFixed(1)}%`, changeColor, `Average price change from ${formatMarketDate(sliced[0].date)} to ${formatMarketDate(sliced[sliced.length - 1].date)}`)}
-      ${statTile('list', 'Sell Orders (latest)', latestOrderCount.toLocaleString(), null, 'Number of active sell orders as of the most recent trading day')}
-      ${statTile('hourglass', 'Est. Days to Sell Batch', daysOfSupply !== null ? `${daysOfSupply}d` : '—', null, "Estimated days to move this redemption's full output at the recent average daily volume")}
+    <div class="lp-market-stat-strip mb-3">
+      ${statCell('Avg Daily Volume', formatCompactMarketUnits(avgDailyVolume) + '/day', null, 'Average units traded per day over the last 7 trading days')}
+      ${statCell(`Price Change (${_lpMarketRangeDays}D)`, `${changeSign}${priceChangePct.toFixed(1)}%`, changeColor, `Average price change from ${formatMarketDate(sliced[0].date)} to ${formatMarketDate(sliced[sliced.length - 1].date)}`)}
+      ${statCell('Sell Orders', latestOrderCount.toLocaleString(), null, 'Number of active sell orders as of the most recent trading day')}
+      ${statCell('Est. Days to Sell', daysOfSupply !== null ? `${daysOfSupply}d` : '—', null, "Estimated days to move this redemption's full output at the recent average daily volume")}
     </div>`;
 
   if (_lpMarketTableView) {
@@ -971,7 +974,7 @@ function renderMarketDrawerContent() {
     </div>`;
 
   buildPriceLineChart(sliced, document.getElementById('lp-market-price-chart-wrap'));
-  buildVolumeBarChart(sliced, document.getElementById('lp-market-volume-chart-wrap'));
+  buildVolumeLineChart(sliced, document.getElementById('lp-market-volume-chart-wrap'));
   positionMarketDrawerTab();
 }
 window.renderMarketDrawerContent = renderMarketDrawerContent;
@@ -1047,22 +1050,18 @@ function smoothPathD(points) {
 }
 
 // Single series (average daily price) - per the dataviz "one axis" rule this is its own chart, not
-// overlaid with volume on a second scale. A smoothed 2.25px line with a soft blurred glow behind
-// it, a gradient area wash (not a flat tint), a dashed period-average reference line, a pulsing
-// end-point, and light gridlines on both axes for real structure. An end-dot with a surface-color
-// ring (.lp-market-hover-dot in styles.css), plus a crosshair+tooltip that snaps to the nearest day
-// under the pointer.
+// overlaid with volume on a second scale. Deliberately plain now: a smoothed 2px line, a flat
+// (not gradient) low-opacity area wash, a dashed period-average reference line, light gridlines -
+// no glow/blur filter and no pulsing end-marker, both cut after feedback that the earlier version
+// read as busy rather than polished. An end-dot with a surface-color ring (.lp-market-hover-dot in
+// styles.css), plus a crosshair+tooltip that snaps to the nearest day under the pointer.
 //
 // The viewBox width matches the container's REAL measured pixel width (not a fixed arbitrary
-// number like 640 stretched via preserveAspectRatio="none") - that stretch was the actual cause of
-// the blurry line, mis-shapen text, and general "not enough detail" look reported against the
-// first version: a 640-unit-wide coordinate system rendered at ~2000 real pixels wide scales X and
-// Y non-uniformly, which distorts stroke widths and squashes/stretches every glyph in the SVG
-// <text> labels. Measuring the container first and using that as W keeps the scale 1:1 in both
-// axes, so strokes/text render crisp exactly like ordinary HTML text would. padL is generous (72,
-// up from an earlier 52) specifically because the widest realistic label ("999.9M ISK" etc.) at
-// 10px IBM Plex Mono needs close to 70px, and an SVG root clips anything drawn past x=0 by default
-// - too little padding was silently cutting the leading digit off every left-axis label.
+// number stretched via preserveAspectRatio="none" - see the earlier version's own note, still true)
+// so strokes/text render crisp at 1:1 scale. Text coordinates specifically are rounded to whole
+// pixels (Math.round, not the sub-pixel .toFixed(1) the path geometry uses) - fractional glyph
+// positions are what was making the axis labels look soft/blurry, a real SVG text-rendering quirk
+// distinct from their color or size.
 function buildPriceLineChart(rows, container) {
   if (!container) return;
   const W = Math.max(280, Math.round(container.clientWidth || container.getBoundingClientRect().width || 640));
@@ -1089,7 +1088,7 @@ function buildPriceLineChart(rows, container) {
   const lastX = points[n - 1][0], lastY = points[n - 1][1];
   const gridY1 = padT, gridYMid = yForPrice(yMid), gridY2 = padT + innerH, avgY = yForPrice(avgP);
 
-  const vLineCount = Math.min(5, n - 1);
+  const vLineCount = Math.min(4, n - 1);
   const vLines = Array.from({ length: vLineCount + 1 }, (_, i) => {
     const x = (padL + (i / vLineCount) * innerW).toFixed(1);
     return `<line class="v" x1="${x}" y1="${gridY1}" x2="${x}" y2="${gridY2}"/>`;
@@ -1097,12 +1096,6 @@ function buildPriceLineChart(rows, container) {
 
   container.innerHTML = `
     <svg id="lp-market-price-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%; height:${H}px; display:block; cursor:crosshair;">
-      <defs>
-        <linearGradient id="lp-price-area-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.34"/>
-          <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.01"/>
-        </linearGradient>
-      </defs>
       <g class="lp-market-chart-grid">
         ${vLines}
         <line x1="${padL}" y1="${gridY1}" x2="${W - padR}" y2="${gridY1}"/>
@@ -1110,16 +1103,14 @@ function buildPriceLineChart(rows, container) {
         <line x1="${padL}" y1="${gridY2}" x2="${W - padR}" y2="${gridY2}"/>
       </g>
       <line class="lp-market-avg-line" x1="${padL}" y1="${avgY.toFixed(1)}" x2="${W - padR}" y2="${avgY.toFixed(1)}"/>
-      <text class="lp-market-avg-label" x="${W - padR - 3}" y="${(avgY - 4).toFixed(1)}" text-anchor="end">avg ${window.formatISKCompact(avgP)}</text>
-      <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${gridY1 + 4}" text-anchor="end">${window.formatISKCompact(yMax)}</text>
-      <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${(gridYMid + 3.5).toFixed(1)}" text-anchor="end">${window.formatISKCompact(yMid)}</text>
-      <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${gridY2 + 4}" text-anchor="end">${window.formatISKCompact(yMin)}</text>
-      <text class="lp-market-chart-axis-label" x="${padL}" y="${H - 6}" text-anchor="start">${formatMarketDate(rows[0].date)}</text>
-      <text class="lp-market-chart-axis-label" x="${W - padR}" y="${H - 6}" text-anchor="end">${formatMarketDate(rows[n - 1].date)}</text>
-      <path class="lp-market-price-area" d="${areaPath}" fill="url(#lp-price-area-grad)"/>
-      <path class="lp-market-price-glow" d="${linePath}"/>
+      <text class="lp-market-avg-label" x="${W - padR - 3}" y="${Math.round(avgY - 4)}" text-anchor="end">avg ${window.formatISKCompact(avgP)}</text>
+      <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${Math.round(gridY1 + 4)}" text-anchor="end">${window.formatISKCompact(yMax)}</text>
+      <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${Math.round(gridYMid + 3.5)}" text-anchor="end">${window.formatISKCompact(yMid)}</text>
+      <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${Math.round(gridY2 + 4)}" text-anchor="end">${window.formatISKCompact(yMin)}</text>
+      <text class="lp-market-chart-axis-label" x="${padL}" y="${Math.round(H - 6)}" text-anchor="start">${formatMarketDate(rows[0].date)}</text>
+      <text class="lp-market-chart-axis-label" x="${W - padR}" y="${Math.round(H - 6)}" text-anchor="end">${formatMarketDate(rows[n - 1].date)}</text>
+      <path class="lp-market-price-area" d="${areaPath}"/>
       <path class="lp-market-price-line" d="${linePath}"/>
-      <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="4.5" class="lp-market-end-pulse"/>
       <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="4" class="lp-market-hover-dot"/>
       <line id="lp-market-price-crosshair" class="lp-market-crosshair" x1="0" y1="${padT}" x2="0" y2="${gridY2}" style="display:none;"/>
       <circle id="lp-market-price-hoverdot" r="5" class="lp-market-hover-dot" style="display:none;"/>
@@ -1158,7 +1149,12 @@ function buildPriceLineChart(rows, container) {
 // a day busier than usual actually looks different from a quiet one, rather than every bar being
 // an identical flat gray block, and it's a real read on the data (see the dashed average line
 // echoing the price chart's own), not decoration for its own sake.
-function buildVolumeBarChart(rows, container) {
+// Single series (units traded per day) - now a plain line, matching the price chart's own
+// treatment rather than a bar chart: same smoothed-path technique, same flat (no gradient) low-
+// opacity fill, same dashed average reference line. Drawn in the app's neutral secondary-ink token
+// rather than the accent color, so it stays visually distinct from the price line above it without
+// introducing a second competing hue.
+function buildVolumeLineChart(rows, container) {
   if (!container) return;
   const W = Math.max(280, Math.round(container.clientWidth || container.getBoundingClientRect().width || 640));
   const H = _lpMarketExpanded ? 160 : 85;
@@ -1167,75 +1163,60 @@ function buildVolumeBarChart(rows, container) {
   const n = rows.length;
   const volumes = rows.map(r => r.volume || 0);
   const avgV = volumes.reduce((s, v) => s + v, 0) / n;
-  const maxV = Math.max(...volumes, 1) * 1.15;
+  const maxV = Math.max(...volumes, 1) * 1.1;
 
-  const slotW = innerW / n;
-  const barW = Math.max(1, Math.min(24, slotW - 2));
-  const xForIndex = (i) => padL + i * slotW + (slotW - barW) / 2;
+  const xForIndex = (i) => n === 1 ? padL + innerW / 2 : padL + (i / (n - 1)) * innerW;
   const yForVol = (v) => padT + innerH - (v / maxV) * innerH;
   const baseline = padT + innerH;
   const avgY = yForVol(avgV);
 
-  const vLineCount = Math.min(5, n - 1);
+  const points = volumes.map((v, i) => [xForIndex(i), yForVol(v)]);
+  const linePath = smoothPathD(points);
+  const areaPath = `${linePath} L${points[n - 1][0].toFixed(1)},${baseline.toFixed(1)} L${points[0][0].toFixed(1)},${baseline.toFixed(1)} Z`;
+  const lastX = points[n - 1][0], lastY = points[n - 1][1];
+
+  const vLineCount = Math.min(4, n - 1);
   const vLines = Array.from({ length: vLineCount + 1 }, (_, i) => {
     const x = (padL + (i / vLineCount) * innerW).toFixed(1);
-    return `<line class="v" x1="${x}" y1="${padT}" x2="${x}" y2="${baseline}"/>`;
-  }).join('');
-
-  const bars = volumes.map((v, i) => {
-    const x = xForIndex(i), y = yForVol(v);
-    const r = Math.min(4, baseline - y, barW / 2);
-    const fill = v > avgV ? 'url(#lp-vol-bar-grad-high)' : 'url(#lp-vol-bar-grad-normal)';
-    const d = r > 0.3
-      ? `M${x.toFixed(1)},${baseline.toFixed(1)} L${x.toFixed(1)},${(y + r).toFixed(1)} Q${x.toFixed(1)},${y.toFixed(1)} ${(x + r).toFixed(1)},${y.toFixed(1)} L${(x + barW - r).toFixed(1)},${y.toFixed(1)} Q${(x + barW).toFixed(1)},${y.toFixed(1)} ${(x + barW).toFixed(1)},${(y + r).toFixed(1)} L${(x + barW).toFixed(1)},${baseline.toFixed(1)} Z`
-      : `M${x.toFixed(1)},${baseline.toFixed(1)} L${x.toFixed(1)},${y.toFixed(1)} L${(x + barW).toFixed(1)},${y.toFixed(1)} L${(x + barW).toFixed(1)},${baseline.toFixed(1)} Z`;
-    return `<path class="lp-market-volume-bar" data-idx="${i}" d="${d}" fill="${fill}"/>`;
+    return `<line class="v" x1="${x}" y1="${padT}" x2="${x}" y2="${baseline.toFixed(1)}"/>`;
   }).join('');
 
   container.innerHTML = `
     <svg id="lp-market-volume-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%; height:${H}px; display:block; cursor:crosshair;">
-      <defs>
-        <linearGradient id="lp-vol-bar-grad-normal" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="var(--text-soft)" stop-opacity="0.7"/>
-          <stop offset="100%" stop-color="var(--text-soft)" stop-opacity="0.28"/>
-        </linearGradient>
-        <linearGradient id="lp-vol-bar-grad-high" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.95"/>
-          <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.4"/>
-        </linearGradient>
-      </defs>
-      <g class="lp-market-chart-grid">${vLines}<line x1="${padL}" y1="${baseline}" x2="${W - padR}" y2="${baseline}"/></g>
+      <g class="lp-market-chart-grid">${vLines}<line x1="${padL}" y1="${baseline.toFixed(1)}" x2="${W - padR}" y2="${baseline.toFixed(1)}"/></g>
       <line class="lp-market-avg-line" x1="${padL}" y1="${avgY.toFixed(1)}" x2="${W - padR}" y2="${avgY.toFixed(1)}"/>
-      <text class="lp-market-avg-label" x="${W - padR - 3}" y="${(avgY - 4).toFixed(1)}" text-anchor="end">avg ${formatCompactMarketUnits(avgV)}</text>
-      <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${padT + 6}" text-anchor="end">${formatCompactMarketUnits(maxV)}</text>
-      <text class="lp-market-chart-axis-label" x="${padL}" y="${H - 6}" text-anchor="start">${formatMarketDate(rows[0].date)}</text>
-      <text class="lp-market-chart-axis-label" x="${W - padR}" y="${H - 6}" text-anchor="end">${formatMarketDate(rows[n - 1].date)}</text>
-      ${bars}
+      <text class="lp-market-avg-label" x="${W - padR - 3}" y="${Math.round(avgY - 4)}" text-anchor="end">avg ${formatCompactMarketUnits(avgV)}</text>
+      <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${Math.round(padT + 6)}" text-anchor="end">${formatCompactMarketUnits(maxV)}</text>
+      <text class="lp-market-chart-axis-label" x="${padL}" y="${Math.round(H - 6)}" text-anchor="start">${formatMarketDate(rows[0].date)}</text>
+      <text class="lp-market-chart-axis-label" x="${W - padR}" y="${Math.round(H - 6)}" text-anchor="end">${formatMarketDate(rows[n - 1].date)}</text>
+      <path style="fill:var(--text-soft); opacity:0.06;" d="${areaPath}"/>
+      <path class="lp-market-volume-line" d="${linePath}"/>
+      <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="4" class="lp-market-hover-dot muted"/>
+      <line id="lp-market-volume-crosshair" class="lp-market-crosshair" x1="0" y1="${padT}" x2="0" y2="${baseline.toFixed(1)}" style="display:none;"/>
+      <circle id="lp-market-volume-hoverdot" r="5" class="lp-market-hover-dot muted" style="display:none;"/>
     </svg>`;
 
   const svgEl = document.getElementById('lp-market-volume-svg');
   const tooltip = getOrCreateMarketTooltip(container);
-  let hoveredIdx = null;
+  const crosshair = document.getElementById('lp-market-volume-crosshair');
+  const hoverDot = document.getElementById('lp-market-volume-hoverdot');
 
   svgEl.addEventListener('pointermove', (e) => {
     const rect = svgEl.getBoundingClientRect();
     const relX = ((e.clientX - rect.left) / rect.width) * W;
-    let idx = Math.floor((relX - padL) / slotW);
+    let idx = Math.round(((relX - padL) / innerW) * (n - 1));
     idx = Math.max(0, Math.min(n - 1, idx));
-    if (idx !== hoveredIdx) {
-      svgEl.querySelectorAll('.lp-market-volume-bar').forEach(b => b.classList.remove('hover'));
-      svgEl.querySelector(`.lp-market-volume-bar[data-idx="${idx}"]`)?.classList.add('hover');
-      hoveredIdx = idx;
-    }
-    const x = xForIndex(idx) + barW / 2, y = yForVol(volumes[idx]);
+    const x = xForIndex(idx), y = yForVol(volumes[idx]);
+    crosshair.setAttribute('x1', x); crosshair.setAttribute('x2', x); crosshair.style.display = '';
+    hoverDot.setAttribute('cx', x); hoverDot.setAttribute('cy', y); hoverDot.style.display = '';
     tooltip.style.display = '';
     tooltip.style.left = `${(x / W) * 100}%`;
     tooltip.style.top = `${(y / H) * 100}%`;
     tooltip.innerHTML = `<div class="lbl">${formatMarketDate(rows[idx].date)}</div><div class="val">${volumes[idx].toLocaleString()} units</div>`;
   });
   svgEl.addEventListener('pointerleave', () => {
-    svgEl.querySelectorAll('.lp-market-volume-bar').forEach(b => b.classList.remove('hover'));
-    hoveredIdx = null;
+    crosshair.style.display = 'none';
+    hoverDot.style.display = 'none';
     tooltip.style.display = 'none';
   });
 }
