@@ -524,6 +524,7 @@ function isolateOffer(offerId) {
   }
 
   _lpIsolatedResult = result;
+  resetMarketDrawer(); // don't carry the previous offer's drawer data/open-state into this one
 
   // #lpstore-main-area is hidden as a whole (not just its inner results div) - it's a flex sibling
   // of #viewport in .content-row, and leaving it visible-but-empty would still claim flex-1 space
@@ -590,6 +591,7 @@ async function isolateDirectSellOffer(result) {
 
 function exitLPInspector() {
   _lpIsolatedResult = null;
+  resetMarketDrawer();
   ['viewport', 'bom-sidebar', 'lpstore-calc-stat-strip'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
   document.getElementById('lp-info-card-col')?.remove();
   document.getElementById('lpstore-main-area')?.classList.remove('hidden');
@@ -789,6 +791,330 @@ function renderLPExtraStats() {
   treeContainer.appendChild(col);
 }
 window.renderLPExtraStats = renderLPExtraStats;
+
+// --- Market Economics pull-up drawer (isolation mode only) ----------------------------------
+// Price history + trade volume for the isolated offer's own PRODUCT (its outputTypeId - already
+// the right typeId for both offer types, see evaluateBpcOffer/evaluateDirectSellOffer), fetched
+// from ESI market history (js/esi.js fetchMarketHistoryRaw) at whatever station the Calculator's
+// own Home Market is set to - the same market every other price on this page already comes from.
+// Two independent single-series charts (price line, volume bars) stacked with the same date domain
+// and padding so they visually align, rather than one dual-axis chart on the same plot - this app
+// has no charting library, so both are hand-rolled inline SVG with their own hover crosshair/
+// tooltip, matching how the tree canvas's own connecting lines are hand-drawn SVG too.
+let _lpMarketDrawerOpen = false;
+let _lpMarketRangeDays = 30;
+let _lpMarketTableView = false;
+let _lpMarketLoadedTypeId = null;
+let _lpMarketHistoryRows = null; // full ~year of ESI history for the currently-loaded typeId, ascending by date
+let _lpMarketRegionId = null;    // resolved once from the Home Market station, then cached for the session
+
+const LP_MARKET_RANGES = [30, 90, 180];
+
+function toggleMarketDrawer() {
+  _lpMarketDrawerOpen = !_lpMarketDrawerOpen;
+  document.getElementById('lp-market-drawer')?.classList.toggle('open', _lpMarketDrawerOpen);
+  document.getElementById('lp-market-drawer-tab')?.classList.toggle('open', _lpMarketDrawerOpen);
+  if (_lpMarketDrawerOpen) loadAndRenderMarketDrawer();
+}
+window.toggleMarketDrawer = toggleMarketDrawer;
+
+// Called whenever a different offer gets isolated (or the inspector is exited entirely) so a
+// previous item's data and open/closed state never carries over into the next one.
+function resetMarketDrawer() {
+  _lpMarketDrawerOpen = false;
+  _lpMarketLoadedTypeId = null;
+  _lpMarketHistoryRows = null;
+  document.getElementById('lp-market-drawer')?.classList.remove('open');
+  document.getElementById('lp-market-drawer-tab')?.classList.remove('open');
+}
+window.resetMarketDrawer = resetMarketDrawer;
+
+function renderMarketRangePills() {
+  const el = document.getElementById('lp-market-range-pills');
+  if (!el) return;
+  el.innerHTML = LP_MARKET_RANGES.map(d => `<button onclick="setMarketRange(${d})" class="lp-pill${d === _lpMarketRangeDays ? ' active' : ''}" style="padding:4px 9px; font-size:10px;">${d}D</button>`).join('');
+}
+
+function setMarketRange(days) {
+  _lpMarketRangeDays = days;
+  renderMarketRangePills();
+  renderMarketDrawerContent();
+}
+window.setMarketRange = setMarketRange;
+
+function setMarketTableView(val) {
+  _lpMarketTableView = val;
+  document.getElementById('lp-market-table-toggle')?.classList.toggle('icon-rail-btn-active', val);
+  renderMarketDrawerContent();
+}
+window.setMarketTableView = setMarketTableView;
+
+async function loadAndRenderMarketDrawer() {
+  if (!_lpIsolatedResult) return;
+  const typeId = _lpIsolatedResult.outputTypeId;
+  const nameEl = document.getElementById('lp-market-item-name');
+  if (nameEl) nameEl.textContent = '— ' + _lpIsolatedResult.outputName;
+  renderMarketRangePills();
+
+  if (_lpMarketLoadedTypeId === typeId && _lpMarketHistoryRows) {
+    renderMarketDrawerContent();
+    return;
+  }
+
+  const body = document.getElementById('lp-market-drawer-body');
+  if (body) body.innerHTML = `<div class="flex items-center justify-center h-full text-slate-500 italic text-sm">Loading market history…</div>`;
+
+  if (!_lpMarketRegionId) {
+    const homeStationId = localStorage.getItem('eve_home_station_id') || '60003760';
+    const resolved = typeof window.resolveStationRegion === 'function' ? await window.resolveStationRegion(homeStationId) : null;
+    _lpMarketRegionId = (resolved && resolved.regionId) || 10000002; // The Forge (Jita) fallback
+  }
+
+  const rows = await window.fetchMarketHistoryRaw(_lpMarketRegionId, typeId);
+  // Bail if the isolated offer changed while this fetch was in flight (e.g. rapid clicking) -
+  // rendering data for whatever's isolated NOW, not what was isolated when the fetch started.
+  if (!_lpIsolatedResult || _lpIsolatedResult.outputTypeId !== typeId) return;
+
+  _lpMarketLoadedTypeId = typeId;
+  _lpMarketHistoryRows = (rows || []).slice().sort((a, b) => a.date < b.date ? -1 : (a.date > b.date ? 1 : 0));
+
+  if (!_lpMarketHistoryRows.length) {
+    if (body) body.innerHTML = `<div class="flex items-center justify-center h-full text-slate-500 italic text-sm text-center px-6">No market history available for this item at your home market.</div>`;
+    return;
+  }
+  renderMarketDrawerContent();
+}
+window.loadAndRenderMarketDrawer = loadAndRenderMarketDrawer;
+
+function renderMarketDrawerContent() {
+  const body = document.getElementById('lp-market-drawer-body');
+  if (!body || !_lpMarketHistoryRows || !_lpMarketHistoryRows.length) return;
+
+  const all = _lpMarketHistoryRows;
+  const sliced = all.slice(-_lpMarketRangeDays);
+  const last7 = all.slice(-7);
+
+  const avgDailyVolume = last7.reduce((s, r) => s + (r.volume || 0), 0) / last7.length;
+  const latestOrderCount = all[all.length - 1].order_count || 0;
+  const firstPrice = sliced[0].average, lastPrice = sliced[sliced.length - 1].average;
+  const priceChangePct = firstPrice > 0 ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0;
+  const qtyNeeded = (window.recipeTreeRoot && window.recipeTreeRoot.qtyNeeded) || 0;
+  const daysOfSupply = avgDailyVolume > 0 ? Math.ceil(qtyNeeded / avgDailyVolume) : null;
+  const changeColor = priceChangePct > 0 ? 'var(--accent)' : (priceChangePct < 0 ? 'var(--red-400, #f87171)' : 'var(--text-mute)');
+  const changeSign = priceChangePct > 0 ? '+' : '';
+
+  const statTile = (label, value, color, title) => `
+    <div class="lp-market-stat-tile" ${title ? `title="${window.esc(title)}"` : ''}>
+      <div class="stat-label">${label}</div>
+      <div class="stat-value" style="${color ? `color:${color};` : ''}">${value}</div>
+    </div>`;
+
+  const statsHTML = `
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-3.5">
+      ${statTile('Avg Daily Volume', formatCompactMarketUnits(avgDailyVolume) + '/day', null, 'Average units traded per day over the last 7 trading days')}
+      ${statTile(`Price Change (${_lpMarketRangeDays}D)`, `${changeSign}${priceChangePct.toFixed(1)}%`, changeColor, `Average price change from ${formatMarketDate(sliced[0].date)} to ${formatMarketDate(sliced[sliced.length - 1].date)}`)}
+      ${statTile('Sell Orders (latest)', latestOrderCount.toLocaleString(), null, 'Number of active sell orders as of the most recent trading day')}
+      ${statTile('Est. Days to Sell Batch', daysOfSupply !== null ? `${daysOfSupply}d` : '—', null, "Estimated days to move this redemption's full output at the recent average daily volume")}
+    </div>`;
+
+  if (_lpMarketTableView) {
+    body.innerHTML = statsHTML + buildMarketTableHTML(sliced);
+    return;
+  }
+
+  body.innerHTML = statsHTML + `
+    <div class="lp-card p-3 mb-2.5">
+      <div class="text-[10.5px] font-bold uppercase tracking-wide mb-1.5" style="color:var(--text-mute);">Average Daily Price</div>
+      <div id="lp-market-price-chart-wrap" style="position:relative;"></div>
+    </div>
+    <div class="lp-card p-3">
+      <div class="text-[10.5px] font-bold uppercase tracking-wide mb-1.5" style="color:var(--text-mute);">Units Traded Per Day</div>
+      <div id="lp-market-volume-chart-wrap" style="position:relative;"></div>
+    </div>`;
+
+  buildPriceLineChart(sliced, document.getElementById('lp-market-price-chart-wrap'));
+  buildVolumeBarChart(sliced, document.getElementById('lp-market-volume-chart-wrap'));
+}
+window.renderMarketDrawerContent = renderMarketDrawerContent;
+
+function formatCompactMarketUnits(n) {
+  const v = Math.round(n || 0);
+  const abs = Math.abs(v);
+  if (abs >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+  if (abs >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+  if (abs >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+  return v.toLocaleString();
+}
+
+// ESI dates are plain "YYYY-MM-DD" - appending a UTC time avoids the well-known bug where
+// `new Date("YYYY-MM-DD")` parses as UTC midnight but .toLocaleDateString() then renders it in the
+// browser's LOCAL timezone, silently shifting the displayed day backward for anyone west of UTC.
+function formatMarketDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+function buildMarketTableHTML(rows) {
+  const reversed = rows.slice().reverse(); // most recent first, matching the ranked-offer table's own convention
+  const rowsHTML = reversed.map(r => `
+    <tr>
+      <td class="py-1">${formatMarketDate(r.date)}</td>
+      <td class="text-right mono">${Math.round(r.average).toLocaleString()} ISK</td>
+      <td class="text-right mono" style="color:var(--text-mute);">${Math.round(r.lowest).toLocaleString()} / ${Math.round(r.highest).toLocaleString()}</td>
+      <td class="text-right mono">${(r.volume || 0).toLocaleString()}</td>
+      <td class="text-right mono" style="color:var(--text-mute);">${(r.order_count || 0).toLocaleString()}</td>
+    </tr>`).join('');
+  return `
+    <div class="overflow-x-auto">
+      <table class="lp-table text-xs mono w-full">
+        <thead><tr>
+          <th>Date</th><th class="text-right">Avg Price</th><th class="text-right">Low / High</th><th class="text-right">Volume</th><th class="text-right">Orders</th>
+        </tr></thead>
+        <tbody>${rowsHTML}</tbody>
+      </table>
+    </div>`;
+}
+
+function getOrCreateMarketTooltip(container) {
+  let tooltip = container.querySelector('.lp-market-chart-tooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.className = 'lp-market-chart-tooltip';
+    tooltip.style.display = 'none';
+    container.appendChild(tooltip);
+  }
+  return tooltip;
+}
+
+// Single series (average daily price) - per the dataviz "one axis" rule this is its own chart, not
+// overlaid with volume on a second scale. 2px line, ~10%-opacity area wash, an end-dot with a
+// surface-color ring (.lp-market-hover-dot in styles.css), and a crosshair+tooltip that snaps to
+// the nearest day under the pointer.
+function buildPriceLineChart(rows, container) {
+  if (!container) return;
+  const W = 640, H = 150, padL = 46, padR = 10, padT = 10, padB = 20;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const n = rows.length;
+  const prices = rows.map(r => r.average);
+  const minP = Math.min(...prices), maxP = Math.max(...prices);
+  const range = (maxP - minP) || Math.max(minP, 1) * 0.1 || 1;
+  const padRange = range * 0.12;
+  const yMin = Math.max(0, minP - padRange), yMax = maxP + padRange;
+  const yDen = (yMax - yMin) || 1;
+
+  const xForIndex = (i) => n === 1 ? padL + innerW / 2 : padL + (i / (n - 1)) * innerW;
+  const yForPrice = (p) => padT + innerH - ((p - yMin) / yDen) * innerH;
+
+  const linePoints = prices.map((p, i) => `${xForIndex(i).toFixed(1)},${yForPrice(p).toFixed(1)}`).join(' ');
+  const baseline = (padT + innerH).toFixed(1);
+  const areaPoints = `${xForIndex(0).toFixed(1)},${baseline} ${linePoints} ${xForIndex(n - 1).toFixed(1)},${baseline}`;
+  const lastX = xForIndex(n - 1), lastY = yForPrice(prices[n - 1]);
+  const gridY1 = padT, gridY2 = padT + innerH;
+
+  container.innerHTML = `
+    <svg id="lp-market-price-svg" viewBox="0 0 ${W} ${H}" style="width:100%; height:${H}px; display:block; cursor:crosshair;" preserveAspectRatio="none">
+      <g class="lp-market-chart-grid">
+        <line x1="${padL}" y1="${gridY1}" x2="${W - padR}" y2="${gridY1}"/>
+        <line x1="${padL}" y1="${gridY2}" x2="${W - padR}" y2="${gridY2}"/>
+      </g>
+      <text class="lp-market-chart-axis-label" x="${padL - 6}" y="${gridY1 + 4}" text-anchor="end">${window.formatISKCompact(yMax)}</text>
+      <text class="lp-market-chart-axis-label" x="${padL - 6}" y="${gridY2 + 4}" text-anchor="end">${window.formatISKCompact(yMin)}</text>
+      <text class="lp-market-chart-axis-label" x="${padL}" y="${H - 4}" text-anchor="start">${formatMarketDate(rows[0].date)}</text>
+      <text class="lp-market-chart-axis-label" x="${W - padR}" y="${H - 4}" text-anchor="end">${formatMarketDate(rows[n - 1].date)}</text>
+      <polygon class="lp-market-price-area" points="${areaPoints}"/>
+      <polyline class="lp-market-price-line" points="${linePoints}"/>
+      <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="4" class="lp-market-hover-dot"/>
+      <line id="lp-market-price-crosshair" class="lp-market-crosshair" x1="0" y1="${padT}" x2="0" y2="${gridY2}" style="display:none;"/>
+      <circle id="lp-market-price-hoverdot" r="5" class="lp-market-hover-dot" style="display:none;"/>
+    </svg>`;
+
+  const svgEl = document.getElementById('lp-market-price-svg');
+  const tooltip = getOrCreateMarketTooltip(container);
+  const crosshair = document.getElementById('lp-market-price-crosshair');
+  const hoverDot = document.getElementById('lp-market-price-hoverdot');
+
+  svgEl.addEventListener('pointermove', (e) => {
+    const rect = svgEl.getBoundingClientRect();
+    const relX = ((e.clientX - rect.left) / rect.width) * W;
+    let idx = Math.round(((relX - padL) / innerW) * (n - 1));
+    idx = Math.max(0, Math.min(n - 1, idx));
+    const x = xForIndex(idx), y = yForPrice(prices[idx]);
+    crosshair.setAttribute('x1', x); crosshair.setAttribute('x2', x); crosshair.style.display = '';
+    hoverDot.setAttribute('cx', x); hoverDot.setAttribute('cy', y); hoverDot.style.display = '';
+    tooltip.style.display = '';
+    tooltip.style.left = `${(x / W) * 100}%`;
+    tooltip.style.top = `${(y / H) * 100}%`;
+    tooltip.innerHTML = `<div class="lbl">${formatMarketDate(rows[idx].date)}</div><div class="val">${Math.round(prices[idx]).toLocaleString()} ISK</div>`;
+  });
+  svgEl.addEventListener('pointerleave', () => {
+    crosshair.style.display = 'none';
+    hoverDot.style.display = 'none';
+    tooltip.style.display = 'none';
+  });
+}
+
+// Single series (units traded per day) - its own chart/axis, stacked below the price chart with
+// the same padL/padR/date domain so the two visually align without being one dual-axis plot. Bars
+// capped at 24px, rounded top / square baseline per the mark spec (a plain <rect rx> would round
+// all four corners, so this is a hand-built path instead).
+function buildVolumeBarChart(rows, container) {
+  if (!container) return;
+  const W = 640, H = 90, padL = 46, padR = 10, padT = 8, padB = 20;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const n = rows.length;
+  const volumes = rows.map(r => r.volume || 0);
+  const maxV = Math.max(...volumes, 1) * 1.15;
+
+  const slotW = innerW / n;
+  const barW = Math.max(1, Math.min(24, slotW - 2));
+  const xForIndex = (i) => padL + i * slotW + (slotW - barW) / 2;
+  const yForVol = (v) => padT + innerH - (v / maxV) * innerH;
+  const baseline = padT + innerH;
+
+  const bars = volumes.map((v, i) => {
+    const x = xForIndex(i), y = yForVol(v);
+    const r = Math.min(4, baseline - y, barW / 2);
+    const d = r > 0.3
+      ? `M${x.toFixed(1)},${baseline.toFixed(1)} L${x.toFixed(1)},${(y + r).toFixed(1)} Q${x.toFixed(1)},${y.toFixed(1)} ${(x + r).toFixed(1)},${y.toFixed(1)} L${(x + barW - r).toFixed(1)},${y.toFixed(1)} Q${(x + barW).toFixed(1)},${y.toFixed(1)} ${(x + barW).toFixed(1)},${(y + r).toFixed(1)} L${(x + barW).toFixed(1)},${baseline.toFixed(1)} Z`
+      : `M${x.toFixed(1)},${baseline.toFixed(1)} L${x.toFixed(1)},${y.toFixed(1)} L${(x + barW).toFixed(1)},${y.toFixed(1)} L${(x + barW).toFixed(1)},${baseline.toFixed(1)} Z`;
+    return `<path class="lp-market-volume-bar" data-idx="${i}" d="${d}"/>`;
+  }).join('');
+
+  container.innerHTML = `
+    <svg id="lp-market-volume-svg" viewBox="0 0 ${W} ${H}" style="width:100%; height:${H}px; display:block; cursor:crosshair;" preserveAspectRatio="none">
+      <g class="lp-market-chart-grid"><line x1="${padL}" y1="${baseline}" x2="${W - padR}" y2="${baseline}"/></g>
+      <text class="lp-market-chart-axis-label" x="${padL - 6}" y="${padT + 6}" text-anchor="end">${formatCompactMarketUnits(maxV)}</text>
+      <text class="lp-market-chart-axis-label" x="${padL}" y="${H - 4}" text-anchor="start">${formatMarketDate(rows[0].date)}</text>
+      <text class="lp-market-chart-axis-label" x="${W - padR}" y="${H - 4}" text-anchor="end">${formatMarketDate(rows[n - 1].date)}</text>
+      ${bars}
+    </svg>`;
+
+  const svgEl = document.getElementById('lp-market-volume-svg');
+  const tooltip = getOrCreateMarketTooltip(container);
+  let hoveredIdx = null;
+
+  svgEl.addEventListener('pointermove', (e) => {
+    const rect = svgEl.getBoundingClientRect();
+    const relX = ((e.clientX - rect.left) / rect.width) * W;
+    let idx = Math.floor((relX - padL) / slotW);
+    idx = Math.max(0, Math.min(n - 1, idx));
+    if (idx !== hoveredIdx) {
+      svgEl.querySelectorAll('.lp-market-volume-bar').forEach(b => b.classList.remove('hover'));
+      svgEl.querySelector(`.lp-market-volume-bar[data-idx="${idx}"]`)?.classList.add('hover');
+      hoveredIdx = idx;
+    }
+    const x = xForIndex(idx) + barW / 2, y = yForVol(volumes[idx]);
+    tooltip.style.display = '';
+    tooltip.style.left = `${(x / W) * 100}%`;
+    tooltip.style.top = `${(y / H) * 100}%`;
+    tooltip.innerHTML = `<div class="lbl">${formatMarketDate(rows[idx].date)}</div><div class="val">${volumes[idx].toLocaleString()} units</div>`;
+  });
+  svgEl.addEventListener('pointerleave', () => {
+    svgEl.querySelectorAll('.lp-market-volume-bar').forEach(b => b.classList.remove('hover'));
+    hoveredIdx = null;
+    tooltip.style.display = 'none';
+  });
+}
 
 // --- Rendering: ranked list -------------------------------------------------------------------
 

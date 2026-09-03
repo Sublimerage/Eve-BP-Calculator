@@ -1297,6 +1297,31 @@ async function fetchAverageDailyVolume(regionId, typeId) {
 }
 window.fetchAverageDailyVolume = fetchAverageDailyVolume;
 
+// Raw ESI market history (one row per trading day: date, average, highest, lowest, order_count,
+// volume - up to ~a year back), cached per region+type so the LP Store's Market Economics drawer
+// (js/lpstore.js) can slice different date ranges and compute its own stats client-side without a
+// fresh fetch every time the range toggle changes. Deliberately separate from
+// fetchAverageDailyVolume above (which throws away everything but a 7-day average, uncached) -
+// that function stays as-is for its existing Compare Markets caller.
+let _marketHistoryRawCache = {};
+async function fetchMarketHistoryRaw(regionId, typeId) {
+  const key = `${regionId}:${typeId}`;
+  if (_marketHistoryRawCache[key] !== undefined) return _marketHistoryRawCache[key];
+  try {
+    const res = await fetch(`https://esi.evetech.net/latest/markets/${regionId}/history/?datasource=tranquility&type_id=${typeId}`);
+    if (!res.ok) { _marketHistoryRawCache[key] = null; return null; }
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : null;
+    _marketHistoryRawCache[key] = rows;
+    return rows;
+  } catch (e) {
+    console.warn('Market history fetch failed:', e);
+    _marketHistoryRawCache[key] = null;
+    return null;
+  }
+}
+window.fetchMarketHistoryRaw = fetchMarketHistoryRaw;
+
 // Fetches price + liquidity for one item across every tracked market in parallel, for the Compare
 // Markets panel. Price comes from Fuzzwork (per-station), volume from ESI history (per-region) -
 // deliberately returned side by side rather than collapsed into a single "best" score, since the
