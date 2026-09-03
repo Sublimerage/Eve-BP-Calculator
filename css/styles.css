@@ -1629,6 +1629,16 @@ body.page-calc .hero-num {
 body.page-calc .hero-num.profit { background: linear-gradient(135deg, #ddffa0, var(--accent)); -webkit-background-clip: text; background-clip: text; }
 body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var(--red)); -webkit-background-clip: text; background-clip: text; }
 
+/* LP Store Economics card (js/lpstore.js renderLPExtraStats) - a thin divider between each stat
+   row instead of pure vertical gap, so the list reads as distinct fields rather than one loose
+   stack of numbers. :first-child excluded via the adjacent-sibling selector, same trick used to
+   space .fo-group above. */
+.lp-econ-rows > div + div {
+  border-top: 1px solid rgba(255,255,255,0.07);
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
 /* ============================================================
    Narrow-viewport fallback - .content-row (shared by all 3 pages) is a fixed-width side-by-side
    flex row (icon rail + diagram + BOM sidebar on index.html; two panes on ledger/invention). Below
