@@ -9,7 +9,7 @@
 <title>EVE LP Store Calculator</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8ff4d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='5'/%3E%3Cpath d='M8.5 12.5L7 21l5-3 5 3-1.5-8.5'/%3E%3C/svg%3E">
 <link class="cache-bust" rel="stylesheet" href="css/tailwind-build.css?v=1.0.4">
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.39.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.41.0">
 <script>(function(){try{var t=localStorage.getItem('eve_color_theme');if(t&&t!=='lime')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
@@ -88,7 +88,7 @@
          'pricing'/'build'/'fees' section ids double up on the Calculator's own FLYOUT_TITLES
          entries; 'store'/'station' are new entries added there for this page. -->
     <aside id="control-sidebar" class="icon-rail">
-      <div id="icon-btn-store" class="icon-rail-btn icon-rail-btn-active" onclick="openFlyoutSection('store')">
+      <div id="icon-btn-store" class="icon-rail-btn" onclick="openFlyoutSection('store')">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5"/></svg><span class="icon-label">Store</span>
       </div>
       <div id="icon-btn-pricing" class="icon-rail-btn" onclick="openFlyoutSection('pricing')">
@@ -104,7 +104,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="8" y1="16" x2="16" y2="8"/></svg><span class="icon-label">Fees</span>
       </div>
 
-      <div id="control-flyout" class="flyout-panel open">
+      <div id="control-flyout" class="flyout-panel">
         <div class="flyout-panel-header">
           <span id="flyout-panel-title" class="flyout-panel-title">LP Store</span>
           <div class="flyout-panel-close" onclick="closeFlyoutPanel()" title="Close">
@@ -113,7 +113,7 @@
         </div>
         <div class="flyout-panel-body">
 
-          <div id="flyout-store" class="flyout-section active">
+          <div id="flyout-store" class="flyout-section">
             <div class="fo-group">
               <label class="lp-label fo-group-label" for="lpstore-corp-select">Faction Warfare LP Store</label>
               <select id="lpstore-corp-select" onchange="selectLPStoreCorp(this.value)" class="field-line w-full font-bold text-xs">
@@ -337,7 +337,7 @@
         <div class="lp-market-drawer-header">
           <div class="flex items-center gap-2 min-w-0">
             <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;flex-shrink:0;"><polyline points="3,17 9,11 13,15 21,6"/><polyline points="15,6 21,6 21,12"/></svg>
-            <span class="font-bold text-sm text-white">Market Economics</span>
+            <span class="font-semibold text-sm" style="color:var(--text);">Market Economics</span>
             <span id="lp-market-item-name" class="text-slate-400 text-xs truncate"></span>
             <span class="flex items-center gap-1 text-[10px] mono flex-shrink-0" style="color:var(--text-mute);" title="Every price and volume figure below comes from this station's market">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px;"><path d="M12 21s7-5.2 7-11a7 7 0 0 0-14 0c0 5.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
@@ -469,7 +469,7 @@
   <script src="js/tree.js?v=8.0.1" defer></script>
   <script src="js/optimizers.js?v=8.0.6" defer></script>
   <script src="js/app.js?v=15.36.0" defer></script>
-  <script src="js/lpstore.js?v=5.1.0" defer></script>
+  <script src="js/lpstore.js?v=5.3.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
