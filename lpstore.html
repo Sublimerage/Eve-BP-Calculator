@@ -95,14 +95,6 @@
       </div>
 
       <div class="lp-row">
-        <label class="lp-label mb-2 block" for="lpstore-search-input">Search Items</label>
-        <div class="relative">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-mute);pointer-events:none;"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.5" y2="15.5"/></svg>
-          <input type="text" id="lpstore-search-input" placeholder="Search by item name..." autocomplete="off" oninput="setLPStoreSearch(this.value)" class="field-line w-full text-slate-200 text-xs mono" style="padding-left:26px;">
-        </div>
-      </div>
-
-      <div class="lp-row">
         <label class="lp-label mb-2 block" for="input-price-mode">Material Pricing (isolated tree)</label>
         <select id="input-price-mode" onchange="if(typeof recalculate==='function') recalculate();" class="field-line w-full font-bold text-xs">
           <option value="sell" selected>Sell (Instant)</option>
@@ -229,14 +221,21 @@
       <div id="lpstore-results-area" class="hidden space-y-4">
         <div id="lpstore-summary-tiles" class="grid grid-cols-2 md:grid-cols-4 gap-2.5"></div>
         <div class="lp-card p-4">
-          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <h2 class="text-sm font-bold uppercase tracking-wider rajdhani" style="color:var(--accent);">Ranked Offers</h2>
-            <p class="text-[10px]" style="color:var(--text-mute);">Categories resolve in the background right after offers load - may take a moment to fully sort the first time.</p>
+          <!-- Moved up from the sidebar - a filter this central deserves to be seen, not buried
+               under Production Station/Optimizers below the fold. Same setLPStoreSearch()
+               live-filter as before, just relocated. -->
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-3">
+            <h2 class="text-sm font-bold uppercase tracking-wider rajdhani flex-shrink-0" style="color:var(--accent);">Ranked Offers</h2>
+            <div class="relative" style="width:280px; max-width:100%;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-mute);pointer-events:none;"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.5" y2="15.5"/></svg>
+              <input type="text" id="lpstore-search-input" placeholder="Search by item name..." autocomplete="off" oninput="setLPStoreSearch(this.value)" class="field-line w-full text-slate-200 text-xs mono" style="padding-left:26px;">
+            </div>
           </div>
           <!-- Category filter, as icon pills instead of a dropdown - populated by
                renderLPCategoryBar() (js/lpstore.js) from LP_CATEGORY_FILTERS, the same lp-pill/active
                convention the Offer Type buttons above use. -->
-          <div id="lpstore-category-bar" class="flex flex-wrap gap-1.5 mb-3.5"></div>
+          <div id="lpstore-category-bar" class="flex flex-wrap gap-1.5 mb-1.5"></div>
+          <p class="text-[10px] mb-3" style="color:var(--text-mute);">Categories resolve in the background right after offers load - may take a moment to fully sort the first time.</p>
           <div id="lpstore-table-container" class="overflow-x-auto"></div>
         </div>
       </div>
@@ -383,12 +382,12 @@
        plain window.onload= assignment specifically so js/lpstore.js's own listener (below) can
        coexist instead of clobbering it - see both files' own comments on this. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
-  <script src="js/config.js?v=8.0.21" defer></script>
+  <script src="js/config.js?v=8.0.22" defer></script>
   <script src="js/esi.js?v=8.0.15" defer></script>
   <script src="js/tree.js?v=8.0.1" defer></script>
   <script src="js/optimizers.js?v=8.0.6" defer></script>
   <script src="js/app.js?v=15.35.0" defer></script>
-  <script src="js/lpstore.js?v=4.2.0" defer></script>
+  <script src="js/lpstore.js?v=4.3.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
