@@ -60,8 +60,66 @@ let _lpRankedResults = [];    // last computed, sorted evaluation results
 let _lpActiveCorpId = null;
 let _lpIsLoading = false;
 let _lpTypeFilter = 'all';    // 'all' | 'direct' | 'bpc'
-let _lpCategoryFilter = 'all'; // 'all' | a numeric SDE category id (string) | 'other'
+let _lpCategoryFilter = 'all'; // 'all' | 'favorites' | a numeric SDE category id (string) | 'other'
 let _lpSearchQuery = '';      // free-text filter against the offer's own output item name
+
+// Favorited offers - keyed by offer_id (the same identifier isolateOffer/toggleLPOfferExpanded
+// already address rows by), not typeId, since CCP can and does offer the same item through several
+// distinct offer_id combos (see the ranked-list row comment on requiredItemsSummary) - favoriting
+// one shouldn't silently favorite the others. Loaded eagerly (not inside the load listener) since
+// it's a synchronous localStorage read with no page dependency, same as any other simple persisted
+// preference.
+let _lpFavoriteOfferIds = new Set();
+try {
+  _lpFavoriteOfferIds = new Set(JSON.parse(localStorage.getItem('eve_lpstore_favorites') || '[]'));
+} catch (e) { /* corrupt/old value - start fresh rather than fail the whole page */ }
+
+function saveLPFavorites() {
+  localStorage.setItem('eve_lpstore_favorites', JSON.stringify([..._lpFavoriteOfferIds]));
+}
+
+function toggleLPFavorite(offerId) {
+  if (_lpFavoriteOfferIds.has(offerId)) _lpFavoriteOfferIds.delete(offerId);
+  else _lpFavoriteOfferIds.add(offerId);
+  saveLPFavorites();
+  renderLPCategoryBar(); // favorites count badge
+  renderLPStoreTable();  // star fill + (if currently viewing the Favorites filter) list membership
+}
+window.toggleLPFavorite = toggleLPFavorite;
+
+// Icon + label config for the category filter bar (js/lpstore.js renderLPCategoryBar) - one source
+// of truth for id/label/icon, walked to both render the buttons and (via LP_CATEGORY_LABELS below,
+// kept as the id->label lookup other code already uses) resolve a typeId's own category.
+const LP_CATEGORY_FILTERS = [
+  { id: 'all', label: 'All', icon: 'grid' },
+  { id: 'favorites', label: 'Favorites', icon: 'star' },
+  { id: '6', label: 'Ships', icon: 'rocket' },
+  { id: '7', label: 'Modules', icon: 'gear' },
+  { id: '8', label: 'Ammo', icon: 'ammo' },
+  { id: '18', label: 'Drones', icon: 'drone' },
+  { id: '20', label: 'Implants', icon: 'cpu' },
+  { id: '16', label: 'Skillbooks', icon: 'book' },
+  { id: '91', label: 'SKINs', icon: 'layers' },
+  { id: '9', label: 'Blueprints', icon: 'file-text' },
+  { id: 'other', label: 'Other', icon: 'package' }
+];
+
+// Renders into #lpstore-category-bar (top of the ranked-offers card, lpstore.html) - called on
+// initial load, on every setLPStoreCategoryFilter, and on toggleLPFavorite (for the count badge).
+// Deliberately separate from renderLPStoreTable: switching the active pill doesn't need the whole
+// (potentially large) table to re-render, only itself and the table's own filter pass.
+function renderLPCategoryBar() {
+  const el = document.getElementById('lpstore-category-bar');
+  if (!el) return;
+  el.innerHTML = LP_CATEGORY_FILTERS.map(f => {
+    const active = _lpCategoryFilter === f.id;
+    const badge = f.id === 'favorites' && _lpFavoriteOfferIds.size
+      ? `<span class="mono" style="margin-left:5px; opacity:0.75;">${_lpFavoriteOfferIds.size}</span>`
+      : '';
+    return `<button onclick="setLPStoreCategoryFilter('${f.id}')" class="lp-pill${active ? ' active' : ''}" title="${window.esc(f.label)}">${window.svgIcon(f.icon)}${window.esc(f.label)}${badge}</button>`;
+  }).join('');
+}
+window.renderLPCategoryBar = renderLPCategoryBar;
 let _lpItemCategoryCache = {}; // typeId -> category id, resolved live (see resolveLPItemCategories)
 let _lpSortKey = 'iskPerLp';
 let _lpSortDir = -1;          // -1 desc, 1 asc
@@ -404,7 +462,8 @@ window.setLPStoreTypeFilter = setLPStoreTypeFilter;
 
 function setLPStoreCategoryFilter(catId) {
   _lpCategoryFilter = catId;
-  renderLPStoreState();
+  renderLPCategoryBar();
+  renderLPStoreTable(); // filtering only - no need to re-render the summary tiles above it
 }
 window.setLPStoreCategoryFilter = setLPStoreCategoryFilter;
 
@@ -816,7 +875,9 @@ function renderLPStoreTable() {
     const q = _lpSearchQuery.toLowerCase();
     rows = rows.filter(r => r.outputName && r.outputName.toLowerCase().includes(q));
   }
-  if (_lpCategoryFilter !== 'all') {
+  if (_lpCategoryFilter === 'favorites') {
+    rows = rows.filter(r => _lpFavoriteOfferIds.has(r.offer.offer_id));
+  } else if (_lpCategoryFilter !== 'all') {
     rows = rows.filter(r => {
       const cat = getLPItemCategory(r.outputTypeId);
       if (cat === undefined) return true; // not resolved yet - don't hide it, just not filterable yet
@@ -873,6 +934,12 @@ function renderLPStoreTable() {
     // isolateDirectSellOffer) - either way its required_items render as real (purple) cards too.
     const isolateBtn = `<button onclick="event.stopPropagation(); isolateOffer(${offer.offer_id});" class="icon-btn flex-shrink-0" style="width:26px;height:26px;" title="Isolate: open this offer in the Calculator's own tree view">${window.svgIcon ? window.svgIcon('expand', { style: 'width:13px;height:13px;' }) : '⤢'}</button>`;
 
+    // Favorited by offer_id (see the state-var comment above) - filled gold star when favorited,
+    // hollow outline otherwise. stopPropagation so starring an offer doesn't also toggle its detail
+    // row open.
+    const isFav = _lpFavoriteOfferIds.has(offer.offer_id);
+    const favBtn = `<button onclick="event.stopPropagation(); toggleLPFavorite(${offer.offer_id});" class="icon-btn flex-shrink-0" style="width:22px;height:22px;" title="${isFav ? 'Remove from Favorites' : 'Add to Favorites'}">${window.svgIcon('star', { style: isFav ? 'fill:#ffd23f; color:#ffd23f;' : 'color:var(--text-mute);' })}</button>`;
+
     let detailHTML = '';
     if (expanded) {
       detailHTML = `
@@ -904,6 +971,7 @@ function renderLPStoreTable() {
       <tr class="lp-store-row cursor-pointer" onclick="toggleLPOfferExpanded(${offer.offer_id})" title="Click for a full cost/value breakdown">
         <td class="py-1.5">
           <div class="flex items-center gap-2 min-w-0">
+            ${favBtn}
             <img src="${iconUrl}" alt="" class="w-6 h-6 rounded flex-shrink-0" loading="lazy" onerror="${iconFallback}">
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-1.5">
@@ -1026,6 +1094,7 @@ window.addEventListener('load', async () => {
   loadSharedTaxSettingsForLPStore();
   renderLPStoreActiveStationLabel();
   if (typeof window.renderProductionPresetDropdown === 'function') window.renderProductionPresetDropdown();
+  renderLPCategoryBar();
   renderLPStoreState();
   installLPRecalculateHook();
 

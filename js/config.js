@@ -192,7 +192,21 @@ const SVG_ICON_PATHS = {
   // the Ledger's Combine Duplicates control (ledger.html hand-writes the same path inline there,
   // same as every other static toolbar icon in that file - this registry entry is for JS-generated
   // markup that wants the same glyph).
-  merge: '<rect x="2" y="3" width="8" height="6" rx="1.3"/><rect x="14" y="3" width="8" height="6" rx="1.3"/><path d="M6 9c0 3 3 3 6 5"/><path d="M18 9c0 3-3 3-6 5"/><rect x="6" y="16" width="12" height="6" rx="1.3"/>'
+  merge: '<rect x="2" y="3" width="8" height="6" rx="1.3"/><rect x="14" y="3" width="8" height="6" rx="1.3"/><path d="M6 9c0 3 3 3 6 5"/><path d="M18 9c0 3-3 3-6 5"/><rect x="6" y="16" width="12" height="6" rx="1.3"/>',
+  // LP Store category filter bar + favorite toggle (js/lpstore.js) - same feather-style 24x24
+  // stroke-path convention as everything above, so these drop into .lp-pill/icon-btn exactly like
+  // the existing icons do. `star` doubles as the favorite toggle: callers fill it in via
+  // opts.style="fill:currentColor" for the "favorited" state rather than a second registry entry -
+  // fill/stroke are inherited SVG properties, so an inline style on the <svg> root cascades to the
+  // bare <polygon> below with no fill of its own.
+  star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  rocket: '<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>',
+  ammo: '<rect x="9" y="2" width="6" height="13" rx="2.6"/><path d="M9 12l3 10 3-10"/>',
+  drone: '<circle cx="12" cy="12" r="3"/><line x1="12" y1="9" x2="12" y2="4.5"/><line x1="12" y1="15" x2="12" y2="19.5"/><line x1="9" y1="12" x2="4.5" y2="12"/><line x1="15" y1="12" x2="19.5" y2="12"/><circle cx="12" cy="3.2" r="1.7"/><circle cx="12" cy="20.8" r="1.7"/><circle cx="3.2" cy="12" r="1.7"/><circle cx="20.8" cy="12" r="1.7"/>',
+  cpu: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>',
+  book: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+  layers: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+  'file-text': '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>'
 };
 
 function svgIcon(name, opts) {
