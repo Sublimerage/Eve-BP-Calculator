@@ -47,8 +47,8 @@ const FW_WARZONE_CORPS = [
   { corpId: 1000180, corpName: 'State Protectorate', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5', group: 'Faction Warfare' },
   { corpId: 1000181, corpName: 'Federal Defense Union', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73', group: 'Faction Warfare' },
   { corpId: 1000182, corpName: 'Tribal Liberation Force', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a', group: 'Faction Warfare' },
-  { corpId: 1000127, corpName: 'Guristas', faction: 'Guristas Pirates', factionId: 500010, color: '#e8c14a', group: 'Pirate Faction' },
-  { corpId: 1000138, corpName: 'Dominations', faction: 'Angel Cartel', factionId: 500011, color: '#e05a5a', group: 'Pirate Faction' },
+  { corpId: 1000437, corpName: 'Commando Guri', faction: 'Guristas Pirates', factionId: 500010, color: '#e8c14a', group: 'Pirate Faction' },
+  { corpId: 1000436, corpName: 'Malakim Zealots', faction: 'Angel Cartel', factionId: 500011, color: '#e05a5a', group: 'Pirate Faction' },
   { corpId: 1000134, corpName: 'Blood Raiders', faction: 'Blood Raider Covenant', factionId: 500012, color: '#a03030', group: 'Pirate Faction' },
   { corpId: 1000162, corpName: 'True Power', faction: "Sansha's Nation", factionId: 500019, color: '#c04ac0', group: 'Pirate Faction' },
   { corpId: 1000135, corpName: 'Serpentis Corporation', faction: 'Serpentis', factionId: 500020, color: '#4ac084', group: 'Pirate Faction' }
