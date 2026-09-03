@@ -1033,8 +1033,26 @@ function renderMarketDrawerContent() {
       <div id="lp-market-volume-chart-wrap" style="position:relative;"></div>
     </div>`;
 
-  buildPriceLineChart(sliced, document.getElementById('lp-market-price-chart-wrap'));
-  buildVolumeCandlestickChart(sliced, document.getElementById('lp-market-volume-chart-wrap'));
+  const priceWrap = document.getElementById('lp-market-price-chart-wrap');
+  const volWrap = document.getElementById('lp-market-volume-chart-wrap');
+  buildPriceLineChart(sliced, priceWrap);
+  buildVolumeCandlestickChart(sliced, volWrap);
+
+  // Building the (fixed-height) volume chart can be what first pushes the drawer body past its
+  // max-height, bringing a scrollbar into existence that narrows both wraps' real width - after
+  // both charts already measured and locked in a wider one moments earlier. Both charts now pin
+  // their SVG to an exact pixel width (see buildPriceLineChart's own note on why), so unlike the
+  // old width:100% this won't silently rescale to the correction - it needs a rebuild. One
+  // corrective pass is enough: the scrollbar's presence is already decided by this point, so a
+  // second pass can't itself trigger a third.
+  const priceSvg = document.getElementById('lp-market-price-svg');
+  if (priceWrap && priceSvg && priceWrap.clientWidth !== parseInt(priceSvg.getAttribute('width'), 10)) {
+    buildPriceLineChart(sliced, priceWrap);
+  }
+  const volSvg = document.getElementById('lp-market-volume-svg');
+  if (volWrap && volSvg && volWrap.clientWidth !== parseInt(volSvg.getAttribute('width'), 10)) {
+    buildVolumeCandlestickChart(sliced, volWrap);
+  }
   positionMarketDrawerTab();
 }
 window.renderMarketDrawerContent = renderMarketDrawerContent;
@@ -1088,40 +1106,38 @@ function getOrCreateMarketTooltip(container) {
   return tooltip;
 }
 
-// Catmull-Rom -> cubic Bezier conversion (uniform, tension 1/6) - the price line is drawn as a
-// smooth curve through the real daily points instead of straight jagged segments between them.
-// Hover/crosshair math never uses this path - it always snaps to the exact (x,y) of a real data
-// index (see the pointermove handler below), so the smoothing is purely a rendering choice and
-// never misrepresents which point is "at" a given date.
-function smoothPathD(points) {
+// Straight segments between each day's real value - no curve-fit. A Catmull-Rom smoothed curve
+// was tried here and rejected (feedback: "makes it look too curvy") - smoothing a *daily average
+// price* series manufactures motion between points that didn't happen and can visually overshoot
+// past real local highs/lows, which is exactly the wrong instinct for a price chart. A plain
+// polyline is what every real market tool (eve-marketer, adam4eve, the in-game chart) uses for
+// this kind of series, and it's honest: every vertex is a real traded day, every segment is a
+// straight interpolation, nothing implied in between.
+function linePathD(points) {
   if (points.length < 2) return '';
-  if (points.length === 2) return `M${points[0][0].toFixed(1)},${points[0][1].toFixed(1)} L${points[1][0].toFixed(1)},${points[1][1].toFixed(1)}`;
-  let d = `M${points[0][0].toFixed(1)},${points[0][1].toFixed(1)}`;
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i === 0 ? 0 : i - 1];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
-    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
-    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
-    d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
-  }
-  return d;
+  return points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
 }
 
 // Single series (average daily price) - per the dataviz "one axis" rule this is its own chart, not
-// overlaid with volume on a second scale. Deliberately plain now: a smoothed 2px line, a flat
-// (not gradient) low-opacity area wash, a dashed period-average reference line, light gridlines -
-// no glow/blur filter and no pulsing end-marker, both cut after feedback that the earlier version
-// read as busy rather than polished. An end-dot with a surface-color ring (.lp-market-hover-dot in
-// styles.css), plus a crosshair+tooltip that snaps to the nearest day under the pointer.
+// overlaid with volume on a second scale. Deliberately plain now: a straight 2px line (see
+// linePathD's own note on why not smoothed), a flat (not gradient) low-opacity area wash, a dashed
+// period-average reference line, light gridlines - no glow/blur filter and no pulsing end-marker,
+// both cut after feedback that the earlier version read as busy rather than polished. An end-dot
+// with a surface-color ring (.lp-market-hover-dot in styles.css), plus a crosshair+tooltip that
+// snaps to the nearest day under the pointer.
 //
 // The viewBox width matches the container's REAL measured pixel width (not a fixed arbitrary
 // number stretched via preserveAspectRatio="none" - see the earlier version's own note, still true)
-// so strokes/text render crisp at 1:1 scale. Text coordinates specifically are rounded to whole
-// pixels (Math.round, not the sub-pixel .toFixed(1) the path geometry uses) - fractional glyph
-// positions are what was making the axis labels look soft/blurry, a real SVG text-rendering quirk
-// distinct from their color or size.
+// AND the SVG's rendered CSS size is pinned to that exact same integer pixel value (width:${W}px,
+// not width:100%) - a percentage width can render at a fractional pixel value the layout engine
+// picks (e.g. a 437.6px-wide flex child), which against an integer viewBox is a sub-1:1 scale of
+// well under a pixel but still enough to soften/blur every glyph and hairline in the chart (this is
+// what was still reading as "blurry, almost glowing" after the earlier Math.round()-on-text fix,
+// which only fixed fractional *position*, not this fractional *scale*). Pinning both to the same
+// integer removes the mismatch entirely; the debounced window resize listener below keeps it
+// correct as the container's real width changes. Text coordinates are still rounded to whole pixels
+// on top of that (Math.round, not the sub-pixel .toFixed(1) the path geometry uses), which remains
+// correct and necessary in its own right.
 function buildPriceLineChart(rows, container) {
   if (!container) return;
   const W = Math.max(280, Math.round(container.clientWidth || container.getBoundingClientRect().width || 640));
@@ -1142,7 +1158,7 @@ function buildPriceLineChart(rows, container) {
   const yForPrice = (p) => padT + innerH - ((p - yMin) / yDen) * innerH;
 
   const points = prices.map((p, i) => [xForIndex(i), yForPrice(p)]);
-  const linePath = smoothPathD(points);
+  const linePath = linePathD(points);
   const baseline = (padT + innerH).toFixed(1);
   const areaPath = `${linePath} L${points[n - 1][0].toFixed(1)},${baseline} L${points[0][0].toFixed(1)},${baseline} Z`;
   const lastX = points[n - 1][0], lastY = points[n - 1][1];
@@ -1155,7 +1171,7 @@ function buildPriceLineChart(rows, container) {
   }).join('');
 
   container.innerHTML = `
-    <svg id="lp-market-price-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%; height:${H}px; display:block; cursor:crosshair;">
+    <svg id="lp-market-price-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:${W}px; height:${H}px; display:block; cursor:crosshair;">
       <g class="lp-market-chart-grid">
         ${vLines}
         <line x1="${padL}" y1="${gridY1}" x2="${W - padR}" y2="${gridY1}"/>
@@ -1242,7 +1258,7 @@ function buildVolumeCandlestickChart(rows, container) {
   }).join('');
 
   container.innerHTML = `
-    <svg id="lp-market-volume-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%; height:${H}px; display:block; cursor:crosshair;">
+    <svg id="lp-market-volume-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:${W}px; height:${H}px; display:block; cursor:crosshair;">
       <g class="lp-market-chart-grid">${vLines}<line x1="${padL}" y1="${baseline.toFixed(1)}" x2="${W - padR}" y2="${baseline.toFixed(1)}"/></g>
       <line class="lp-market-avg-line" x1="${padL}" y1="${avgY.toFixed(1)}" x2="${W - padR}" y2="${avgY.toFixed(1)}"/>
       <text class="lp-market-avg-label" x="${W - padR - 3}" y="${Math.round(avgY - 4)}" text-anchor="end">avg ${formatCompactMarketUnits(avgV)}</text>
