@@ -50,10 +50,6 @@
     </div>
   </header>
 
-  <!-- LP-specific stats, only meaningful once an offer is isolated - the Calculator's own
-       .stat-strip (below) has no concept of LP, so this sits alongside it rather than inside it. -->
-  <section id="lpstore-inspector-extra-stats" class="grid grid-cols-2 md:grid-cols-5 gap-2.5 px-4 pt-3 hidden"></section>
-
   <!-- Calculator's own dashboard summary bar (js/app.js recalculate() writes into these ids
        directly) - hidden until an offer is isolated, shown/hidden together with #viewport below. -->
   <section id="lpstore-calc-stat-strip" class="stat-strip relative z-10 hidden">
@@ -320,7 +316,7 @@
   <script src="js/tree.js?v=8.0.1" defer></script>
   <script src="js/optimizers.js?v=8.0.6" defer></script>
   <script src="js/app.js?v=15.34.2" defer></script>
-  <script src="js/lpstore.js?v=2.2.1" defer></script>
+  <script src="js/lpstore.js?v=3.0.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
