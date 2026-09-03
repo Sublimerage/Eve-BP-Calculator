@@ -50,6 +50,39 @@
     </div>
   </header>
 
+  <!-- LP-specific stats, only meaningful once an offer is isolated - the Calculator's own
+       .stat-strip (below) has no concept of LP, so this sits alongside it rather than inside it. -->
+  <section id="lpstore-inspector-extra-stats" class="grid grid-cols-2 md:grid-cols-4 gap-2.5 px-4 pt-3 hidden"></section>
+
+  <!-- Calculator's own dashboard summary bar (js/app.js recalculate() writes into these ids
+       directly) - hidden until an offer is isolated, shown/hidden together with #viewport below. -->
+  <section id="lpstore-calc-stat-strip" class="stat-strip relative z-10 hidden">
+    <div class="stat">
+      <div class="stat-label">Total production cost</div>
+      <div id="summary-build-cost" class="stat-value mono" style="color:var(--cost);">0 ISK</div>
+      <div id="summary-runs-subtext" class="stat-sub mono">Mat: 0 + Fee: 0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Surplus leftovers credit</div>
+      <div id="summary-surplus-credit" class="stat-value mono" style="color:var(--accent);">0 ISK</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Net output revenue</div>
+      <div id="summary-output-sell" class="stat-value mono">0 ISK</div>
+      <div id="summary-output-buy" class="stat-sub mono">Instant Buy: 0 ISK</div>
+    </div>
+    <div class="stat">
+      <div id="summary-profit-sell-label" class="stat-label">Net profit (sell output)</div>
+      <div id="summary-profit-sell" class="stat-value mono" style="color:var(--green);">0 ISK</div>
+      <div id="summary-roi-sell" class="stat-sub mono" style="color:var(--green);">ROI: 0%</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Net profit (instant buy)</div>
+      <div id="summary-profit-buy" class="stat-value mono" style="color:var(--green);">0 ISK</div>
+      <div id="summary-roi-buy" class="stat-sub mono" style="color:var(--green);">ROI: 0%</div>
+    </div>
+  </section>
+
   <div class="content-row flex-1 flex overflow-hidden relative">
 
     <!-- Left: Warzone picker + settings -->
@@ -61,8 +94,16 @@
           <option value="">— Choose a warzone LP store —</option>
         </select>
         <p class="text-[10px] mt-2 leading-relaxed" style="color:var(--text-mute);">
-          Ranked by <b>estimated ISK profit per LP spent</b>, regardless of your current standing or access - that's on you to sort out in-game. Every price (required items to acquire, output to sell) assumes the Jita sell/instant-buy price, output net of your Sales Tax + Broker Fee below. This ranking is a quick estimate - for a real plan, expand an offer and use "Build This BPC" or "Add Required Items to Shopping List".
+          Ranked by <b>estimated ISK profit per LP spent</b>, regardless of your current standing or access - that's on you to sort out in-game. Every price (required items to acquire, output to sell) assumes the Jita sell/instant-buy price, output net of your Sales Tax + Broker Fee below. This ranking is a quick estimate - for a BPC offer, isolate it to open the exact same interactive build tree the Calculator uses.
         </p>
+      </div>
+
+      <div class="lp-row">
+        <label class="lp-label mb-2 block" for="input-price-mode">Material Pricing (isolated tree)</label>
+        <select id="input-price-mode" onchange="if(typeof recalculate==='function') recalculate();" class="field-line w-full font-bold text-xs">
+          <option value="sell" selected>Sell (Instant)</option>
+          <option value="buy">Buy Order</option>
+        </select>
       </div>
 
       <div class="lp-row">
@@ -107,25 +148,9 @@
         </div>
       </div>
 
-      <!-- Standalone shopping list, not a Ledger job - see js/lpstore.js's own comment on why these
-           stay separate from the Ledger's build-oriented job model. Collapsed by default, same
-           <details> pattern as Invention's "Skill Levels" section. -->
-      <details class="lp-row group" open>
-        <summary class="cursor-pointer flex items-center justify-between list-none" style="color:var(--text-mute);">
-          <span class="lp-label">Shopping List (<span id="lpstore-shopping-count">0</span>)</span>
-          <span class="group-open:rotate-90 transition-transform" style="color:var(--text-mute);"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg></span>
-        </summary>
-        <div id="lpstore-shopping-list-body" class="pt-2"></div>
-        <div class="flex gap-1.5 mt-2">
-          <button onclick="copyLPShoppingListMultibuy(this)" class="btn-glass flex-1 px-2.5 py-1.5 text-[11px]">Copy Multibuy</button>
-          <button onclick="clearLPShoppingList()" class="btn-glass btn-glass-muted px-2.5 py-1.5 text-[11px]">Clear</button>
-        </div>
-        <p class="text-[10px] mt-2 leading-relaxed" style="color:var(--text-mute);">Required items from any offer you expand below - pick Sell (instant-buy) or Buy (patient buy order) per item, then Copy Multibuy to paste straight into the in-game multibuy window.</p>
-      </details>
-
       <div class="lp-row">
         <p class="text-[10px] leading-relaxed" style="color:var(--text-mute);">
-          <b>Prototype note:</b> ESI doesn't report a Blueprint Copy offer's run count, so every BPC granted is assumed to be a single-run copy (the long-standing convention for FW store blueprints). Click any row for its full cost/value breakdown.
+          <b>Note:</b> ESI doesn't report a Blueprint Copy offer's run count, so every BPC granted is assumed to be a single-run copy (the long-standing convention for FW store blueprints). Click any row for its full cost/value breakdown, or use the <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:11px;height:11px;display:inline;"><path d="M4 9V5a1 1 0 011-1h4"/><path d="M20 9V5a1 1 0 00-1-1h-4"/><path d="M4 15v4a1 1 0 001 1h4"/><path d="M20 15v4a1 1 0 01-1 1h-4"/></svg> icon to isolate a BPC offer into the full Calculator build tree.
         </p>
       </div>
 
@@ -147,26 +172,155 @@
           <div id="lpstore-table-container" class="overflow-x-auto"></div>
         </div>
       </div>
+    </main>
 
-      <!-- Build Inspector - replaces the ranked list entirely while an offer is isolated (see
-           isolateOffer/exitLPInspector, js/lpstore.js). Every control inside recomputes and
-           re-renders live; nothing here triggers a page navigation except "Open in Calculator". -->
-      <div id="lpstore-inspector" class="hidden space-y-4">
-        <div id="lpstore-inspector-header" class="lp-card p-3 flex items-center gap-2.5"></div>
-        <div id="lpstore-inspector-summary" class="space-y-2.5"></div>
-        <div class="lp-card p-2">
-          <div id="lpstore-inspector-rows" class="overflow-x-auto"></div>
+    <!-- Isolated Build Inspector - the Calculator's OWN tree canvas, exactly as it appears on
+         index.html (js/app.js renderTreeDiagram/createNodeCard, unmodified). Hidden until
+         isolateOffer() runs; hidden together with #lpstore-main-area's ranked list. Structurally a
+         sibling of it (not nested inside), matching index.html's own #viewport/#bom-sidebar being
+         flex siblings in .content-row rather than living inside a scrolling <main>. -->
+    <div class="flex-1 relative border-t border-orange-500/20 hidden" id="viewport" onclick="clearHighlight()">
+      <div id="pan-zoom-content">
+        <svg id="tree-svg"></svg>
+        <div id="tree-container" class="relative flex justify-center items-center space-x-24 p-24 min-w-max min-h-max"></div>
+      </div>
+
+      <div class="absolute top-3 left-3 z-40 flex items-center gap-1.5 mono text-xs" onclick="event.stopPropagation()">
+        <button onclick="exitLPInspector()" class="btn-glass btn-glass-muted px-2.5 py-1.5 text-[11px] flex items-center gap-1.5" title="Back to the ranked offer list">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back to List
+        </button>
+        <span id="lpstore-inspector-name" class="px-2.5 py-1.5 glass-card text-slate-200 font-semibold truncate" style="max-width:260px;"></span>
+      </div>
+
+      <div class="absolute top-3 right-3 z-40 flex items-center gap-1.5 mono text-xs" onclick="event.stopPropagation()">
+        <span id="zoom-level-text" class="px-2.5 py-1.5 glass-card text-slate-300 font-semibold">100%</span>
+        <button onclick="collapseAllNodes()" class="icon-btn" title="Collapse every branch that has inputs, to shrink very tall builds">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7,4 12,9 17,4"/><polyline points="7,20 12,15 17,20"/></svg>
+        </button>
+        <button onclick="expandAllNodes()" class="icon-btn" title="Expand every collapsed branch">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7,9 12,4 17,9"/><polyline points="7,15 12,20 17,15"/></svg>
+        </button>
+        <button onclick="centerOnSelectedNode()" class="icon-btn" title="Center on selected card, or the final output if nothing is selected [F]">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+        </button>
+        <button onclick="resetPanZoom()" class="icon-btn" title="Reset pan and zoom">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-2.2-5.9"/><polyline points="21,3 21,9 15,9"/></svg>
+        </button>
+      </div>
+
+      <div id="viewport-hint" class="absolute bottom-3 left-3 z-40 px-3 py-1.5 mono text-slate-400 text-[11px]" title="Click Card: Highlight Inputs &amp; Output · Click BOM Row: Center Material · [F]: Center Output">
+        Click card to highlight · Click BOM row to center · [F] to center output
+      </div>
+    </div>
+
+    <!-- Bill of Materials (BOM) Sidebar - identical to index.html's #bom-sidebar (same ids, same
+         markup), populated automatically by js/app.js renderBillOfMaterials() once an offer is
+         isolated. Hidden together with #viewport above. -->
+    <aside id="bom-sidebar" class="lp-card w-80 md:w-96 flex flex-col overflow-hidden flex-shrink-0 z-20 m-4 ml-0 p-4 hidden">
+      <div class="lp-row flex justify-between items-center" style="padding-top:0; margin-top:0; border-top:none;">
+        <div class="min-w-0">
+          <h2 class="font-bold rajdhani tracking-wider text-sm uppercase truncate" style="color:var(--text);" title="Bill of Materials: click a row to focus its card in the diagram">Bill of Materials</h2>
+          <div class="text-[9px] mono truncate" style="color:var(--text-mute);">CLICK ROW TO FOCUS CARD IN DIAGRAM</div>
+        </div>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+          <button id="btn-bom-view-mode" onclick="toggleBomViewMode()" class="btn-glass btn-glass-muted px-2.5 py-1.5 text-[10px]" title="Switch between detailed and compact list view">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3.5" y1="6" x2="3.51" y2="6"/><line x1="3.5" y1="12" x2="3.51" y2="12"/><line x1="3.5" y1="18" x2="3.51" y2="18"/></svg> Compact
+          </button>
+          <button onclick="copyMultibuyText()" class="btn-glass px-3.5 py-1.5 text-xs">
+            Copy Multibuy
+          </button>
         </div>
       </div>
-    </main>
+
+      <details open class="lp-row group">
+        <summary class="cursor-pointer flex items-center justify-between list-none" style="color:var(--text-mute);" title="Only affects this shopping list and Copy Multibuy - materials you already have in stock are excluded from what's shown/copied here. Does NOT affect Total Production Cost or Profit, which always reflect full market value regardless of stock.">
+          <span class="lp-label flex items-center gap-1.5">
+            Stock &amp; Location <span id="location-search-feedback" class="text-[9px] font-mono font-bold normal-case hidden" style="color:var(--accent);"></span>
+          </span>
+          <span class="group-open:rotate-90 transition-transform" style="color:var(--text-mute);"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg></span>
+        </summary>
+        <div class="pt-2.5 space-y-2.5">
+          <div class="flex items-center gap-2">
+            <label class="pill-check">
+              <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()">
+              <span class="pill-check-face"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>Personal</span>
+            </label>
+            <label class="pill-check">
+              <input type="checkbox" id="use-corp-assets" checked onchange="applyStockLocationFilter()">
+              <span class="pill-check-face"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V7a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v14"/><path d="M12 11h6a1 1 0 0 1 1 1v9"/><line x1="8" y1="9" x2="8" y2="9.01"/><line x1="8" y1="13" x2="8" y2="13.01"/><line x1="8" y1="17" x2="8" y2="17.01"/><line x1="16" y1="15" x2="16" y2="15.01"/><line x1="16" y1="19" x2="16" y2="19.01"/></svg>Corp</span>
+            </label>
+          </div>
+          <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterLocationDropdownOptions()"
+            class="field-line w-full text-[11px] mono" style="color:var(--text);">
+          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="field-line w-full font-bold text-[11px] truncate" style="color:var(--accent);">
+            <option value="all" selected>All Locations (Combined Assets)</option>
+            <option value="industry_system">Current System Only (JITA)</option>
+          </select>
+        </div>
+      </details>
+
+      <div class="lp-row space-y-2.5 flex flex-col">
+        <div class="flex items-center gap-1.5">
+          <div class="flex-1 min-w-0">
+            <button id="deduct-stock-mode" value="true" onclick="toggleDeductStockButton(this, 'recalculate')" class="btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5" title="Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg> Deducting Stock</button>
+          </div>
+          <button onclick="refreshLiveAssets()" class="btn-glass btn-glass-muted px-2.5 py-1.5 flex items-center justify-center flex-shrink-0" style="height:30px;" title="Refresh Assets: fetch your latest live character and corp assets from EVE Online" aria-label="Refresh Assets">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 4 21 9 16 9"/></svg>
+          </button>
+        </div>
+        <div class="flex items-center justify-between text-[11px] mono">
+          <span class="font-bold" style="color:var(--text-mute);">Order Type:</span>
+          <div class="flex gap-1">
+            <button onclick="setBOMOrderFilter('all')" id="btn-bom-order-all" class="lp-pill active" style="padding:5px 12px;">All</button>
+            <button onclick="setBOMOrderFilter('buy')" id="btn-bom-order-buy" class="lp-pill" style="padding:5px 12px;">Buy</button>
+            <button onclick="setBOMOrderFilter('sell')" id="btn-bom-order-sell" class="lp-pill" style="padding:5px 12px;">Sell</button>
+          </div>
+        </div>
+        <div class="flex items-center justify-between text-[11px] mono">
+          <span class="font-bold" style="color:var(--text-mute);">Category:</span>
+          <select id="bom-category-select" onchange="setBOMCategoryFilter(this.value)" class="field-line px-2 py-1 text-[11px] w-40 font-semibold" style="color:var(--text);">
+            <option value="all">All Items</option>
+            <option value="minerals">Minerals</option>
+            <option value="pigas">PI / Gases</option>
+            <option value="fuel">Fuel Blocks</option>
+            <option value="ships">Ships</option>
+            <option value="others">Others</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="bom-items-list" class="lp-row flex-1 min-h-0 overflow-y-auto space-y-2 text-xs" style="margin-bottom:0;"></div>
+
+      <div class="lp-row mono">
+        <div class="flex justify-between text-xs" style="color:var(--text-mute);">
+          <span>Unique Material Types:</span>
+          <span id="bom-type-count" class="font-bold" style="color:var(--text);">0</span>
+        </div>
+        <div class="flex justify-between text-xs mt-1" style="color:var(--text-mute);">
+          <span>Total Volume:</span>
+          <span id="bom-total-volume" class="font-bold" style="color:var(--text-soft);">0 m3</span>
+        </div>
+        <div class="mt-2">
+          <div class="text-[10.5px] uppercase tracking-wide" style="color:var(--text-mute);">Grand Total Material ISK</div>
+          <div id="bom-total-isk" class="font-bold text-base" style="color:var(--cost);">0 ISK</div>
+        </div>
+      </div>
+    </aside>
   </div>
 
+  <!-- js/app.js loaded here too (same as index.html) - it owns the tree canvas (#viewport/
+       #tree-container), the Bill of Materials sidebar (#bom-sidebar), and selectItem()/recalculate(),
+       all reused as-is for the isolated build view. Registers its own 'load' listener rather than a
+       plain window.onload= assignment specifically so js/lpstore.js's own listener (below) can
+       coexist instead of clobbering it - see both files' own comments on this. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
   <script src="js/config.js?v=8.0.20" defer></script>
   <script src="js/esi.js?v=8.0.15" defer></script>
   <script src="js/tree.js?v=8.0.1" defer></script>
-  <script src="js/optimizers.js?v=8.0.5" defer></script>
-  <script src="js/lpstore.js?v=2.0.1" defer></script>
+  <script src="js/optimizers.js?v=8.0.6" defer></script>
+  <script src="js/app.js?v=15.34.1" defer></script>
+  <script src="js/lpstore.js?v=2.1.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
