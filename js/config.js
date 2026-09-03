@@ -1094,8 +1094,15 @@ const BUILTIN_RECIPES = {
   4248: {
     blueprintTypeID: 4248, productTypeID: 4247, productName: "Hydrogen Fuel Block", mfgQtyPerRun: 40, productQtyPerRun: 40, portionSize: 40, qty: 40, time: 15
   },
+  // Gila's blueprintTypeID was 17714 here for both keys - that's actually Stabber Fleet Issue
+  // Blueprint's real typeId (confirmed via ESI /universe/ids/), not Gila's (17716). Since the
+  // buildPrepackedIndexes loop below applies BUILTIN_RECIPES unconditionally (unlike the main
+  // recipesObj loop, which guards against overwriting a real recipe - see setRecipeMapEntry), this
+  // was silently clobbering the correct Stabber Fleet Issue Blueprint -> Stabber Fleet Issue
+  // mapping in recipeMap with this Gila recipe every time the app loaded, making any Stabber Fleet
+  // Issue BPC display/build as a Gila everywhere in the app, not just the LP Store.
   17715: {
-    blueprintTypeID: 17714, productTypeID: 17715, productName: "Gila", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 24000,
+    blueprintTypeID: 17716, productTypeID: 17715, productName: "Gila", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 24000,
     mfgMaterials: [
       { typeId: 621, name: "Caracal", baseQty: 1 },
       { typeId: 57478, name: "Auto-Integrity Preservation Seal", baseQty: 60 },
@@ -1103,8 +1110,8 @@ const BUILTIN_RECIPES = {
       { typeId: 57479, name: "Core Temperature Regulator", baseQty: 1 }
     ]
   },
-  17714: {
-    blueprintTypeID: 17714, productTypeID: 17715, productName: "Gila", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 24000,
+  17716: {
+    blueprintTypeID: 17716, productTypeID: 17715, productName: "Gila", mfgQtyPerRun: 1, productQtyPerRun: 1, portionSize: 1, qty: 1, time: 24000,
     mfgMaterials: [
       { typeId: 621, name: "Caracal", baseQty: 1 },
       { typeId: 57478, name: "Auto-Integrity Preservation Seal", baseQty: 60 },

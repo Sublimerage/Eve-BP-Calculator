@@ -90,9 +90,18 @@ window.toggleLPFavorite = toggleLPFavorite;
 // Icon + label config for the category filter bar (js/lpstore.js renderLPCategoryBar) - one source
 // of truth for id/label/icon, walked to both render the buttons and (via LP_CATEGORY_LABELS below,
 // kept as the id->label lookup other code already uses) resolve a typeId's own category.
+//
+// 'blueprints' is a sentinel, not a real SDE category id, same idea as 'favorites'/'other' below.
+// A BPC offer is classified by what it BUILDS (evaluateBpcOffer sets outputTypeId to the product,
+// not the blueprint item itself - see its own comment), so a ship BPC already lives under Ships,
+// an implant BPC under Implants, etc. - real SDE category 9 ("Blueprint") essentially never gets
+// hit that way, which is why this pill showed nothing before. Fixed by making it a cross-cutting
+// filter instead: every offer that grants a BPC, regardless of what it builds - see the
+// 'blueprints' branch in renderLPStoreTable's filter chain below.
 const LP_CATEGORY_FILTERS = [
   { id: 'all', label: 'All', icon: 'grid' },
   { id: 'favorites', label: 'Favorites', icon: 'star' },
+  { id: 'blueprints', label: 'Blueprints', icon: 'file-text' },
   { id: '6', label: 'Ships', icon: 'rocket' },
   { id: '7', label: 'Modules', icon: 'gear' },
   { id: '8', label: 'Ammo', icon: 'ammo' },
@@ -100,7 +109,6 @@ const LP_CATEGORY_FILTERS = [
   { id: '20', label: 'Implants', icon: 'cpu' },
   { id: '16', label: 'Skillbooks', icon: 'book' },
   { id: '91', label: 'SKINs', icon: 'layers' },
-  { id: '9', label: 'Blueprints', icon: 'file-text' },
   { id: 'other', label: 'Other', icon: 'package' }
 ];
 
@@ -201,7 +209,7 @@ async function resolveMissingItemNames(typeIds) {
 // type's group_id (no batch endpoint exists for this one, so these run individually but in
 // parallel), then /universe/groups/{id}/ for that group's category_id - cached at both levels so a
 // second store sharing common groups (most module/ammo groups repeat across corps) doesn't refetch.
-const LP_CATEGORY_LABELS = { 6: 'Ships', 7: 'Modules', 8: 'Ammo & Charges', 9: 'Blueprints (other)', 16: 'Skillbooks', 18: 'Drones', 20: 'Implants', 91: 'SKINs' };
+const LP_CATEGORY_LABELS = { 6: 'Ships', 7: 'Modules', 8: 'Ammo & Charges', 16: 'Skillbooks', 18: 'Drones', 20: 'Implants', 91: 'SKINs' };
 let _lpGroupCategoryCache = {}; // groupId -> categoryId
 
 function getLPItemCategory(typeId) {
@@ -722,24 +730,20 @@ function renderLPExtraStats() {
   const profitColor = profit > 0 ? 'var(--accent)' : 'var(--red-400, #f87171)';
   const iskPerLpDisplay = iskPerLp === null ? '—' : Math.round(iskPerLp).toLocaleString();
 
-  // A row stacks its value onto its own line (instead of sitting beside the label) once the two
-  // combined would realistically overflow this card's width at text-sm mono - keeps the common
-  // case (short values) compact while big ISK/LP totals (this is EVE, they get big) never clip
-  // past the card edge regardless of magnitude, without ever truncating precision.
-  const row = (label, value, color, title) => {
-    const stacked = (label.length + value.length) > 34;
-    const titleAttr = title ? `title="${window.esc(title)}"` : '';
-    const valueSpan = `<span class="font-bold whitespace-nowrap" style="color:${color || 'var(--text)'};">${value}</span>`;
-    return stacked
-      ? `<div ${titleAttr}>
-          <div class="text-slate-400">${label}</div>
-          <div class="text-right">${valueSpan}</div>
-        </div>`
-      : `<div class="flex justify-between items-center gap-3" ${titleAttr}>
-          <span class="text-slate-400 flex-shrink-0">${label}</span>
-          ${valueSpan}
-        </div>`;
-  };
+  // Label above, value below, right-aligned - every single time, regardless of how long the value
+  // is. A previous version switched a row between sitting-inline and stacked-onto-its-own-line
+  // depending on the value's length, which kept any one row from overflowing but looked broken
+  // across the card as a whole: a short "Total LP Spent" would sit compact on one line right next
+  // to a "Redemption Fee" stacked onto two, at two different heights, with nothing lining up (this
+  // is what a Komodo BPC's real numbers - 150,000,000,000 ISK + 150,000,000 LP - looked like). One
+  // shape for every row removes the inconsistency instead of patching around it, and this card's
+  // width already comfortably fits any realistic single ISK/LP figure on its own line (EVE's ISK
+  // supply is large, but not "doesn't fit in ~46 mono characters" large).
+  const row = (label, value, color, title) => `
+    <div ${title ? `title="${window.esc(title)}"` : ''}>
+      <div class="text-slate-400" style="font-size:10.5px;">${label}</div>
+      <div class="text-right font-bold whitespace-nowrap" style="color:${color || 'var(--text)'};">${value}</div>
+    </div>`;
 
   // Same overflow logic as row() above, applied to the two standalone hero numbers: shrink the
   // font in steps as the string gets longer instead of letting it run past the card edge.
@@ -762,18 +766,19 @@ function renderLPExtraStats() {
       <svg viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0;"><circle cx="12" cy="8" r="5"/><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5"/></svg>
       <span class="font-bold text-sm text-white">LP Store Economics</span>
     </div>
-    <div class="text-sm mono space-y-2">
+    <div class="text-sm mono space-y-2.5">
       ${row('Total ISK Cost', Math.round(totalIskCost).toLocaleString() + ' ISK', null, 'Build materials + required redemption items (purple cards) + job install fee + the flat ISK portion of redeeming this offer')}
-      ${row('Redemption Fee', `${Math.round(flatIskCost).toLocaleString()} ISK + ${flatLpCost.toLocaleString()} LP`, '#c084fc', 'The flat ISK/LP portion of redeeming this offer - on top of the required items already counted in Total ISK Cost above')}
-      ${row('Total LP Spent', `${totalLpCost.toLocaleString()} LP`, '#c084fc', 'Redemption LP + any component set to "Acquire via LP" in the tree')}
+      ${row('Redemption Fee (ISK)', Math.round(flatIskCost).toLocaleString() + ' ISK', '#c084fc', 'The flat ISK portion of redeeming this offer - on top of the required items already counted in Total ISK Cost above')}
+      ${row('Redemption Fee (LP)', flatLpCost.toLocaleString() + ' LP', '#c084fc', 'The flat LP portion of redeeming this offer')}
+      ${row('Total LP Spent', totalLpCost.toLocaleString() + ' LP', '#c084fc', 'Redemption LP + any component set to "Acquire via LP" in the tree')}
     </div>
     <div class="border-t border-[#3a3025] mt-2.5 pt-2.5">
       <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;" title="Net sell revenue minus build materials, required redemption items, job fee, and the flat redemption fee">LP-Aware Profit</div>
       <div class="hero-num ${profit >= 0 ? 'profit' : 'loss'}" style="font-size:${heroFontSize}; white-space:nowrap;">${profitText}</div>
     </div>
-    <div class="border-t border-[#3a3025] mt-2 pt-2 flex justify-between items-center" title="Estimated ISK profit per LP spent">
-      <span class="text-slate-300 font-bold text-sm flex-shrink-0">ISK / LP</span>
-      <span class="font-bold mono whitespace-nowrap" style="color:${profitColor}; font-size:${iskPerLpFontSize};">${iskPerLpDisplay}</span>
+    <div class="border-t border-[#3a3025] mt-2.5 pt-2.5" title="Estimated ISK profit per LP spent">
+      <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">ISK / LP</div>
+      <div class="text-right font-bold mono whitespace-nowrap" style="color:${profitColor}; font-size:${iskPerLpFontSize};">${iskPerLpDisplay}</div>
     </div>
   `;
 
@@ -877,6 +882,10 @@ function renderLPStoreTable() {
   }
   if (_lpCategoryFilter === 'favorites') {
     rows = rows.filter(r => _lpFavoriteOfferIds.has(r.offer.offer_id));
+  } else if (_lpCategoryFilter === 'blueprints') {
+    // Cross-cutting, not an SDE category - every offer that grants a BPC, whatever it builds
+    // (ship, implant, ammo...). Same test the "Blueprints" Offer Type pill above already uses.
+    rows = rows.filter(r => r.offerType === 'bpc');
   } else if (_lpCategoryFilter !== 'all') {
     rows = rows.filter(r => {
       const cat = getLPItemCategory(r.outputTypeId);
