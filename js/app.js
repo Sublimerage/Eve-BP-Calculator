@@ -2002,18 +2002,26 @@ function createNodeCard(node) {
           const filledSegs = Math.min(totalSegs, Math.round((stockQty / node.qtyNeeded) * totalSegs));
           return `<div class="seg-bar mt-1.5" title="Stock covers ${Math.min(100, Math.round((stockQty / node.qtyNeeded) * 100))}% of what this needs">${Array.from({length: totalSegs}, (_, i) => `<div class="${i < filledSegs ? 'filled' : ''}"></div>`).join('')}</div>`;
         })() : ''}
-        ${node.isBuildingSelf && node.batchYield > 1 ? `<div class="text-orange-300 text-xs mono font-semibold mt-0.5">(${node.runsNeeded} Run${node.runsNeeded > 1 ? 's' : ''} @ ${node.batchYield}/run ${surplus > 0 ? `→ ${surplus} Surplus` : ''})</div>` : ''}
+        ${node.isBuildingSelf && node.batchYield > 1 && !node.isLPIsolatedRoot ? `<div class="text-orange-300 text-xs mono font-semibold mt-0.5">(${node.runsNeeded} Run${node.runsNeeded > 1 ? 's' : ''} @ ${node.batchYield}/run ${surplus > 0 ? `→ ${surplus} Surplus` : ''})</div>` : ''}
       </div>
     </div>
 
     <div class="space-y-2.5">
       ${isRoot ? `
         <div class="border-t border-[#3a3025] pt-2.5 flex items-center justify-between text-sm mono" onclick="event.stopPropagation()">
-          <span class="text-slate-300 font-bold">Runs:</span>
-          <div class="flex items-center space-x-1">
-            <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" onchange="syncCardRunsToGlobal(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-16 bg-black/40 rounded text-center font-bold p-1 outline-none" style="border:1px solid rgba(var(--accent-rgb),0.5); color:var(--accent);">
-            <span class="text-slate-400 text-xs">Runs</span>
-          </div>
+          ${node.isLPIsolatedRoot ? `
+            <span class="text-slate-300 font-bold" title="How many separate times you redeem this LP store offer - NOT blueprint runs. Each redemption grants a fixed amount (shown above), so everything scales as this count times that fixed amount.">Times Redeemed:</span>
+            <div class="flex items-center space-x-1">
+              <input type="number" id="card-bp-runs" value="${node._lpRedemptionCount || 1}" min="1" max="1000000" onchange="window.onLPRedemptionCountChange(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-16 bg-black/40 rounded text-center font-bold p-1 outline-none" style="border:1px solid rgba(var(--accent-rgb),0.5); color:var(--accent);">
+              <span class="text-slate-400 text-xs">time${(node._lpRedemptionCount || 1) === 1 ? '' : 's'}</span>
+            </div>
+          ` : `
+            <span class="text-slate-300 font-bold">Runs:</span>
+            <div class="flex items-center space-x-1">
+              <input type="number" id="card-bp-runs" value="${node.runsNeeded}" min="1" max="1000000" onchange="syncCardRunsToGlobal(event)" onkeydown="if(event.key==='Enter') this.blur()" class="w-16 bg-black/40 rounded text-center font-bold p-1 outline-none" style="border:1px solid rgba(var(--accent-rgb),0.5); color:var(--accent);">
+              <span class="text-slate-400 text-xs">Runs</span>
+            </div>
+          `}
         </div>
       ` : ''}
       ${sellStrategyUI}

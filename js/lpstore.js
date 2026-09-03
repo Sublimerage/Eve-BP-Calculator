@@ -38,11 +38,20 @@
 // resolves a similarly-named but unrelated PLAYER corp, "Federal Defence Union" (British spelling,
 // id 98351639, a single-member corp with a chat-log bio) if you search the wrong spelling. This
 // list's ids were confirmed via direct corporation lookups, not name search, to avoid that trap.
+//
+// Pirate faction stores added the same way - verified via ESI's own /universe/factions/ endpoint,
+// which carries each faction's own corporation_id directly (no name-search trap possible), then
+// confirmed each one actually has a real loyalty store by fetching its offers live.
 const FW_WARZONE_CORPS = [
-  { corpId: 1000179, corpName: '24th Imperial Crusade', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
-  { corpId: 1000180, corpName: 'State Protectorate', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
-  { corpId: 1000181, corpName: 'Federal Defense Union', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
-  { corpId: 1000182, corpName: 'Tribal Liberation Force', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' }
+  { corpId: 1000179, corpName: '24th Imperial Crusade', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168', group: 'Faction Warfare' },
+  { corpId: 1000180, corpName: 'State Protectorate', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5', group: 'Faction Warfare' },
+  { corpId: 1000181, corpName: 'Federal Defense Union', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73', group: 'Faction Warfare' },
+  { corpId: 1000182, corpName: 'Tribal Liberation Force', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a', group: 'Faction Warfare' },
+  { corpId: 1000127, corpName: 'Guristas', faction: 'Guristas Pirates', factionId: 500010, color: '#e8c14a', group: 'Pirate Faction' },
+  { corpId: 1000138, corpName: 'Dominations', faction: 'Angel Cartel', factionId: 500011, color: '#e05a5a', group: 'Pirate Faction' },
+  { corpId: 1000134, corpName: 'Blood Raiders', faction: 'Blood Raider Covenant', factionId: 500012, color: '#a03030', group: 'Pirate Faction' },
+  { corpId: 1000162, corpName: 'True Power', faction: "Sansha's Nation", factionId: 500019, color: '#c04ac0', group: 'Pirate Faction' },
+  { corpId: 1000135, corpName: 'Serpentis Corporation', faction: 'Serpentis', factionId: 500020, color: '#4ac084', group: 'Pirate Faction' }
 ];
 window.FW_WARZONE_CORPS = FW_WARZONE_CORPS;
 
@@ -51,6 +60,8 @@ let _lpRankedResults = [];    // last computed, sorted evaluation results
 let _lpActiveCorpId = null;
 let _lpIsLoading = false;
 let _lpTypeFilter = 'all';    // 'all' | 'direct' | 'bpc'
+let _lpCategoryFilter = 'all'; // 'all' | a numeric SDE category id (string) | 'other'
+let _lpItemCategoryCache = {}; // typeId -> category id, resolved live (see resolveLPItemCategories)
 let _lpSortKey = 'iskPerLp';
 let _lpSortDir = -1;          // -1 desc, 1 asc
 let _lpExpandedOfferIds = new Set();
@@ -119,6 +130,59 @@ async function resolveMissingItemNames(typeIds) {
       (data || []).forEach(entry => { _lpResolvedNames[entry.id] = entry.name; });
     } catch (e) { console.warn('[LP Store] Failed to resolve names for', chunk, e); }
   }));
+}
+
+// --- Item categories (Ships / Modules / Ammo / Implants / Skillbooks / SKINs / Drones / ...) ----
+// eve_db.js's own EVE_GROUP_IDS/EVE_CATEGORIES tables turned out NOT to be item classification data
+// at all when checked against real ESI output (they're keyed the same way but hold universe/
+// location groupings - "Region", "Constellation", "Corporation" - a leftover from a different
+// feature) - confirmed by cross-checking a handful of known items (a ship, a module, a SKIN) and
+// finding the local table's answer didn't match ESI's. So this resolves categories live instead,
+// same live-fallback philosophy as resolveMissingItemNames above: /universe/types/{id}/ for a
+// type's group_id (no batch endpoint exists for this one, so these run individually but in
+// parallel), then /universe/groups/{id}/ for that group's category_id - cached at both levels so a
+// second store sharing common groups (most module/ammo groups repeat across corps) doesn't refetch.
+const LP_CATEGORY_LABELS = { 6: 'Ships', 7: 'Modules', 8: 'Ammo & Charges', 9: 'Blueprints (other)', 16: 'Skillbooks', 18: 'Drones', 20: 'Implants', 91: 'SKINs' };
+let _lpGroupCategoryCache = {}; // groupId -> categoryId
+
+function getLPItemCategory(typeId) {
+  return _lpItemCategoryCache[typeId]; // undefined until resolved - callers treat that as "unknown yet", not "other"
+}
+
+// Deliberately NOT awaited by callers on the critical path - kicked off in the background after the
+// ranked list already has something to show, since a few hundred individual ESI calls (however
+// parallel) shouldn't hold up the numbers players actually came for. Re-renders the table once done
+// so the category filter (and any category-dependent display) picks up the real values.
+async function resolveLPItemCategories(typeIds) {
+  const missingTypes = [...new Set(typeIds)].filter(id => _lpItemCategoryCache[id] === undefined);
+  if (!missingTypes.length) return;
+
+  const groupIdByType = {};
+  await Promise.all(missingTypes.map(async (id) => {
+    try {
+      const res = await fetch(`https://esi.evetech.net/latest/universe/types/${id}/?datasource=tranquility`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.group_id !== undefined) groupIdByType[id] = data.group_id;
+    } catch (e) { /* leave uncategorized rather than fail the whole batch */ }
+  }));
+
+  const missingGroups = [...new Set(Object.values(groupIdByType))].filter(gid => _lpGroupCategoryCache[gid] === undefined);
+  await Promise.all(missingGroups.map(async (gid) => {
+    try {
+      const res = await fetch(`https://esi.evetech.net/latest/universe/groups/${gid}/?datasource=tranquility`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      _lpGroupCategoryCache[gid] = (data && data.category_id !== undefined) ? data.category_id : null;
+    } catch (e) { _lpGroupCategoryCache[gid] = null; }
+  }));
+
+  missingTypes.forEach(id => {
+    const gid = groupIdByType[id];
+    _lpItemCategoryCache[id] = (gid !== undefined && _lpGroupCategoryCache[gid] != null) ? _lpGroupCategoryCache[gid] : null;
+  });
+
+  renderLPStoreState();
 }
 
 // --- Offer fetch --------------------------------------------------------------------------
@@ -312,6 +376,12 @@ async function loadAndRankLPStore(corpId) {
 
   _lpIsLoading = false;
   renderLPStoreState();
+
+  // Fire-and-forget - see resolveLPItemCategories's own note on why this doesn't block the render
+  // above. Classifies by outputTypeId, which for a BPC offer is already the PRODUCT it builds (a
+  // ship BPC resolves to "Ships" the same as a direct-sell ship would, not a separate "Blueprints"
+  // bucket), so one Category filter covers both offer types uniformly.
+  resolveLPItemCategories(_lpRankedResults.map(r => r.outputTypeId));
 }
 window.loadAndRankLPStore = loadAndRankLPStore;
 
@@ -323,9 +393,19 @@ window.selectLPStoreCorp = selectLPStoreCorp;
 
 function setLPStoreTypeFilter(filter) {
   _lpTypeFilter = filter;
+  ['all', 'direct', 'bpc'].forEach(f => {
+    const btn = document.getElementById(`btn-lpstore-type-${f}`);
+    if (btn) btn.className = `lp-pill${f === filter ? ' active' : ''} flex-1 text-center`;
+  });
   renderLPStoreState();
 }
 window.setLPStoreTypeFilter = setLPStoreTypeFilter;
+
+function setLPStoreCategoryFilter(catId) {
+  _lpCategoryFilter = catId;
+  renderLPStoreState();
+}
+window.setLPStoreCategoryFilter = setLPStoreCategoryFilter;
 
 function setLPStoreSort(key) {
   if (_lpSortKey === key) {
@@ -383,12 +463,13 @@ function isolateOffer(offerId) {
   if (result.offerType === 'bpc') {
     // selectItem (js/app.js) is the Calculator's own "load this blueprint" entry point - it resets
     // every build/buy/ME/TE override, builds the real recipe tree, fetches prices, and calls
-    // recalculate() itself. Runs are set to this offer's own quantity afterward, same pattern
-    // js/app.js's own loadBlueprintIntoCalculator uses for a real owned BPC.
+    // recalculate() itself (which runs ensureLPRedemptionNodesPresent below via the recalculate
+    // hook - nothing else needs doing here). Runs start at exactly 1 redemption's worth (offer.
+    // quantity blueprint runs), same pattern js/app.js's own loadBlueprintIntoCalculator uses for a
+    // real owned BPC.
     window.selectItem(result.blueprintTypeId, getLPItemName(result.blueprintTypeId), false).then(async () => {
       window.globalRuns = result.bpcCopies || 1;
       await window.fetchMarketPrices((result.offer.required_items || []).map(r => r.type_id));
-      injectLPRedemptionNodes(window.recipeTreeRoot, result.offer);
       if (typeof window.recalculate === 'function') window.recalculate();
     });
   } else {
@@ -399,13 +480,13 @@ window.isolateOffer = isolateOffer;
 
 // No blueprint exists for a direct-sell offer, so selectItem() doesn't apply - this builds a
 // synthetic root in the exact shape selectItem() would have produced (same fields recalculate()/
-// createNodeCard() read), with isBuildingSelf:true so its children (the required_items, injected
-// below) actually render and get summed into the cost - "as if we're building it", per the request
-// this was built from, even though there's no manufacturing job behind it (recipe stays null, so
-// calculateNodeJobFee/calculateTotalBuildSeconds both naturally contribute 0 - no special-casing
-// needed there). batchYield is this offer's own quantity-per-redemption and globalRuns starts at 1
-// redemption, so the existing qtyNeeded = batchYield * runs math (recalculate(), unmodified) falls
-// out correctly with no new formula.
+// createNodeCard() read), with isBuildingSelf:true so its children (the required_items, injected by
+// the recalculate hook below) actually render and get summed into the cost - "as if we're building
+// it", per the request this was built from, even though there's no manufacturing job behind it
+// (recipe stays null, so calculateNodeJobFee/calculateTotalBuildSeconds both naturally contribute 0
+// - no special-casing needed there). batchYield is this offer's own quantity-per-redemption and
+// globalRuns starts at 1 redemption, so the existing qtyNeeded = batchYield * runs math
+// (recalculate(), unmodified) falls out correctly with no new formula.
 async function isolateDirectSellOffer(result) {
   const offer = result.offer;
   window.buildSelfOverrides = {};
@@ -430,26 +511,43 @@ async function isolateDirectSellOffer(result) {
   };
 
   await window.fetchMarketPrices([offer.type_id, ...(offer.required_items || []).map(r => r.type_id)]);
-  injectLPRedemptionNodes(window.recipeTreeRoot, offer);
   if (typeof window.recalculate === 'function') window.recalculate();
 }
 
 function exitLPInspector() {
   _lpIsolatedResult = null;
   ['viewport', 'bom-sidebar', 'lpstore-calc-stat-strip'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
-  document.getElementById('lp-info-card')?.remove();
+  document.getElementById('lp-info-card-col')?.remove();
   document.getElementById('lpstore-main-area')?.classList.remove('hidden');
 }
 window.exitLPInspector = exitLPInspector;
 
-// How many times the isolated offer is being redeemed, given the current run count - the unit
-// "runs" means differs by offer type (see isolateDirectSellOffer's own note), so this is the one
-// place that distinction is resolved, shared by the redemption-node sync below and the stat strip.
+// How many separate times the isolated offer is being redeemed, given the current run count. The
+// relationship between "runs" (window.globalRuns, what the Calculator's own machinery actually
+// scales the tree by) and "redemptions" (the number the player actually cares about and edits, see
+// onLPRedemptionCountChange) differs by offer type: a BPC redemption grants offer.quantity separate
+// 1-run BPCs at once (runs = redemptions * offer.quantity), while a direct-sell redemption's
+// synthetic root already treats "runs" as directly meaning "redemptions" (see
+// isolateDirectSellOffer). Kept as one exact division (not the old ceil-based guess) because
+// onLPRedemptionCountChange is now the only thing that ever sets globalRuns for an isolated offer,
+// so it's always an exact multiple.
 function getLPRedemptionBatches(result) {
   const runs = window.globalRuns || 1;
-  if (result.offerType === 'bpc') return Math.ceil(runs / (result.offer.quantity || 1));
-  return runs; // direct-sell root: "runs" already directly means "times redeemed"
+  if (result.offerType === 'bpc') return Math.max(1, Math.round(runs / (result.offer.quantity || 1)));
+  return runs;
 }
+
+// The root card's own "Times Redeemed" input (js/app.js createNodeCard, isLPIsolatedRoot branch)
+// calls this instead of the Calculator's normal syncCardRunsToGlobal - redemptions is the number the
+// player actually edits, translated to the runs count the rest of the Calculator's machinery expects.
+function onLPRedemptionCountChange(e) {
+  if (!_lpIsolatedResult) return;
+  const redemptions = Math.max(1, parseInt(e.target.value) || 1);
+  const offer = _lpIsolatedResult.offer;
+  window.globalRuns = _lpIsolatedResult.offerType === 'bpc' ? redemptions * (offer.quantity || 1) : redemptions;
+  if (typeof window.recalculate === 'function') window.recalculate();
+}
+window.onLPRedemptionCountChange = onLPRedemptionCountChange;
 
 // Adds one child node per required_item, in the same shape a real tree node has (so createNodeCard/
 // calculateTreeNodeCost/etc. handle them with zero special-casing beyond the isRedemptionRequirement
@@ -471,15 +569,29 @@ function injectLPRedemptionNodes(root, offer) {
   });
 }
 
-// scaleTreeQuantities (js/tree.js) only touches a child whose typeId appears in the PARENT's own
-// recipe.materials - a redemption-requirement node never matches that (it isn't a build material),
-// so its qtyNeeded is never touched by the Calculator's own recompute and has to be kept in sync
-// here instead, run BEFORE the wrapped recalculate() below so cost/BOM/cards all see the right
-// number on the same pass, not one render behind.
-function syncLPRedemptionNodes() {
+// Run before every recalculate() this page triggers (see installLPRecalculateHook) - handles BOTH
+// keeping the redemption nodes' quantities in sync with the current redemption count AND
+// re-injecting them if they're missing. They go missing whenever js/app.js rebuilds the tree from
+// scratch, which happens more often than just the initial isolate: toggling "Build" on ANY
+// component deep in the tree (optimizers.js toggleBuildSelf) re-runs selectItem() to fetch that
+// component's own children, which throws away and rebuilds the WHOLE tree including the root -
+// silently dropping these synthetic nodes if they aren't re-added here every time. Also re-stamps
+// isLPIsolatedRoot/_lpRedemptionCount on the root for the same reason (createNodeCard's "Times
+// Redeemed" branch needs them present on whatever the CURRENT root object is, not just the first
+// one selectItem() ever built).
+function ensureLPRedemptionNodesPresent() {
   if (!_lpIsolatedResult || !window.recipeTreeRoot) return;
-  const batches = getLPRedemptionBatches(_lpIsolatedResult);
-  (window.recipeTreeRoot.children || []).forEach(child => {
+  const root = window.recipeTreeRoot;
+  const result = _lpIsolatedResult;
+
+  root.isLPIsolatedRoot = true;
+  root.children = root.children || [];
+  const alreadyInjected = root.children.some(c => c.isRedemptionRequirement);
+  if (!alreadyInjected) injectLPRedemptionNodes(root, result.offer);
+
+  const batches = getLPRedemptionBatches(result);
+  root._lpRedemptionCount = batches;
+  root.children.forEach(child => {
     if (child.isRedemptionRequirement) child.qtyNeeded = child._perBatchQty * batches;
   });
 }
@@ -493,10 +605,11 @@ function installLPRecalculateHook() {
   const original = window.recalculate;
   const wrapped = function (...args) {
     window.__lpSpentThisRecalc = 0; // calculateTreeNodeCost (js/optimizers.js) accumulates into this
-    syncLPRedemptionNodes();
+    ensureLPRedemptionNodesPresent();
     const result = original.apply(this, args);
     restoreCalculatorState(_lpSavedCalculatorState); // undo this call's own saveActiveState() - see the note above CALCULATOR_STATE_KEYS
     renderLPExtraStats();
+    renderLPStoreActiveStationLabel(); // picks up a structure/preset change made via the sidebar
     return result;
   };
   wrapped.__lpWrapped = true;
@@ -505,18 +618,22 @@ function installLPRecalculateHook() {
 
 // The Calculator's own stat strip has no concept of LP. Rather than a separate strip of big boxes
 // competing for space at the top of the page, this renders as ONE compact card - same glass-card/
-// diagram-node styling real tree cards use - inserted right next to the root card itself, so it
-// reads as part of the tree rather than a bolted-on dashboard. Only the offer's flat isk_cost/
-// lp_cost (no typeId, can't be a tree node) needs adding on top of the Calculator's own figure -
-// required_items are real tree children at this point, so window.recipeTreeRoot.calculatedCost
-// (materials + job fee, the Calculator's own unmodified number) already includes them.
+// diagram-node styling real tree cards use - in its OWN column appended right after the root
+// card's column in #tree-container, so it sits beside the root card (columns lay out left-to-right,
+// and the root's column - depth 0 - is always the rightmost existing one, see renderTreeDiagram in
+// js/app.js), reading as part of the tree rather than a bolted-on dashboard. Only the offer's flat
+// isk_cost/lp_cost (no typeId, can't be a tree node) needs adding on top of the Calculator's own
+// figure - required_items are real tree children at this point, so
+// window.recipeTreeRoot.calculatedCost (materials + job fee, the Calculator's own unmodified
+// number) already includes them.
 function renderLPExtraStats() {
-  document.getElementById('lp-info-card')?.remove();
+  document.getElementById('lp-info-card-col')?.remove();
   if (!_lpIsolatedResult || !window.recipeTreeRoot) return;
 
   const root = window.recipeTreeRoot;
+  const treeContainer = document.getElementById('tree-container');
   const rootCardEl = document.getElementById(`node-card-${root.instanceId}`);
-  if (!rootCardEl || !rootCardEl.parentElement) return; // tree hasn't rendered yet this pass
+  if (!treeContainer || !rootCardEl) return; // tree hasn't rendered yet this pass
 
   const result = _lpIsolatedResult;
   const offer = result.offer;
@@ -540,23 +657,23 @@ function renderLPExtraStats() {
   const iskPerLpDisplay = iskPerLp === null ? '—' : Math.round(iskPerLp).toLocaleString();
 
   const row = (label, value, color, title) => `
-    <div class="flex justify-between items-center gap-2" ${title ? `title="${window.esc(title)}"` : ''}>
-      <span class="text-slate-400">${label}</span>
-      <span class="font-bold text-right" style="color:${color || 'var(--text)'};">${value}</span>
+    <div class="flex justify-between items-center gap-3" ${title ? `title="${window.esc(title)}"` : ''}>
+      <span class="text-slate-400 flex-shrink-0">${label}</span>
+      <span class="font-bold text-right whitespace-nowrap" style="color:${color || 'var(--text)'};">${value}</span>
     </div>`;
 
   const card = document.createElement('div');
   card.id = 'lp-info-card';
-  card.className = 'diagram-node glass-card p-3 w-72';
+  card.className = 'diagram-node glass-card p-3.5 w-96';
   card.style.borderTopColor = '#c084fc';
   card.innerHTML = `
     <div class="flex items-center gap-1.5 border-b border-[#3a3025] pb-2 mb-2.5">
       <svg viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0;"><circle cx="12" cy="8" r="5"/><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5"/></svg>
       <span class="font-bold text-sm text-white">LP Store Economics</span>
     </div>
-    <div class="text-xs mono space-y-1.5">
-      ${row('Total ISK Cost', Math.round(totalIskCost).toLocaleString(), null, 'Build materials + required redemption items (purple cards) + job install fee + the flat ISK portion of redeeming this offer')}
-      ${row('Redemption Fee', `${Math.round(flatIskCost).toLocaleString()} + ${flatLpCost.toLocaleString()} LP`, '#c084fc', 'The flat ISK/LP portion of redeeming this offer - on top of the required items already counted in Total ISK Cost above')}
+    <div class="text-sm mono space-y-2">
+      ${row('Total ISK Cost', Math.round(totalIskCost).toLocaleString() + ' ISK', null, 'Build materials + required redemption items (purple cards) + job install fee + the flat ISK portion of redeeming this offer')}
+      ${row('Redemption Fee', `${Math.round(flatIskCost).toLocaleString()} ISK + ${flatLpCost.toLocaleString()} LP`, '#c084fc', 'The flat ISK/LP portion of redeeming this offer - on top of the required items already counted in Total ISK Cost above')}
       ${row('Total LP Spent', `${totalLpCost.toLocaleString()} LP`, '#c084fc', 'Redemption LP + any component set to "Acquire via LP" in the tree')}
     </div>
     <div class="border-t border-[#3a3025] mt-2.5 pt-2.5">
@@ -564,12 +681,16 @@ function renderLPExtraStats() {
       <div class="hero-num ${profit >= 0 ? 'profit' : 'loss'}">${Math.round(profit).toLocaleString()} ISK</div>
     </div>
     <div class="border-t border-[#3a3025] mt-2 pt-2 flex justify-between items-center" title="Estimated ISK profit per LP spent">
-      <span class="text-slate-300 font-bold text-xs">ISK / LP</span>
-      <span class="font-bold text-lg mono" style="color:${profitColor};">${iskPerLpDisplay}</span>
+      <span class="text-slate-300 font-bold text-sm">ISK / LP</span>
+      <span class="font-bold text-xl mono" style="color:${profitColor};">${iskPerLpDisplay}</span>
     </div>
   `;
 
-  rootCardEl.insertAdjacentElement('afterend', card);
+  const col = document.createElement('div');
+  col.id = 'lp-info-card-col';
+  col.className = 'flex flex-col justify-center';
+  col.appendChild(card);
+  treeContainer.appendChild(col);
 }
 window.renderLPExtraStats = renderLPExtraStats;
 
@@ -659,6 +780,14 @@ function renderLPStoreTable() {
 
   let rows = _lpRankedResults.slice();
   if (_lpTypeFilter !== 'all') rows = rows.filter(r => r.offerType === _lpTypeFilter);
+  if (_lpCategoryFilter !== 'all') {
+    rows = rows.filter(r => {
+      const cat = getLPItemCategory(r.outputTypeId);
+      if (cat === undefined) return true; // not resolved yet - don't hide it, just not filterable yet
+      if (_lpCategoryFilter === 'other') return cat === null || !LP_CATEGORY_LABELS[cat];
+      return String(cat) === _lpCategoryFilter;
+    });
+  }
   rows.sort((a, b) => {
     const av = a[_lpSortKey], bv = b[_lpSortKey];
     const an = (av === null || av === undefined) ? -Infinity : av;
@@ -674,7 +803,10 @@ function renderLPStoreTable() {
   const rowsHTML = rows.map(r => {
     const offer = r.offer;
     const isBpc = r.offerType === 'bpc';
-    const iconUrl = getLPStoreIconUrl(r.outputTypeId, isBpc);
+    // A BPC offer's icon must come from the BLUEPRINT's own typeId (r.blueprintTypeId, i.e.
+    // offer.type_id) - r.outputTypeId is the manufactured PRODUCT's typeId (e.g. the ship itself),
+    // which has no /bpc art of its own and would 404/fall through to a wrong or generic image.
+    const iconUrl = getLPStoreIconUrl(isBpc ? r.blueprintTypeId : r.outputTypeId, isBpc);
     const profitColor = r.profit > 0 ? 'var(--accent)' : 'var(--red-400, #f87171)';
     const iskPerLpDisplay = r.iskPerLp === null ? '—' : Math.round(r.iskPerLp).toLocaleString();
     const expanded = _lpExpandedOfferIds.has(offer.offer_id);
@@ -830,8 +962,14 @@ window.renderLPStoreActiveStationLabel = renderLPStoreActiveStationLabel;
 function populateLPStoreCorpSelect() {
   const select = document.getElementById('lpstore-corp-select');
   if (!select) return;
-  select.innerHTML = '<option value="">— Choose a warzone LP store —</option>' +
-    FW_WARZONE_CORPS.map(c => `<option value="${c.corpId}" style="color:${c.color}; font-weight:bold;">${window.esc(c.faction)} — ${window.esc(c.corpName)}</option>`).join('');
+  const groups = ['Faction Warfare', 'Pirate Faction'];
+  const groupsHTML = groups.map(g => {
+    const opts = FW_WARZONE_CORPS.filter(c => c.group === g)
+      .map(c => `<option value="${c.corpId}" style="color:${c.color}; font-weight:bold;">${window.esc(c.faction)} — ${window.esc(c.corpName)}</option>`)
+      .join('');
+    return `<optgroup label="${window.esc(g)}">${opts}</optgroup>`;
+  }).join('');
+  select.innerHTML = '<option value="">— Choose an LP store —</option>' + groupsHTML;
 }
 
 // addEventListener rather than a plain `window.onload =` assignment - js/app.js (also loaded on
@@ -851,6 +989,7 @@ window.addEventListener('load', async () => {
   populateLPStoreCorpSelect();
   loadSharedTaxSettingsForLPStore();
   renderLPStoreActiveStationLabel();
+  if (typeof window.renderProductionPresetDropdown === 'function') window.renderProductionPresetDropdown();
   renderLPStoreState();
   installLPRecalculateHook();
 
