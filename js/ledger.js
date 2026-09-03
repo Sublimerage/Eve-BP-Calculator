@@ -2263,11 +2263,32 @@ async function syncWithEveIndustryJobs(silent) {
       const ratio = startRuns / totalRuns;
       const remainingRuns = totalRuns - startRuns;
       const remainingRatio = remainingRuns / totalRuns;
-      const scaleMaterials = (r) => Array.isArray(candidate.materials) ? candidate.materials.map(m => {
-        const scaledQty = Math.ceil(m.qtyNeeded * r);
-        const scaledStock = Math.min(m.stockQty || 0, scaledQty);
-        return { ...m, qtyNeeded: scaledQty, stockQty: scaledStock, netQtyNeeded: Math.max(0, scaledQty - scaledStock), lineCost: (m.unitPrice || 0) * Math.max(0, scaledQty - scaledStock) };
-      }) : [];
+
+      // Split each material's total between the two fragments WITHOUT rounding each side
+      // independently. m.qtyNeeded already went through Math.ceil once (calculateInputQuantity, for
+      // the full totalRuns) - re-ceiling BOTH ratio*qtyNeeded and (1-ratio)*qtyNeeded separately can
+      // round up twice on the same total, but the real danger is the STARTED side specifically: it can
+      // come out LOWER than a fresh single-run calculation would give (provably, ceil(ceil(n*x)*r) <=
+      // ceil(x) for r=1/n). The started side is what gets subtracted from the shared stock pool as
+      // "already consumed" when the BOM renders - an under-counted started side leaves MORE apparent
+      // stock for every job rendered after it than physically exists, which is exactly "the ledger
+      // looked fine, then I ran out in game." Ceiling only the started side (conservative: assume at
+      // least this much was really consumed) and deriving the remaining side as the exact complement
+      // guarantees the two fragments always sum back to the trusted original total - no material
+      // invented or lost in the split, and no phantom stock leaking into later jobs.
+      const splitMaterials = () => {
+        const started = [], remaining = [];
+        (Array.isArray(candidate.materials) ? candidate.materials : []).forEach(m => {
+          const startedQty = Math.min(m.qtyNeeded, Math.ceil(m.qtyNeeded * ratio));
+          const remainingQty = Math.max(0, m.qtyNeeded - startedQty);
+          const startedStock = Math.min(m.stockQty || 0, startedQty);
+          const remainingStock = (m.stockQty || 0) - startedStock;
+          started.push({ ...m, qtyNeeded: startedQty, stockQty: startedStock, netQtyNeeded: Math.max(0, startedQty - startedStock), lineCost: (m.unitPrice || 0) * Math.max(0, startedQty - startedStock) });
+          remaining.push({ ...m, qtyNeeded: remainingQty, stockQty: remainingStock, netQtyNeeded: Math.max(0, remainingQty - remainingStock), lineCost: (m.unitPrice || 0) * Math.max(0, remainingQty - remainingStock) });
+        });
+        return { started, remaining };
+      };
+      const { started: startedMaterials, remaining: remainingMaterials } = splitMaterials();
 
       const activeFragment = {
         ...candidate,
@@ -2277,7 +2298,7 @@ async function syncWithEveIndustryJobs(silent) {
         calculatedCost: (candidate.calculatedCost || 0) * ratio,
         netProfit: candidate.netProfit !== undefined ? candidate.netProfit * ratio : undefined,
         totalBuildSeconds: totalBuildSeconds,
-        materials: scaleMaterials(ratio),
+        materials: startedMaterials,
         startedAt: startedAt,
         isStarted: true,
         eveJobId: rj.job_id,
@@ -2291,7 +2312,7 @@ async function syncWithEveIndustryJobs(silent) {
         calculatedCost: (candidate.calculatedCost || 0) * remainingRatio,
         netProfit: candidate.netProfit !== undefined ? candidate.netProfit * remainingRatio : undefined,
         totalBuildSeconds: (candidate.totalBuildSeconds || 0) * remainingRatio,
-        materials: scaleMaterials(remainingRatio),
+        materials: remainingMaterials,
         startedAt: undefined,
         isStarted: false,
         splitFromId: candidate.id
@@ -2895,6 +2916,26 @@ function updateStockLastSyncedDisplay() {
 window.updateStockLastSyncedDisplay = updateStockLastSyncedDisplay;
 // Keep the "Xm ago" text current while the ledger sits open, same idea as the job countdown timers.
 setInterval(() => { if (typeof updateStockLastSyncedDisplay === 'function') updateStockLastSyncedDisplay(); }, 60000);
+
+// Real re-sync (not just the age label above), on a timer, for as long as the Ledger tab stays open.
+// Both asset stock and EVE job status were previously only ever refreshed once, on page load (inside
+// handleEsiSSOCallback's "no OAuth code, just check if we're already logged in" branch, chained into
+// syncWithEveIndustryJobs) - correct while the tab gets reloaded often, but a long manufacturing
+// session where the Ledger just sits open in a tab across many real jobs starting/finishing would
+// never see fresher data until a manual reload or a click on "Sync EVE Jobs"/"Refresh" stock. That's
+// what was actually behind "stock syncing takes a very long time" - not the sync being slow once
+// triggered, but nothing ever re-triggering it. 10 minutes: frequent enough to matter within an active
+// session, and well under CCP's own ~1hr server-side cache on the assets endpoint (ESI itself won't
+// hand back fresher asset data than that no matter how often this polls), so this can't outrun what
+// EVE's own backend is willing to report.
+setInterval(() => {
+  if (!localStorage.getItem('esi_char_id')) return; // not logged in - nothing to sync
+  if (typeof window.handleEsiSSOCallback === 'function') {
+    window.handleEsiSSOCallback()
+      .then(() => { if (typeof window.syncWithEveIndustryJobs === 'function') return window.syncWithEveIndustryJobs(true); })
+      .catch(err => console.error('[Ledger] Periodic background sync error:', err));
+  }
+}, 600000);
 
 function applyJournalStockFilter() {
   const filterVal = document.getElementById('stock-location-filter')?.value || 'all';
