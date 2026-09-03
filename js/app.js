@@ -2939,7 +2939,12 @@ const FLYOUT_TITLES = {
   build: 'Build & Optimize',
   structure: 'System & Structure',
   fees: 'Taxes & Fees',
-  markets: 'Markets'
+  markets: 'Markets',
+  // 'store'/'station' are lpstore.html-only section ids (its own icon-rail reuses this exact
+  // lookup, plus 'pricing'/'build'/'fees' above for the sections it shares in spirit with the
+  // Calculator) - harmless extra keys here, index.html never asks for either.
+  store: 'LP Store',
+  station: 'Production Station'
 };
 
 function openFlyoutSection(sectionId) {

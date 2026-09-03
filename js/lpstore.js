@@ -741,8 +741,8 @@ function renderLPExtraStats() {
   // supply is large, but not "doesn't fit in ~46 mono characters" large).
   const row = (label, value, color, title) => `
     <div ${title ? `title="${window.esc(title)}"` : ''}>
-      <div class="text-slate-400" style="font-size:10.5px;">${label}</div>
-      <div class="text-right font-bold whitespace-nowrap" style="color:${color || 'var(--text)'};">${value}</div>
+      <div class="text-slate-400" style="font-size:11.5px;">${label}</div>
+      <div class="text-right font-bold whitespace-nowrap" style="font-size:16px; color:${color || 'var(--text)'};">${value}</div>
     </div>`;
 
   // Same overflow logic as row() above, applied to the two standalone hero numbers: shrink the
@@ -766,7 +766,7 @@ function renderLPExtraStats() {
       <svg viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;flex-shrink:0;"><circle cx="12" cy="8" r="5"/><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5"/></svg>
       <span class="font-bold text-sm text-white">LP Store Economics</span>
     </div>
-    <div class="text-sm mono space-y-2.5">
+    <div class="text-sm mono lp-econ-rows">
       ${row('Total ISK Cost', Math.round(totalIskCost).toLocaleString() + ' ISK', null, 'Build materials + required redemption items (purple cards) + job install fee + the flat ISK portion of redeeming this offer')}
       ${row('Redemption Fee (ISK)', Math.round(flatIskCost).toLocaleString() + ' ISK', '#c084fc', 'The flat ISK portion of redeeming this offer - on top of the required items already counted in Total ISK Cost above')}
       ${row('Redemption Fee (LP)', flatLpCost.toLocaleString() + ' LP', '#c084fc', 'The flat LP portion of redeeming this offer')}
@@ -941,7 +941,12 @@ function renderLPStoreTable() {
     // Isolate opens the real Calculator canvas for ANY offer now - a BPC gets its actual recipe
     // tree, a direct-sell item gets a synthetic root standing in for "the item you receive" (see
     // isolateDirectSellOffer) - either way its required_items render as real (purple) cards too.
-    const isolateBtn = `<button onclick="event.stopPropagation(); isolateOffer(${offer.offer_id});" class="icon-btn flex-shrink-0" style="width:26px;height:26px;" title="Isolate: open this offer in the Calculator's own tree view">${window.svgIcon ? window.svgIcon('expand', { style: 'width:13px;height:13px;' }) : '⤢'}</button>`;
+    // A real icon+label button, in its own trailing table column (not squeezed into the crowded
+    // Item cell alongside the favorite star/icon/name/badge, which is where this used to live as a
+    // tiny 26px icon-only square - easy to miss and unclear what it even did without hovering for
+    // the tooltip). "Isolate" matches the term used everywhere else this action is described
+    // (isolateOffer, the detail row's own "Isolate this BPC/item →" button, the sidebar note).
+    const isolateBtn = `<button onclick="event.stopPropagation(); isolateOffer(${offer.offer_id});" class="btn-glass btn-glass-muted py-1.5 px-3 text-[11px] font-bold flex items-center gap-1.5 whitespace-nowrap" title="Open this offer in the Calculator's own build-tree view">${window.svgIcon ? window.svgIcon('expand', { style: 'width:12px;height:12px;' }) : '⤢'} Isolate</button>`;
 
     // Favorited by offer_id (see the state-var comment above) - filled gold star when favorited,
     // hollow outline otherwise. stopPropagation so starring an offer doesn't also toggle its detail
@@ -953,7 +958,7 @@ function renderLPStoreTable() {
     if (expanded) {
       detailHTML = `
         <tr class="lp-detail-row">
-          <td colspan="7" class="px-3 pb-3">
+          <td colspan="8" class="px-3 pb-3">
             <div class="rounded-md p-3 text-[11px] mono" style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
               <div class="grid grid-cols-2 gap-x-6 gap-y-1.5">
                 <div><span style="color:var(--text-mute);">ISK Cost:</span> ${Math.round(offer.isk_cost).toLocaleString()} ISK</div>
@@ -989,7 +994,6 @@ function renderLPStoreTable() {
               </div>
               <div class="truncate text-[10px]" style="color:var(--text-mute);">${requiredItemsSummary}</div>
             </div>
-            ${isolateBtn}
           </div>
         </td>
         <td class="text-right mono">${offer.lp_cost.toLocaleString()}</td>
@@ -998,6 +1002,7 @@ function renderLPStoreTable() {
         <td class="text-right mono font-bold" style="color:${profitColor};">${Math.round(r.profit).toLocaleString()}</td>
         <td class="text-right mono font-bold" style="color:${profitColor};">${iskPerLpDisplay}</td>
         <td class="text-right" style="color:var(--text-mute);">${isBpc && r.buildSeconds > 0 ? window.formatDurationCompact(r.buildSeconds) : '—'}</td>
+        <td class="text-right">${isolateBtn}</td>
       </tr>
       ${detailHTML}`;
   }).join('');
@@ -1013,6 +1018,7 @@ function renderLPStoreTable() {
           <th class="text-right cursor-pointer" onclick="setLPStoreSort('profit')">Est. Profit${sortIndicator('profit')}</th>
           <th class="text-right cursor-pointer" onclick="setLPStoreSort('iskPerLp')" title="Estimated ISK profit per LP spent - the ranking metric.">ISK / LP${sortIndicator('iskPerLp')}</th>
           <th class="text-right">Build Time</th>
+          <th class="text-right"></th>
         </tr>
       </thead>
       <tbody>${rowsHTML}</tbody>
