@@ -1726,52 +1726,45 @@ body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var
   padding: 14px 16px 18px;
 }
 
-/* Stat tiles row at the top of the drawer body - an icon + left accent bar per tile (not just a
-   label/value pair on a flat rectangle) so each one reads as a distinct shape instead of empty
-   background on wide screens, and a subtler value color than the app's default near-white text
-   token, matched below in .lp-market-stat-tile .stat-value. */
-.lp-market-stat-tile {
-  position: relative;
+/* Stat strip - ONE thin bar, four label:value pairs separated by a hairline divider, not four
+   separate boxy cards with icons and accent bars. That earlier version was flagged as too big/
+   heavy for what's basically a quick readout - this is closer to a ticker line: compact, no card
+   chrome per number, nothing competing with the charts below it for attention. */
+.lp-market-stat-strip {
+  display: flex;
+  align-items: stretch;
   background: var(--glass-fill);
   border-radius: var(--radius-card);
-  padding: 10px 12px 10px 15px;
   overflow: hidden;
 }
-.lp-market-stat-tile::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 10px; bottom: 10px;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--accent);
-  opacity: 0.55;
+.lp-market-stat-cell {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
-.lp-market-stat-tile .stat-label { font-size: 9.5px; display: flex; align-items: center; gap: 5px; }
-.lp-market-stat-tile .stat-label svg { width: 11px; height: 11px; stroke: var(--text-mute); flex-shrink: 0; }
-.lp-market-stat-tile .stat-value { font-size: 17px; font-weight: 600; color: var(--text-soft); margin-top: 2px; }
+.lp-market-stat-cell + .lp-market-stat-cell { border-left: 1px solid var(--glass-border); }
+.lp-market-stat-cell .stat-label { font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-market-stat-cell .stat-value { font-size: 14px; font-weight: 600; color: var(--text); }
 
-/* Charts - gradients/glow filter are declared once per SVG in its own <defs> (js/lpstore.js), these
-   classes cover everything that doesn't need per-render color math. Hairline recessive gridlines
-   (both axes now - a light vertical rhythm reads as more considered than horizontal-only), a
-   Catmull-Rom-smoothed line instead of straight segments between points, and a 2px surface ring
-   around the hover dot so it stays legible crossing the line - per the dataviz mark specs. */
+/* Charts - deliberately plain: one flat-color line each (no gradients, no glow/blur, no bar
+   chart), matching feedback that the earlier gradient/glow/bar treatment read as busy rather than
+   polished. Text coordinates are rounded to whole pixels everywhere in js/lpstore.js (not
+   sub-pixel .toFixed(1) values like the path geometry) - fractional positioning is what was making
+   the axis labels look soft/blurry, a real SVG rendering quirk, not a color or size problem. */
 .lp-market-chart-grid line { stroke: rgba(255,255,255,0.06); stroke-width: 1; shape-rendering: crispEdges; }
-.lp-market-chart-grid line.v { stroke: rgba(255,255,255,0.035); }
-.lp-market-chart-axis-label { font-size: 10px; fill: var(--text-soft); font-family: 'IBM Plex Mono', monospace; }
-.lp-market-avg-line { stroke: var(--text-mute); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.8; }
-.lp-market-avg-label { font-size: 9px; fill: var(--text-mute); font-family: 'IBM Plex Mono', monospace; font-style: italic; }
-.lp-market-price-line { fill: none; stroke: var(--accent); stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
-.lp-market-price-glow { fill: none; stroke: var(--accent); stroke-width: 6; stroke-linejoin: round; stroke-linecap: round; opacity: 0.22; filter: blur(3px); }
+.lp-market-chart-grid line.v { stroke: rgba(255,255,255,0.03); }
+.lp-market-chart-axis-label { font-size: 10px; fill: var(--text-soft); font-family: 'IBM Plex Mono', monospace; text-rendering: optimizeLegibility; }
+.lp-market-avg-line { stroke: var(--text-mute); stroke-width: 1; stroke-dasharray: 3 3; }
+.lp-market-avg-label { font-size: 9px; fill: var(--text-mute); font-family: 'IBM Plex Mono', monospace; }
+.lp-market-price-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.lp-market-price-area { fill: var(--accent); opacity: 0.08; }
+.lp-market-volume-line { fill: none; stroke: var(--text-soft); stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; }
 .lp-market-hover-dot { fill: var(--accent); stroke: var(--bg-0); stroke-width: 2; }
-.lp-market-end-pulse { fill: none; stroke: var(--accent); stroke-width: 1.5; opacity: 0.55; animation: lp-market-pulse 2.2s ease-out infinite; transform-origin: center; transform-box: fill-box; }
-@media (prefers-reduced-motion: reduce) { .lp-market-end-pulse { animation: none; opacity: 0; } }
-@keyframes lp-market-pulse {
-  0% { transform: scale(1); opacity: 0.55; }
-  100% { transform: scale(2.6); opacity: 0; }
-}
+.lp-market-hover-dot.muted { fill: var(--text-soft); }
 .lp-market-crosshair { stroke: rgba(255,255,255,0.2); stroke-width: 1; shape-rendering: crispEdges; }
-.lp-market-volume-bar { transition: opacity 0.1s ease; }
-.lp-market-volume-bar:hover, .lp-market-volume-bar.hover { opacity: 0.85; }
 .lp-market-chart-tooltip {
   position: absolute;
   pointer-events: none;
