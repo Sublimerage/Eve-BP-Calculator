@@ -9,7 +9,7 @@
 <title>EVE LP Store Calculator</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8ff4d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='5'/%3E%3Cpath d='M8.5 12.5L7 21l5-3 5 3-1.5-8.5'/%3E%3C/svg%3E">
 <link class="cache-bust" rel="stylesheet" href="css/tailwind-build.css?v=1.0.4">
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.38.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.39.0">
 <script>(function(){try{var t=localStorage.getItem('eve_color_theme');if(t&&t!=='lime')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
@@ -339,9 +339,16 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;flex-shrink:0;"><polyline points="3,17 9,11 13,15 21,6"/><polyline points="15,6 21,6 21,12"/></svg>
             <span class="font-bold text-sm text-white">Market Economics</span>
             <span id="lp-market-item-name" class="text-slate-400 text-xs truncate"></span>
+            <span class="flex items-center gap-1 text-[10px] mono flex-shrink-0" style="color:var(--text-mute);" title="Every price and volume figure below comes from this station's market">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px;"><path d="M12 21s7-5.2 7-11a7 7 0 0 0-14 0c0 5.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+              <span id="lp-market-region-label">—</span>
+            </span>
           </div>
           <div class="flex items-center gap-1.5 flex-shrink-0">
             <div id="lp-market-range-pills" class="flex gap-1"></div>
+            <button onclick="toggleMarketExpanded()" id="lp-market-expand-toggle" class="icon-btn" title="Toggle a taller drawer">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+            </button>
             <button onclick="setMarketTableView(!_lpMarketTableView)" id="lp-market-table-toggle" class="icon-btn" title="Switch between chart and table view">
               <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
             </button>
@@ -458,11 +465,11 @@
        coexist instead of clobbering it - see both files' own comments on this. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
   <script src="js/config.js?v=8.0.22" defer></script>
-  <script src="js/esi.js?v=8.0.16" defer></script>
+  <script src="js/esi.js?v=8.0.17" defer></script>
   <script src="js/tree.js?v=8.0.1" defer></script>
   <script src="js/optimizers.js?v=8.0.6" defer></script>
   <script src="js/app.js?v=15.36.0" defer></script>
-  <script src="js/lpstore.js?v=5.0.0" defer></script>
+  <script src="js/lpstore.js?v=5.1.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
