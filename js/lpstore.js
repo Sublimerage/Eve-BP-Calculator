@@ -317,14 +317,22 @@ window.toggleLPOfferExpanded = toggleLPOfferExpanded;
 // =================================================================================================
 // Isolate: hand off to the Calculator's own tree canvas + Bill of Materials sidebar (js/app.js,
 // also loaded on this page) rather than a separate lookalike UI - the exact same floating cards
-// connected by lines, the exact same BOM panel, that the Calculator already has. Only BPC offers
-// have a tree to isolate; a direct-sell offer keeps its existing click-to-expand row detail as its
-// only interaction (see renderLPStoreTable).
+// connected by lines, the exact same BOM panel, that the Calculator already has. Works for BOTH
+// offer types now: a BPC offer isolates via the Calculator's own selectItem() (a real recipe tree);
+// a direct-sell offer gets a synthetic root built the same shape selectItem() would produce, since
+// there's no blueprint to hand it - "as if we're building it" per the request this was built from.
+//
+// Either way, the offer's own required_items (what you turn in to REDEEM it - a separate thing from
+// a BPC's own build materials) are injected as extra root-level children, so they show up as real
+// cards connected by lines instead of only a lump sum in the stat strip. They're visually distinct
+// (isRedemptionRequirement flag - purple card accent + purple line, js/app.js createNodeCard /
+// drawConnectingLinesForTree) so it's obvious at a glance which cards are "build this" vs "turn
+// this in".
 // =================================================================================================
 
 function isolateOffer(offerId) {
   const result = _lpRankedResults.find(r => r.offer.offer_id === offerId);
-  if (!result || result.offerType !== 'bpc') return;
+  if (!result) return;
   if (typeof window.selectItem !== 'function') {
     console.error('[LP Store] window.selectItem is unavailable - is js/app.js loaded on this page?');
     return;
@@ -341,19 +349,59 @@ function isolateOffer(offerId) {
   const nameEl = document.getElementById('lpstore-inspector-name');
   if (nameEl) nameEl.textContent = result.outputName;
 
-  // selectItem (js/app.js) is the Calculator's own "load this blueprint" entry point - it resets
-  // every build/buy/ME/TE override, builds the real recipe tree, fetches prices, and calls
-  // recalculate() itself (cards + connecting lines + BOM sidebar, all existing code). Runs are set
-  // to this offer's own quantity afterward, same pattern js/app.js's own
-  // loadBlueprintIntoCalculator uses for a real owned BPC.
-  window.selectItem(result.blueprintTypeId, getLPItemName(result.blueprintTypeId), false).then(() => {
-    window.globalRuns = result.bpcCopies || 1;
-    const runsInput = document.getElementById('bp-runs');
-    if (runsInput) runsInput.value = window.globalRuns;
-    if (typeof window.recalculate === 'function') window.recalculate();
-  });
+  if (result.offerType === 'bpc') {
+    // selectItem (js/app.js) is the Calculator's own "load this blueprint" entry point - it resets
+    // every build/buy/ME/TE override, builds the real recipe tree, fetches prices, and calls
+    // recalculate() itself. Runs are set to this offer's own quantity afterward, same pattern
+    // js/app.js's own loadBlueprintIntoCalculator uses for a real owned BPC.
+    window.selectItem(result.blueprintTypeId, getLPItemName(result.blueprintTypeId), false).then(async () => {
+      window.globalRuns = result.bpcCopies || 1;
+      await window.fetchMarketPrices((result.offer.required_items || []).map(r => r.type_id));
+      injectLPRedemptionNodes(window.recipeTreeRoot, result.offer);
+      if (typeof window.recalculate === 'function') window.recalculate();
+    });
+  } else {
+    isolateDirectSellOffer(result);
+  }
 }
 window.isolateOffer = isolateOffer;
+
+// No blueprint exists for a direct-sell offer, so selectItem() doesn't apply - this builds a
+// synthetic root in the exact shape selectItem() would have produced (same fields recalculate()/
+// createNodeCard() read), with isBuildingSelf:true so its children (the required_items, injected
+// below) actually render and get summed into the cost - "as if we're building it", per the request
+// this was built from, even though there's no manufacturing job behind it (recipe stays null, so
+// calculateNodeJobFee/calculateTotalBuildSeconds both naturally contribute 0 - no special-casing
+// needed there). batchYield is this offer's own quantity-per-redemption and globalRuns starts at 1
+// redemption, so the existing qtyNeeded = batchYield * runs math (recalculate(), unmodified) falls
+// out correctly with no new formula.
+async function isolateDirectSellOffer(result) {
+  const offer = result.offer;
+  window.buildSelfOverrides = {};
+  window.customBuyModes = {};
+  window.customMEOverrides = {};
+  window.customTEOverrides = {};
+  window.selectedInstanceId = null;
+  window.isolatedInstanceId = null;
+  window.collapsedInstanceIds = new Set();
+  window.rootSellStrategy = 'market-sell';
+  window.rootCustomPrice = 0;
+  window.currentProduct = { id: offer.type_id, name: result.outputName };
+  window.globalRuns = 1;
+
+  window.recipeTreeRoot = {
+    instanceId: ++window.instanceCounter, parentInstanceId: null,
+    typeId: offer.type_id, displayTypeId: offer.type_id, productTypeId: offer.type_id,
+    name: result.outputName, productName: result.outputName,
+    qtyNeeded: offer.quantity || 1, depth: 0, recipe: null, children: [],
+    isManufacturable: false, isReaction: false, batchYield: offer.quantity || 1, runsNeeded: 1,
+    isBuildingSelf: true, customME: 0, customTE: 0, unitEIV: 0, jobEIV: 0, jobFee: 0
+  };
+
+  await window.fetchMarketPrices([offer.type_id, ...(offer.required_items || []).map(r => r.type_id)]);
+  injectLPRedemptionNodes(window.recipeTreeRoot, offer);
+  if (typeof window.recalculate === 'function') window.recalculate();
+}
 
 function exitLPInspector() {
   _lpIsolatedResult = null;
@@ -362,15 +410,58 @@ function exitLPInspector() {
 }
 window.exitLPInspector = exitLPInspector;
 
-// Wraps the Calculator's own recalculate() ONCE, on this page only, to also refresh the LP-specific
-// extra stat strip after every recompute - every existing trigger for recalculate (Build/Buy/LP
-// toggles, runs change, ME/TE edits, tax/fee edits) picks this up automatically, with no new wiring
-// needed at any of those call sites.
+// How many times the isolated offer is being redeemed, given the current run count - the unit
+// "runs" means differs by offer type (see isolateDirectSellOffer's own note), so this is the one
+// place that distinction is resolved, shared by the redemption-node sync below and the stat strip.
+function getLPRedemptionBatches(result) {
+  const runs = window.globalRuns || 1;
+  if (result.offerType === 'bpc') return Math.ceil(runs / (result.offer.quantity || 1));
+  return runs; // direct-sell root: "runs" already directly means "times redeemed"
+}
+
+// Adds one child node per required_item, in the same shape a real tree node has (so createNodeCard/
+// calculateTreeNodeCost/etc. handle them with zero special-casing beyond the isRedemptionRequirement
+// flag) - instanceId comes from the SAME global counter tree.js/app.js use for their own nodes
+// (config.js's `var instanceCounter` is a live global, not a snapshot), so there's no collision risk.
+function injectLPRedemptionNodes(root, offer) {
+  if (!root) return;
+  root.children = root.children || [];
+  (offer.required_items || []).forEach(ri => {
+    root.children.push({
+      instanceId: ++window.instanceCounter, parentInstanceId: root.instanceId,
+      typeId: ri.type_id, displayTypeId: ri.type_id, productTypeId: ri.type_id,
+      name: getLPItemName(ri.type_id), productName: getLPItemName(ri.type_id),
+      qtyNeeded: ri.quantity, depth: (root.depth || 0) + 1, recipe: null, children: [],
+      isManufacturable: false, isReaction: false, batchYield: 1, runsNeeded: 1,
+      isBuildingSelf: false, customME: 0, customTE: 0, unitEIV: 0, jobEIV: 0, jobFee: 0,
+      isRedemptionRequirement: true, _perBatchQty: ri.quantity
+    });
+  });
+}
+
+// scaleTreeQuantities (js/tree.js) only touches a child whose typeId appears in the PARENT's own
+// recipe.materials - a redemption-requirement node never matches that (it isn't a build material),
+// so its qtyNeeded is never touched by the Calculator's own recompute and has to be kept in sync
+// here instead, run BEFORE the wrapped recalculate() below so cost/BOM/cards all see the right
+// number on the same pass, not one render behind.
+function syncLPRedemptionNodes() {
+  if (!_lpIsolatedResult || !window.recipeTreeRoot) return;
+  const batches = getLPRedemptionBatches(_lpIsolatedResult);
+  (window.recipeTreeRoot.children || []).forEach(child => {
+    if (child.isRedemptionRequirement) child.qtyNeeded = child._perBatchQty * batches;
+  });
+}
+
+// Wraps the Calculator's own recalculate() ONCE, on this page only, to sync the redemption nodes
+// first and refresh the LP-specific extra stat strip after - every existing trigger for recalculate
+// (Build/Buy/LP toggles, runs change, ME/TE edits, tax/fee edits) picks both up automatically, with
+// no new wiring needed at any of those call sites.
 function installLPRecalculateHook() {
   if (typeof window.recalculate !== 'function' || window.recalculate.__lpWrapped) return;
   const original = window.recalculate;
   const wrapped = function (...args) {
     window.__lpSpentThisRecalc = 0; // calculateTreeNodeCost (js/optimizers.js) accumulates into this
+    syncLPRedemptionNodes();
     const result = original.apply(this, args);
     renderLPExtraStats();
     return result;
@@ -380,8 +471,10 @@ function installLPRecalculateHook() {
 }
 
 // The Calculator's own stat strip has no concept of LP - this adds the numbers unique to this page
-// (the offer's own redemption cost, total LP spent including any in-tree "Acquire via LP" picks,
-// and ISK-per-LP) alongside it, without touching the Calculator's own stats at all.
+// alongside it, without touching the Calculator's own stats at all. Only the offer's flat isk_cost/
+// lp_cost (no typeId, can't be a tree node) needs adding on top here now - required_items are real
+// tree children at this point, so window.recipeTreeRoot.calculatedCost (materials + job fee, the
+// Calculator's own unmodified figure) already includes them.
 function renderLPExtraStats() {
   const el = document.getElementById('lpstore-inspector-extra-stats');
   if (!el) return;
@@ -389,18 +482,13 @@ function renderLPExtraStats() {
 
   const result = _lpIsolatedResult;
   const offer = result.offer;
-  const runs = window.globalRuns || 1;
-  const batches = Math.ceil(runs / (offer.quantity || 1));
-  // The offer's OWN redemption cost (getting the BPC in hand at all) - not part of the material
-  // tree, which only represents what's needed to BUILD the product once the BPC is in hand.
-  const redemptionIskCost = batches * offer.isk_cost + batches * requiredItemsMarketCost(offer);
-  const redemptionLpCost = batches * offer.lp_cost;
-
-  const materialIskCost = window.recipeTreeRoot.calculatedCost || 0;
+  const batches = getLPRedemptionBatches(result);
+  const flatIskCost = batches * offer.isk_cost;
+  const flatLpCost = batches * offer.lp_cost;
   const acquiredLpCost = window.__lpSpentThisRecalc || 0;
 
-  const totalIskCost = materialIskCost + redemptionIskCost;
-  const totalLpCost = acquiredLpCost + redemptionLpCost;
+  const totalIskCost = (window.recipeTreeRoot.calculatedCost || 0) + flatIskCost;
+  const totalLpCost = acquiredLpCost + flatLpCost;
 
   // recalculate() already computed net sell revenue net of tax/broker (outputMarketValue is the
   // gross figure it derived that from) - profit is redone here against totalIskCost (which the
@@ -419,9 +507,10 @@ function renderLPExtraStats() {
     </div>`;
 
   el.innerHTML = `
-    ${tile('Redeem This BPC', `${Math.round(redemptionIskCost).toLocaleString()} ISK + ${redemptionLpCost.toLocaleString()} LP`, null, `Cost to acquire ${batches} cop${batches === 1 ? 'y' : 'ies'} of this BPC from the store (${runs} runs @ ${offer.quantity} run(s)/redemption)`)}
-    ${tile('Total LP Spent', totalLpCost.toLocaleString(), null, 'Redemption LP + any component set to "Acquire via LP" in the tree below')}
-    ${tile('LP-Aware Profit', Math.round(profit).toLocaleString(), profitColor, 'Net sell revenue minus material cost, job fee, AND this BPC\'s own redemption cost')}
+    ${tile('Total ISK Cost', Math.round(totalIskCost).toLocaleString(), null, 'Build materials + required redemption items (both shown as cards below) + job install fee + the flat ISK portion of redeeming this offer')}
+    ${tile('Redemption Fee (flat)', `${Math.round(flatIskCost).toLocaleString()} ISK + ${flatLpCost.toLocaleString()} LP`, null, 'The pure ISK/LP portion of redeeming this offer, on top of the required items shown as purple cards in the tree below (those are already counted in Total ISK Cost).')}
+    ${tile('Total LP Spent', totalLpCost.toLocaleString(), null, 'Redemption LP + any component set to "Acquire via LP" in the tree')}
+    ${tile('LP-Aware Profit', Math.round(profit).toLocaleString(), profitColor, 'Net sell revenue minus build materials, required redemption items, job fee, and the flat redemption fee')}
     ${tile('ISK / LP', iskPerLp === null ? '—' : Math.round(iskPerLp).toLocaleString(), profitColor)}
   `;
 }
@@ -554,11 +643,10 @@ function renderLPStoreTable() {
       ? offer.required_items.map(r2 => `${r2.quantity}x ${window.esc(getLPItemName(r2.type_id))}`).join(', ')
       : (offer.isk_cost > 0 ? 'ISK + LP only' : 'LP only');
 
-    // Isolate (the real Calculator canvas) only applies to BPC offers - a direct-sell offer has no
-    // blueprint/material tree to show, so it keeps its detail row as its only interaction.
-    const isolateBtn = isBpc
-      ? `<button onclick="event.stopPropagation(); isolateOffer(${offer.offer_id});" class="icon-btn flex-shrink-0" style="width:26px;height:26px;" title="Isolate: open this blueprint in the Calculator's own tree view">${window.svgIcon ? window.svgIcon('expand', { style: 'width:13px;height:13px;' }) : '⤢'}</button>`
-      : '';
+    // Isolate opens the real Calculator canvas for ANY offer now - a BPC gets its actual recipe
+    // tree, a direct-sell item gets a synthetic root standing in for "the item you receive" (see
+    // isolateDirectSellOffer) - either way its required_items render as real (purple) cards too.
+    const isolateBtn = `<button onclick="event.stopPropagation(); isolateOffer(${offer.offer_id});" class="icon-btn flex-shrink-0" style="width:26px;height:26px;" title="Isolate: open this offer in the Calculator's own tree view">${window.svgIcon ? window.svgIcon('expand', { style: 'width:13px;height:13px;' }) : '⤢'}</button>`;
 
     let detailHTML = '';
     if (expanded) {
@@ -579,13 +667,9 @@ function renderLPStoreTable() {
               <div class="mt-2 pt-2" style="border-top:1px solid rgba(255,255,255,0.06); color:var(--text-mute);">
                 Turned in: ${requiredItemsSummary}
               </div>
-              ${isBpc ? `
-                <div class="mt-2.5 pt-2.5" style="border-top:1px solid rgba(255,255,255,0.06);">
-                  <button onclick="event.stopPropagation(); isolateOffer(${offer.offer_id});" class="btn-glass px-2.5 py-1 text-[10px]">Isolate this BPC →</button>
-                </div>
-              ` : `
-                <div class="mt-2 italic" style="color:var(--text-mute);">Direct-sell item - no blueprint tree to open.</div>
-              `}
+              <div class="mt-2.5 pt-2.5" style="border-top:1px solid rgba(255,255,255,0.06);">
+                <button onclick="event.stopPropagation(); isolateOffer(${offer.offer_id});" class="btn-glass px-2.5 py-1 text-[10px]">${isBpc ? 'Isolate this BPC →' : 'Isolate this item →'}</button>
+              </div>
             </div>
           </td>
         </tr>`;

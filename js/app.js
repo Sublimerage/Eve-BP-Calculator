@@ -1865,6 +1865,10 @@ function createNodeCard(node) {
   let cardStyle = 'w-72';
   let borderAccent = '';
   if (isRoot) { cardStyle = 'w-96'; }
+  // isRedemptionRequirement (LP Store page only, js/lpstore.js injectLPRedemptionNodes) - an item
+  // turned in to redeem an LP offer, not a build material at all, so it gets its own color rather
+  // than falling into the ordinary "bought, not built" blue below.
+  else if (node.isRedemptionRequirement) { cardStyle = 'w-72'; borderAccent = 'border-top-color:#c084fc;'; }
   else if (!node.isBuildingSelf) { cardStyle = 'w-72'; borderAccent = 'border-top-color:var(--blue);'; }
   else if (node.isReaction) { cardStyle = 'w-72'; borderAccent = 'border-top-color:var(--violet);'; }
   else if (node.batchYield > 1) { cardStyle = 'w-72'; borderAccent = 'border-top-color:var(--accent);'; }
@@ -1957,6 +1961,7 @@ function createNodeCard(node) {
         <div class="flex items-center justify-between gap-1.5">
           <span class="font-bold text-sm text-white truncate min-w-0 cursor-pointer hover:text-orange-300 hover:underline transition" onclick="copyMaterialNameToClipboard(event, this, '${window.esc(node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()).replace(/'/g, "\\'")}')" title="Click to copy this item's exact name to your clipboard, ready to paste into EVE's search/market">${node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()}</span>
           <div class="flex items-center space-x-1 flex-shrink-0">
+            ${node.isRedemptionRequirement ? `<span class="text-[9px] mono px-1.5 py-0.5 rounded flex-shrink-0" style="background:rgba(192,132,252,0.15); color:#c084fc;" title="Turned in to redeem this LP store offer - not a build material.">REDEEM</span>` : ''}
             ${isRoot ? `
               <div class="relative group inline-block" onclick="event.stopPropagation()">
                 <span class="toggle-btn cursor-help" title="Unit EIV: ${formattedUnitEIV} | Total Job EIV: ${formattedTotalEIV}">
@@ -2649,6 +2654,13 @@ function drawConnectingLinesForTree(root) {
             path.setAttribute('stroke', '#6b7078');
             path.setAttribute('stroke-width', '1.5');
             path.setAttribute('stroke-opacity', '0.12');
+          } else if (child.isRedemptionRequirement) {
+            // Matches the redemption-requirement card's own purple accent (isRedemptionRequirement,
+            // js/lpstore.js injectLPRedemptionNodes) - visually separates "turned in to redeem this
+            // offer" lines from ordinary build-material ones at a glance.
+            path.setAttribute('stroke', '#c084fc');
+            path.setAttribute('stroke-width', '2');
+            path.setAttribute('stroke-opacity', '0.8');
           } else {
             path.setAttribute('stroke', '#6b7078');
             path.setAttribute('stroke-width', '2');
