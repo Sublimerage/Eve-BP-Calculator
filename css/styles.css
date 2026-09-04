@@ -1729,7 +1729,17 @@ body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var
    makes the drawer taller - this just raises how much room they're allowed to grow into. */
 .lp-market-drawer.expanded { max-height: 93%; }
 .lp-market-drawer.open {
-  transform: translateY(0);
+  /* none, not translateY(0) - an identity transform is still an ACTIVE transform, and any element
+     with one gets promoted to its own GPU-composited layer for as long as that's true, not just
+     during the slide-in transition. A composited layer gets rasterized/pasted onto the page as its
+     own unit, which is a real, separate source of soft/blurred text and edges from anything actually
+     wrong with this drawer's own SVG charts - every fix already made to their internal coordinates
+     couldn't touch this, since it happens one level up, after the SVG has already rendered crisply.
+     transform: none still animates correctly FROM translateY(100%) (browsers treat "no transform" as
+     translateY(0) for interpolation purposes) - the drawer slides in exactly the same way - but once
+     that transition ends and the drawer is sitting open and static, there's no active transform left
+     to force the layer promotion, so the browser can render its content normally again. */
+  transform: none;
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
