@@ -1676,11 +1676,16 @@ function getPrereqLabel(job) {
 // a separate symbol you have to already know the meaning of, and it generalizes past LP Store
 // offers (always 1 run per job) to any jobCount/runsPerJob combination the Calculator's own "Jobs"
 // field can produce.
+// The "Job(s)"/"Run(s)" words render smaller and lighter-weight than the numbers next to them (the
+// parent span carries the big bold accent styling for the numbers - this only needs to override size/
+// weight, color still inherits so the words stay the same green as the numbers) - the count is the
+// thing actually worth reading at a glance; the unit word is just there to disambiguate it.
 function runsDisplayHTML(job) {
+  const unit = (word) => `<span style="font-size:0.6em; font-weight:600;">${word}</span>`;
   if ((job.jobCount || 1) <= 1) {
-    return `${job.runsNeeded.toLocaleString()} Run${job.runsNeeded > 1 ? 's' : ''}`;
+    return `${job.runsNeeded.toLocaleString()} ${unit(`Run${job.runsNeeded > 1 ? 's' : ''}`)}`;
   }
-  return `${job.jobCount.toLocaleString()} Job${job.jobCount > 1 ? 's' : ''} <span style="opacity:0.6;">&times;</span> ${(job.runsPerJob || 1).toLocaleString()} Run${(job.runsPerJob || 1) > 1 ? 's' : ''}`;
+  return `${job.jobCount.toLocaleString()} ${unit(`Job${job.jobCount > 1 ? 's' : ''}`)} <span style="opacity:0.6; font-size:0.7em; font-weight:600;">&times;</span> ${(job.runsPerJob || 1).toLocaleString()} ${unit(`Run${(job.runsPerJob || 1) > 1 ? 's' : ''}`)}`;
 }
 
 // The small gear icon next to a prerequisite's name - a shared one gets a "xN" count alongside it so
