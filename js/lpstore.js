@@ -1345,7 +1345,11 @@ function buildVolumeCandlestickChart(rows, container) {
     const w = Math.max(1, Math.round(stickW));
     const h = Math.max(1, baselineR - y);
     const up = i === 0 ? true : prices[i] >= prices[i - 1];
-    const color = up ? 'var(--accent)' : 'var(--red-400, #f87171)';
+    // Dimmed relative to the raw --accent/--red-400 tokens: at full brand intensity these bars
+    // read as a glaring, "glowing" outline against the near-black chart background (confirmed via
+    // computed-style + ancestor filter/shadow inspection - no actual outline/blur is being drawn,
+    // it's pure color-contrast bloom). Mixing in some black keeps hue/opacity intact but calms it.
+    const color = up ? 'color-mix(in srgb, var(--accent) 78%, black)' : 'color-mix(in srgb, var(--red-400, #f87171) 78%, black)';
     return `<rect data-idx="${i}" class="lp-market-candlestick" x="${x}" y="${y}" width="${w}" height="${h}" fill="${color}"/>`;
   }).join('');
 
