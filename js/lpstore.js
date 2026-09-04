@@ -1209,6 +1209,21 @@ function linePathD(points) {
 // correct as the container's real width changes. Text coordinates are still rounded to whole pixels
 // on top of that (Math.round, not the sub-pixel .toFixed(1) the path geometry uses), which remains
 // correct and necessary in its own right.
+// NOTE: this does NOT fix the "white outline" bug - that turned out to be an inherited
+// stroke:currentColor from a sitewide svg[viewBox] icon-reset rule, fixed in styles.css (search
+// there for svg[viewBox] for the full explanation) with a plain stroke:none on the chart roots.
+// This function only addresses a separate, real complaint: --accent/--red-400 at full brand
+// intensity read as too bright/glowy against this near-black card. Computes a 78%-toward-black mix
+// via plain arithmetic (equivalent to color-mix(in srgb, var(--accent) 78%, black), avoided here
+// only because it's one more moving part, not because it caused the outline). --accent/--red-400
+// vary by the active EVE-faction theme, so this reads the live computed value, not a hardcoded hex.
+function dimmedMarketColor(cssVarName, fallbackHex, pct) {
+  const raw = (getComputedStyle(document.body).getPropertyValue(cssVarName).trim() || fallbackHex).replace('#', '');
+  const r = parseInt(raw.slice(0, 2), 16), g = parseInt(raw.slice(2, 4), 16), b = parseInt(raw.slice(4, 6), 16);
+  const mix = (c) => Math.round(c * pct / 100);
+  return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+}
+
 function buildPriceLineChart(rows, container) {
   if (!container) return;
   const W = Math.max(280, Math.round(container.clientWidth || container.getBoundingClientRect().width || 640));
@@ -1248,6 +1263,7 @@ function buildPriceLineChart(rows, container) {
     const x = Math.round(padL + (i / vLineCount) * innerW);
     return `<line class="v" x1="${x}" y1="${gridY1R}" x2="${x}" y2="${gridY2R}"/>`;
   }).join('');
+  const lineColor = dimmedMarketColor('--accent', '#9de137', 78);
 
   container.innerHTML = `
     <svg id="lp-market-price-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:${W}px; height:${H}px; display:block; cursor:crosshair;">
@@ -1264,11 +1280,11 @@ function buildPriceLineChart(rows, container) {
       <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${Math.round(gridY2 + 4)}" text-anchor="end">${window.formatISKCompact(yMin)}</text>
       <text class="lp-market-chart-axis-label" x="${padL}" y="${Math.round(H - 6)}" text-anchor="start">${formatMarketDate(rows[0].date)}</text>
       <text class="lp-market-chart-axis-label" x="${W - padR}" y="${Math.round(H - 6)}" text-anchor="end">${formatMarketDate(rows[n - 1].date)}</text>
-      <path class="lp-market-price-area" d="${areaPath}"/>
-      <path class="lp-market-price-line" d="${linePath}"/>
-      <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="4" class="lp-market-hover-dot"/>
+      <path class="lp-market-price-area" d="${areaPath}" style="fill:${lineColor};"/>
+      <path class="lp-market-price-line" d="${linePath}" style="stroke:${lineColor};"/>
+      <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="4" class="lp-market-hover-dot" style="fill:${lineColor};"/>
       <line id="lp-market-price-crosshair" class="lp-market-crosshair" x1="0" y1="${padT}" x2="0" y2="${gridY2}" style="display:none;"/>
-      <circle id="lp-market-price-hoverdot" r="5" class="lp-market-hover-dot" style="display:none;"/>
+      <circle id="lp-market-price-hoverdot" r="5" class="lp-market-hover-dot" style="display:none; fill:${lineColor};"/>
     </svg>`;
 
   const svgEl = document.getElementById('lp-market-price-svg');
@@ -1340,16 +1356,14 @@ function buildVolumeCandlestickChart(rows, container) {
   // not 80% - a semi-transparent fill anti-aliasing against the card background underneath was
   // compounding the same soft-edge look; hover swaps to a brightness filter instead of opacity so
   // there's still a hover state without reintroducing transparency.
+  const upColor = dimmedMarketColor('--accent', '#9de137', 78);
+  const downColor = dimmedMarketColor('--red-400', '#f87171', 78);
   const sticks = volumes.map((v, i) => {
     const x = Math.round(xForIndex(i)), y = Math.round(yForVol(v));
     const w = Math.max(1, Math.round(stickW));
     const h = Math.max(1, baselineR - y);
     const up = i === 0 ? true : prices[i] >= prices[i - 1];
-    // Dimmed relative to the raw --accent/--red-400 tokens: at full brand intensity these bars
-    // read as a glaring, "glowing" outline against the near-black chart background (confirmed via
-    // computed-style + ancestor filter/shadow inspection - no actual outline/blur is being drawn,
-    // it's pure color-contrast bloom). Mixing in some black keeps hue/opacity intact but calms it.
-    const color = up ? 'color-mix(in srgb, var(--accent) 78%, black)' : 'color-mix(in srgb, var(--red-400, #f87171) 78%, black)';
+    const color = up ? upColor : downColor;
     return `<rect data-idx="${i}" class="lp-market-candlestick" x="${x}" y="${y}" width="${w}" height="${h}" fill="${color}"/>`;
   }).join('');
 
