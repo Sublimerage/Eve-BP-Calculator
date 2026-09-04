@@ -1787,28 +1787,45 @@ body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var
    chart), matching feedback that the earlier gradient/glow/bar treatment read as busy rather than
    polished. Text coordinates are rounded to whole pixels everywhere in js/lpstore.js (not
    sub-pixel .toFixed(1) values like the path geometry) - fractional positioning is what was making
-   the axis labels look soft/blurry, a real SVG rendering quirk, not a color or size problem. */
+   the axis labels look soft/blurry, a real SVG rendering quirk, not a color or size problem.
+
+   THE ACTUAL "white outline on the candlesticks" / "text too bold and thick, blurry and glowing"
+   bug, found via pixel-sampling then confirmed on the live, untouched DOM (getComputedStyle, no
+   canvas/rasterizing tricks involved): svg[viewBox] { stroke: currentColor; } (search this file for
+   that selector) is a sitewide reset for small line-art icon SVGs (nav icons, button icons - they
+   want stroke:currentColor, fill:none). `stroke` is an INHERITED SVG property, and every chart SVG
+   this file builds also carries a viewBox attribute, so that rule ALSO applied to every shape and
+   every <text> glyph inside these charts that doesn't set its own stroke - candlestick rects, the
+   price-area fill, and BOTH label classes below all silently got a 1px near-white
+   (rgb(242,243,245), i.e. var(--text)) stroke on top of their real fill. That's a literal outline
+   on the bars and a literal outline on every glyph - not blur, not color/size, an actual second
+   paint operation, invisible in any of this file's own rules since none of them declared a stroke
+   for these elements at all. The single stroke:none block below the grid rules resets it for both
+   chart roots; grid lines/avg-line/crosshair/the price line's inline stroke/the hover-dot's own
+   stroke all still work because a directly-set stroke always wins over an inherited one regardless
+   of where in the tree it came from - only elements with no stroke of their own were affected. */
 .lp-market-chart-grid line { stroke: rgba(255,255,255,0.06); stroke-width: 1; shape-rendering: crispEdges; }
 .lp-market-chart-grid line.v { stroke: rgba(255,255,255,0.03); }
+#lp-market-price-svg, #lp-market-volume-svg { stroke: none; }
 .lp-market-chart-axis-label { font-size: 11px; fill: var(--text-soft); font-family: 'IBM Plex Mono', monospace; text-rendering: optimizeLegibility; }
 .lp-market-avg-line { stroke: var(--text-mute); stroke-width: 1; stroke-dasharray: 3 3; shape-rendering: crispEdges; }
 .lp-market-avg-label { font-size: 10px; fill: var(--text-mute); font-family: 'IBM Plex Mono', monospace; }
-/* Dimmed via color-mix rather than the raw --accent token - confirmed (computed-style + ancestor
-   filter/backdrop-filter/shadow inspection, all inactive) that the "glowy/thick/outlined" look was
-   never a rendering bug: it's --accent's own brand intensity (a very bright, saturated lime/orange
-   depending on theme) painted at full strength on a near-black card. Scoped to this chart only -
-   --accent itself is untouched everywhere else on the site. */
-.lp-market-price-line { fill: none; stroke: color-mix(in srgb, var(--accent) 78%, black); stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; }
-.lp-market-price-area { fill: color-mix(in srgb, var(--accent) 78%, black); opacity: 0.08; }
+/* fill/stroke color is NOT set here on purpose - js/lpstore.js's dimmedMarketColor() computes a
+   78%-toward-black mix of --accent/--red-400 (plain arithmetic, not color-mix()) and sets it as an
+   inline style/attribute per element instead, since --accent alone reads too bright/saturated
+   against this near-black card. See buildPriceLineChart/buildVolumeCandlestickChart. */
+.lp-market-price-line { fill: none; stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; }
+.lp-market-price-area { opacity: 0.08; }
 .lp-market-volume-line { fill: none; stroke: var(--text-soft); stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; }
-/* Flat fill, no stroke - candlestick geometry is integer-rounded (see js/lpstore.js) and crispEdges
-   is belt-and-suspenders on top of that: sharp axis-aligned rectangles, nothing worth anti-aliasing.
-   Fill color itself is dimmed at the source in js/lpstore.js, same reasoning as the price line above.
+/* Flat fill, no stroke (the stroke:none reset above the grid rules is what actually guarantees
+   that now - see its comment) - candlestick geometry is integer-rounded (see js/lpstore.js) and
+   crispEdges is belt-and-suspenders on top of that: sharp axis-aligned rectangles, nothing worth
+   anti-aliasing. Fill color itself is set inline per bar in js/lpstore.js.
    Hover swaps to a brightness bump (not an opacity toggle) so the highlighted bar stays a flat,
    fully-opaque color instead of turning translucent against the card background. */
 .lp-market-candlestick { shape-rendering: crispEdges; }
 .lp-market-candlestick.is-hovered { filter: brightness(1.3); }
-.lp-market-hover-dot { fill: color-mix(in srgb, var(--accent) 78%, black); stroke: var(--bg-0); stroke-width: 2; }
+.lp-market-hover-dot { stroke: var(--bg-0); stroke-width: 2; }
 .lp-market-hover-dot.muted { fill: var(--text-soft); }
 .lp-market-crosshair { stroke: rgba(255,255,255,0.2); stroke-width: 1; shape-rendering: crispEdges; }
 .lp-market-chart-tooltip {
