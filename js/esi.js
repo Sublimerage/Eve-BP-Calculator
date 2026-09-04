@@ -1166,7 +1166,18 @@ async function fetchSystemSCIById(systemId, systemName) {
     if (sciBadgeEl) {
       sciBadgeEl.textContent = `System: ${systemName.toUpperCase()}${secLabel} | SCI: ${(mfgSCI * 100).toFixed(2)}% (Mfg) / ${(reactSCI * 100).toFixed(2)}% (React) / ${(inventionSCI * 100).toFixed(2)}% (Invention)`;
     }
-    if (typeof recalculate === 'function') recalculate();
+    // Awaited (not fire-and-forget) so this function's own promise doesn't resolve until the
+    // recalculation triggered by the system change is actually done. This matters beyond just this
+    // page: loadProductionPreset (js/app.js) awaits selectSolarSystem (which awaits this) and then
+    // fires its OWN recalculate() once facility/tax/rig settings are updated - without this await,
+    // that produced two overlapping, unordered recalculate passes. Harmless on most pages, but on
+    // the LP Store page (js/lpstore.js) both passes accumulate into the same global
+    // window.__lpSpentThisRecalc, which the wrapped recalculate() resets to 0 at the start of each
+    // call - two interleaved passes could stomp each other's total and leave whichever one's DOM
+    // update landed last showing a stale/wrong ISK-per-LP, exactly the sort of thing a single
+    // later recalculate (e.g. toggling a component's buy mode) would then "fix" by simply not
+    // racing anything. Awaiting here serializes the two calls instead.
+    if (typeof recalculate === 'function') await recalculate();
   } catch (err) {
     console.warn('System SCI fetch error:', err);
   }
