@@ -1235,21 +1235,29 @@ function buildPriceLineChart(rows, container) {
   const lastX = points[n - 1][0], lastY = points[n - 1][1];
   const gridY1 = padT, gridYMid = yForPrice(yMid), gridY2 = padT + innerH, avgY = yForPrice(avgP);
 
+  // Grid/reference lines are hairlines (stroke-width 1) at whatever fractional Y a price/date
+  // happens to fall at - exactly like the sub-pixel TEXT positions fixed elsewhere in this file
+  // (see the Math.round() note below), a 1px line straddling two device pixels anti-aliases into a
+  // soft ~2px smear instead of one crisp line. Rounded to the pixel grid for the same reason text
+  // coordinates are - this only applies to straight hairline geometry; the price line's own curve
+  // keeps sub-pixel precision (smoothness there benefits from it, and a curve doesn't have the
+  // single-hard-edge-per-pixel-row shape that makes off-grid placement read as blur).
+  const gridY1R = Math.round(gridY1), gridYMidR = Math.round(gridYMid), gridY2R = Math.round(gridY2), avgYR = Math.round(avgY);
   const vLineCount = Math.min(4, n - 1);
   const vLines = Array.from({ length: vLineCount + 1 }, (_, i) => {
-    const x = (padL + (i / vLineCount) * innerW).toFixed(1);
-    return `<line class="v" x1="${x}" y1="${gridY1}" x2="${x}" y2="${gridY2}"/>`;
+    const x = Math.round(padL + (i / vLineCount) * innerW);
+    return `<line class="v" x1="${x}" y1="${gridY1R}" x2="${x}" y2="${gridY2R}"/>`;
   }).join('');
 
   container.innerHTML = `
     <svg id="lp-market-price-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:${W}px; height:${H}px; display:block; cursor:crosshair;">
       <g class="lp-market-chart-grid">
         ${vLines}
-        <line x1="${padL}" y1="${gridY1}" x2="${W - padR}" y2="${gridY1}"/>
-        <line x1="${padL}" y1="${gridYMid.toFixed(1)}" x2="${W - padR}" y2="${gridYMid.toFixed(1)}"/>
-        <line x1="${padL}" y1="${gridY2}" x2="${W - padR}" y2="${gridY2}"/>
+        <line x1="${padL}" y1="${gridY1R}" x2="${W - padR}" y2="${gridY1R}"/>
+        <line x1="${padL}" y1="${gridYMidR}" x2="${W - padR}" y2="${gridYMidR}"/>
+        <line x1="${padL}" y1="${gridY2R}" x2="${W - padR}" y2="${gridY2R}"/>
       </g>
-      <line class="lp-market-avg-line" x1="${padL}" y1="${avgY.toFixed(1)}" x2="${W - padR}" y2="${avgY.toFixed(1)}"/>
+      <line class="lp-market-avg-line" x1="${padL}" y1="${avgYR}" x2="${W - padR}" y2="${avgYR}"/>
       <text class="lp-market-avg-label" x="${W - padR - 3}" y="${Math.round(avgY - 4)}" text-anchor="end">avg ${window.formatISKCompact(avgP)}</text>
       <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${Math.round(gridY1 + 4)}" text-anchor="end">${window.formatISKCompact(yMax)}</text>
       <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${Math.round(gridYMid + 3.5)}" text-anchor="end">${window.formatISKCompact(yMid)}</text>
@@ -1314,24 +1322,37 @@ function buildVolumeCandlestickChart(rows, container) {
   const yForVol = (v) => padT + innerH - (v / maxV) * innerH;
   const baseline = padT + innerH;
   const avgY = yForVol(avgV);
+  // Same pixel-grid rounding as the price chart's grid/avg lines, applied to the baseline too - see
+  // that function's own comment on why hairline geometry needs this and curves don't.
+  const baselineR = Math.round(baseline), avgYR = Math.round(avgY);
 
   const vLineCount = Math.min(4, n - 1);
   const vLines = Array.from({ length: vLineCount + 1 }, (_, i) => {
-    const x = (padL + (i / vLineCount) * innerW).toFixed(1);
-    return `<line class="v" x1="${x}" y1="${padT}" x2="${x}" y2="${baseline.toFixed(1)}"/>`;
+    const x = Math.round(padL + (i / vLineCount) * innerW);
+    return `<line class="v" x1="${x}" y1="${padT}" x2="${x}" y2="${baselineR}"/>`;
   }).join('');
 
+  // Candlestick rects get the identical treatment, and for the identical reason - a filled shape
+  // with a hard edge (unlike the price line's smooth curve) reads as a soft glow/outline when that
+  // edge sits between two device pixels instead of on one. Rounding x/y/width/height to the pixel
+  // grid, plus shape-rendering:crispEdges (belt and suspenders - tells the renderer to prioritize
+  // sharp edges over anti-aliased ones for this exact case), removes it. Flat full opacity now too,
+  // not 80% - a semi-transparent fill anti-aliasing against the card background underneath was
+  // compounding the same soft-edge look; hover swaps to a brightness filter instead of opacity so
+  // there's still a hover state without reintroducing transparency.
   const sticks = volumes.map((v, i) => {
-    const x = xForIndex(i), y = yForVol(v);
+    const x = Math.round(xForIndex(i)), y = Math.round(yForVol(v));
+    const w = Math.max(1, Math.round(stickW));
+    const h = Math.max(1, baselineR - y);
     const up = i === 0 ? true : prices[i] >= prices[i - 1];
     const color = up ? 'var(--accent)' : 'var(--red-400, #f87171)';
-    return `<rect data-idx="${i}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${stickW.toFixed(1)}" height="${Math.max(0.5, baseline - y).toFixed(1)}" fill="${color}" opacity="0.8"/>`;
+    return `<rect data-idx="${i}" class="lp-market-candlestick" x="${x}" y="${y}" width="${w}" height="${h}" fill="${color}"/>`;
   }).join('');
 
   container.innerHTML = `
     <svg id="lp-market-volume-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:${W}px; height:${H}px; display:block; cursor:crosshair;">
-      <g class="lp-market-chart-grid">${vLines}<line x1="${padL}" y1="${baseline.toFixed(1)}" x2="${W - padR}" y2="${baseline.toFixed(1)}"/></g>
-      <line class="lp-market-avg-line" x1="${padL}" y1="${avgY.toFixed(1)}" x2="${W - padR}" y2="${avgY.toFixed(1)}"/>
+      <g class="lp-market-chart-grid">${vLines}<line x1="${padL}" y1="${baselineR}" x2="${W - padR}" y2="${baselineR}"/></g>
+      <line class="lp-market-avg-line" x1="${padL}" y1="${avgYR}" x2="${W - padR}" y2="${avgYR}"/>
       <text class="lp-market-avg-label" x="${W - padR - 3}" y="${Math.round(avgY - 4)}" text-anchor="end">avg ${formatCompactMarketUnits(avgV)}</text>
       <text class="lp-market-chart-axis-label" x="${padL - 8}" y="${Math.round(padT + 6)}" text-anchor="end">${formatCompactMarketUnits(maxV)}</text>
       <text class="lp-market-chart-axis-label" x="${padL}" y="${Math.round(H - 6)}" text-anchor="start">${formatMarketDate(rows[0].date)}</text>
@@ -1349,9 +1370,9 @@ function buildVolumeCandlestickChart(rows, container) {
     let idx = Math.floor((relX - padL) / slotW);
     idx = Math.max(0, Math.min(n - 1, idx));
     if (idx !== hoveredIdx) {
-      svgEl.querySelectorAll('rect[data-idx]').forEach(el => el.style.opacity = '0.8');
+      svgEl.querySelectorAll('rect[data-idx]').forEach(el => el.classList.remove('is-hovered'));
       const el = svgEl.querySelector(`rect[data-idx="${idx}"]`);
-      if (el) el.style.opacity = '1';
+      if (el) el.classList.add('is-hovered');
       hoveredIdx = idx;
     }
     const x = xForIndex(idx) + stickW / 2, y = yForVol(volumes[idx]);
@@ -1361,7 +1382,7 @@ function buildVolumeCandlestickChart(rows, container) {
     tooltip.innerHTML = `<div class="lbl">${formatMarketDate(rows[idx].date)}</div><div class="val">${volumes[idx].toLocaleString()} units</div>`;
   });
   svgEl.addEventListener('pointerleave', () => {
-    svgEl.querySelectorAll('rect[data-idx]').forEach(el => el.style.opacity = '0.8');
+    svgEl.querySelectorAll('rect[data-idx]').forEach(el => el.classList.remove('is-hovered'));
     hoveredIdx = null;
     tooltip.style.display = 'none';
   });
