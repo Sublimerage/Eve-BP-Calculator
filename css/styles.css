@@ -1294,6 +1294,22 @@ body.page-calc .field-editable:focus {
   border-bottom-color: var(--accent) !important;
 }
 
+/* .num-no-spin: strips the browser's native up/down spinner buttons on a number input - meant for
+   the Ledger's inline Jobs/Runs editors, which size themselves down to as few as 2-3ch to fit a
+   dense row. The spinner buttons are unconditional chrome a <input type=number> always reserves
+   space for regardless of the input's own CSS width, and at that width they were eating nearly all
+   of it, leaving the actual digit clipped or invisible - not a sizing bug, a fixed cost this rule
+   removes. The keyboard/scroll up-down-arrow increment behavior is native to the input type and
+   unaffected - only the visible button chrome goes away. */
+body.page-calc .num-no-spin {
+  -moz-appearance: textfield;
+}
+body.page-calc .num-no-spin::-webkit-inner-spin-button,
+body.page-calc .num-no-spin::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 /* ============================================================
    Shared component vocabulary (originally built for Ledger + Invention, extended to the whole
    page-calc family so any page can reuse it) - small set of classes reused everywhere instead of
@@ -1333,6 +1349,14 @@ body.page-calc .lp-badge-danger { background: rgba(var(--red-rgb),0.18); color: 
    existing buy/sell toggle buttons, where buy is already the highlighted "usually more
    profitable" choice; sell gets this blue so the two are distinguishable at a glance. */
 body.page-calc .lp-badge-blue { background: rgba(106,152,222,0.18); color: #6a98de; }
+/* Same reasoning as .lp-badge-blue above, same fix - hardcoded rather than var(--violet), which
+   theme-unify also redirects onto --accent on the Ledger. A material acquired via an LP Store
+   redemption (js/optimizers.js's 'lp' price strategy) isn't a market purchase at all, so tagging it
+   BUY (the only two options this badge had before) was actively misleading, not just imprecise -
+   it reads as "go buy this on the market" for something you're not buying on the market. Reuses
+   --violet's own literal value (154,134,214 / #9a86d6), tying it to the same violet identity
+   redemption-requirement cards already use elsewhere in the LP Store. */
+body.page-calc .lp-badge-violet { background: rgba(154,134,214,0.18); color: #9a86d6; }
 
 /* Marks the blueprint-browser row for whatever's currently loaded into the calculator - persists
    across closing/reopening the drawer (even across a reload) since it's driven by a localStorage-
