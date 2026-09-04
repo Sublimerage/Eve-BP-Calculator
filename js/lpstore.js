@@ -169,7 +169,7 @@ let _lpRedemptionCount = 1;
 // recalculate() this page triggers, undoing that particular side effect without touching app.js at
 // all. The live, in-memory session (window.recipeTreeRoot etc.) is completely unaffected - only
 // what a FUTURE fresh load of index.html would read back.
-const CALCULATOR_STATE_KEYS = ['eve_active_product', 'eve_build_self_overrides', 'eve_custom_buy_modes', 'eve_custom_me_overrides', 'eve_custom_te_overrides', 'eve_global_runs', 'eve_root_sell_strategy', 'eve_root_custom_price'];
+const CALCULATOR_STATE_KEYS = ['eve_active_product', 'eve_build_self_overrides', 'eve_custom_buy_modes', 'eve_custom_me_overrides', 'eve_custom_te_overrides', 'eve_global_runs', 'eve_global_jobs', 'eve_root_sell_strategy', 'eve_root_custom_price'];
 
 function snapshotCalculatorState() {
   const snap = {};
