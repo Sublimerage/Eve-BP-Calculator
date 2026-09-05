@@ -1621,8 +1621,8 @@ window.addEventListener('resize', () => {
 
 // --- Rendering: ranked list -------------------------------------------------------------------
 
-function getLPStoreIconUrl(typeId, isBpc) {
-  return `https://images.evetech.net/types/${typeId}/${isBpc ? 'bpc' : 'icon'}?size=32`;
+function getLPStoreIconUrl(typeId, isBpc, size) {
+  return `https://images.evetech.net/types/${typeId}/${isBpc ? 'bpc' : 'icon'}?size=${size || 32}`;
 }
 
 // Final stage of the icon fallback chain (icon -> render -> this) - swaps a genuinely-imageless
@@ -2120,10 +2120,87 @@ window.toggleLPOwnedPopover = toggleLPOwnedPopover;
 // --- Find Item: reverse search across every known LP store -----------------------------------
 // The corp popover goes corp -> items; this goes the other way, item -> every corp that sells or
 // grants it. That needs at least one offers fetch per corp (fetchLPStoreOffers already caches per
-// corpId, so a corp the user's already browsed this session doesn't refetch) - ~180 stores, so
-// built once per page load (not per keystroke) and cached in _lpItemSearchIndex.
+// corpId, so a corp the user's already browsed this session doesn't refetch) - ~180 stores, plus a
+// market price lookup for every distinct item touched. _lpItemSearchIndex caches this in memory for
+// the rest of the current page load; LP_ITEM_SEARCH_CACHE_KEY (below) additionally persists it to
+// localStorage so a page RELOAD doesn't repeat the same ~180-store fetch from scratch every time
+// (confirmed report: "is it loading from the API every time?" - yes, it was, since a plain JS
+// variable doesn't survive a reload). ESI's own store-offers route documents itself as expiring
+// server-side "daily at 11:05", so the underlying data can't have changed more often than that
+// anyway - a several-hour client cache doesn't throw away anything actually fresh.
 let _lpItemSearchIndex = null;   // null until built; array of flat, lightweight entries after
 let _lpItemSearchBuilding = false;
+const LP_ITEM_SEARCH_CACHE_KEY = 'eve_lpstore_item_search_cache';
+const LP_ITEM_SEARCH_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+// Stored as compact array tuples, not named-key objects, and derived text (outputName,
+// requiredItemsSummary, profit, iskPerLp) isn't stored at all - only the raw ids/quantities are,
+// with names and prices deduplicated by type id in their own small maps instead of repeated in
+// full across ~32,000 entries. A first attempt storing fully-enriched objects measured at ~9MB,
+// uncomfortably close to (or over) the ~5-10MB localStorage quota most browsers enforce; this
+// compact form is a handful of numbers per entry plus two small lookup maps, several times smaller
+// for the exact same underlying data. loadLPItemSearchIndexCache re-derives everything else
+// (outputName/requiredItemsSummary/profit/iskPerLp) the same way buildLPItemSearchIndex does,
+// which is pure local computation once the caches below are warmed - no network calls either way.
+function saveLPItemSearchIndexCache(entries) {
+  try {
+    const typeIds = new Set();
+    const compactEntries = entries.map(e => {
+      typeIds.add(e.outputTypeId);
+      const req = (e.requiredItems || []).map(r => { typeIds.add(r.type_id); return [r.type_id, r.quantity]; });
+      return [e.corpId, e.offerId, e.outputTypeId, e.outputQty, e.isBpc ? 1 : 0, e.iskCost, e.lpCost, req];
+    });
+    const names = {}, prices = {};
+    typeIds.forEach(id => {
+      names[id] = getLPItemName(id);
+      const p = window.priceCache[id];
+      if (p) prices[id] = [p.sell || 0, p.buy || 0];
+    });
+    localStorage.setItem(LP_ITEM_SEARCH_CACHE_KEY, JSON.stringify({ builtAt: Date.now(), entries: compactEntries, names, prices }));
+  } catch (e) {
+    // Quota exceeded or similar, e.g. a browser with localStorage disabled entirely - non-fatal,
+    // it just means the next open rebuilds from scratch same as every open did before this cache
+    // existed, not a broken feature.
+    console.warn('[LP Store] Failed to cache the item search index (will rebuild fresh next time):', e);
+  }
+}
+
+function loadLPItemSearchIndexCache() {
+  try {
+    const raw = localStorage.getItem(LP_ITEM_SEARCH_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.entries) || Date.now() - parsed.builtAt > LP_ITEM_SEARCH_CACHE_TTL_MS) return null;
+
+    // Warms the SAME shared name/price caches getLPItemName/window.priceCache read from everywhere
+    // else in this file (only filling gaps - never overwriting anything already resolved this
+    // session) - a cache-loaded item search also means the ranked list/Isolate don't need to
+    // refetch these specific items' names or prices either, not just this feature.
+    Object.entries(parsed.names || {}).forEach(([id, name]) => { if (!_lpResolvedNames[id]) _lpResolvedNames[id] = name; });
+    Object.entries(parsed.prices || {}).forEach(([id, pair]) => { if (!window.priceCache[id]) window.priceCache[id] = { sell: pair[0], buy: pair[1] }; });
+
+    const corpsById = new Map(LP_STORE_CORPS.map(c => [c.corpId, c]));
+    const { salesTax, brokerFee } = window.getActiveFeeInputs ? window.getActiveFeeInputs() : { salesTax: 0.036, brokerFee: 0.01 };
+    return parsed.entries.map(([corpId, offerId, outputTypeId, outputQty, isBpcFlag, iskCost, lpCost, req]) => {
+      const corp = corpsById.get(corpId);
+      const outputName = getLPItemName(outputTypeId);
+      const requiredItemsSummary = req.length
+        ? req.map(([tId, qty]) => `${qty}x ${getLPItemName(tId)}`).join(', ')
+        : (iskCost > 0 ? 'ISK + LP only' : 'LP only');
+      const outputPrice = (window.priceCache[outputTypeId] || {}).sell || 0;
+      const revenue = (outputPrice * outputQty) * (1 - salesTax - brokerFee);
+      const requiredItemsCost = req.reduce((sum, [tId, qty]) => sum + ((window.priceCache[tId] || {}).sell || 0) * qty, 0);
+      const profit = revenue - iskCost - requiredItemsCost;
+      return {
+        corpId, corpName: corp ? corp.corpName : `Corporation ${corpId}`, color: corp ? corp.color : 'var(--text-mute)',
+        offerId, outputTypeId, outputQty, isBpc: !!isBpcFlag, iskCost, lpCost, outputName, requiredItemsSummary,
+        profit, iskPerLp: lpCost > 0 ? profit / lpCost : null
+      };
+    });
+  } catch (e) {
+    return null;
+  }
+}
 
 // Same concurrency-limited-map shape as scripts/fetch_lp_corps.js's own mapWithConcurrency (a
 // separate Node-only script, not loaded in the browser, so this is a small duplicate rather than a
@@ -2142,6 +2219,15 @@ async function mapWithConcurrencyLP(items, concurrency, worker) {
 async function buildLPItemSearchIndex() {
   if (_lpItemSearchIndex || _lpItemSearchBuilding) return;
   _lpItemSearchBuilding = true;
+
+  const cached = loadLPItemSearchIndexCache();
+  if (cached) {
+    _lpItemSearchIndex = cached;
+    _lpItemSearchBuilding = false;
+    filterLPItemSearchResults(document.getElementById('lpstore-item-search-input')?.value || '');
+    return;
+  }
+
   const resultsEl = document.getElementById('lpstore-item-search-results');
   const setProgress = (done) => {
     if (resultsEl) resultsEl.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">Indexing every LP store... ${done}/${LP_STORE_CORPS.length}</div>`;
@@ -2211,6 +2297,7 @@ async function buildLPItemSearchIndex() {
 
   _lpItemSearchIndex = entries;
   _lpItemSearchBuilding = false;
+  saveLPItemSearchIndexCache(entries);
   filterLPItemSearchResults(document.getElementById('lpstore-item-search-input')?.value || '');
 }
 
@@ -2277,9 +2364,16 @@ function lpItemSearchGroupHTML(group) {
     if (b.entry.iskPerLp !== null) return 1;
     return a.entry.lpCost - b.entry.lpCost;
   });
+  // Same icon + onerror fallback chain the ranked list's own rows already use (icon -> render -> a
+  // generic placeholder via handleLPIconLoadError, for the confirmed real case of SKINs having
+  // neither) - see that code's own comment for why. Shown once per group, same as the name itself,
+  // rather than repeated per corp row.
+  const iconUrl = getLPStoreIconUrl(group.outputTypeId, group.isBpc, 64);
+  const iconFallback = `this.onerror=function(){window.handleLPIconLoadError(this);}; this.src='https://images.evetech.net/types/${group.outputTypeId}/render?size=64';`;
   return `
     <div class="lpstore-item-search-group">
       <div class="lpstore-item-search-group-header">
+        <img src="${iconUrl}" alt="" class="lpstore-item-search-group-icon" loading="lazy" onerror="${iconFallback}">
         <span class="lpstore-item-search-group-name">${window.esc(group.outputName)}</span>
         ${group.isBpc ? '<span class="lpstore-item-search-bpc-tag">BPC</span>' : ''}
         <span class="lpstore-item-search-group-count">${group.entries.length} corp${group.entries.length === 1 ? '' : 's'}</span>
