@@ -579,7 +579,13 @@ svg[viewBox] { stroke: currentColor; }
 }
 .lpstore-corp-row:hover { background: rgba(255,255,255,0.06); }
 .lpstore-corp-row-active { background: rgba(var(--accent-rgb), 0.14); }
-.lpstore-corp-row-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+/* Real corp logo (js/lpstore.js lpCorpLogoHTML), shared by every corp row in this file (corp
+   picker, LP Owned, Find Item) - the colored circle IS the element, not a separate fallback node;
+   the logo <img> sits on top of it and removes itself on a load error (onerror), so a corp whose
+   logo asset doesn't load just shows the plain colored circle underneath instead of a broken-image
+   icon or empty gap. */
+.lpstore-corp-logo-wrap { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.lpstore-corp-logo { width: 100%; height: 100%; object-fit: cover; }
 .lpstore-corp-row-name { color: var(--text); font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lpstore-corp-row-faction { font-size: 13px; font-weight: 600; flex-shrink: 0; }
 
@@ -589,25 +595,31 @@ svg[viewBox] { stroke: currentColor; }
    the item's own name on every single row ("no point to repeat the name over and over again"). This
    whole area is a full-width main-content section now (#lpstore-item-search-area in lpstore.html),
    not a small popover, so nothing here needs the popover's own width/scroll constraints. */
-.lpstore-item-search-group + .lpstore-item-search-group { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--glass-border); }
-.lpstore-item-search-group-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.lpstore-item-search-group-name { font-weight: 700; font-size: 14px; color: var(--text); }
-.lpstore-item-search-group-count { margin-left: auto; font-size: 11px; color: var(--text-mute); flex-shrink: 0; }
-.lpstore-item-search-group-rows { display: flex; flex-direction: column; gap: 5px; }
+.lpstore-item-search-group + .lpstore-item-search-group { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border); }
+.lpstore-item-search-group-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.lpstore-item-search-group-name { font-weight: 700; font-size: 17px; color: var(--text); }
+.lpstore-item-search-group-count { margin-left: auto; font-size: 12.5px; color: var(--text-mute); flex-shrink: 0; }
+.lpstore-item-search-group-rows { display: flex; flex-direction: column; gap: 6px; }
 /* Corps you already have enough LP with float to the top of their item's group (sorted in
    lpItemSearchGroupHTML) and get a faint accent tint here so that's visible at a glance, not just
    from position - matches the "corporations I have the LP for it to show up at the top" request. */
 .lpstore-item-search-corp-row {
-  display: flex; align-items: center; gap: 10px; width: 100%;
-  padding: 9px 12px; border-radius: var(--radius-input); text-align: left; cursor: pointer;
-  background: rgba(255,255,255,0.02); font-size: 13.5px;
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 12px 14px; border-radius: var(--radius-input); text-align: left; cursor: pointer;
+  background: rgba(255,255,255,0.02); font-size: 15px;
 }
 .lpstore-item-search-corp-row:hover { background: rgba(255,255,255,0.07); }
 .lpstore-item-search-corp-row-affordable { background: rgba(var(--accent-rgb), 0.10); }
 .lpstore-item-search-corp-row-affordable:hover { background: rgba(var(--accent-rgb), 0.16); }
-.lpstore-item-search-corp-row-cost { margin-left: auto; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: var(--text-soft); white-space: nowrap; }
+/* Cost line + Est. ISK/LP line, stacked and right-aligned, so the row reads: corp name on the
+   left, everything about the deal on the right. */
+.lpstore-item-search-corp-row-stats { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.lpstore-item-search-corp-row-cost { font-size: 13.5px; font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
+.lpstore-item-search-isk { color: var(--cost); }
+.lpstore-item-search-lp { color: #c084fc; }
+.lpstore-item-search-profit { font-size: 12.5px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
 .lpstore-item-search-bpc-tag { font-size: 9.5px; font-weight: 700; color: #c084fc; border: 1px solid rgba(192,132,252,0.4); border-radius: 4px; padding: 1px 4px; vertical-align: 1px; }
-.lpstore-item-search-lp-badge { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
+.lpstore-item-search-lp-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
 .lpstore-item-search-lp-ok { background: rgba(var(--accent-rgb), 0.18); color: var(--accent); }
 .lpstore-item-search-lp-short { background: rgba(255,255,255,0.06); color: var(--text-mute); }
 
