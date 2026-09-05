@@ -601,6 +601,7 @@ svg[viewBox] { stroke: currentColor; }
    not a small popover, so nothing here needs the popover's own width/scroll constraints. */
 .lpstore-item-search-group + .lpstore-item-search-group { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border); }
 .lpstore-item-search-group-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.lpstore-item-search-group-icon { width: 36px; height: 36px; border-radius: var(--radius-input); background: rgba(255,255,255,0.06); flex-shrink: 0; object-fit: contain; }
 .lpstore-item-search-group-name { font-weight: 700; font-size: 17px; color: var(--text); }
 .lpstore-item-search-group-count { margin-left: auto; font-size: 12.5px; color: var(--text-mute); flex-shrink: 0; }
 .lpstore-item-search-group-rows { display: flex; flex-direction: column; gap: 6px; }
