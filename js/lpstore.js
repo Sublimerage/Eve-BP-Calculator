@@ -2215,12 +2215,16 @@ async function buildLPItemSearchIndex() {
 }
 
 // Small <img>+fallback pattern shared by every corp row in this file (corp picker, LP Owned, Find
-// Item) - a real logo is far more recognizable than an abstract color dot. The colored circle is
-// the element itself, not a separate fallback node - the logo sits on top of it, and if the image
-// 404s (removed via onerror) the plain colored circle underneath just shows through, so there's
-// always something sensible on screen either way.
+// Item) - a real logo is far more recognizable than an abstract color dot. The wrap's own
+// background is a neutral, fixed tone (not the corp's color) - a good many corp logo PNGs have
+// real transparent regions around the emblem, and coloring the wrap behind them showed as a
+// distracting colored halo THROUGH the logo even when it loaded fine, not just as a fallback for a
+// failed one (confirmed report: "strange blue background" - Caldari-faction corps' assigned color
+// is blue). The corp's own color only ever appears as a plain background if the logo fails to load
+// at all (removed via onerror, at which point this fills in as a color-coded fallback instead of a
+// blank circle). size=64 (was 32) since the display size is considerably bigger now too.
 function lpCorpLogoHTML(corpId, color) {
-  return `<span class="lpstore-corp-logo-wrap" style="background:${color};"><img src="https://images.evetech.net/corporations/${corpId}/logo?size=32" alt="" loading="lazy" class="lpstore-corp-logo" onerror="this.remove();"></span>`;
+  return `<span class="lpstore-corp-logo-wrap"><img src="https://images.evetech.net/corporations/${corpId}/logo?size=64" alt="" loading="lazy" class="lpstore-corp-logo" onerror="this.remove(); this.parentElement.style.background='${color}';"></span>`;
 }
 
 // One row per CORP within an item's group (see filterLPItemSearchResults below) - the item name
