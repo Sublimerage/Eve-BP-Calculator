@@ -540,7 +540,17 @@ svg[viewBox] { stroke: currentColor; }
 /* LP Store corporation picker (js/lpstore.js renderLPStoreCorpList) - search-or-browse over ~180
    corps/19 factions, replacing what used to be a 9-option <select>. Faction headers collapse to one
    line each by default (a flat, always-visible 180-row list would defeat the point of not being a
-   giant dropdown); clicking one expands just that faction's own corp rows below it. */
+   giant dropdown); clicking one expands just that faction's own corp rows below it.
+
+   The picker itself lives in #lpstore-corp-popover, absolutely positioned off the persistent
+   #lpstore-corp-switcher bar in lpstore.html - it used to be a full flyout-panel section, which
+   meant opening/closing a whole overlay every time you wanted to change corp, and that overlay
+   covered the ranked-offer list underneath it while open. Anchoring it to the switcher bar instead
+   means only a compact area right below the bar is ever covered, and it's reachable without going
+   through the icon-rail at all. */
+/* Positioning only - background/border/shadow come from the .glass-card class this also carries
+   in the HTML, the same surface treatment every other floating panel in the app already uses. */
+.lpstore-corp-popover { position: absolute; top: 100%; left: 12px; right: 12px; margin-top: 8px; z-index: 30; padding: 12px; }
 .lpstore-corp-list { max-height: 280px; overflow-y: auto; border-radius: var(--radius-input); border: 1px solid var(--glass-border); }
 .lpstore-corp-faction-group + .lpstore-corp-faction-group { border-top: 1px solid var(--glass-border); }
 .lpstore-corp-faction-header {
