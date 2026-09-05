@@ -9,7 +9,7 @@
 <title>EVE LP Store Calculator</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8ff4d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='5'/%3E%3Cpath d='M8.5 12.5L7 21l5-3 5 3-1.5-8.5'/%3E%3C/svg%3E">
 <link class="cache-bust" rel="stylesheet" href="css/tailwind-build.css?v=1.0.4">
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.49.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.50.0">
 <script>(function(){try{var t=localStorage.getItem('eve_color_theme');if(t&&t!=='lime')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
@@ -115,10 +115,17 @@
 
           <div id="flyout-store" class="flyout-section">
             <div class="fo-group">
-              <label class="lp-label fo-group-label" for="lpstore-corp-select">Faction Warfare LP Store</label>
-              <select id="lpstore-corp-select" onchange="selectLPStoreCorp(this.value)" class="field-line w-full font-bold text-xs">
-                <option value="">— Choose a warzone LP store —</option>
-              </select>
+              <label class="lp-label fo-group-label" for="lpstore-corp-search">NPC Corporation LP Store</label>
+              <!-- Search + browse, not a dropdown - 181 corps across 19 factions doesn't fit one
+                   (see js/lpstore.js's own note on LP_STORE_CORPS/renderLPStoreCorpList). Typing
+                   filters to a flat list of matches (by corp OR faction name); an empty box shows
+                   the full roster grouped by faction, collapsed to one line each until clicked. -->
+              <div class="relative">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-mute);pointer-events:none;"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.5" y2="15.5"/></svg>
+                <input type="text" id="lpstore-corp-search" placeholder="Search corporation or faction..." autocomplete="off" oninput="filterLPStoreCorpList(this.value)" class="field-box w-full text-white font-bold mono text-sm" style="padding:9px 12px 9px 34px;">
+              </div>
+              <div id="lpstore-corp-list" class="lpstore-corp-list mt-2"></div>
+              <div class="text-[10px] mono mt-2" style="color:var(--text-mute);">Currently: <span id="lpstore-corp-active-label" style="font-weight:bold;">— none selected —</span></div>
               <p class="text-[10px] mt-2 leading-relaxed" style="color:var(--text-mute);">
                 Ranked by <b>estimated ISK profit per LP spent</b>, regardless of your current standing or access - that's on you to sort out in-game. Every price (required items to acquire, output to sell) assumes the Jita sell/instant-buy price, output net of your Sales Tax + Broker Fee below. This ranking is a quick estimate - for a BPC offer, isolate it to open the exact same interactive build tree the Calculator uses.
               </p>
@@ -472,7 +479,7 @@
   <script src="js/tree.js?v=8.0.3" defer></script>
   <script src="js/optimizers.js?v=8.0.7" defer></script>
   <script src="js/app.js?v=15.37.2" defer></script>
-  <script src="js/lpstore.js?v=7.9.0" defer></script>
+  <script src="js/lpstore.js?v=7.10.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
