@@ -583,19 +583,31 @@ svg[viewBox] { stroke: currentColor; }
 .lpstore-corp-row-name { color: var(--text); font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lpstore-corp-row-faction { font-size: 13px; font-weight: 600; flex-shrink: 0; }
 
-/* Find Item reverse-search results (js/lpstore.js lpItemSearchRowHTML) - two lines per row (item +
-   corp on top, cost + optional "do I have the LP" badge below), unlike the single-line corp-picker
-   rows above, since there's more to show per result here. */
-.lpstore-item-search-row {
-  display: flex; flex-direction: column; gap: 4px; width: 100%;
-  padding: 10px 12px; text-align: left; cursor: pointer;
-  border-top: 1px solid rgba(255,255,255,0.03);
+/* Find Item reverse-search results (js/lpstore.js lpItemSearchGroupHTML/lpItemSearchCorpRowHTML) -
+   grouped by item (one header, shown once, per distinct item found) with every corp that offers it
+   nested underneath as its own row - replacing an earlier flat per-offer-row version that repeated
+   the item's own name on every single row ("no point to repeat the name over and over again"). This
+   whole area is a full-width main-content section now (#lpstore-item-search-area in lpstore.html),
+   not a small popover, so nothing here needs the popover's own width/scroll constraints. */
+.lpstore-item-search-group + .lpstore-item-search-group { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--glass-border); }
+.lpstore-item-search-group-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.lpstore-item-search-group-name { font-weight: 700; font-size: 14px; color: var(--text); }
+.lpstore-item-search-group-count { margin-left: auto; font-size: 11px; color: var(--text-mute); flex-shrink: 0; }
+.lpstore-item-search-group-rows { display: flex; flex-direction: column; gap: 5px; }
+/* Corps you already have enough LP with float to the top of their item's group (sorted in
+   lpItemSearchGroupHTML) and get a faint accent tint here so that's visible at a glance, not just
+   from position - matches the "corporations I have the LP for it to show up at the top" request. */
+.lpstore-item-search-corp-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 12px; border-radius: var(--radius-input); text-align: left; cursor: pointer;
+  background: rgba(255,255,255,0.02); font-size: 13.5px;
 }
-.lpstore-item-search-row:hover { background: rgba(255,255,255,0.06); }
-.lpstore-item-search-row-main { display: flex; align-items: center; gap: 8px; }
-.lpstore-item-search-row-cost { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-left: 18px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: var(--text-soft); }
-.lpstore-item-search-bpc-tag { font-size: 9.5px; font-weight: 700; color: #c084fc; border: 1px solid rgba(192,132,252,0.4); border-radius: 4px; padding: 1px 4px; margin-left: 4px; vertical-align: 1px; }
-.lpstore-item-search-lp-badge { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.lpstore-item-search-corp-row:hover { background: rgba(255,255,255,0.07); }
+.lpstore-item-search-corp-row-affordable { background: rgba(var(--accent-rgb), 0.10); }
+.lpstore-item-search-corp-row-affordable:hover { background: rgba(var(--accent-rgb), 0.16); }
+.lpstore-item-search-corp-row-cost { margin-left: auto; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace; color: var(--text-soft); white-space: nowrap; }
+.lpstore-item-search-bpc-tag { font-size: 9.5px; font-weight: 700; color: #c084fc; border: 1px solid rgba(192,132,252,0.4); border-radius: 4px; padding: 1px 4px; vertical-align: 1px; }
+.lpstore-item-search-lp-badge { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
 .lpstore-item-search-lp-ok { background: rgba(var(--accent-rgb), 0.18); color: var(--accent); }
 .lpstore-item-search-lp-short { background: rgba(255,255,255,0.06); color: var(--text-mute); }
 
