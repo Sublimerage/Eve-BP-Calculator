@@ -1649,22 +1649,27 @@ function renderLPStoreSummaryTiles() {
   const best = _lpRankedResults.filter(r => r.iskPerLp !== null).sort((a, b) => b.iskPerLp - a.iskPerLp)[0];
   const bpcCount = _lpRankedResults.filter(r => r.offerType === 'bpc').length;
 
+  // One shared row, not 4 separate boxed cards - the individual .lp-card wrapper per stat read as
+  // visual clutter for what's really one dashboard strip (matches feedback on this exact point).
+  // Divided by a hairline between cells instead, same idea as .lp-market-stat-strip's own cells.
   el.innerHTML = `
-    <div class="lp-card p-3">
-      <div class="text-[10px] uppercase tracking-wider" style="color:var(--text-mute);">Total Offers</div>
-      <div class="text-xl font-bold mono text-white">${total}</div>
-    </div>
-    <div class="lp-card p-3">
-      <div class="text-[10px] uppercase tracking-wider" style="color:var(--text-mute);">Profitable</div>
-      <div class="text-xl font-bold mono" style="color:var(--accent);">${profitable}</div>
-    </div>
-    <div class="lp-card p-3">
-      <div class="text-[10px] uppercase tracking-wider" style="color:var(--text-mute);">Blueprint Offers</div>
-      <div class="text-xl font-bold mono text-white">${bpcCount}</div>
-    </div>
-    <div class="lp-card p-3">
-      <div class="text-[10px] uppercase tracking-wider" style="color:var(--text-mute);">Best ISK / LP</div>
-      <div class="text-xl font-bold mono" style="color:var(--accent);">${best ? Math.round(best.iskPerLp).toLocaleString() : '—'}</div>
+    <div class="lpstore-stat-row">
+      <div class="lpstore-stat-cell">
+        <div class="lpstore-stat-label">Total Offers</div>
+        <div class="lpstore-stat-value text-white">${total}</div>
+      </div>
+      <div class="lpstore-stat-cell">
+        <div class="lpstore-stat-label">Profitable</div>
+        <div class="lpstore-stat-value" style="color:var(--accent);">${profitable}</div>
+      </div>
+      <div class="lpstore-stat-cell">
+        <div class="lpstore-stat-label">Blueprint Offers</div>
+        <div class="lpstore-stat-value text-white">${bpcCount}</div>
+      </div>
+      <div class="lpstore-stat-cell">
+        <div class="lpstore-stat-label">Best ISK / LP</div>
+        <div class="lpstore-stat-value" style="color:var(--accent);">${best ? Math.round(best.iskPerLp).toLocaleString() : '—'}</div>
+      </div>
     </div>
   `;
 }
@@ -1997,6 +2002,20 @@ function toggleLPStoreCorpPopover() {
   else closeLPStoreCorpPopover();
 }
 window.toggleLPStoreCorpPopover = toggleLPStoreCorpPopover;
+
+// Click-outside-to-close, not blur-to-close - a faction group header is a <button> inside the
+// popover, so expanding one blurs the search input same as clicking a corp row does, and a blur
+// handler can't tell those two apart (confirmed report: expanding a category closed the whole
+// popover before a corp was ever picked). This only closes on a click that lands OUTSIDE the
+// entire switcher bar (button + popover), so anything clicked inside it - the search input, a
+// faction header, a corp row - is left alone; only pickLPStoreCorp's own explicit close (a real
+// selection) or clicking elsewhere closes it.
+document.addEventListener('click', (e) => {
+  const switcher = document.getElementById('lpstore-corp-switcher');
+  const popover = document.getElementById('lpstore-corp-popover');
+  if (!switcher || !popover || popover.classList.contains('hidden')) return;
+  if (!switcher.contains(e.target)) closeLPStoreCorpPopover();
+});
 
 // addEventListener rather than a plain `window.onload =` assignment - js/app.js (also loaded on
 // this page, for the real tree canvas/BOM sidebar) registers its own load handler the same way;
