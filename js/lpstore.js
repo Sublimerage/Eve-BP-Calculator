@@ -1972,12 +1972,14 @@ function pickLPStoreCorp(corpId) {
 }
 window.pickLPStoreCorp = pickLPStoreCorp;
 
-// Three popovers now share one switcher bar (#lpstore-corp-switcher): the corp picker, "LP Owned"
-// (a character's own LP balances), and "Find Item" (reverse search across every store). Listed
-// together so opening any one closes the other two (three overlapping popovers off one bar would
-// be worse than the single flyout this whole approach replaced) and so the click-outside listener
-// further down covers all three without repeating itself per popover.
-const LP_STORE_POPOVER_IDS = ['lpstore-corp-popover', 'lpstore-lp-owned-popover', 'lpstore-item-search-popover'];
+// Two popovers now share the switcher bar (#lpstore-corp-switcher): the corp picker and "LP Owned"
+// (a character's own LP balances). Listed together so opening one closes the other, and so the
+// click-outside listener further down covers both without repeating itself per popover. "Find
+// Item" (reverse search across every store) used to be a third popover here too, but a small
+// popover was too cramped once results grouped one item under several corps - it's its own
+// dedicated main-content area now (showLPItemSearchArea/exitLPItemSearchArea below), same idea as
+// the isolated build canvas.
+const LP_STORE_POPOVER_IDS = ['lpstore-corp-popover', 'lpstore-lp-owned-popover'];
 
 function closeAllLPStorePopovers() {
   LP_STORE_POPOVER_IDS.forEach(id => {
@@ -2189,29 +2191,55 @@ async function buildLPItemSearchIndex() {
   filterLPItemSearchResults(document.getElementById('lpstore-item-search-input')?.value || '');
 }
 
-function lpItemSearchRowHTML(entry) {
+// One row per CORP within an item's group (see filterLPItemSearchResults below) - the item name
+// itself is only shown once, on the group's own header, not repeated per corp like the old flat
+// per-offer row did.
+function lpItemSearchCorpRowHTML(entry, hasEnough, myLp) {
   // Optional, per the user's own framing ("that's optional, not sure if it's a good idea") - only
   // checks the offer's own LP cost against the character's balance with THAT corp, nothing about
   // isk_cost or required_items availability, and only appears at all when logged in with real
   // balance data (getLPOwnedBalances - see its own comment on why corp-held LP isn't a real thing).
-  const balances = getLPOwnedBalances();
-  const myLp = (balances && balances.byCorpId) ? (balances.byCorpId[entry.corpId] || 0) : null;
   let lpBadge = '';
   if (myLp !== null) {
-    lpBadge = myLp >= entry.lpCost
-      ? `<span class="lpstore-item-search-lp-badge lpstore-item-search-lp-ok" title="You have ${Math.round(myLp).toLocaleString()} LP with ${window.esc(entry.corpName)}">&#10003; You have enough LP</span>`
-      : `<span class="lpstore-item-search-lp-badge lpstore-item-search-lp-short" title="You have ${Math.round(myLp).toLocaleString()} LP with ${window.esc(entry.corpName)}">Need ${Math.round(entry.lpCost - myLp).toLocaleString()} more LP</span>`;
+    lpBadge = hasEnough
+      ? `<span class="lpstore-item-search-lp-badge lpstore-item-search-lp-ok" title="You have ${Math.round(myLp).toLocaleString()} LP with ${window.esc(entry.corpName)}">&#10003; enough LP</span>`
+      : `<span class="lpstore-item-search-lp-badge lpstore-item-search-lp-short" title="You have ${Math.round(myLp).toLocaleString()} LP with ${window.esc(entry.corpName)}">need ${Math.round(entry.lpCost - myLp).toLocaleString()} more LP</span>`;
   }
   const iskPart = entry.iskCost > 0 ? `${Math.round(entry.iskCost).toLocaleString()} ISK + ` : '';
   return `
-    <button type="button" onclick="jumpToLPItemSearchResult(${entry.corpId}, ${entry.offerId})" class="lpstore-item-search-row" title="${window.esc(entry.requiredItemsSummary)}">
-      <div class="lpstore-item-search-row-main">
-        <span class="lpstore-corp-row-dot" style="background:${entry.color};"></span>
-        <span class="lpstore-corp-row-name">${window.esc(entry.outputName)}${entry.isBpc ? ' <span class="lpstore-item-search-bpc-tag">BPC</span>' : ''}</span>
-        <span class="lpstore-corp-row-faction" style="color:${entry.color};">${window.esc(entry.corpName)}</span>
-      </div>
-      <div class="lpstore-item-search-row-cost">${iskPart}${entry.lpCost.toLocaleString()} LP${lpBadge}</div>
+    <button type="button" onclick="jumpToLPItemSearchResult(${entry.corpId}, ${entry.offerId})" class="lpstore-item-search-corp-row${hasEnough ? ' lpstore-item-search-corp-row-affordable' : ''}" title="${window.esc(entry.requiredItemsSummary)}">
+      <span class="lpstore-corp-row-dot" style="background:${entry.color};"></span>
+      <span class="lpstore-corp-row-name">${window.esc(entry.corpName)}</span>
+      <span class="lpstore-item-search-corp-row-cost">${iskPart}${entry.lpCost.toLocaleString()} LP</span>
+      ${lpBadge}
     </button>`;
+}
+
+// One group per distinct item (outputTypeId, not name - two different items could coincidentally
+// share a name) - the corps that offer it are sorted so ones you already have enough LP with float
+// to the top (per the user's own request), cheapest LP cost first as the tiebreaker either side of
+// that split.
+function lpItemSearchGroupHTML(group) {
+  const balances = getLPOwnedBalances();
+  const withLp = group.entries.map(entry => {
+    const myLp = (balances && balances.byCorpId) ? (balances.byCorpId[entry.corpId] || 0) : null;
+    return { entry, myLp, hasEnough: myLp !== null && myLp >= entry.lpCost };
+  });
+  withLp.sort((a, b) => {
+    if (a.hasEnough !== b.hasEnough) return a.hasEnough ? -1 : 1;
+    return a.entry.lpCost - b.entry.lpCost;
+  });
+  return `
+    <div class="lpstore-item-search-group">
+      <div class="lpstore-item-search-group-header">
+        <span class="lpstore-item-search-group-name">${window.esc(group.outputName)}</span>
+        ${group.isBpc ? '<span class="lpstore-item-search-bpc-tag">BPC</span>' : ''}
+        <span class="lpstore-item-search-group-count">${group.entries.length} corp${group.entries.length === 1 ? '' : 's'}</span>
+      </div>
+      <div class="lpstore-item-search-group-rows">
+        ${withLp.map(({ entry, myLp, hasEnough }) => lpItemSearchCorpRowHTML(entry, hasEnough, myLp)).join('')}
+      </div>
+    </div>`;
 }
 
 function filterLPItemSearchResults(query) {
@@ -2225,20 +2253,30 @@ function filterLPItemSearchResults(query) {
     el.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">Type at least 2 characters to search across all ${LP_STORE_CORPS.length} known LP stores.</div>`;
     return;
   }
-  const MAX_HITS = 200; // a common item name (e.g. a T1 module) can otherwise match hundreds of offers
   const hits = _lpItemSearchIndex.filter(e => e.outputName.toLowerCase().includes(q));
   if (!hits.length) {
     el.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">No LP store sells or grants anything matching "${window.esc(query)}".</div>`;
     return;
   }
-  hits.sort((a, b) => a.outputName.localeCompare(b.outputName) || a.lpCost - b.lpCost);
-  const shown = hits.slice(0, MAX_HITS);
-  el.innerHTML = shown.map(lpItemSearchRowHTML).join('')
-    + (hits.length > MAX_HITS ? `<div class="p-2 text-center text-slate-500 text-[10px]">+ ${hits.length - MAX_HITS} more match${hits.length - MAX_HITS === 1 ? '' : 'es'} - narrow your search to see them</div>` : '');
+
+  // Grouped by item, not one row per offer - a search matching one item across a dozen corps used
+  // to repeat that item's own name a dozen times, once per row, which is exactly what was reported
+  // as not useful ("there's no point to repeat the name over and over again").
+  const groups = new Map();
+  hits.forEach(e => {
+    if (!groups.has(e.outputTypeId)) groups.set(e.outputTypeId, { outputTypeId: e.outputTypeId, outputName: e.outputName, isBpc: e.isBpc, entries: [] });
+    groups.get(e.outputTypeId).entries.push(e);
+  });
+  const MAX_GROUPS = 60; // a common word (e.g. "charge") can otherwise match dozens of distinct items
+  const sortedGroups = [...groups.values()].sort((a, b) => a.outputName.localeCompare(b.outputName));
+  const shown = sortedGroups.slice(0, MAX_GROUPS);
+  el.innerHTML = shown.map(lpItemSearchGroupHTML).join('')
+    + (sortedGroups.length > MAX_GROUPS ? `<div class="p-2 text-center text-slate-500 text-[10px]">+ ${sortedGroups.length - MAX_GROUPS} more item${sortedGroups.length - MAX_GROUPS === 1 ? '' : 's'} match - narrow your search to see them</div>` : '');
 }
 window.filterLPItemSearchResults = filterLPItemSearchResults;
 
 async function jumpToLPItemSearchResult(corpId, offerId) {
+  document.getElementById('lpstore-item-search-area')?.classList.add('hidden');
   closeAllLPStorePopovers();
   const corp = LP_STORE_CORPS.find(c => c.corpId === corpId);
   if (corp) { _lpCorpListOpenFaction = corp.faction; renderLPStoreCorpList(''); }
@@ -2248,31 +2286,27 @@ async function jumpToLPItemSearchResult(corpId, offerId) {
 }
 window.jumpToLPItemSearchResult = jumpToLPItemSearchResult;
 
-function openLPItemSearchPopover() {
+// Dedicated main-content view, not a popover - "just like the LP store [ranked-offer] list" per the
+// user's own framing; a popover was too cramped once results grouped one item under several corps.
+// Same shown/hidden-sibling-state pattern the isolated build canvas already uses (see
+// exitLPInspector), just for this state instead of #viewport.
+function showLPItemSearchArea() {
   closeAllLPStorePopovers();
-  const popover = document.getElementById('lpstore-item-search-popover');
-  if (!popover) return;
-  popover.classList.remove('hidden');
+  ['lpstore-empty-state', 'lpstore-loading-state', 'lpstore-error-state', 'lpstore-results-area'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+  const area = document.getElementById('lpstore-item-search-area');
+  if (area) area.classList.remove('hidden');
   const input = document.getElementById('lpstore-item-search-input');
   if (input) input.focus();
   if (_lpItemSearchIndex) filterLPItemSearchResults(input ? input.value : '');
   else buildLPItemSearchIndex();
 }
-window.openLPItemSearchPopover = openLPItemSearchPopover;
+window.showLPItemSearchArea = showLPItemSearchArea;
 
-function closeLPItemSearchPopover() {
-  const popover = document.getElementById('lpstore-item-search-popover');
-  if (popover) popover.classList.add('hidden');
+function exitLPItemSearchArea() {
+  document.getElementById('lpstore-item-search-area')?.classList.add('hidden');
+  renderLPStoreState(); // re-shows whichever of empty/loading/results-area actually applies now
 }
-window.closeLPItemSearchPopover = closeLPItemSearchPopover;
-
-function toggleLPItemSearchPopover() {
-  const popover = document.getElementById('lpstore-item-search-popover');
-  if (!popover) return;
-  if (popover.classList.contains('hidden')) openLPItemSearchPopover();
-  else closeLPItemSearchPopover();
-}
-window.toggleLPItemSearchPopover = toggleLPItemSearchPopover;
+window.exitLPItemSearchArea = exitLPItemSearchArea;
 
 // Click-outside-to-close, not blur-to-close - a faction group header is a <button> inside the
 // popover, so expanding one blurs the search input same as clicking a corp row does, and a blur
