@@ -2366,6 +2366,17 @@ function lpItemSearchGroupHTML(group) {
     if (b.entry.iskPerLp !== null) return 1;
     return a.entry.lpCost - b.entry.lpCost;
   });
+  // Same blue ITEM / purple BPC pill the ranked list's own rows use (see its typeBadge, same
+  // colors/style) - always shown, never just for BPC. Grouping used to be keyed by outputTypeId
+  // alone, which silently MERGED an item sold directly by one corp with the same item granted as a
+  // BPC by another - a BPC's outputTypeId already resolves to the product it builds (so a
+  // "Vindicator" BPC and a directly-sold "Vindicator" shared one group), hiding exactly the
+  // distinction reported as important. The key is outputTypeId+isBpc now (see
+  // filterLPItemSearchResults/renderLPItemSearchResultsArea) so those are always two separate
+  // groups, each unambiguously labeled.
+  const typeBadge = group.isBpc
+    ? `<span class="lpstore-item-search-type-badge lpstore-item-search-type-bpc" title="Redeeming these offers grants a Blueprint Copy - Est. ISK/LP is what building it out nets, not the BPC's own resale value.">BPC</span>`
+    : `<span class="lpstore-item-search-type-badge lpstore-item-search-type-item">ITEM</span>`;
   // Same icon + onerror fallback chain the ranked list's own rows already use (icon -> render -> a
   // generic placeholder via handleLPIconLoadError, for the confirmed real case of SKINs having
   // neither) - see that code's own comment for why. Shown once per group, same as the name itself,
@@ -2377,7 +2388,7 @@ function lpItemSearchGroupHTML(group) {
       <div class="lpstore-item-search-group-header">
         <img src="${iconUrl}" alt="" class="lpstore-item-search-group-icon" loading="lazy" onerror="${iconFallback}">
         <span class="lpstore-item-search-group-name">${window.esc(group.outputName)}</span>
-        ${group.isBpc ? '<span class="lpstore-item-search-bpc-tag">BPC</span>' : ''}
+        ${typeBadge}
         <span class="lpstore-item-search-group-count">${group.entries.length} corp${group.entries.length === 1 ? '' : 's'}</span>
       </div>
       <div class="lpstore-item-search-group-rows">
@@ -2389,16 +2400,22 @@ function lpItemSearchGroupHTML(group) {
 // Which item's own corp list is currently shown in #lpstore-item-search-results - null until a
 // suggestion is actually picked (see pickLPItemSearchSuggestion). Typing alone only ever populates
 // the SUGGESTIONS dropdown now, not this - "only when I select an item it should show the corps".
+// isBpc is tracked alongside the type id - see lpItemSearchGroupHTML's own note on why identity
+// here is outputTypeId+isBpc together, not outputTypeId alone.
 let _lpItemSearchSelectedTypeId = null;
+let _lpItemSearchSelectedIsBpc = false;
 
 function lpItemSearchSuggestionRowHTML(group) {
   const iconUrl = getLPStoreIconUrl(group.outputTypeId, group.isBpc, 32);
   const iconFallback = `this.onerror=function(){window.handleLPIconLoadError(this);}; this.src='https://images.evetech.net/types/${group.outputTypeId}/render?size=32';`;
+  const typeBadge = group.isBpc
+    ? `<span class="lpstore-item-search-type-badge lpstore-item-search-type-bpc">BPC</span>`
+    : `<span class="lpstore-item-search-type-badge lpstore-item-search-type-item">ITEM</span>`;
   return `
-    <button type="button" onclick="pickLPItemSearchSuggestion(${group.outputTypeId})" class="lpstore-item-search-suggestion-row">
+    <button type="button" onclick="pickLPItemSearchSuggestion(${group.outputTypeId}, ${group.isBpc ? 'true' : 'false'})" class="lpstore-item-search-suggestion-row">
       <img src="${iconUrl}" alt="" class="lpstore-item-search-suggestion-icon" loading="lazy" onerror="${iconFallback}">
       <span class="lpstore-corp-row-name">${window.esc(group.outputName)}</span>
-      ${group.isBpc ? '<span class="lpstore-item-search-bpc-tag">BPC</span>' : ''}
+      ${typeBadge}
       <span class="lpstore-item-search-group-count">${group.entries.length} corp${group.entries.length === 1 ? '' : 's'}</span>
     </button>`;
 }
@@ -2413,9 +2430,9 @@ function renderLPItemSearchResultsArea() {
     el.innerHTML = `<p class="text-sm italic" style="color:var(--text-mute);">Search for an item above, then select it from the suggestions to see which corps offer it.</p>`;
     return;
   }
-  const matching = (_lpItemSearchIndex || []).filter(e => e.outputTypeId === _lpItemSearchSelectedTypeId);
+  const matching = (_lpItemSearchIndex || []).filter(e => e.outputTypeId === _lpItemSearchSelectedTypeId && e.isBpc === _lpItemSearchSelectedIsBpc);
   if (!matching.length) { _lpItemSearchSelectedTypeId = null; renderLPItemSearchResultsArea(); return; }
-  const group = { outputTypeId: _lpItemSearchSelectedTypeId, outputName: matching[0].outputName, isBpc: matching[0].isBpc, entries: matching };
+  const group = { outputTypeId: _lpItemSearchSelectedTypeId, outputName: matching[0].outputName, isBpc: _lpItemSearchSelectedIsBpc, entries: matching };
   el.innerHTML = lpItemSearchGroupHTML(group);
 }
 window.renderLPItemSearchResultsArea = renderLPItemSearchResultsArea;
@@ -2444,10 +2461,15 @@ function filterLPItemSearchResults(query) {
     return;
   }
 
+  // Keyed by outputTypeId+isBpc together, not outputTypeId alone - a BPC's outputTypeId already
+  // resolves to the product it builds, so an item sold directly by one corp and the same item
+  // granted as a BPC by another corp would otherwise land in one merged group. See
+  // lpItemSearchGroupHTML's own note for the full story.
   const groups = new Map();
   hits.forEach(e => {
-    if (!groups.has(e.outputTypeId)) groups.set(e.outputTypeId, { outputTypeId: e.outputTypeId, outputName: e.outputName, isBpc: e.isBpc, entries: [] });
-    groups.get(e.outputTypeId).entries.push(e);
+    const key = e.outputTypeId + ':' + (e.isBpc ? 1 : 0);
+    if (!groups.has(key)) groups.set(key, { outputTypeId: e.outputTypeId, outputName: e.outputName, isBpc: e.isBpc, entries: [] });
+    groups.get(key).entries.push(e);
   });
   const MAX_SUGGESTIONS = 30; // a common word (e.g. "charge") can otherwise match dozens of distinct items
   const sortedGroups = [...groups.values()].sort((a, b) => a.outputName.localeCompare(b.outputName));
@@ -2458,12 +2480,13 @@ function filterLPItemSearchResults(query) {
 }
 window.filterLPItemSearchResults = filterLPItemSearchResults;
 
-function pickLPItemSearchSuggestion(outputTypeId) {
+function pickLPItemSearchSuggestion(outputTypeId, isBpc) {
   document.getElementById('lpstore-item-search-suggestions')?.classList.add('hidden');
-  const match = _lpItemSearchIndex && _lpItemSearchIndex.find(e => e.outputTypeId === outputTypeId);
+  const match = _lpItemSearchIndex && _lpItemSearchIndex.find(e => e.outputTypeId === outputTypeId && e.isBpc === isBpc);
   const input = document.getElementById('lpstore-item-search-input');
   if (input && match) input.value = match.outputName;
   _lpItemSearchSelectedTypeId = outputTypeId;
+  _lpItemSearchSelectedIsBpc = !!isBpc;
   renderLPItemSearchResultsArea();
 }
 window.pickLPItemSearchSuggestion = pickLPItemSearchSuggestion;
