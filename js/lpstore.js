@@ -1976,11 +1976,22 @@ window.toggleLPStoreCorpPopover = toggleLPStoreCorpPopover;
 // entire switcher bar (button + popover), so anything clicked inside it - the search input, a
 // faction header, a corp row - is left alone; only pickLPStoreCorp's own explicit close (a real
 // selection) or clicking elsewhere closes it.
+//
+// Uses composedPath(), not switcher.contains(e.target) - a faction header's own onclick
+// (toggleLPStoreCorpFactionGroup) replaces #lpstore-corp-list's innerHTML SYNCHRONOUSLY, which
+// detaches the clicked button from the document before this listener (further up the bubble
+// phase, on the same click) ever runs. A detached node has no parent at all, so
+// switcher.contains(e.target) then always returns false regardless of where the click actually
+// started - confirmed report: it closed on every category click, not just the ones after a
+// re-render happened to still be attached. composedPath() is captured once, at dispatch time,
+// before any handler has a chance to mutate the DOM, so it still lists switcher as an ancestor of
+// the ORIGINAL click target even after that target itself has since been removed.
 document.addEventListener('click', (e) => {
   const switcher = document.getElementById('lpstore-corp-switcher');
   const popover = document.getElementById('lpstore-corp-popover');
   if (!switcher || !popover || popover.classList.contains('hidden')) return;
-  if (!switcher.contains(e.target)) closeLPStoreCorpPopover();
+  const path = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
+  if (!path.includes(switcher)) closeLPStoreCorpPopover();
 });
 
 // addEventListener rather than a plain `window.onload =` assignment - js/app.js (also loaded on
