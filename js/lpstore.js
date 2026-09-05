@@ -32,28 +32,203 @@
 // calculateTreeNodeCost, inert everywhere except when window.__lpOfferByOutputTypeId has a match.
 // =============================================================================================
 
-// Verified directly against ESI (GET /corporations/{id}/, one at a time) during development - NOT
-// hand-typed off a wiki. The 4 main FW warzone corps, one per empire. Worth calling out: the real
-// Gallente corp is "Federal Defense Union" (US spelling) - ESI's /universe/ids/ name search also
-// resolves a similarly-named but unrelated PLAYER corp, "Federal Defence Union" (British spelling,
-// id 98351639, a single-member corp with a chat-log bio) if you search the wrong spelling. This
-// list's ids were confirmed via direct corporation lookups, not name search, to avoid that trap.
-//
-// Pirate faction stores added the same way - verified via ESI's own /universe/factions/ endpoint,
-// which carries each faction's own corporation_id directly (no name-search trap possible), then
-// confirmed each one actually has a real loyalty store by fetching its offers live.
-const FW_WARZONE_CORPS = [
-  { corpId: 1000179, corpName: '24th Imperial Crusade', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168', group: 'Faction Warfare' },
-  { corpId: 1000180, corpName: 'State Protectorate', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5', group: 'Faction Warfare' },
-  { corpId: 1000181, corpName: 'Federal Defense Union', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73', group: 'Faction Warfare' },
-  { corpId: 1000182, corpName: 'Tribal Liberation Force', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a', group: 'Faction Warfare' },
-  { corpId: 1000437, corpName: 'Commando Guri', faction: 'Guristas Pirates', factionId: 500010, color: '#e8c14a', group: 'Pirate Faction' },
-  { corpId: 1000436, corpName: 'Malakim Zealots', faction: 'Angel Cartel', factionId: 500011, color: '#e05a5a', group: 'Pirate Faction' },
-  { corpId: 1000134, corpName: 'Blood Raiders', faction: 'Blood Raider Covenant', factionId: 500012, color: '#a03030', group: 'Pirate Faction' },
-  { corpId: 1000162, corpName: 'True Power', faction: "Sansha's Nation", factionId: 500019, color: '#c04ac0', group: 'Pirate Faction' },
-  { corpId: 1000135, corpName: 'Serpentis Corporation', faction: 'Serpentis', factionId: 500020, color: '#4ac084', group: 'Pirate Faction' }
+// Every NPC corporation in the game with a real, non-empty LP store - not just the 4 Faction
+// Warfare warzone corps this used to be limited to. Generated (not hand-typed - the
+// project_builtin_recipes_overwrite_risk memory is exactly why: a hand-typed/wiki-sourced recipe
+// entry was wrong and had to be fully audited out) by scripts/fetch_lp_corps.js, in two verified
+// steps: (1) every one of ESI's 283 NPC corporation ids is checked live against
+// /loyalty/stores/{id}/offers/ and kept only if it actually returns a non-empty store (181 do -
+// most NPC corps don't have one at all); (2) each surviving corp's faction comes from CCP's own
+// static data export (Fuzzwork's crpNPCCorporations.csv mirror), not ESI's /corporations/{id}/
+// endpoint, which leaves faction_id empty for the overwhelming majority of these (confirmed - only
+// live-ESI-and-ID-lookup coincidentally worked for the original 9-entry list because those specific
+// corps happen to be the ones CCP's live endpoint does populate). `color` is a decorative UI choice
+// for the picker/ranked-list, same as it always was here - not itself sourced from ESI/SDE.
+// Re-run scripts/fetch_lp_corps.js + scripts/format_lp_corps.js if CCP ever adds/removes a store.
+const LP_STORE_CORPS = [
+  { corpId: 1000179, corpName: '24th Imperial Crusade', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000073, corpName: 'Amarr Certified News', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000079, corpName: 'Amarr Civil Service', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000063, corpName: 'Amarr Constructions', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000084, corpName: 'Amarr Navy', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000083, corpName: 'Amarr Trade Registry', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000090, corpName: 'Ardishapur Family', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000064, corpName: 'Carthum Conglomerate', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000092, corpName: 'Civic Court', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000085, corpName: 'Court Chamberlain', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000069, corpName: 'Ducia Foundry', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000086, corpName: 'Emperor Family', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000076, corpName: 'Further Foodstuffs', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000165, corpName: 'Hedion University', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000070, corpName: 'HZO Refinery', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000166, corpName: 'Imperial Academy', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000065, corpName: 'Imperial Armaments', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000078, corpName: 'Imperial Chancellor', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000072, corpName: 'Imperial Shipment', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000283, corpName: 'Imperial War Reserves', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000071, corpName: 'Inherent Implants', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000074, corpName: 'Joint Harvesting', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000087, corpName: 'Kador Family', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000089, corpName: 'Kor-Azor Family', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000081, corpName: 'Ministry of Assessment', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000082, corpName: 'Ministry of Internal Order', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000080, corpName: 'Ministry of War', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000068, corpName: 'Noble Appliances', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000075, corpName: 'Nurtura', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000077, corpName: 'Royal Amarr Institute', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000088, corpName: 'Sarum Family', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000091, corpName: 'Tash-Murkon Family', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000093, corpName: 'Theology Council', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000066, corpName: 'Viziam', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000067, corpName: 'Zoar and Sons', faction: 'Amarr Empire', factionId: 500003, color: '#e0c168' },
+  { corpId: 1000126, corpName: 'Ammatar Consulate', faction: 'Ammatar Mandate', factionId: 500007, color: '#d4a05c' },
+  { corpId: 1000123, corpName: 'Ammatar Fleet', faction: 'Ammatar Mandate', factionId: 500007, color: '#d4a05c' },
+  { corpId: 1000154, corpName: 'Nefantar Miner Association', faction: 'Ammatar Mandate', factionId: 500007, color: '#d4a05c' },
+  { corpId: 1000124, corpName: 'Archangels', faction: 'Angel Cartel', factionId: 500011, color: '#e05a5a' },
+  { corpId: 1000138, corpName: 'Dominations', faction: 'Angel Cartel', factionId: 500011, color: '#e05a5a' },
+  { corpId: 1000136, corpName: 'Guardian Angels', faction: 'Angel Cartel', factionId: 500011, color: '#e05a5a' },
+  { corpId: 1000436, corpName: 'Malakim Zealots', faction: 'Angel Cartel', factionId: 500011, color: '#e05a5a' },
+  { corpId: 1000133, corpName: 'Salvation Angels', faction: 'Angel Cartel', factionId: 500011, color: '#e05a5a' },
+  { corpId: 1000134, corpName: 'Blood Raiders', faction: 'Blood Raider Covenant', factionId: 500012, color: '#a03030' },
+  { corpId: 1000033, corpName: 'Caldari Business Tribunal', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000026, corpName: 'Caldari Constructions', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000028, corpName: 'Caldari Funds Unlimited', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000035, corpName: 'Caldari Navy', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000009, corpName: 'Caldari Provisions', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000015, corpName: 'Caldari Steel', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000002, corpName: 'CBD Corporation', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000024, corpName: 'CBD Sell Division', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000031, corpName: 'Chief Executive Panel', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000043, corpName: 'Corporate Police Force', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000006, corpName: 'Deep Core Mining Inc.', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000018, corpName: 'Echelon Entertainment', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000023, corpName: 'Expert Distribution', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000027, corpName: 'Expert Housing', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000039, corpName: 'Home Guard', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000034, corpName: 'House of Records', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000005, corpName: 'Hyasyoda Corporation', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000036, corpName: 'Internal Security', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000019, corpName: 'Ishukone Corporation', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000038, corpName: 'Ishukone Watch', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000010, corpName: 'Kaalakiota Corporation', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000020, corpName: 'Lai Dai Corporation', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000037, corpName: 'Lai Dai Protection Service', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000032, corpName: 'Mercantile Club', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000008, corpName: 'Minedrill', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000030, corpName: 'Modern Finances', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000017, corpName: 'Nugoeihuvi Corporation', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000040, corpName: 'Peace and Order Unit', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000014, corpName: 'Perkone', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000007, corpName: 'Poksu Mineral Group', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000003, corpName: 'Prompt Delivery', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000022, corpName: 'Propel Dynamics', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000013, corpName: 'Rapid Assembly', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000044, corpName: 'School of Applied Knowledge', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000045, corpName: 'Science and Trade Institute', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000041, corpName: 'Spacelane Patrol', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000029, corpName: 'State and Region Bank', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000284, corpName: 'State Military Stockpile', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000180, corpName: 'State Protectorate', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000167, corpName: 'State War Academy', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000025, corpName: 'Sukuuvestaa Corporation', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000012, corpName: 'Top Down', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000011, corpName: 'Wiyrkomi Corporation', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000042, corpName: 'Wiyrkomi Peace Corps', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000004, corpName: 'Ytiri', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000016, corpName: 'Zainou', faction: 'Caldari State', factionId: 500001, color: '#5b9bd5' },
+  { corpId: 1000125, corpName: 'CONCORD', faction: 'CONCORD Assembly', factionId: 500006, color: '#8fa3b3' },
+  { corpId: 1000137, corpName: 'DED', faction: 'CONCORD Assembly', factionId: 500006, color: '#8fa3b3' },
+  { corpId: 1000096, corpName: 'Inner Zone Shipping', faction: 'EverMore', factionId: 500013, color: '#b8c4cc' },
+  { corpId: 1000419, corpName: 'Paragon', faction: 'EverMore', factionId: 500013, color: '#b8c4cc' },
+  { corpId: 1000021, corpName: 'Zero-G Research Firm', faction: 'EverMore', factionId: 500013, color: '#b8c4cc' },
+  { corpId: 1000111, corpName: 'Aliastra', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000103, corpName: 'Allotek Industries', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000098, corpName: 'Astral Mining Inc.', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000112, corpName: 'Bank of Luminaire', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000169, corpName: 'Center for Advanced Studies', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000108, corpName: 'Chemal Tech', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000099, corpName: 'Combined Harvest', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000101, corpName: 'CreoDron', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000109, corpName: 'Duvolle Laboratories', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000106, corpName: 'Egonics Inc.', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000119, corpName: 'Federal Administration', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000181, corpName: 'Federal Defense Union', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000095, corpName: 'Federal Freight', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000121, corpName: 'Federal Intelligence Office', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000168, corpName: 'Federal Navy Academy', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000285, corpName: 'Federal Strategic Materiel', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000122, corpName: 'Federation Customs', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000120, corpName: 'Federation Navy', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000110, corpName: 'FedMart', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000114, corpName: 'Garoun Investment Bank', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000105, corpName: 'Impetus', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000097, corpName: 'Material Acquisition', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000113, corpName: 'Pend Insurance', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000104, corpName: 'Poteque Pharmaceuticals', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000116, corpName: 'President', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000100, corpName: 'Quafe Company', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000102, corpName: 'Roden Shipyards', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000117, corpName: 'Senate', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000118, corpName: 'Supreme Court', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000107, corpName: 'The Scope', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000094, corpName: 'TransStellar Shipping', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000115, corpName: 'University of Caille', faction: 'Gallente Federation', factionId: 500004, color: '#6fbf73' },
+  { corpId: 1000437, corpName: 'Commando Guri', faction: 'Guristas Pirates', factionId: 500010, color: '#e8c14a' },
+  { corpId: 1000127, corpName: 'Guristas', faction: 'Guristas Pirates', factionId: 500010, color: '#e8c14a' },
+  { corpId: 1000141, corpName: 'Guristas Production', faction: 'Guristas Pirates', factionId: 500010, color: '#e8c14a' },
+  { corpId: 1000151, corpName: 'Khanid Innovation', faction: 'Khanid Kingdom', factionId: 500008, color: '#8a5a9e' },
+  { corpId: 1000152, corpName: 'Khanid Transport', faction: 'Khanid Kingdom', factionId: 500008, color: '#8a5a9e' },
+  { corpId: 1000153, corpName: 'Khanid Works', faction: 'Khanid Kingdom', factionId: 500008, color: '#8a5a9e' },
+  { corpId: 1000156, corpName: 'Royal Khanid Navy', faction: 'Khanid Kingdom', factionId: 500008, color: '#8a5a9e' },
+  { corpId: 1000057, corpName: 'Boundless Creation', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000049, corpName: 'Brutor Tribe', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000056, corpName: 'Core Complexion Inc.', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000058, corpName: 'Eifyr and Co.', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000061, corpName: 'Freedom Extension', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000047, corpName: 'Krusual Tribe', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000055, corpName: 'Minmatar Mining Corporation', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000060, corpName: 'Native Freshfood', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000172, corpName: 'Pator Tech School', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000051, corpName: 'Republic Fleet', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000286, corpName: 'Republic Fleet Ordnance', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000052, corpName: 'Republic Justice Department', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000170, corpName: 'Republic Military School', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000050, corpName: 'Republic Parliament', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000054, corpName: 'Republic Security Services', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000171, corpName: 'Republic University', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000046, corpName: 'Sebiestor Tribe', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000059, corpName: 'Six Kin Development', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000062, corpName: 'The Leisure Group', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000182, corpName: 'Tribal Liberation Force', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000053, corpName: 'Urban Management', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000048, corpName: 'Vherokior Tribe', faction: 'Minmatar Republic', factionId: 500002, color: '#c85a4a' },
+  { corpId: 1000128, corpName: "Mordu's Legion", faction: "Mordu's Legion Command", factionId: 500018, color: '#5a7a8a' },
+  { corpId: 1000277, corpName: 'Frostline Laboratories', faction: 'ORE', factionId: 500014, color: '#d98c3a' },
+  { corpId: 1000276, corpName: 'ORE Technologies', faction: 'ORE', factionId: 500014, color: '#d98c3a' },
+  { corpId: 1000270, corpName: 'Outer Ring Development', faction: 'ORE', factionId: 500014, color: '#d98c3a' },
+  { corpId: 1000129, corpName: 'Outer Ring Excavations', faction: 'ORE', factionId: 500014, color: '#d98c3a' },
+  { corpId: 1000271, corpName: 'Outer Ring Prospecting', faction: 'ORE', factionId: 500014, color: '#d98c3a' },
+  { corpId: 1000161, corpName: "True Creations", faction: "Sansha's Nation", factionId: 500019, color: '#c04ac0' },
+  { corpId: 1000162, corpName: 'True Power', faction: "Sansha's Nation", factionId: 500019, color: '#c04ac0' },
+  { corpId: 1000135, corpName: 'Serpentis Corporation', faction: 'Serpentis', factionId: 500020, color: '#4ac084' },
+  { corpId: 1000157, corpName: 'Serpentis Inquest', faction: 'Serpentis', factionId: 500020, color: '#4ac084' },
+  { corpId: 1000139, corpName: 'Food Relief', faction: 'Servant Sisters of EVE', factionId: 500016, color: '#3ac8b8' },
+  { corpId: 1000130, corpName: 'Sisters of EVE', faction: 'Servant Sisters of EVE', factionId: 500016, color: '#3ac8b8' },
+  { corpId: 1000159, corpName: 'The Sanctuary', faction: 'Servant Sisters of EVE', factionId: 500016, color: '#3ac8b8' },
+  { corpId: 1000140, corpName: 'Genolution', faction: 'The Society of Conscious Thought', factionId: 500017, color: '#4ac8e0' },
+  { corpId: 1000131, corpName: 'Society of Conscious Thought', faction: 'The Society of Conscious Thought', factionId: 500017, color: '#4ac8e0' },
+  { corpId: 1000144, corpName: 'Intaki Bank', faction: 'The Syndicate', factionId: 500009, color: '#7a6a8a' },
+  { corpId: 1000145, corpName: 'Intaki Commerce', faction: 'The Syndicate', factionId: 500009, color: '#7a6a8a' },
+  { corpId: 1000146, corpName: 'Intaki Space Police', faction: 'The Syndicate', factionId: 500009, color: '#7a6a8a' },
+  { corpId: 1000147, corpName: 'Intaki Syndicate', faction: 'The Syndicate', factionId: 500009, color: '#7a6a8a' },
+  { corpId: 1000160, corpName: 'Thukker Mix', faction: 'Thukker Tribe', factionId: 500015, color: '#a06a3a' },
+  { corpId: 1000163, corpName: 'Trust Partners', faction: 'Thukker Tribe', factionId: 500015, color: '#a06a3a' },
+  { corpId: 1000293, corpName: 'Perun Clade', faction: 'Triglavian Collective', factionId: 500026, color: '#3ec87a' },
+  { corpId: 1000294, corpName: 'Svarog Clade', faction: 'Triglavian Collective', factionId: 500026, color: '#3ec87a' },
+  { corpId: 1000298, corpName: 'The Convocation of Triglav', faction: 'Triglavian Collective', factionId: 500026, color: '#3ec87a' },
+  { corpId: 1000292, corpName: 'Veles Clade', faction: 'Triglavian Collective', factionId: 500026, color: '#3ec87a' }
 ];
-window.FW_WARZONE_CORPS = FW_WARZONE_CORPS;
+window.LP_STORE_CORPS = LP_STORE_CORPS;
 
 let _lpOffersCache = {};      // corpId -> raw ESI offers array
 let _lpRankedResults = [];    // last computed, sorted evaluation results
@@ -473,6 +648,7 @@ window.loadAndRankLPStore = loadAndRankLPStore;
 
 function selectLPStoreCorp(corpIdStr) {
   if (!corpIdStr) return;
+  if (typeof renderLPStoreCorpActiveLabel === 'function') renderLPStoreCorpActiveLabel(corpIdStr);
   loadAndRankLPStore(corpIdStr);
 }
 window.selectLPStoreCorp = selectLPStoreCorp;
@@ -1706,18 +1882,93 @@ function renderLPStoreActiveStationLabel() {
 }
 window.renderLPStoreActiveStationLabel = renderLPStoreActiveStationLabel;
 
-function populateLPStoreCorpSelect() {
-  const select = document.getElementById('lpstore-corp-select');
-  if (!select) return;
-  const groups = ['Faction Warfare', 'Pirate Faction'];
-  const groupsHTML = groups.map(g => {
-    const opts = FW_WARZONE_CORPS.filter(c => c.group === g)
-      .map(c => `<option value="${c.corpId}" style="color:${c.color}; font-weight:bold;">${window.esc(c.faction)} — ${window.esc(c.corpName)}</option>`)
-      .join('');
-    return `<optgroup label="${window.esc(g)}">${opts}</optgroup>`;
-  }).join('');
-  select.innerHTML = '<option value="">— Choose an LP store —</option>' + groupsHTML;
+// Corp picker, replacing the old flat <select> - 181 corps across 19 factions doesn't fit a
+// dropdown (the whole reason this exists: see the user's own framing, "a dropdown list will not be
+// good when there are tens or even hundreds of corporations"). Two views sharing one render
+// function and one #lpstore-corp-list container:
+//   - Empty query: grouped browse - one header row per faction (LP_STORE_CORPS' own array order,
+//     alphabetical since that's how format_lp_corps.js sorted it), collapsed by default so the
+//     initial view is 19 compact rows, not 181. Exactly one faction open at a time
+//     (_lpCorpListOpenFaction) - simpler than a bitset of open groups, and there's rarely a reason
+//     to compare two factions' rosters side by side.
+//   - Non-empty query: flat filtered results across every corp, ignoring group boundaries entirely
+//     - matches the corp's own name OR its faction's name, so "amarr" surfaces the whole Amarr
+//     roster without needing to open that group first.
+let _lpCorpListOpenFaction = null;
+
+function lpStoreCorpRowHTML(c) {
+  const active = c.corpId === _lpActiveCorpId ? ' lpstore-corp-row-active' : '';
+  return `
+    <button type="button" onclick="pickLPStoreCorp(${c.corpId})" class="lpstore-corp-row${active}">
+      <span class="lpstore-corp-row-dot" style="background:${c.color};"></span>
+      <span class="lpstore-corp-row-name">${window.esc(c.corpName)}</span>
+      <span class="lpstore-corp-row-faction" style="color:${c.color};">${window.esc(c.faction)}</span>
+    </button>`;
 }
+
+function renderLPStoreCorpList(query) {
+  const el = document.getElementById('lpstore-corp-list');
+  if (!el) return;
+  const q = (query || '').trim().toLowerCase();
+
+  if (!q) {
+    const factions = [...new Set(LP_STORE_CORPS.map(c => c.faction))];
+    el.innerHTML = factions.map(faction => {
+      const corps = LP_STORE_CORPS.filter(c => c.faction === faction);
+      const isOpen = _lpCorpListOpenFaction === faction;
+      const color = corps[0].color;
+      return `
+        <div class="lpstore-corp-faction-group">
+          <button type="button" onclick="toggleLPStoreCorpFactionGroup('${window.esc(faction).replace(/'/g, "\\'")}')" class="lpstore-corp-faction-header" style="border-left-color:${color};">
+            <span style="color:${color};">${window.esc(faction)}</span>
+            <span class="lpstore-corp-faction-count">${corps.length}</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lpstore-corp-faction-chevron${isOpen ? ' open' : ''}"><polyline points="9,6 15,12 9,18"/></svg>
+          </button>
+          ${isOpen ? `<div class="lpstore-corp-faction-rows">${corps.map(lpStoreCorpRowHTML).join('')}</div>` : ''}
+        </div>`;
+    }).join('');
+    return;
+  }
+
+  const hits = LP_STORE_CORPS.filter(c => c.corpName.toLowerCase().includes(q) || c.faction.toLowerCase().includes(q));
+  el.innerHTML = hits.length
+    ? hits.map(lpStoreCorpRowHTML).join('')
+    : `<div class="p-3 text-slate-400 text-xs italic">No corporation matching "${window.esc(query)}".</div>`;
+}
+window.renderLPStoreCorpList = renderLPStoreCorpList;
+
+function filterLPStoreCorpList(query) {
+  renderLPStoreCorpList(query);
+}
+window.filterLPStoreCorpList = filterLPStoreCorpList;
+
+function toggleLPStoreCorpFactionGroup(faction) {
+  _lpCorpListOpenFaction = (_lpCorpListOpenFaction === faction) ? null : faction;
+  renderLPStoreCorpList(document.getElementById('lpstore-corp-search')?.value || '');
+}
+window.toggleLPStoreCorpFactionGroup = toggleLPStoreCorpFactionGroup;
+
+// Kept separate from the search input's own value on purpose - once a corp is picked, the search
+// box clears back to its placeholder (it's for FINDING a corp, not for permanently displaying the
+// current one), so this label is the only place "what's currently loaded" stays visible.
+function renderLPStoreCorpActiveLabel(corpIdOrStr) {
+  const el = document.getElementById('lpstore-corp-active-label');
+  if (!el) return;
+  const corp = LP_STORE_CORPS.find(c => c.corpId === parseInt(corpIdOrStr));
+  el.textContent = corp ? `${corp.corpName} — ${corp.faction}` : '— none selected —';
+  el.style.color = corp ? corp.color : 'var(--text-mute)';
+}
+window.renderLPStoreCorpActiveLabel = renderLPStoreCorpActiveLabel;
+
+function pickLPStoreCorp(corpId) {
+  const corp = LP_STORE_CORPS.find(c => c.corpId === corpId);
+  const searchInput = document.getElementById('lpstore-corp-search');
+  if (searchInput) searchInput.value = '';
+  if (corp) _lpCorpListOpenFaction = corp.faction;
+  selectLPStoreCorp(corpId);
+  renderLPStoreCorpList('');
+}
+window.pickLPStoreCorp = pickLPStoreCorp;
 
 // addEventListener rather than a plain `window.onload =` assignment - js/app.js (also loaded on
 // this page, for the real tree canvas/BOM sidebar) registers its own load handler the same way;
@@ -1733,7 +1984,8 @@ window.addEventListener('load', async () => {
   // next load.
   _lpSavedCalculatorState = snapshotCalculatorState();
 
-  populateLPStoreCorpSelect();
+  renderLPStoreCorpList('');
+  renderLPStoreCorpActiveLabel(null);
   loadSharedTaxSettingsForLPStore();
   renderLPStoreActiveStationLabel();
   if (typeof window.renderProductionPresetDropdown === 'function') window.renderProductionPresetDropdown();
@@ -1747,9 +1999,12 @@ window.addEventListener('load', async () => {
   // reset" even though the real state was fine. Only open it now when there's genuinely nothing to
   // restore - a first-time visitor who needs the picker - never on a returning one.
   const lastCorp = localStorage.getItem('eve_lpstore_last_corp');
-  const select = document.getElementById('lpstore-corp-select');
-  if (lastCorp && select) {
-    select.value = lastCorp;
+  if (lastCorp) {
+    // Pre-open the restored corp's own faction group so re-opening the picker later (to switch
+    // corps) shows it expanded rather than starting from the fully-collapsed default.
+    const corp = LP_STORE_CORPS.find(c => c.corpId === parseInt(lastCorp));
+    if (corp) { _lpCorpListOpenFaction = corp.faction; renderLPStoreCorpList(''); }
+    renderLPStoreCorpActiveLabel(lastCorp);
     await loadAndRankLPStore(lastCorp);
     // If an offer was isolated when the page was last closed, re-isolate it now that
     // _lpRankedResults is populated - isolateOffer() itself no-ops harmlessly if the saved id
