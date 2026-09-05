@@ -602,6 +602,20 @@ svg[viewBox] { stroke: currentColor; }
 .lpstore-item-search-group + .lpstore-item-search-group { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border); }
 .lpstore-item-search-group-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .lpstore-item-search-group-icon { width: 36px; height: 36px; border-radius: var(--radius-input); background: rgba(255,255,255,0.06); flex-shrink: 0; object-fit: contain; }
+
+/* Autocomplete suggestions (js/lpstore.js lpItemSearchSuggestionRowHTML) - one row per distinct
+   item as you type, shown in #lpstore-item-search-suggestions (reuses .lpstore-corp-popover for
+   position/sizing, same anchored-dropdown-under-the-input treatment as the corp picker). Picking
+   one is what actually populates the results area below - see filterLPItemSearchResults vs
+   pickLPItemSearchSuggestion's own comments for why those are two separate functions now. */
+.lpstore-item-search-suggestion-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; text-align: left; cursor: pointer; font-size: 14px;
+  border-top: 1px solid rgba(255,255,255,0.03);
+}
+.lpstore-item-search-suggestion-row:first-child { border-top: none; }
+.lpstore-item-search-suggestion-row:hover { background: rgba(255,255,255,0.06); }
+.lpstore-item-search-suggestion-icon { width: 28px; height: 28px; border-radius: var(--radius-input); background: rgba(255,255,255,0.06); flex-shrink: 0; object-fit: contain; }
 .lpstore-item-search-group-name { font-weight: 700; font-size: 17px; color: var(--text); }
 .lpstore-item-search-group-count { margin-left: auto; font-size: 12.5px; color: var(--text-mute); flex-shrink: 0; }
 .lpstore-item-search-group-rows { display: flex; flex-direction: column; gap: 6px; }
