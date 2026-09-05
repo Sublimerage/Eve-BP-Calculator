@@ -1967,8 +1967,36 @@ function pickLPStoreCorp(corpId) {
   if (corp) _lpCorpListOpenFaction = corp.faction;
   selectLPStoreCorp(corpId);
   renderLPStoreCorpList('');
+  closeLPStoreCorpPopover();
 }
 window.pickLPStoreCorp = pickLPStoreCorp;
+
+// Popover (js/lpstore.js's own renderLPStoreCorpList/etc. fill #lpstore-corp-list inside it) -
+// anchored to the persistent #lpstore-corp-switcher bar in lpstore.html, not a flyout panel. Only
+// this small absolute-positioned box opens/closes, so picking a corp (or just glancing at the
+// ranked list while deciding) never requires covering the whole page first.
+function openLPStoreCorpPopover() {
+  const popover = document.getElementById('lpstore-corp-popover');
+  if (!popover) return;
+  popover.classList.remove('hidden');
+  const searchInput = document.getElementById('lpstore-corp-search');
+  if (searchInput) searchInput.focus();
+}
+window.openLPStoreCorpPopover = openLPStoreCorpPopover;
+
+function closeLPStoreCorpPopover() {
+  const popover = document.getElementById('lpstore-corp-popover');
+  if (popover) popover.classList.add('hidden');
+}
+window.closeLPStoreCorpPopover = closeLPStoreCorpPopover;
+
+function toggleLPStoreCorpPopover() {
+  const popover = document.getElementById('lpstore-corp-popover');
+  if (!popover) return;
+  if (popover.classList.contains('hidden')) openLPStoreCorpPopover();
+  else closeLPStoreCorpPopover();
+}
+window.toggleLPStoreCorpPopover = toggleLPStoreCorpPopover;
 
 // addEventListener rather than a plain `window.onload =` assignment - js/app.js (also loaded on
 // this page, for the real tree canvas/BOM sidebar) registers its own load handler the same way;
@@ -1993,14 +2021,13 @@ window.addEventListener('load', async () => {
   renderLPStoreState();
   installLPRecalculateHook();
 
-  // The flyout used to hardcode "Store" open by default in the HTML - harmless the first time,
-  // but on every SUBSEQUENT load it popped open and covered the ranked list that had actually
-  // already restored correctly underneath it (eve_lpstore_last_corp below), reading as "everything
-  // reset" even though the real state was fine. Only open it now when there's genuinely nothing to
-  // restore - a first-time visitor who needs the picker - never on a returning one.
+  // Only auto-open the corp popover when there's genuinely nothing to restore - a first-time
+  // visitor who needs the picker, guided straight to it instead of staring at the empty state.
+  // Never on a returning visitor: popping it open over a list that already restored correctly
+  // would read as "everything reset" even though the real state was fine.
   const lastCorp = localStorage.getItem('eve_lpstore_last_corp');
   if (lastCorp) {
-    // Pre-open the restored corp's own faction group so re-opening the picker later (to switch
+    // Pre-open the restored corp's own faction group so opening the popover later (to switch
     // corps) shows it expanded rather than starting from the fully-collapsed default.
     const corp = LP_STORE_CORPS.find(c => c.corpId === parseInt(lastCorp));
     if (corp) { _lpCorpListOpenFaction = corp.faction; renderLPStoreCorpList(''); }
@@ -2012,6 +2039,6 @@ window.addEventListener('load', async () => {
     const lastOfferId = localStorage.getItem('eve_lpstore_last_isolated_offer');
     if (lastOfferId) isolateOffer(parseInt(lastOfferId));
   } else {
-    openFlyoutSection('store');
+    openLPStoreCorpPopover();
   }
 });
