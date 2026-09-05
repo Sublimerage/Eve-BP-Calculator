@@ -2322,11 +2322,36 @@ async function syncWithEveIndustryJobs(silent) {
   untrackedRealJobs.forEach(rj => {
     if (usedRealJobIds.has(rj.job_id)) return;
     const targetProductId = rj.product_type_id;
+    // The real blueprint's ACTUAL researched ME/TE (from ESI, same source buildAutoImportedJob's own
+    // Pass 2 already trusts) must match what the pending job's own material/time numbers were
+    // calculated with (its buildConfigSnapshot's per-blueprint override, defaulting to 0/0 the same
+    // way tree.js's own node.customME/customTE default - see its own comment). A pending job assumes
+    // fixed ME/TE at add-time; if the blueprint actually used in-game was researched differently, the
+    // pending job's materials are for the WRONG numbers, and splitting them would silently carry that
+    // mismatch into both fragments. Safer to treat it as no fit at all and let it auto-import in Pass
+    // 2 instead, which always computes fresh from the real ME/TE.
+    const realBpInfo = blueprintMeTeMap[rj.blueprint_id] || { me: 0, te: 0 };
     const candidates = activeJobs
-      .filter(j => j && !j.isStarted && (j.productTypeId || j.typeId) === targetProductId && j.runsNeeded >= rj.runs)
+      .filter(j => {
+        if (!j || j.isStarted || (j.productTypeId || j.typeId) !== targetProductId || j.runsNeeded < rj.runs) return false;
+        const snapshot = j.buildConfigSnapshot || {};
+        const jobME = (snapshot.customMEOverrides && snapshot.customMEOverrides[j.typeId] !== undefined) ? snapshot.customMEOverrides[j.typeId] : 0;
+        const jobTE = (snapshot.customTEOverrides && snapshot.customTEOverrides[j.typeId] !== undefined) ? snapshot.customTEOverrides[j.typeId] : 0;
+        return jobME === realBpInfo.me && jobTE === realBpInfo.te;
+      })
       .sort((a, b) => a.runsNeeded - b.runsNeeded); // smallest sufficient fit first, to avoid attributing a small job to a much larger unrelated one
     const candidate = candidates[0];
-    if (!candidate) return; // no fit among pending jobs - falls through to auto-import in pass 2
+    if (!candidate) {
+      // Distinguishes "no candidate at all" from "candidate existed but ME/TE didn't match" in the
+      // console log, since the latter used to be a silent, hard-to-diagnose mismatch before this check
+      // existed (see the conversation that led here: a 32-run pending job not absorbing a 57-run real
+      // job looked identical to this in the log either way without this line).
+      const sameProductPending = activeJobs.filter(j => j && !j.isStarted && (j.productTypeId || j.typeId) === targetProductId);
+      if (sameProductPending.length) {
+        console.info(`[JobSync]   ⚠ Real job_id=${rj.job_id} (ME=${realBpInfo.me}%, TE=${realBpInfo.te}%) found ${sameProductPending.length} pending job(s) for the same product, but none matched on runs+ME/TE - falling through to auto-import.`);
+      }
+      return; // no fit among pending jobs - falls through to auto-import in pass 2
+    }
 
     usedRealJobIds.add(rj.job_id);
     matchedCount++;
