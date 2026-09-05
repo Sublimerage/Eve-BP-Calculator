@@ -2224,6 +2224,7 @@ async function buildLPItemSearchIndex() {
   if (cached) {
     _lpItemSearchIndex = cached;
     _lpItemSearchBuilding = false;
+    renderLPItemSearchResultsArea();
     filterLPItemSearchResults(document.getElementById('lpstore-item-search-input')?.value || '');
     return;
   }
@@ -2298,6 +2299,7 @@ async function buildLPItemSearchIndex() {
   _lpItemSearchIndex = entries;
   _lpItemSearchBuilding = false;
   saveLPItemSearchIndexCache(entries);
+  renderLPItemSearchResultsArea();
   filterLPItemSearchResults(document.getElementById('lpstore-item-search-input')?.value || '');
 }
 
@@ -2384,38 +2386,87 @@ function lpItemSearchGroupHTML(group) {
     </div>`;
 }
 
-function filterLPItemSearchResults(query) {
+// Which item's own corp list is currently shown in #lpstore-item-search-results - null until a
+// suggestion is actually picked (see pickLPItemSearchSuggestion). Typing alone only ever populates
+// the SUGGESTIONS dropdown now, not this - "only when I select an item it should show the corps".
+let _lpItemSearchSelectedTypeId = null;
+
+function lpItemSearchSuggestionRowHTML(group) {
+  const iconUrl = getLPStoreIconUrl(group.outputTypeId, group.isBpc, 32);
+  const iconFallback = `this.onerror=function(){window.handleLPIconLoadError(this);}; this.src='https://images.evetech.net/types/${group.outputTypeId}/render?size=32';`;
+  return `
+    <button type="button" onclick="pickLPItemSearchSuggestion(${group.outputTypeId})" class="lpstore-item-search-suggestion-row">
+      <img src="${iconUrl}" alt="" class="lpstore-item-search-suggestion-icon" loading="lazy" onerror="${iconFallback}">
+      <span class="lpstore-corp-row-name">${window.esc(group.outputName)}</span>
+      ${group.isBpc ? '<span class="lpstore-item-search-bpc-tag">BPC</span>' : ''}
+      <span class="lpstore-item-search-group-count">${group.entries.length} corp${group.entries.length === 1 ? '' : 's'}</span>
+    </button>`;
+}
+
+// Renders whichever item is currently selected (or the initial prompt if none is yet) into
+// #lpstore-item-search-results - separate from filterLPItemSearchResults (suggestions) so the two
+// can be called independently: this after a pick, that on every keystroke.
+function renderLPItemSearchResultsArea() {
   const el = document.getElementById('lpstore-item-search-results');
   if (!el) return;
-  if (_lpItemSearchBuilding) return; // buildLPItemSearchIndex owns the display until it finishes
+  if (_lpItemSearchSelectedTypeId === null) {
+    el.innerHTML = `<p class="text-sm italic" style="color:var(--text-mute);">Search for an item above, then select it from the suggestions to see which corps offer it.</p>`;
+    return;
+  }
+  const matching = (_lpItemSearchIndex || []).filter(e => e.outputTypeId === _lpItemSearchSelectedTypeId);
+  if (!matching.length) { _lpItemSearchSelectedTypeId = null; renderLPItemSearchResultsArea(); return; }
+  const group = { outputTypeId: _lpItemSearchSelectedTypeId, outputName: matching[0].outputName, isBpc: matching[0].isBpc, entries: matching };
+  el.innerHTML = lpItemSearchGroupHTML(group);
+}
+window.renderLPItemSearchResultsArea = renderLPItemSearchResultsArea;
+
+// Typing only ever fills the suggestions dropdown - a real autocomplete, not the old live filter
+// straight into the results area (that matched a different, flat/grouped-list design this replaced;
+// see #lpstore-item-search-results' own note in lpstore.html). Grouped by item (not one suggestion
+// per offer) for the same reason the results themselves are - "Caldari Navy Ballistic Control
+// System" is one suggestion regardless of how many corps sell it, with a corp count so that's still
+// visible before picking it.
+function filterLPItemSearchResults(query) {
+  const suggestionsEl = document.getElementById('lpstore-item-search-suggestions');
+  if (!suggestionsEl) return;
+  if (_lpItemSearchBuilding) return; // buildLPItemSearchIndex owns #lpstore-item-search-results (progress) until it finishes
   if (!_lpItemSearchIndex) { buildLPItemSearchIndex(); return; }
 
   const q = (query || '').trim().toLowerCase();
   if (q.length < 2) {
-    el.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">Type at least 2 characters to search across all ${LP_STORE_CORPS.length} known LP stores.</div>`;
+    suggestionsEl.classList.add('hidden');
     return;
   }
   const hits = _lpItemSearchIndex.filter(e => e.outputName.toLowerCase().includes(q));
   if (!hits.length) {
-    el.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">No LP store sells or grants anything matching "${window.esc(query)}".</div>`;
+    suggestionsEl.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">No LP store sells or grants anything matching "${window.esc(query)}".</div>`;
+    suggestionsEl.classList.remove('hidden');
     return;
   }
 
-  // Grouped by item, not one row per offer - a search matching one item across a dozen corps used
-  // to repeat that item's own name a dozen times, once per row, which is exactly what was reported
-  // as not useful ("there's no point to repeat the name over and over again").
   const groups = new Map();
   hits.forEach(e => {
     if (!groups.has(e.outputTypeId)) groups.set(e.outputTypeId, { outputTypeId: e.outputTypeId, outputName: e.outputName, isBpc: e.isBpc, entries: [] });
     groups.get(e.outputTypeId).entries.push(e);
   });
-  const MAX_GROUPS = 60; // a common word (e.g. "charge") can otherwise match dozens of distinct items
+  const MAX_SUGGESTIONS = 30; // a common word (e.g. "charge") can otherwise match dozens of distinct items
   const sortedGroups = [...groups.values()].sort((a, b) => a.outputName.localeCompare(b.outputName));
-  const shown = sortedGroups.slice(0, MAX_GROUPS);
-  el.innerHTML = shown.map(lpItemSearchGroupHTML).join('')
-    + (sortedGroups.length > MAX_GROUPS ? `<div class="p-2 text-center text-slate-500 text-[10px]">+ ${sortedGroups.length - MAX_GROUPS} more item${sortedGroups.length - MAX_GROUPS === 1 ? '' : 's'} match - narrow your search to see them</div>` : '');
+  const shown = sortedGroups.slice(0, MAX_SUGGESTIONS);
+  suggestionsEl.innerHTML = shown.map(lpItemSearchSuggestionRowHTML).join('')
+    + (sortedGroups.length > MAX_SUGGESTIONS ? `<div class="p-2 text-center text-slate-500 text-[10px]">+ ${sortedGroups.length - MAX_SUGGESTIONS} more - keep typing to narrow it down</div>` : '');
+  suggestionsEl.classList.remove('hidden');
 }
 window.filterLPItemSearchResults = filterLPItemSearchResults;
+
+function pickLPItemSearchSuggestion(outputTypeId) {
+  document.getElementById('lpstore-item-search-suggestions')?.classList.add('hidden');
+  const match = _lpItemSearchIndex && _lpItemSearchIndex.find(e => e.outputTypeId === outputTypeId);
+  const input = document.getElementById('lpstore-item-search-input');
+  if (input && match) input.value = match.outputName;
+  _lpItemSearchSelectedTypeId = outputTypeId;
+  renderLPItemSearchResultsArea();
+}
+window.pickLPItemSearchSuggestion = pickLPItemSearchSuggestion;
 
 async function jumpToLPItemSearchResult(corpId, offerId) {
   document.getElementById('lpstore-item-search-area')?.classList.add('hidden');
@@ -2437,10 +2488,11 @@ function showLPItemSearchArea() {
   ['lpstore-empty-state', 'lpstore-loading-state', 'lpstore-error-state', 'lpstore-results-area'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
   const area = document.getElementById('lpstore-item-search-area');
   if (area) area.classList.remove('hidden');
+  document.getElementById('lpstore-item-search-suggestions')?.classList.add('hidden');
   const input = document.getElementById('lpstore-item-search-input');
   if (input) input.focus();
-  if (_lpItemSearchIndex) filterLPItemSearchResults(input ? input.value : '');
-  else buildLPItemSearchIndex();
+  if (_lpItemSearchIndex) renderLPItemSearchResultsArea();
+  else buildLPItemSearchIndex(); // renders its own progress, then the prompt (or a prior selection) once done
 }
 window.showLPItemSearchArea = showLPItemSearchArea;
 
