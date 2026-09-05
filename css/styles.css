@@ -632,6 +632,8 @@ svg[viewBox] { stroke: currentColor; }
 .lpstore-item-search-corp-row-affordable:hover { background: rgba(var(--accent-rgb), 0.16); }
 /* Cost line + Est. ISK/LP line, stacked and right-aligned, so the row reads: corp name on the
    left, everything about the deal on the right. */
+.lpstore-item-search-corp-name-wrap { display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 2px; }
+.lpstore-item-search-bpc-runs { font-size: 10.5px; color: var(--text-mute); white-space: nowrap; }
 .lpstore-item-search-corp-row-stats { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
 .lpstore-item-search-corp-row-cost { font-size: 13.5px; font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
 .lpstore-item-search-isk { color: var(--cost); }
