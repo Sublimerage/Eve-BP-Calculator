@@ -637,7 +637,9 @@ svg[viewBox] { stroke: currentColor; }
 .lpstore-item-search-isk { color: var(--cost); }
 .lpstore-item-search-lp { color: #c084fc; }
 .lpstore-item-search-profit { font-size: 12.5px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; white-space: nowrap; }
-.lpstore-item-search-bpc-tag { font-size: 9.5px; font-weight: 700; color: #c084fc; border: 1px solid rgba(192,132,252,0.4); border-radius: 4px; padding: 1px 4px; vertical-align: 1px; }
+.lpstore-item-search-type-badge { font-size: 9px; font-family: var(--font-mono, monospace); font-weight: 700; border-radius: 4px; padding: 2px 6px; flex-shrink: 0; }
+.lpstore-item-search-type-bpc { background: rgba(192,132,252,0.15); color: #c084fc; }
+.lpstore-item-search-type-item { background: rgba(56,189,248,0.15); color: #38bdf8; }
 .lpstore-item-search-lp-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
 .lpstore-item-search-lp-ok { background: rgba(var(--accent-rgb), 0.18); color: var(--accent); }
 .lpstore-item-search-lp-short { background: rgba(255,255,255,0.06); color: var(--text-mute); }
