@@ -296,7 +296,11 @@ async function startEsiSSOLogin() {
   // (https://developers.eveonline.com) for this Client ID. Log it so it can be copied verbatim -
   // including the trailing slash, which EVE matches exactly.
   console.info(`[EVE SSO] Sending redirect_uri: "${redirectUri}" - this exact string must be registered as a Callback URL for Client ID ${clientId} at https://developers.eveonline.com`);
-  const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1 esi-corporations.read_divisions.v1 esi-industry.read_character_jobs.v1 esi-industry.read_corporation_jobs.v1 esi-characters.read_blueprints.v1 esi-corporations.read_blueprints.v1 esi-search.search_structures.v1';
+  // esi-characters.read_loyalty.v1 added for the LP Store's "LP Owned" panel - anyone who logged in
+  // before this was added has a token without it (missing-scope calls come back 401/403, handled as
+  // an expected, non-fatal outcome by fetchLPBalances/fetchWithAuth's suppressLogout - see there);
+  // they need to log in again once to grant it, same as any other newly-added scope would require.
+  const scope = 'esi-assets.read_assets.v1 esi-assets.read_corporation_assets.v1 esi-universe.read_structures.v1 esi-skills.read_skills.v1 esi-corporations.read_divisions.v1 esi-industry.read_character_jobs.v1 esi-industry.read_corporation_jobs.v1 esi-characters.read_blueprints.v1 esi-corporations.read_blueprints.v1 esi-search.search_structures.v1 esi-characters.read_loyalty.v1';
   const state = generateRandomString(16);
   localStorage.setItem('esi_auth_state', state);
   const authUrl = `https://login.eveonline.com/v2/oauth/authorize/?response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&client_id=${encodeURIComponent(clientId)}&scope=${encodeURIComponent(scope)}&code_challenge=${challenge}&code_challenge_method=S256&state=${state}`;
@@ -427,6 +431,7 @@ function logoutEsiSSO() {
   localStorage.removeItem('esi_corp_ticker');
   localStorage.removeItem('esi_code_verifier');
   localStorage.removeItem('esi_auth_state');
+  localStorage.removeItem('eve_char_lp_balances');
   window.rawAssetItems = [];
   window.userStockMap = {};
   window.corpDivisionNames = {};
@@ -535,6 +540,27 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       }
     } catch (e) {
       console.warn('ESI Skills fetch failed:', e);
+    }
+    // suppressLogout:true - most characters logged in before esi-characters.read_loyalty.v1 was
+    // added won't have it on their existing token yet (a 401/403 here is the normal, expected
+    // outcome for them, not a broken session) until they log in again once to grant it.
+    try {
+      const lpRes = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/loyalty/points/?datasource=tranquility`, { cache: 'no-store' }, accessToken, true);
+      if (lpRes && lpRes.ok) {
+        const lpData = await lpRes.json();
+        if (Array.isArray(lpData)) {
+          const byCorpId = {};
+          lpData.forEach(entry => { byCorpId[entry.corporation_id] = entry.loyalty_points; });
+          localStorage.setItem('eve_char_lp_balances', JSON.stringify({ fetchedAt: Date.now(), byCorpId }));
+        }
+      } else if (lpRes) {
+        // A real response, just not ok (401/403 = missing scope on an older token) - record that
+        // explicitly rather than leaving a stale/absent value, so the LP Store's "LP Owned" panel
+        // can tell "we asked and were refused" apart from "never asked yet" and prompt a re-login.
+        localStorage.setItem('eve_char_lp_balances', JSON.stringify({ fetchedAt: Date.now(), missingScope: true }));
+      }
+    } catch (e) {
+      console.warn('ESI Loyalty points fetch failed:', e);
     }
     let page = 1;
     let hasMore = true;

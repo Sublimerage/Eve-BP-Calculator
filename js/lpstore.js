@@ -238,24 +238,41 @@ let _lpTypeFilter = 'all';    // 'all' | 'direct' | 'bpc'
 let _lpCategoryFilter = 'all'; // 'all' | 'favorites' | a numeric SDE category id (string) | 'other'
 let _lpSearchQuery = '';      // free-text filter against the offer's own output item name
 
-// Favorited offers - keyed by offer_id (the same identifier isolateOffer/toggleLPOfferExpanded
-// already address rows by), not typeId, since CCP can and does offer the same item through several
-// distinct offer_id combos (see the ranked-list row comment on requiredItemsSummary) - favoriting
-// one shouldn't silently favorite the others. Loaded eagerly (not inside the load listener) since
-// it's a synchronous localStorage read with no page dependency, same as any other simple persisted
-// preference.
+// Favorited offers - keyed by "corpId:offer_id", NOT bare offer_id. offer_id turned out not to be
+// globally unique across corporations - confirmed live: offer_id 4102 is a real, different offer in
+// BOTH Guristas' Commando Guri store (a "Security Connections" ISK/LP offer) AND Amarr's 24th
+// Imperial Crusade store, and ESI has no way to disambiguate them beyond which store you asked. A
+// favorite keyed by bare offer_id therefore didn't just mis-report a count for another store (the
+// bug as originally reported) - filtering to Favorites in one corp could silently show a
+// completely unrelated offer from a DIFFERENT corp that happened to reuse the same id. corpId
+// disambiguates that; offer_id alone still separates distinct offers for the same item WITHIN one
+// corp's own store (CCP can and does offer the same item through several distinct offer_id combos
+// in a single store - see the ranked-list row's own comment on requiredItemsSummary), so this key
+// keeps both properties. Loaded eagerly (not inside the load listener) since it's a synchronous
+// localStorage read with no page dependency, same as any other simple persisted preference.
+//
+// Existing saved values from before this fix are bare offer_ids with no corp attached at all -
+// there's no way to know which corp they belonged to, and keeping them risks exactly the
+// cross-corp collision above, so they're discarded rather than guessed-migrated. Anything already
+// in the new "corpId:offerId" shape (contains ':') is kept.
 let _lpFavoriteOfferIds = new Set();
 try {
-  _lpFavoriteOfferIds = new Set(JSON.parse(localStorage.getItem('eve_lpstore_favorites') || '[]'));
+  const saved = JSON.parse(localStorage.getItem('eve_lpstore_favorites') || '[]');
+  _lpFavoriteOfferIds = new Set(saved.filter(v => typeof v === 'string' && v.includes(':')));
 } catch (e) { /* corrupt/old value - start fresh rather than fail the whole page */ }
+
+function lpFavoriteKey(offerId) {
+  return `${_lpActiveCorpId}:${offerId}`;
+}
 
 function saveLPFavorites() {
   localStorage.setItem('eve_lpstore_favorites', JSON.stringify([..._lpFavoriteOfferIds]));
 }
 
 function toggleLPFavorite(offerId) {
-  if (_lpFavoriteOfferIds.has(offerId)) _lpFavoriteOfferIds.delete(offerId);
-  else _lpFavoriteOfferIds.add(offerId);
+  const key = lpFavoriteKey(offerId);
+  if (_lpFavoriteOfferIds.has(key)) _lpFavoriteOfferIds.delete(key);
+  else _lpFavoriteOfferIds.add(key);
   saveLPFavorites();
   renderLPCategoryBar(); // favorites count badge
   renderLPStoreTable();  // star fill + (if currently viewing the Favorites filter) list membership
@@ -294,10 +311,18 @@ const LP_CATEGORY_FILTERS = [
 function renderLPCategoryBar() {
   const el = document.getElementById('lpstore-category-bar');
   if (!el) return;
+  // Favorites are keyed by offer_id, which is only meaningful within the store it came from - a
+  // favorite saved in one corp's store has no counterpart offer_id in a different corp's own list
+  // (see the note above _lpFavoriteOfferIds). The badge used to show _lpFavoriteOfferIds.size, the
+  // GLOBAL count across every corp ever favorited from, which kept showing a nonzero number here
+  // even when none of those favorites exist in the currently-loaded corp's own offers - a count
+  // for favorites you couldn't actually see or filter to from this screen. Scoped to just the
+  // current corp's own ranked offers instead, matching what clicking the pill actually filters to.
+  const favoritesInThisStore = _lpRankedResults.filter(r => _lpFavoriteOfferIds.has(lpFavoriteKey(r.offer.offer_id))).length;
   el.innerHTML = LP_CATEGORY_FILTERS.map(f => {
     const active = _lpCategoryFilter === f.id;
-    const badge = f.id === 'favorites' && _lpFavoriteOfferIds.size
-      ? `<span class="mono" style="margin-left:5px; opacity:0.75;">${_lpFavoriteOfferIds.size}</span>`
+    const badge = f.id === 'favorites' && favoritesInThisStore
+      ? `<span class="mono" style="margin-left:5px; opacity:0.75;">${favoritesInThisStore}</span>`
       : '';
     return `<button onclick="setLPStoreCategoryFilter('${f.id}')" class="lp-pill${active ? ' active' : ''}" title="${window.esc(f.label)}">${window.svgIcon(f.icon)}${window.esc(f.label)}${badge}</button>`;
   }).join('');
@@ -1637,6 +1662,11 @@ function renderLPStoreState(err) {
   // a tax/fee edit that re-triggers loadAndRankLPStore).
   if (resultsArea && !_lpIsolatedResult) resultsArea.classList.remove('hidden');
 
+  // Refreshes the Favorites pill's count for whichever corp _lpRankedResults now holds - without
+  // this, switching corps left that badge showing the PREVIOUS corp's own count (or an earlier,
+  // now-stale one) until something else happened to re-trigger renderLPCategoryBar (toggling a
+  // favorite, clicking a category pill), same underlying bug as the count being unscoped at all.
+  renderLPCategoryBar();
   renderLPStoreTable();
 }
 
@@ -1656,7 +1686,7 @@ function renderLPStoreTable() {
     rows = rows.filter(r => r.outputName && r.outputName.toLowerCase().includes(q));
   }
   if (_lpCategoryFilter === 'favorites') {
-    rows = rows.filter(r => _lpFavoriteOfferIds.has(r.offer.offer_id));
+    rows = rows.filter(r => _lpFavoriteOfferIds.has(lpFavoriteKey(r.offer.offer_id)));
   } else if (_lpCategoryFilter === 'blueprints') {
     // Cross-cutting, not an SDE category - every offer that grants a BPC, whatever it builds
     // (ship, implant, ammo...). Same test the "Blueprints" Offer Type pill above already uses.
@@ -1723,10 +1753,10 @@ function renderLPStoreTable() {
     // (isolateOffer, the detail row's own "Isolate this BPC/item →" button, the sidebar note).
     const isolateBtn = `<button onclick="event.stopPropagation(); isolateOffer(${offer.offer_id});" class="btn-glass btn-glass-muted py-1.5 px-3 text-[11px] font-bold flex items-center gap-1.5 whitespace-nowrap" title="Open this offer in the Calculator's own build-tree view">${window.svgIcon ? window.svgIcon('expand', { style: 'width:12px;height:12px;' }) : '⤢'} Isolate</button>`;
 
-    // Favorited by offer_id (see the state-var comment above) - filled gold star when favorited,
-    // hollow outline otherwise. stopPropagation so starring an offer doesn't also toggle its detail
-    // row open.
-    const isFav = _lpFavoriteOfferIds.has(offer.offer_id);
+    // Favorited by corpId:offer_id (see the state-var comment above) - filled gold star when
+    // favorited, hollow outline otherwise. stopPropagation so starring an offer doesn't also
+    // toggle its detail row open.
+    const isFav = _lpFavoriteOfferIds.has(lpFavoriteKey(offer.offer_id));
     const favBtn = `<button onclick="event.stopPropagation(); toggleLPFavorite(${offer.offer_id});" class="icon-btn flex-shrink-0" style="width:22px;height:22px;" title="${isFav ? 'Remove from Favorites' : 'Add to Favorites'}">${window.svgIcon('star', { style: isFav ? 'fill:#ffd23f; color:#ffd23f;' : 'color:var(--text-mute);' })}</button>`;
 
     let detailHTML = '';
@@ -1942,11 +1972,27 @@ function pickLPStoreCorp(corpId) {
 }
 window.pickLPStoreCorp = pickLPStoreCorp;
 
+// Three popovers now share one switcher bar (#lpstore-corp-switcher): the corp picker, "LP Owned"
+// (a character's own LP balances), and "Find Item" (reverse search across every store). Listed
+// together so opening any one closes the other two (three overlapping popovers off one bar would
+// be worse than the single flyout this whole approach replaced) and so the click-outside listener
+// further down covers all three without repeating itself per popover.
+const LP_STORE_POPOVER_IDS = ['lpstore-corp-popover', 'lpstore-lp-owned-popover', 'lpstore-item-search-popover'];
+
+function closeAllLPStorePopovers() {
+  LP_STORE_POPOVER_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
+}
+window.closeAllLPStorePopovers = closeAllLPStorePopovers;
+
 // Popover (js/lpstore.js's own renderLPStoreCorpList/etc. fill #lpstore-corp-list inside it) -
 // anchored to the persistent #lpstore-corp-switcher bar in lpstore.html, not a flyout panel. Only
 // this small absolute-positioned box opens/closes, so picking a corp (or just glancing at the
 // ranked list while deciding) never requires covering the whole page first.
 function openLPStoreCorpPopover() {
+  closeAllLPStorePopovers();
   const popover = document.getElementById('lpstore-corp-popover');
   if (!popover) return;
   popover.classList.remove('hidden');
@@ -1969,15 +2015,274 @@ function toggleLPStoreCorpPopover() {
 }
 window.toggleLPStoreCorpPopover = toggleLPStoreCorpPopover;
 
+// --- LP Owned: a character's own real LP balance per corp -----------------------------------
+// There is no such thing as corporation-held LP in EVE - confirmed directly against ESI, which has
+// no /corporations/{id}/loyalty/points/ route at all (a genuine 404, not an auth-gated one). LP is
+// always a personal character stat, same as standing. js/esi.js's fetchUserAndCorpAssets fetches
+// the real GET /characters/{id}/loyalty/points/ (needs esi-characters.read_loyalty.v1, added
+// alongside this feature - anyone who logged in before it existed needs to log in again once to
+// grant it) and caches it to localStorage as 'eve_char_lp_balances'; this just reads and displays
+// that cache, resolving each corporation_id against LP_STORE_CORPS for a name/faction/color.
+function getLPOwnedBalances() {
+  try {
+    const raw = localStorage.getItem('eve_char_lp_balances');
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+window.getLPOwnedBalances = getLPOwnedBalances;
+
+function renderLPOwnedContent() {
+  const el = document.getElementById('lpstore-lp-owned-content');
+  if (!el) return;
+  const charId = localStorage.getItem('esi_char_id');
+  const charName = localStorage.getItem('esi_char_name');
+  const loginBtn = `
+    <button onclick="startEsiSSOLogin()" class="btn-glass w-full py-2 text-xs flex items-center justify-center gap-1.5 mt-2">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+      EVE SSO Login
+    </button>`;
+
+  if (!charId) {
+    el.innerHTML = `<div class="text-sm" style="color:var(--text-soft);">Log in with EVE SSO to see your character's own LP balance with every corporation you've earned it from.</div>${loginBtn}`;
+    return;
+  }
+  const balances = getLPOwnedBalances();
+  if (!balances) {
+    el.innerHTML = `<div class="text-sm italic" style="color:var(--text-mute);">No LP data yet - click Refresh Assets in the header, or reload the page.</div>`;
+    return;
+  }
+  if (balances.missingScope) {
+    el.innerHTML = `<div class="text-sm" style="color:var(--text-soft);">Your current login doesn't have permission to view LP balances yet (added after you last logged in) - log in again to grant it.</div>${loginBtn}`;
+    return;
+  }
+
+  const rows = Object.entries(balances.byCorpId || {})
+    .map(([corpIdStr, lp]) => ({ corpId: parseInt(corpIdStr), lp }))
+    .filter(r => r.lp > 0)
+    .sort((a, b) => b.lp - a.lp);
+
+  if (!rows.length) {
+    el.innerHTML = `<div class="text-sm italic" style="color:var(--text-mute);">${window.esc(charName || 'This character')} doesn't have LP with any corporation yet.</div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="text-[10px] uppercase tracking-wide mb-2" style="color:var(--text-mute);">${window.esc(charName || 'Your character')}'s LP balance - click one to view that store</div>
+    <div class="lpstore-corp-list">
+      ${rows.map(r => {
+        const corp = LP_STORE_CORPS.find(c => c.corpId === r.corpId);
+        const name = corp ? corp.corpName : `Corporation ${r.corpId}`;
+        const color = corp ? corp.color : 'var(--text-mute)';
+        return `
+          <button type="button" onclick="jumpToOwnedLPCorp(${r.corpId})" class="lpstore-corp-row">
+            <span class="lpstore-corp-row-dot" style="background:${color};"></span>
+            <span class="lpstore-corp-row-name">${window.esc(name)}</span>
+            <span class="lpstore-corp-row-faction" style="color:${color};">${Math.round(r.lp).toLocaleString()} LP</span>
+          </button>`;
+      }).join('')}
+    </div>`;
+}
+window.renderLPOwnedContent = renderLPOwnedContent;
+
+async function jumpToOwnedLPCorp(corpId) {
+  closeAllLPStorePopovers();
+  const corp = LP_STORE_CORPS.find(c => c.corpId === corpId);
+  if (corp) { _lpCorpListOpenFaction = corp.faction; renderLPStoreCorpList(''); }
+  selectLPStoreCorp(corpId);
+}
+window.jumpToOwnedLPCorp = jumpToOwnedLPCorp;
+
+function openLPOwnedPopover() {
+  closeAllLPStorePopovers();
+  const popover = document.getElementById('lpstore-lp-owned-popover');
+  if (!popover) return;
+  renderLPOwnedContent();
+  popover.classList.remove('hidden');
+}
+window.openLPOwnedPopover = openLPOwnedPopover;
+
+function closeLPOwnedPopover() {
+  const popover = document.getElementById('lpstore-lp-owned-popover');
+  if (popover) popover.classList.add('hidden');
+}
+window.closeLPOwnedPopover = closeLPOwnedPopover;
+
+function toggleLPOwnedPopover() {
+  const popover = document.getElementById('lpstore-lp-owned-popover');
+  if (!popover) return;
+  if (popover.classList.contains('hidden')) openLPOwnedPopover();
+  else closeLPOwnedPopover();
+}
+window.toggleLPOwnedPopover = toggleLPOwnedPopover;
+
+// --- Find Item: reverse search across every known LP store -----------------------------------
+// The corp popover goes corp -> items; this goes the other way, item -> every corp that sells or
+// grants it. That needs at least one offers fetch per corp (fetchLPStoreOffers already caches per
+// corpId, so a corp the user's already browsed this session doesn't refetch) - ~180 stores, so
+// built once per page load (not per keystroke) and cached in _lpItemSearchIndex.
+let _lpItemSearchIndex = null;   // null until built; array of flat, lightweight entries after
+let _lpItemSearchBuilding = false;
+
+// Same concurrency-limited-map shape as scripts/fetch_lp_corps.js's own mapWithConcurrency (a
+// separate Node-only script, not loaded in the browser, so this is a small duplicate rather than a
+// shared import - this project has no bundler/module system to share it through). Return values
+// aren't needed here (each worker call pushes into a shared array as a side effect instead).
+async function mapWithConcurrencyLP(items, concurrency, worker) {
+  let next = 0;
+  async function runOne() {
+    while (next < items.length) {
+      await worker(items[next++]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, runOne));
+}
+
+async function buildLPItemSearchIndex() {
+  if (_lpItemSearchIndex || _lpItemSearchBuilding) return;
+  _lpItemSearchBuilding = true;
+  const resultsEl = document.getElementById('lpstore-item-search-results');
+  const setProgress = (done) => {
+    if (resultsEl) resultsEl.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">Indexing every LP store... ${done}/${LP_STORE_CORPS.length}</div>`;
+  };
+  setProgress(0);
+
+  const entries = [];
+  let done = 0;
+  await mapWithConcurrencyLP(LP_STORE_CORPS, 15, async (corp) => {
+    try {
+      const offers = await fetchLPStoreOffers(corp.corpId);
+      offers.forEach(offer => {
+        const isBpc = isBlueprintOffer(offer);
+        let outputTypeId = offer.type_id;
+        if (isBpc) {
+          const recipe = window.recipeMap[offer.type_id];
+          outputTypeId = recipe ? parseInt(recipe.productTypeID) : offer.type_id;
+        }
+        entries.push({
+          corpId: corp.corpId, corpName: corp.corpName, color: corp.color,
+          offerId: offer.offer_id, outputTypeId, isBpc,
+          iskCost: offer.isk_cost, lpCost: offer.lp_cost,
+          requiredItems: offer.required_items || []
+        });
+      });
+    } catch (e) {
+      console.warn('[LP Store] Item search index: failed to fetch offers for corp', corp.corpId, e);
+    }
+    done++;
+    setProgress(done);
+  });
+
+  // Same name-resolution helper the ranked list itself uses, batched once across every distinct
+  // type id this index touches rather than per-entry.
+  const allTypeIds = new Set();
+  entries.forEach(e => { allTypeIds.add(e.outputTypeId); e.requiredItems.forEach(r => allTypeIds.add(r.type_id)); });
+  await resolveMissingItemNames(Array.from(allTypeIds));
+  entries.forEach(e => {
+    e.outputName = getLPItemName(e.outputTypeId);
+    e.requiredItemsSummary = e.requiredItems.length
+      ? e.requiredItems.map(r => `${r.quantity}x ${getLPItemName(r.type_id)}`).join(', ')
+      : (e.iskCost > 0 ? 'ISK + LP only' : 'LP only');
+  });
+
+  _lpItemSearchIndex = entries;
+  _lpItemSearchBuilding = false;
+  filterLPItemSearchResults(document.getElementById('lpstore-item-search-input')?.value || '');
+}
+
+function lpItemSearchRowHTML(entry) {
+  // Optional, per the user's own framing ("that's optional, not sure if it's a good idea") - only
+  // checks the offer's own LP cost against the character's balance with THAT corp, nothing about
+  // isk_cost or required_items availability, and only appears at all when logged in with real
+  // balance data (getLPOwnedBalances - see its own comment on why corp-held LP isn't a real thing).
+  const balances = getLPOwnedBalances();
+  const myLp = (balances && balances.byCorpId) ? (balances.byCorpId[entry.corpId] || 0) : null;
+  let lpBadge = '';
+  if (myLp !== null) {
+    lpBadge = myLp >= entry.lpCost
+      ? `<span class="lpstore-item-search-lp-badge lpstore-item-search-lp-ok" title="You have ${Math.round(myLp).toLocaleString()} LP with ${window.esc(entry.corpName)}">&#10003; You have enough LP</span>`
+      : `<span class="lpstore-item-search-lp-badge lpstore-item-search-lp-short" title="You have ${Math.round(myLp).toLocaleString()} LP with ${window.esc(entry.corpName)}">Need ${Math.round(entry.lpCost - myLp).toLocaleString()} more LP</span>`;
+  }
+  const iskPart = entry.iskCost > 0 ? `${Math.round(entry.iskCost).toLocaleString()} ISK + ` : '';
+  return `
+    <button type="button" onclick="jumpToLPItemSearchResult(${entry.corpId}, ${entry.offerId})" class="lpstore-item-search-row" title="${window.esc(entry.requiredItemsSummary)}">
+      <div class="lpstore-item-search-row-main">
+        <span class="lpstore-corp-row-dot" style="background:${entry.color};"></span>
+        <span class="lpstore-corp-row-name">${window.esc(entry.outputName)}${entry.isBpc ? ' <span class="lpstore-item-search-bpc-tag">BPC</span>' : ''}</span>
+        <span class="lpstore-corp-row-faction" style="color:${entry.color};">${window.esc(entry.corpName)}</span>
+      </div>
+      <div class="lpstore-item-search-row-cost">${iskPart}${entry.lpCost.toLocaleString()} LP${lpBadge}</div>
+    </button>`;
+}
+
+function filterLPItemSearchResults(query) {
+  const el = document.getElementById('lpstore-item-search-results');
+  if (!el) return;
+  if (_lpItemSearchBuilding) return; // buildLPItemSearchIndex owns the display until it finishes
+  if (!_lpItemSearchIndex) { buildLPItemSearchIndex(); return; }
+
+  const q = (query || '').trim().toLowerCase();
+  if (q.length < 2) {
+    el.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">Type at least 2 characters to search across all ${LP_STORE_CORPS.length} known LP stores.</div>`;
+    return;
+  }
+  const MAX_HITS = 200; // a common item name (e.g. a T1 module) can otherwise match hundreds of offers
+  const hits = _lpItemSearchIndex.filter(e => e.outputName.toLowerCase().includes(q));
+  if (!hits.length) {
+    el.innerHTML = `<div class="p-3 text-slate-400 text-xs italic">No LP store sells or grants anything matching "${window.esc(query)}".</div>`;
+    return;
+  }
+  hits.sort((a, b) => a.outputName.localeCompare(b.outputName) || a.lpCost - b.lpCost);
+  const shown = hits.slice(0, MAX_HITS);
+  el.innerHTML = shown.map(lpItemSearchRowHTML).join('')
+    + (hits.length > MAX_HITS ? `<div class="p-2 text-center text-slate-500 text-[10px]">+ ${hits.length - MAX_HITS} more match${hits.length - MAX_HITS === 1 ? '' : 'es'} - narrow your search to see them</div>` : '');
+}
+window.filterLPItemSearchResults = filterLPItemSearchResults;
+
+async function jumpToLPItemSearchResult(corpId, offerId) {
+  closeAllLPStorePopovers();
+  const corp = LP_STORE_CORPS.find(c => c.corpId === corpId);
+  if (corp) { _lpCorpListOpenFaction = corp.faction; renderLPStoreCorpList(''); }
+  renderLPStoreCorpActiveLabel(corpId);
+  await loadAndRankLPStore(corpId);
+  isolateOffer(offerId);
+}
+window.jumpToLPItemSearchResult = jumpToLPItemSearchResult;
+
+function openLPItemSearchPopover() {
+  closeAllLPStorePopovers();
+  const popover = document.getElementById('lpstore-item-search-popover');
+  if (!popover) return;
+  popover.classList.remove('hidden');
+  const input = document.getElementById('lpstore-item-search-input');
+  if (input) input.focus();
+  if (_lpItemSearchIndex) filterLPItemSearchResults(input ? input.value : '');
+  else buildLPItemSearchIndex();
+}
+window.openLPItemSearchPopover = openLPItemSearchPopover;
+
+function closeLPItemSearchPopover() {
+  const popover = document.getElementById('lpstore-item-search-popover');
+  if (popover) popover.classList.add('hidden');
+}
+window.closeLPItemSearchPopover = closeLPItemSearchPopover;
+
+function toggleLPItemSearchPopover() {
+  const popover = document.getElementById('lpstore-item-search-popover');
+  if (!popover) return;
+  if (popover.classList.contains('hidden')) openLPItemSearchPopover();
+  else closeLPItemSearchPopover();
+}
+window.toggleLPItemSearchPopover = toggleLPItemSearchPopover;
+
 // Click-outside-to-close, not blur-to-close - a faction group header is a <button> inside the
 // popover, so expanding one blurs the search input same as clicking a corp row does, and a blur
 // handler can't tell those two apart (confirmed report: expanding a category closed the whole
 // popover before a corp was ever picked). This only closes on a click that lands OUTSIDE the
-// entire switcher bar (button + popover), so anything clicked inside it - the search input, a
-// faction header, a corp row - is left alone; only pickLPStoreCorp's own explicit close (a real
-// selection) or clicking elsewhere closes it.
+// entire switcher bar (any of the three popovers, or their trigger buttons), so anything clicked
+// inside it is left alone; only an explicit close call (picking something) or clicking elsewhere
+// closes whichever popover is open.
 //
-// Uses composedPath(), not switcher.contains(e.target) - a faction header's own onclick
+// Uses composedPath(), not switcher.contains(e.target) - a faction group header's own onclick
 // (toggleLPStoreCorpFactionGroup) replaces #lpstore-corp-list's innerHTML SYNCHRONOUSLY, which
 // detaches the clicked button from the document before this listener (further up the bubble
 // phase, on the same click) ever runs. A detached node has no parent at all, so
@@ -1988,10 +2293,14 @@ window.toggleLPStoreCorpPopover = toggleLPStoreCorpPopover;
 // the ORIGINAL click target even after that target itself has since been removed.
 document.addEventListener('click', (e) => {
   const switcher = document.getElementById('lpstore-corp-switcher');
-  const popover = document.getElementById('lpstore-corp-popover');
-  if (!switcher || !popover || popover.classList.contains('hidden')) return;
+  if (!switcher) return;
+  const anyOpen = LP_STORE_POPOVER_IDS.some(id => {
+    const el = document.getElementById(id);
+    return el && !el.classList.contains('hidden');
+  });
+  if (!anyOpen) return;
   const path = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
-  if (!path.includes(switcher)) closeLPStoreCorpPopover();
+  if (!path.includes(switcher)) closeAllLPStorePopovers();
 });
 
 // addEventListener rather than a plain `window.onload =` assignment - js/app.js (also loaded on
