@@ -550,7 +550,15 @@ svg[viewBox] { stroke: currentColor; }
    through the icon-rail at all. */
 /* Positioning only - background/border/shadow come from the .glass-card class this also carries
    in the HTML, the same surface treatment every other floating panel in the app already uses. */
-.lpstore-corp-popover { position: absolute; top: 100%; left: 12px; right: 12px; margin-top: 8px; z-index: 30; padding: 12px; }
+/* max-width caps it at a sane size regardless of how wide #lpstore-corp-switcher itself is (a
+   full-width .lp-card - on anything but a narrow window that's much wider than a compact popover
+   should ever be). Without this it stretched to match the switcher bar's own width - confirmed:
+   1343px wide on a 1600px browser window - leaving every row's short text floating sparse on the
+   left of a mostly-empty box, exactly the "unusable, hard to read" layout reported for Find Item's
+   results specifically (its rows have the most text of the three popovers, so the wasted width was
+   most obvious there, but all three shared this same unbounded sizing). left/right still handle
+   the narrow-screen case, shrinking it below max-width so it never overflows a small viewport. */
+.lpstore-corp-popover { position: absolute; top: 100%; left: 12px; right: 12px; max-width: 520px; margin-top: 8px; z-index: 30; padding: 12px; }
 .lpstore-corp-list { max-height: 360px; overflow-y: auto; border-radius: var(--radius-input); border: 1px solid var(--glass-border); }
 .lpstore-corp-faction-group + .lpstore-corp-faction-group { border-top: 1px solid var(--glass-border); }
 .lpstore-corp-faction-header {
