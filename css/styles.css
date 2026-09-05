@@ -555,25 +555,35 @@ svg[viewBox] { stroke: currentColor; }
 .lpstore-corp-faction-group + .lpstore-corp-faction-group { border-top: 1px solid var(--glass-border); }
 .lpstore-corp-faction-header {
   display: flex; align-items: center; gap: 8px; width: 100%;
-  padding: 7px 10px; border-left: 3px solid transparent;
-  background: rgba(255,255,255,0.02); font-size: 11.5px; font-weight: 700;
+  padding: 8px 10px; border-left: 3px solid transparent;
+  background: rgba(255,255,255,0.02); font-size: 13.5px; font-weight: 700;
   text-align: left; cursor: pointer;
 }
 .lpstore-corp-faction-header:hover { background: rgba(255,255,255,0.06); }
-.lpstore-corp-faction-count { color: var(--text-mute); font-size: 10px; font-weight: 600; }
-.lpstore-corp-faction-chevron { width: 11px; height: 11px; margin-left: auto; color: var(--text-mute); flex-shrink: 0; transition: transform 0.15s ease; }
+.lpstore-corp-faction-count { color: var(--text-mute); font-size: 11.5px; font-weight: 600; }
+.lpstore-corp-faction-chevron { width: 12px; height: 12px; margin-left: auto; color: var(--text-mute); flex-shrink: 0; transition: transform 0.15s ease; }
 .lpstore-corp-faction-chevron.open { transform: rotate(90deg); }
 .lpstore-corp-faction-rows { background: rgba(0,0,0,0.15); }
 .lpstore-corp-row {
   display: flex; align-items: center; gap: 8px; width: 100%;
-  padding: 6px 10px 6px 22px; font-size: 11.5px; text-align: left; cursor: pointer;
+  padding: 7px 10px 7px 22px; font-size: 13.5px; text-align: left; cursor: pointer;
   border-top: 1px solid rgba(255,255,255,0.03);
 }
 .lpstore-corp-row:hover { background: rgba(255,255,255,0.06); }
 .lpstore-corp-row-active { background: rgba(var(--accent-rgb), 0.14); }
 .lpstore-corp-row-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .lpstore-corp-row-name { color: var(--text); font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lpstore-corp-row-faction { font-size: 10px; font-weight: 600; flex-shrink: 0; }
+.lpstore-corp-row-faction { font-size: 11.5px; font-weight: 600; flex-shrink: 0; }
+
+/* Ranked-offer summary strip (js/lpstore.js renderLPStoreSummaryTiles) - one shared card divided
+   into cells by a hairline, replacing 4 separate .lp-card boxes that didn't add anything besides
+   visual noise for what's really one row of related numbers (same idea as .lp-market-stat-strip's
+   own cells further down this file). */
+.lpstore-stat-row { display: flex; flex-wrap: wrap; background: var(--glass-fill); border: 1px solid var(--glass-border); border-radius: var(--radius-card); box-shadow: var(--glass-shadow); }
+.lpstore-stat-cell { flex: 1 1 140px; min-width: 0; padding: 10px 16px; }
+.lpstore-stat-cell + .lpstore-stat-cell { border-left: 1px solid var(--glass-border); }
+.lpstore-stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-mute); }
+.lpstore-stat-value { font-size: 20px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; margin-top: 2px; }
 
 .flyout-panel input, .flyout-panel select {
   border-radius: var(--radius-input) !important;
