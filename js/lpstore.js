@@ -2142,13 +2142,17 @@ const LP_ITEM_SEARCH_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 // for the exact same underlying data. loadLPItemSearchIndexCache re-derives everything else
 // (outputName/requiredItemsSummary/profit/iskPerLp) the same way buildLPItemSearchIndex does,
 // which is pure local computation once the caches below are warmed - no network calls either way.
+const LP_ITEM_SEARCH_CACHE_SCHEMA = 2; // bump whenever the compact tuple shape below changes, so an
+// older cached shape (missing newly-added fields) is discarded and rebuilt rather than silently
+// read back with those fields undefined.
 function saveLPItemSearchIndexCache(entries) {
   try {
     const typeIds = new Set();
     const compactEntries = entries.map(e => {
       typeIds.add(e.outputTypeId);
+      if (e.blueprintTypeId) typeIds.add(e.blueprintTypeId);
       const req = (e.requiredItems || []).map(r => { typeIds.add(r.type_id); return [r.type_id, r.quantity]; });
-      return [e.corpId, e.offerId, e.outputTypeId, e.outputQty, e.isBpc ? 1 : 0, e.iskCost, e.lpCost, req];
+      return [e.corpId, e.offerId, e.outputTypeId, e.outputQty, e.isBpc ? 1 : 0, e.iskCost, e.lpCost, req, e.blueprintTypeId || null, e.bpcCopies || null];
     });
     const names = {}, prices = {};
     typeIds.forEach(id => {
@@ -2156,7 +2160,7 @@ function saveLPItemSearchIndexCache(entries) {
       const p = window.priceCache[id];
       if (p) prices[id] = [p.sell || 0, p.buy || 0];
     });
-    localStorage.setItem(LP_ITEM_SEARCH_CACHE_KEY, JSON.stringify({ builtAt: Date.now(), entries: compactEntries, names, prices }));
+    localStorage.setItem(LP_ITEM_SEARCH_CACHE_KEY, JSON.stringify({ schemaVersion: LP_ITEM_SEARCH_CACHE_SCHEMA, builtAt: Date.now(), entries: compactEntries, names, prices }));
   } catch (e) {
     // Quota exceeded or similar, e.g. a browser with localStorage disabled entirely - non-fatal,
     // it just means the next open rebuilds from scratch same as every open did before this cache
@@ -2170,7 +2174,7 @@ function loadLPItemSearchIndexCache() {
     const raw = localStorage.getItem(LP_ITEM_SEARCH_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.entries) || Date.now() - parsed.builtAt > LP_ITEM_SEARCH_CACHE_TTL_MS) return null;
+    if (!parsed || !Array.isArray(parsed.entries) || parsed.schemaVersion !== LP_ITEM_SEARCH_CACHE_SCHEMA || Date.now() - parsed.builtAt > LP_ITEM_SEARCH_CACHE_TTL_MS) return null;
 
     // Warms the SAME shared name/price caches getLPItemName/window.priceCache read from everywhere
     // else in this file (only filling gaps - never overwriting anything already resolved this
@@ -2181,7 +2185,7 @@ function loadLPItemSearchIndexCache() {
 
     const corpsById = new Map(LP_STORE_CORPS.map(c => [c.corpId, c]));
     const { salesTax, brokerFee } = window.getActiveFeeInputs ? window.getActiveFeeInputs() : { salesTax: 0.036, brokerFee: 0.01 };
-    return parsed.entries.map(([corpId, offerId, outputTypeId, outputQty, isBpcFlag, iskCost, lpCost, req]) => {
+    return parsed.entries.map(([corpId, offerId, outputTypeId, outputQty, isBpcFlag, iskCost, lpCost, req, blueprintTypeId, bpcCopies]) => {
       const corp = corpsById.get(corpId);
       const outputName = getLPItemName(outputTypeId);
       const requiredItemsSummary = req.length
@@ -2193,7 +2197,8 @@ function loadLPItemSearchIndexCache() {
       const profit = revenue - iskCost - requiredItemsCost;
       return {
         corpId, corpName: corp ? corp.corpName : `Corporation ${corpId}`, color: corp ? corp.color : 'var(--text-mute)',
-        offerId, outputTypeId, outputQty, isBpc: !!isBpcFlag, iskCost, lpCost, outputName, requiredItemsSummary,
+        offerId, outputTypeId, outputQty, isBpc: !!isBpcFlag, blueprintTypeId: blueprintTypeId || null, bpcCopies: bpcCopies || null,
+        iskCost, lpCost, outputName, requiredItemsSummary,
         profit, iskPerLp: lpCost > 0 ? profit / lpCost : null
       };
     });
@@ -2242,8 +2247,16 @@ async function buildLPItemSearchIndex() {
       const offers = await fetchLPStoreOffers(corp.corpId);
       offers.forEach(offer => {
         const isBpc = isBlueprintOffer(offer);
+        // offer.type_id IS the blueprint's own type id for a BPC offer - reassigned below to the
+        // PRODUCT's type id for outputTypeId, so it's captured here first as blueprintTypeId. The
+        // two are different items with different icons (the blueprint's own icon, via the /bpc
+        // render endpoint, needs the blueprint's OWN type id - requesting it with the product's type
+        // id, which is what outputTypeId holds, returns the wrong/missing icon). Same fields
+        // evaluateBpcOffer already returns (blueprintTypeId, bpcCopies) - kept consistent with that.
         let outputTypeId = offer.type_id;
         let outputQty = offer.quantity;
+        const blueprintTypeId = isBpc ? offer.type_id : null;
+        const bpcCopies = isBpc ? offer.quantity : null;
         if (isBpc) {
           const recipe = window.recipeMap[offer.type_id];
           outputTypeId = recipe ? parseInt(recipe.productTypeID) : offer.type_id;
@@ -2254,7 +2267,7 @@ async function buildLPItemSearchIndex() {
         }
         entries.push({
           corpId: corp.corpId, corpName: corp.corpName, color: corp.color,
-          offerId: offer.offer_id, outputTypeId, outputQty, isBpc,
+          offerId: offer.offer_id, outputTypeId, outputQty, isBpc, blueprintTypeId, bpcCopies,
           iskCost: offer.isk_cost, lpCost: offer.lp_cost,
           requiredItems: offer.required_items || []
         });
@@ -2337,10 +2350,18 @@ function lpItemSearchCorpRowHTML(entry, hasEnough, myLp) {
   const profitKnown = entry.iskPerLp !== null;
   const profitColor = profitKnown ? (entry.iskPerLp >= 0 ? 'var(--accent)' : 'var(--red-400, #f87171)') : 'var(--text-mute)';
   const profitText = profitKnown ? `${Math.round(entry.iskPerLp).toLocaleString()} ISK/LP` : '—';
+  // LP store BPCs are always single-run copies (same fact evaluateBpcOffer's own comment explains) -
+  // offer.quantity (bpcCopies) is therefore both "how many copies" and "how many total runs" at
+  // once, and can differ corp to corp for the same product, so it's shown per row, not once on the
+  // shared group header.
+  const runsPart = entry.isBpc ? `<span class="lpstore-item-search-bpc-runs" title="LP store BPCs are always single-run copies">${entry.bpcCopies || 1}x BPC &middot; 1 run each</span>` : '';
   return `
     <button type="button" onclick="jumpToLPItemSearchResult(${entry.corpId}, ${entry.offerId})" class="lpstore-item-search-corp-row${hasEnough ? ' lpstore-item-search-corp-row-affordable' : ''}" title="${window.esc(entry.requiredItemsSummary)}">
       ${lpCorpLogoHTML(entry.corpId, entry.color)}
-      <span class="lpstore-corp-row-name">${window.esc(entry.corpName)}</span>
+      <span class="lpstore-item-search-corp-name-wrap">
+        <span class="lpstore-corp-row-name">${window.esc(entry.corpName)}</span>
+        ${runsPart}
+      </span>
       <span class="lpstore-item-search-corp-row-stats">
         <span class="lpstore-item-search-corp-row-cost">${iskPart}<span class="lpstore-item-search-lp">${entry.lpCost.toLocaleString()} LP</span></span>
         <span class="lpstore-item-search-profit" style="color:${profitColor};" title="Est. profit per LP spent - see the Find Item header note on how this is estimated">Est. ${profitText}</span>
@@ -2380,8 +2401,13 @@ function lpItemSearchGroupHTML(group) {
   // Same icon + onerror fallback chain the ranked list's own rows already use (icon -> render -> a
   // generic placeholder via handleLPIconLoadError, for the confirmed real case of SKINs having
   // neither) - see that code's own comment for why. Shown once per group, same as the name itself,
-  // rather than repeated per corp row.
-  const iconUrl = getLPStoreIconUrl(group.outputTypeId, group.isBpc, 64);
+  // rather than repeated per corp row. For a BPC group the primary icon must come from the
+  // BLUEPRINT's own type id (group.blueprintTypeId, i.e. offer.type_id) via the /bpc render
+  // endpoint - group.outputTypeId is the manufactured PRODUCT's type id, which has no /bpc art of
+  // its own; the fallback still uses the product's /render though, same as the ranked list, since
+  // that's at least a recognizable image if the blueprint's own art 404s.
+  const groupIconTypeId = (group.isBpc && group.blueprintTypeId) ? group.blueprintTypeId : group.outputTypeId;
+  const iconUrl = getLPStoreIconUrl(groupIconTypeId, group.isBpc, 64);
   const iconFallback = `this.onerror=function(){window.handleLPIconLoadError(this);}; this.src='https://images.evetech.net/types/${group.outputTypeId}/render?size=64';`;
   return `
     <div class="lpstore-item-search-group">
@@ -2406,7 +2432,9 @@ let _lpItemSearchSelectedTypeId = null;
 let _lpItemSearchSelectedIsBpc = false;
 
 function lpItemSearchSuggestionRowHTML(group) {
-  const iconUrl = getLPStoreIconUrl(group.outputTypeId, group.isBpc, 32);
+  // Same BPC-icon fix as lpItemSearchGroupHTML - the blueprint's own type id, not the product's.
+  const groupIconTypeId = (group.isBpc && group.blueprintTypeId) ? group.blueprintTypeId : group.outputTypeId;
+  const iconUrl = getLPStoreIconUrl(groupIconTypeId, group.isBpc, 32);
   const iconFallback = `this.onerror=function(){window.handleLPIconLoadError(this);}; this.src='https://images.evetech.net/types/${group.outputTypeId}/render?size=32';`;
   const typeBadge = group.isBpc
     ? `<span class="lpstore-item-search-type-badge lpstore-item-search-type-bpc">BPC</span>`
@@ -2432,7 +2460,7 @@ function renderLPItemSearchResultsArea() {
   }
   const matching = (_lpItemSearchIndex || []).filter(e => e.outputTypeId === _lpItemSearchSelectedTypeId && e.isBpc === _lpItemSearchSelectedIsBpc);
   if (!matching.length) { _lpItemSearchSelectedTypeId = null; renderLPItemSearchResultsArea(); return; }
-  const group = { outputTypeId: _lpItemSearchSelectedTypeId, outputName: matching[0].outputName, isBpc: _lpItemSearchSelectedIsBpc, entries: matching };
+  const group = { outputTypeId: _lpItemSearchSelectedTypeId, outputName: matching[0].outputName, isBpc: _lpItemSearchSelectedIsBpc, blueprintTypeId: matching[0].blueprintTypeId, entries: matching };
   el.innerHTML = lpItemSearchGroupHTML(group);
 }
 window.renderLPItemSearchResultsArea = renderLPItemSearchResultsArea;
@@ -2468,7 +2496,7 @@ function filterLPItemSearchResults(query) {
   const groups = new Map();
   hits.forEach(e => {
     const key = e.outputTypeId + ':' + (e.isBpc ? 1 : 0);
-    if (!groups.has(key)) groups.set(key, { outputTypeId: e.outputTypeId, outputName: e.outputName, isBpc: e.isBpc, entries: [] });
+    if (!groups.has(key)) groups.set(key, { outputTypeId: e.outputTypeId, outputName: e.outputName, isBpc: e.isBpc, blueprintTypeId: e.blueprintTypeId, entries: [] });
     groups.get(key).entries.push(e);
   });
   const MAX_SUGGESTIONS = 30; // a common word (e.g. "charge") can otherwise match dozens of distinct items
