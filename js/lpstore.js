@@ -1901,7 +1901,7 @@ function lpStoreCorpRowHTML(c) {
   const active = c.corpId === _lpActiveCorpId ? ' lpstore-corp-row-active' : '';
   return `
     <button type="button" onclick="pickLPStoreCorp(${c.corpId})" class="lpstore-corp-row${active}">
-      <span class="lpstore-corp-row-dot" style="background:${c.color};"></span>
+      ${lpCorpLogoHTML(c.corpId, c.color)}
       <span class="lpstore-corp-row-name">${window.esc(c.corpName)}</span>
       <span class="lpstore-corp-row-faction" style="color:${c.color};">${window.esc(c.faction)}</span>
     </button>`;
@@ -2077,7 +2077,7 @@ function renderLPOwnedContent() {
         const color = corp ? corp.color : 'var(--text-mute)';
         return `
           <button type="button" onclick="jumpToOwnedLPCorp(${r.corpId})" class="lpstore-corp-row">
-            <span class="lpstore-corp-row-dot" style="background:${color};"></span>
+            ${lpCorpLogoHTML(r.corpId, color)}
             <span class="lpstore-corp-row-name">${window.esc(name)}</span>
             <span class="lpstore-corp-row-faction" style="color:${color};">${Math.round(r.lp).toLocaleString()} LP</span>
           </button>`;
@@ -2156,13 +2156,18 @@ async function buildLPItemSearchIndex() {
       offers.forEach(offer => {
         const isBpc = isBlueprintOffer(offer);
         let outputTypeId = offer.type_id;
+        let outputQty = offer.quantity;
         if (isBpc) {
           const recipe = window.recipeMap[offer.type_id];
           outputTypeId = recipe ? parseInt(recipe.productTypeID) : offer.type_id;
+          // A BPC redemption grants offer.quantity blueprint COPIES, not units of the product - the
+          // actual product yield is that times the blueprint's own per-run output (single-run
+          // copies, same convention evaluateBpcOffer already uses elsewhere in this file).
+          outputQty = recipe ? offer.quantity * (recipe.productQtyPerRun || 1) : offer.quantity;
         }
         entries.push({
           corpId: corp.corpId, corpName: corp.corpName, color: corp.color,
-          offerId: offer.offer_id, outputTypeId, isBpc,
+          offerId: offer.offer_id, outputTypeId, outputQty, isBpc,
           iskCost: offer.isk_cost, lpCost: offer.lp_cost,
           requiredItems: offer.required_items || []
         });
@@ -2179,16 +2184,43 @@ async function buildLPItemSearchIndex() {
   const allTypeIds = new Set();
   entries.forEach(e => { allTypeIds.add(e.outputTypeId); e.requiredItems.forEach(r => allTypeIds.add(r.type_id)); });
   await resolveMissingItemNames(Array.from(allTypeIds));
+
+  // Est. ISK/LP per entry - same formula evaluateDirectSellOffer uses (net of sales tax + broker
+  // fee, output value minus required-items cost minus the offer's own isk_cost). For a BPC offer
+  // this deliberately stops short of the ranked list's full evaluateBpcOffer - it prices the
+  // PRODUCT's market value but not what it actually costs to BUILD from the blueprint (materials,
+  // job fee), so it reads optimistic for BPC offers specifically. Good enough for "which corp looks
+  // like the better deal" at a glance across ~180 stores without building a full recipe tree for
+  // every BPC offer in the index (that's what Isolate is for - the real number, one offer at a
+  // time) - labeled "Est." wherever it's shown so that trade-off is visible, not just assumed.
+  await window.fetchMarketPrices(Array.from(allTypeIds));
+  const { salesTax, brokerFee } = window.getActiveFeeInputs ? window.getActiveFeeInputs() : { salesTax: 0.036, brokerFee: 0.01 };
   entries.forEach(e => {
     e.outputName = getLPItemName(e.outputTypeId);
     e.requiredItemsSummary = e.requiredItems.length
       ? e.requiredItems.map(r => `${r.quantity}x ${getLPItemName(r.type_id)}`).join(', ')
       : (e.iskCost > 0 ? 'ISK + LP only' : 'LP only');
+
+    const outputPrice = (window.priceCache[e.outputTypeId] || {}).sell || 0;
+    const grossRevenue = outputPrice * e.outputQty;
+    const revenue = grossRevenue * (1 - salesTax - brokerFee);
+    const requiredItemsCost = e.requiredItems.reduce((sum, r) => sum + ((window.priceCache[r.type_id] || {}).sell || 0) * r.quantity, 0);
+    e.profit = revenue - e.iskCost - requiredItemsCost;
+    e.iskPerLp = e.lpCost > 0 ? e.profit / e.lpCost : null;
   });
 
   _lpItemSearchIndex = entries;
   _lpItemSearchBuilding = false;
   filterLPItemSearchResults(document.getElementById('lpstore-item-search-input')?.value || '');
+}
+
+// Small <img>+fallback pattern shared by every corp row in this file (corp picker, LP Owned, Find
+// Item) - a real logo is far more recognizable than an abstract color dot. The colored circle is
+// the element itself, not a separate fallback node - the logo sits on top of it, and if the image
+// 404s (removed via onerror) the plain colored circle underneath just shows through, so there's
+// always something sensible on screen either way.
+function lpCorpLogoHTML(corpId, color) {
+  return `<span class="lpstore-corp-logo-wrap" style="background:${color};"><img src="https://images.evetech.net/corporations/${corpId}/logo?size=32" alt="" loading="lazy" class="lpstore-corp-logo" onerror="this.remove();"></span>`;
 }
 
 // One row per CORP within an item's group (see filterLPItemSearchResults below) - the item name
@@ -2205,20 +2237,29 @@ function lpItemSearchCorpRowHTML(entry, hasEnough, myLp) {
       ? `<span class="lpstore-item-search-lp-badge lpstore-item-search-lp-ok" title="You have ${Math.round(myLp).toLocaleString()} LP with ${window.esc(entry.corpName)}">&#10003; enough LP</span>`
       : `<span class="lpstore-item-search-lp-badge lpstore-item-search-lp-short" title="You have ${Math.round(myLp).toLocaleString()} LP with ${window.esc(entry.corpName)}">need ${Math.round(entry.lpCost - myLp).toLocaleString()} more LP</span>`;
   }
-  const iskPart = entry.iskCost > 0 ? `${Math.round(entry.iskCost).toLocaleString()} ISK + ` : '';
+  const iskPart = entry.iskCost > 0 ? `<span class="lpstore-item-search-isk">${Math.round(entry.iskCost).toLocaleString()} ISK</span> + ` : '';
+  // Est. ISK/LP - see buildLPItemSearchIndex's own comment on why this is an estimate (a BPC
+  // offer's build cost isn't in it). null when the offer is free (no LP cost to divide against, or
+  // priced entirely in required-items with nothing to compare) - shown as a plain dash then.
+  const profitKnown = entry.iskPerLp !== null;
+  const profitColor = profitKnown ? (entry.iskPerLp >= 0 ? 'var(--accent)' : 'var(--red-400, #f87171)') : 'var(--text-mute)';
+  const profitText = profitKnown ? `${Math.round(entry.iskPerLp).toLocaleString()} ISK/LP` : '—';
   return `
     <button type="button" onclick="jumpToLPItemSearchResult(${entry.corpId}, ${entry.offerId})" class="lpstore-item-search-corp-row${hasEnough ? ' lpstore-item-search-corp-row-affordable' : ''}" title="${window.esc(entry.requiredItemsSummary)}">
-      <span class="lpstore-corp-row-dot" style="background:${entry.color};"></span>
+      ${lpCorpLogoHTML(entry.corpId, entry.color)}
       <span class="lpstore-corp-row-name">${window.esc(entry.corpName)}</span>
-      <span class="lpstore-item-search-corp-row-cost">${iskPart}${entry.lpCost.toLocaleString()} LP</span>
+      <span class="lpstore-item-search-corp-row-stats">
+        <span class="lpstore-item-search-corp-row-cost">${iskPart}<span class="lpstore-item-search-lp">${entry.lpCost.toLocaleString()} LP</span></span>
+        <span class="lpstore-item-search-profit" style="color:${profitColor};" title="Est. profit per LP spent - see the Find Item header note on how this is estimated">Est. ${profitText}</span>
+      </span>
       ${lpBadge}
     </button>`;
 }
 
 // One group per distinct item (outputTypeId, not name - two different items could coincidentally
 // share a name) - the corps that offer it are sorted so ones you already have enough LP with float
-// to the top (per the user's own request), cheapest LP cost first as the tiebreaker either side of
-// that split.
+// to the top (per the user's own request), best estimated ISK/LP as the tiebreaker either side of
+// that split (falling back to cheapest LP cost when profit can't be estimated for one side).
 function lpItemSearchGroupHTML(group) {
   const balances = getLPOwnedBalances();
   const withLp = group.entries.map(entry => {
@@ -2227,6 +2268,9 @@ function lpItemSearchGroupHTML(group) {
   });
   withLp.sort((a, b) => {
     if (a.hasEnough !== b.hasEnough) return a.hasEnough ? -1 : 1;
+    if (a.entry.iskPerLp !== null && b.entry.iskPerLp !== null) return b.entry.iskPerLp - a.entry.iskPerLp;
+    if (a.entry.iskPerLp !== null) return -1; // a known profit beats an inestimable one
+    if (b.entry.iskPerLp !== null) return 1;
     return a.entry.lpCost - b.entry.lpCost;
   });
   return `
