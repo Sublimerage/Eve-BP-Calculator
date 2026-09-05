@@ -1637,41 +1637,7 @@ function renderLPStoreState(err) {
   // a tax/fee edit that re-triggers loadAndRankLPStore).
   if (resultsArea && !_lpIsolatedResult) resultsArea.classList.remove('hidden');
 
-  renderLPStoreSummaryTiles();
   renderLPStoreTable();
-}
-
-function renderLPStoreSummaryTiles() {
-  const el = document.getElementById('lpstore-summary-tiles');
-  if (!el) return;
-  const total = _lpRankedResults.length;
-  const profitable = _lpRankedResults.filter(r => r.profit > 0).length;
-  const best = _lpRankedResults.filter(r => r.iskPerLp !== null).sort((a, b) => b.iskPerLp - a.iskPerLp)[0];
-  const bpcCount = _lpRankedResults.filter(r => r.offerType === 'bpc').length;
-
-  // One shared row, not 4 separate boxed cards - the individual .lp-card wrapper per stat read as
-  // visual clutter for what's really one dashboard strip (matches feedback on this exact point).
-  // Divided by a hairline between cells instead, same idea as .lp-market-stat-strip's own cells.
-  el.innerHTML = `
-    <div class="lpstore-stat-row">
-      <div class="lpstore-stat-cell">
-        <div class="lpstore-stat-label">Total Offers</div>
-        <div class="lpstore-stat-value text-white">${total}</div>
-      </div>
-      <div class="lpstore-stat-cell">
-        <div class="lpstore-stat-label">Profitable</div>
-        <div class="lpstore-stat-value" style="color:var(--accent);">${profitable}</div>
-      </div>
-      <div class="lpstore-stat-cell">
-        <div class="lpstore-stat-label">Blueprint Offers</div>
-        <div class="lpstore-stat-value text-white">${bpcCount}</div>
-      </div>
-      <div class="lpstore-stat-cell">
-        <div class="lpstore-stat-label">Best ISK / LP</div>
-        <div class="lpstore-stat-value" style="color:var(--accent);">${best ? Math.round(best.iskPerLp).toLocaleString() : '—'}</div>
-      </div>
-    </div>
-  `;
 }
 
 function sortIndicator(key) {
