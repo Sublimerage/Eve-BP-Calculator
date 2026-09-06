@@ -529,7 +529,7 @@ async function evaluateDirectSellOffer(offer) {
     revenue, cost, requiredItemsCost, profit,
     lpCost: offer.lp_cost, iskCost: offer.isk_cost,
     iskPerLp: offer.lp_cost > 0 ? profit / offer.lp_cost : null,
-    buildSeconds: 0, bpcCopies: 0
+    buildSeconds: 0, bpcRuns: 0
   };
 }
 
@@ -537,21 +537,26 @@ async function evaluateBpcOffer(offer) {
   const recipe = window.recipeMap[offer.type_id];
   const productTypeId = parseInt(recipe.productTypeID);
   const batchYield = recipe.productQtyPerRun || 1;
-  // ESI's offer schema has no field for the granted BPC's run count - FW LP store blueprints are,
-  // as a long-standing EVE mechanic, always single-run copies, so each unit of offer.quantity is
-  // treated as exactly 1 run. Called out in the UI rather than silently assumed, since it's the
-  // one number here ESI itself can't confirm.
+  // offer.quantity IS the run count on the ONE blueprint copy this offer grants - NOT a count of
+  // several separate single-run copies (an earlier version of this code assumed the opposite,
+  // reported as wrong: the in-game redemption preview shows e.g. "1 x Caldari Navy Large Graviton
+  // Smartbomb Blueprint (5 runs, copy)" for an offer, and cross-checking that exact offer live
+  // against ESI's own /loyalty/stores/{corp}/offers/ confirms quantity=5 for it - one item, 5 runs,
+  // not 5 items of 1 run each). Confirmed for several offers of different corps/products, not just
+  // one.
   const runs = offer.quantity;
 
   const priorRootProduct = window.recipeTreeRootProductTypeId;
   window.recipeTreeRootProductTypeId = productTypeId;
   let root;
   try {
-    // jobCount: runs - LP store BPCs are always single-run copies (see this function's own comment on
-    // `runs` above), so `runs` copies means `runs` SEPARATE real jobs of 1 run each, not one
-    // `runs`-run job. See buildRecursiveRecipeTree's own comment on node.jobCount for why that
-    // changes the material math.
-    root = await window.buildRecursiveRecipeTree(parseInt(offer.type_id), getLPItemName(offer.type_id), runs, 0, 6, new Set(), null, runs);
+    // jobCount: 1 - this offer grants ONE physical blueprint copy with `runs` runs on it (see this
+    // function's own comment on `runs` above), so it's one combined `runs`-run job, not `runs`
+    // separate 1-run jobs - buildRecursiveRecipeTree's own comment on node.jobCount explains why
+    // getting this wrong matters: jobCount > 1 rounds material need up per job independently, which
+    // overstates both material cost and (since job fee is a percentage of material EIV) job fee for
+    // any offer with quantity > 1.
+    root = await window.buildRecursiveRecipeTree(parseInt(offer.type_id), getLPItemName(offer.type_id), runs, 0, 6, new Set(), null, 1);
   } finally {
     window.recipeTreeRootProductTypeId = priorRootProduct;
   }
@@ -597,7 +602,7 @@ async function evaluateBpcOffer(offer) {
     revenue, cost, requiredItemsCost, materialCost, jobFee, profit,
     lpCost: offer.lp_cost, iskCost: offer.isk_cost,
     iskPerLp: offer.lp_cost > 0 ? profit / offer.lp_cost : null,
-    buildSeconds, bpcCopies: offer.quantity, blueprintTypeId: offer.type_id
+    buildSeconds, bpcRuns: offer.quantity, blueprintTypeId: offer.type_id
   };
 }
 
@@ -768,10 +773,10 @@ async function isolateOffer(offerId) {
     // .then(), because every await below depends on selectItem's own tree/DOM actually being
     // finished, not just started.
     //
-    // window.globalRuns/window.globalJobs (LP store BPCs are always single-run copies - see
-    // evaluateBpcOffer's own comment on why that needs special material-rounding handling, via the
-    // general node.jobCount mechanic - see buildRecursiveRecipeTree's own comment) are NOT set here -
-    // ensureLPRedemptionNodesPresent (run by the recalculate hook below) derives both fresh from
+    // window.globalRuns/window.globalJobs (one redemption = one blueprint copy with offer.quantity
+    // runs on it, several redemptions = several separate copies - see ensureLPRedemptionNodesPresent's
+    // own comment, and evaluateBpcOffer's, for the full story and how this was confirmed) are NOT set
+    // here - ensureLPRedemptionNodesPresent (run by the recalculate hook below) derives both fresh from
     // _lpRedemptionCount on every single recalculate, not just this first one. Setting them only here
     // was a previous version of this code, and it broke the moment anything rebuilt the tree
     // afterward (toggling Build/Buy on any component, or changing the home market station both call
@@ -980,15 +985,19 @@ async function ensureLPRedemptionNodesPresent() {
 
   root.isLPIsolatedRoot = true;
   root._lpRedemptionCount = _lpRedemptionCount;
-  // A BPC redemption's runs-per-job is ALWAYS 1 (LP store blueprints are always single-run copies -
-  // see evaluateBpcOffer's own comment), so the general node.jobCount mechanic (buildRecursiveRecipeTree's
-  // own comment) applies with jobCount = every copy this many redemptions grants and runsPerJob = 1.
-  // Direct-sell has no such concept (its synthetic root's recipe stays null, so scaleTreeQuantities
-  // never even reaches the jobCount branch for it) - globalRuns there just directly means redemptions,
-  // same as isolateDirectSellOffer already assumed.
+  // Each redemption of a BPC offer grants ONE physical blueprint copy with result.offer.quantity
+  // runs on it (see evaluateBpcOffer's own comment - confirmed against ESI live data and the in-game
+  // redemption preview, NOT several separate single-run copies). Redeeming the SAME offer several
+  // times ("Times Redeemed") really does give several separate physical copies though - that part IS
+  // jobCount, one real job per redemption - so jobCount = _lpRedemptionCount (how many separate
+  // copies you're planning around) and runsPerJob = result.offer.quantity (runs on each one), via the
+  // general node.jobCount mechanic (see buildRecursiveRecipeTree's own comment). Direct-sell has no
+  // such concept (its synthetic root's recipe stays null, so scaleTreeQuantities never even reaches
+  // the jobCount branch for it) - globalRuns there just directly means redemptions, same as
+  // isolateDirectSellOffer already assumed.
   if (result.offerType === 'bpc') {
-    window.globalJobs = _lpRedemptionCount * (result.offer.quantity || 1);
-    window.globalRuns = 1;
+    window.globalJobs = _lpRedemptionCount;
+    window.globalRuns = result.offer.quantity || 1;
   } else {
     window.globalJobs = 1;
     window.globalRuns = _lpRedemptionCount;
@@ -1773,7 +1782,7 @@ function renderLPStoreTable() {
                 ${isBpc ? `<div><span style="color:var(--text-mute);">Material Cost to Build:</span> ${Math.round(r.materialCost).toLocaleString()} ISK</div>` : ''}
                 ${isBpc ? `<div><span style="color:var(--text-mute);">Job Install Fee:</span> ${Math.round(r.jobFee).toLocaleString()} ISK</div>` : ''}
                 ${isBpc ? `<div><span style="color:var(--text-mute);">Build Time:</span> ${r.buildSeconds > 0 ? window.formatDurationCompact(r.buildSeconds) : 'no time data'}</div>` : ''}
-                ${isBpc ? `<div><span style="color:var(--text-mute);">BPCs Granted:</span> ${r.bpcCopies} (assumed 1 run each - see sidebar note)</div>` : ''}
+                ${isBpc ? `<div><span style="color:var(--text-mute);">Blueprint Copy:</span> 1 copy, ${r.bpcRuns} run${r.bpcRuns === 1 ? '' : 's'}</div>` : ''}
               </div>
               <div class="mt-2 pt-2" style="border-top:1px solid rgba(255,255,255,0.06); color:var(--text-mute);">
                 Turned in: ${requiredItemsSummary}
@@ -2152,7 +2161,7 @@ function saveLPItemSearchIndexCache(entries) {
       typeIds.add(e.outputTypeId);
       if (e.blueprintTypeId) typeIds.add(e.blueprintTypeId);
       const req = (e.requiredItems || []).map(r => { typeIds.add(r.type_id); return [r.type_id, r.quantity]; });
-      return [e.corpId, e.offerId, e.outputTypeId, e.outputQty, e.isBpc ? 1 : 0, e.iskCost, e.lpCost, req, e.blueprintTypeId || null, e.bpcCopies || null];
+      return [e.corpId, e.offerId, e.outputTypeId, e.outputQty, e.isBpc ? 1 : 0, e.iskCost, e.lpCost, req, e.blueprintTypeId || null, e.bpcRuns || null];
     });
     const names = {}, prices = {};
     typeIds.forEach(id => {
@@ -2185,7 +2194,7 @@ function loadLPItemSearchIndexCache() {
 
     const corpsById = new Map(LP_STORE_CORPS.map(c => [c.corpId, c]));
     const { salesTax, brokerFee } = window.getActiveFeeInputs ? window.getActiveFeeInputs() : { salesTax: 0.036, brokerFee: 0.01 };
-    return parsed.entries.map(([corpId, offerId, outputTypeId, outputQty, isBpcFlag, iskCost, lpCost, req, blueprintTypeId, bpcCopies]) => {
+    return parsed.entries.map(([corpId, offerId, outputTypeId, outputQty, isBpcFlag, iskCost, lpCost, req, blueprintTypeId, bpcRuns]) => {
       const corp = corpsById.get(corpId);
       const outputName = getLPItemName(outputTypeId);
       const requiredItemsSummary = req.length
@@ -2197,7 +2206,7 @@ function loadLPItemSearchIndexCache() {
       const profit = revenue - iskCost - requiredItemsCost;
       return {
         corpId, corpName: corp ? corp.corpName : `Corporation ${corpId}`, color: corp ? corp.color : 'var(--text-mute)',
-        offerId, outputTypeId, outputQty, isBpc: !!isBpcFlag, blueprintTypeId: blueprintTypeId || null, bpcCopies: bpcCopies || null,
+        offerId, outputTypeId, outputQty, isBpc: !!isBpcFlag, blueprintTypeId: blueprintTypeId || null, bpcRuns: bpcRuns || null,
         iskCost, lpCost, outputName, requiredItemsSummary,
         profit, iskPerLp: lpCost > 0 ? profit / lpCost : null
       };
@@ -2252,22 +2261,23 @@ async function buildLPItemSearchIndex() {
         // two are different items with different icons (the blueprint's own icon, via the /bpc
         // render endpoint, needs the blueprint's OWN type id - requesting it with the product's type
         // id, which is what outputTypeId holds, returns the wrong/missing icon). Same fields
-        // evaluateBpcOffer already returns (blueprintTypeId, bpcCopies) - kept consistent with that.
+        // evaluateBpcOffer already returns (blueprintTypeId, bpcRuns) - kept consistent with that.
         let outputTypeId = offer.type_id;
         let outputQty = offer.quantity;
         const blueprintTypeId = isBpc ? offer.type_id : null;
-        const bpcCopies = isBpc ? offer.quantity : null;
+        const bpcRuns = isBpc ? offer.quantity : null;
         if (isBpc) {
           const recipe = window.recipeMap[offer.type_id];
           outputTypeId = recipe ? parseInt(recipe.productTypeID) : offer.type_id;
-          // A BPC redemption grants offer.quantity blueprint COPIES, not units of the product - the
-          // actual product yield is that times the blueprint's own per-run output (single-run
-          // copies, same convention evaluateBpcOffer already uses elsewhere in this file).
+          // offer.quantity is the RUN COUNT on the one blueprint copy this offer grants (see
+          // evaluateBpcOffer's own comment - confirmed against ESI live data and the in-game
+          // redemption preview, NOT several separate single-run copies), so the actual product yield
+          // is that times the blueprint's own per-run output.
           outputQty = recipe ? offer.quantity * (recipe.productQtyPerRun || 1) : offer.quantity;
         }
         entries.push({
           corpId: corp.corpId, corpName: corp.corpName, color: corp.color,
-          offerId: offer.offer_id, outputTypeId, outputQty, isBpc, blueprintTypeId, bpcCopies,
+          offerId: offer.offer_id, outputTypeId, outputQty, isBpc, blueprintTypeId, bpcRuns,
           iskCost: offer.isk_cost, lpCost: offer.lp_cost,
           requiredItems: offer.required_items || []
         });
@@ -2350,11 +2360,11 @@ function lpItemSearchCorpRowHTML(entry, hasEnough, myLp) {
   const profitKnown = entry.iskPerLp !== null;
   const profitColor = profitKnown ? (entry.iskPerLp >= 0 ? 'var(--accent)' : 'var(--red-400, #f87171)') : 'var(--text-mute)';
   const profitText = profitKnown ? `${Math.round(entry.iskPerLp).toLocaleString()} ISK/LP` : '—';
-  // LP store BPCs are always single-run copies (same fact evaluateBpcOffer's own comment explains) -
-  // offer.quantity (bpcCopies) is therefore both "how many copies" and "how many total runs" at
-  // once, and can differ corp to corp for the same product, so it's shown per row, not once on the
-  // shared group header.
-  const runsPart = entry.isBpc ? `<span class="lpstore-item-search-bpc-runs" title="LP store BPCs are always single-run copies">${entry.bpcCopies || 1}x BPC &middot; 1 run each</span>` : '';
+  // offer.quantity (bpcRuns) is the run count on the ONE blueprint copy this offer grants - not a
+  // count of several separate single-run copies (see evaluateBpcOffer's own comment - confirmed
+  // against ESI live data and the in-game redemption preview). Can differ corp to corp for the same
+  // product, so it's shown per row, not once on the shared group header.
+  const runsPart = entry.isBpc ? `<span class="lpstore-item-search-bpc-runs" title="One blueprint copy, with this many runs on it">1x BPC &middot; ${entry.bpcRuns || 1} run${(entry.bpcRuns || 1) === 1 ? '' : 's'}</span>` : '';
   return `
     <button type="button" onclick="jumpToLPItemSearchResult(${entry.corpId}, ${entry.offerId})" class="lpstore-item-search-corp-row${hasEnough ? ' lpstore-item-search-corp-row-affordable' : ''}" title="${window.esc(entry.requiredItemsSummary)}">
       ${lpCorpLogoHTML(entry.corpId, entry.color)}
