@@ -2530,12 +2530,22 @@ async function jumpToLPItemSearchResult(corpId, offerId) {
 }
 window.jumpToLPItemSearchResult = jumpToLPItemSearchResult;
 
+// Keeps the switcher bar's "This Store"/"All Stores" tabs in sync with whichever main-content view
+// is actually showing, so which search scope you're in is always visible at a glance rather than
+// only knowable from a button you already clicked - see showLPItemSearchArea/exitLPItemSearchArea,
+// the only two places main content switches between the ranked list and the item-search view.
+function setLPStoreSearchModeTab(mode) {
+  document.getElementById('lpstore-tab-store')?.classList.toggle('active', mode === 'store');
+  document.getElementById('lpstore-tab-finditem')?.classList.toggle('active', mode === 'finditem');
+}
+
 // Dedicated main-content view, not a popover - "just like the LP store [ranked-offer] list" per the
 // user's own framing; a popover was too cramped once results grouped one item under several corps.
 // Same shown/hidden-sibling-state pattern the isolated build canvas already uses (see
 // exitLPInspector), just for this state instead of #viewport.
 function showLPItemSearchArea() {
   closeAllLPStorePopovers();
+  setLPStoreSearchModeTab('finditem');
   ['lpstore-empty-state', 'lpstore-loading-state', 'lpstore-error-state', 'lpstore-results-area'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
   const area = document.getElementById('lpstore-item-search-area');
   if (area) area.classList.remove('hidden');
@@ -2548,6 +2558,7 @@ function showLPItemSearchArea() {
 window.showLPItemSearchArea = showLPItemSearchArea;
 
 function exitLPItemSearchArea() {
+  setLPStoreSearchModeTab('store');
   document.getElementById('lpstore-item-search-area')?.classList.add('hidden');
   renderLPStoreState(); // re-shows whichever of empty/loading/results-area actually applies now
 }
