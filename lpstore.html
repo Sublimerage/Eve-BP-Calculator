@@ -264,10 +264,18 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><circle cx="12" cy="8" r="5"/><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5"/></svg>
               LP Owned
             </button>
-            <button type="button" onclick="showLPItemSearchArea()" class="btn-glass btn-glass-muted px-3 py-1.5 text-xs flex items-center gap-1.5 flex-shrink-0">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><circle cx="10.5" cy="10.5" r="6.5"/><line x1="20" y1="20" x2="15.5" y2="15.5"/></svg>
-              Find Item
-            </button>
+            <!-- Search-scope tabs, replacing the old standalone "Find Item" button - a plain action
+                 button gave no persistent signal of which search you were currently using (reported
+                 as confusing: easy to lose track of "this store" vs "every store"). Always visible
+                 here regardless of which main-content view is showing, with the active one lit up via
+                 .lp-pill.active - see js/lpstore.js's showLPItemSearchArea/exitLPItemSearchArea,
+                 which now also call setLPStoreSearchModeTab() to keep this in sync. This also
+                 replaces the item-search view's own former "Back to Store" button - one control for
+                 switching, not two different-looking ones that did the same thing. -->
+            <div class="flex items-center gap-1 p-1 rounded-full flex-shrink-0" style="background:rgba(255,255,255,0.04);">
+              <button type="button" id="lpstore-tab-store" onclick="exitLPItemSearchArea()" class="lp-pill active" title="Search only the currently selected corporation's own offers">This Store</button>
+              <button type="button" id="lpstore-tab-finditem" onclick="showLPItemSearchArea()" class="lp-pill" title="Search every known LP store at once for one item">All Stores</button>
+            </div>
           </div>
         </div>
         <div id="lpstore-corp-popover" class="lpstore-corp-popover glass-card hidden">
@@ -335,11 +343,10 @@
            whichever of empty/loading/results-area actually applies via exitLPItemSearchArea. -->
       <div id="lpstore-item-search-area" class="hidden space-y-4">
         <div class="lp-card p-4">
+          <!-- No "Back to Store" button here anymore - the "This Store" tab in the switcher bar
+               above (always visible, same control that got you here) does that job now instead of a
+               second, differently-styled way to do the same thing. -->
           <div class="flex items-center gap-3 mb-1">
-            <button onclick="exitLPItemSearchArea()" class="btn-glass btn-glass-muted px-2.5 py-1.5 text-[11px] flex items-center gap-1.5 flex-shrink-0">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-              Back to Store
-            </button>
             <h2 class="text-sm font-bold uppercase tracking-wider rajdhani" style="color:var(--accent);">Find Item Across Every LP Store</h2>
           </div>
           <p class="text-[10px] mb-3 leading-relaxed" style="color:var(--text-mute);">Est. ISK/LP is net of sales tax + broker fee, same as the ranked list - for a <span class="lpstore-item-search-type-badge lpstore-item-search-type-bpc">BPC</span> offer it prices the product's market value but not what it costs to actually build (materials, job fee), so it reads a bit optimistic there. Isolate an offer for the real number.</p>
@@ -553,7 +560,7 @@
   <script src="js/tree.js?v=8.0.3" defer></script>
   <script src="js/optimizers.js?v=8.0.7" defer></script>
   <script src="js/app.js?v=15.37.2" defer></script>
-  <script src="js/lpstore.js?v=7.25.0" defer></script>
+  <script src="js/lpstore.js?v=7.26.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
