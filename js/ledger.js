@@ -1813,16 +1813,18 @@ function renderJobOwnershipBadgeHTML(job, iconOnly) {
   // Real ESI character portrait instead of a generic person/building glyph - same
   // images.evetech.net/characters/{id}/portrait endpoint the pilot badge and character switcher
   // already use, so a job's owner is recognizable by face, not just by hovering a tooltip.
-  // A softly-rounded square, not a full circle (border-radius:50%) - reported as a real visual
-  // clash: a hard circle sitting right next to the preset chip's own pill/rectangle-ish .lp-badge
-  // (also border-radius:999px, but a WIDE text pill reads as boxy overall since the rounding is only
-  // visible at its short ends) looked like two different design languages side by side. A rounded
-  // square echoes the pill's own soft-cornered-rectangle language instead of fighting it, while still
-  // reading clearly as "a face, not an icon". iconOnly (list view) sized up from 14 to 18px - a
-  // portrait needs more pixels than a simple vector glyph to actually be recognizable as a face at a
-  // glance, reported as too small to make out at the old size.
+  // A square, not a full circle (border-radius:50%) - reported as a real visual clash: a hard circle
+  // sitting right next to the preset chip's own pill/rectangle-ish .lp-badge looked like two different
+  // design languages side by side. A first attempt at a softly-rounded square (5px on an ~16-18px
+  // image, roughly a 30% corner ratio) turned out to be indistinguishable from a circle at that size
+  // once actually screenshotted - corner curvature that subtle just doesn't survive being that small,
+  // confirmed directly rather than assumed. Going with a near-flat 2px radius instead - still soft
+  // enough not to look like a broken/unstyled image, but unambiguously reads as square, not round, at
+  // a glance. iconOnly (list view) sized up from 14 to 18px - a portrait needs more pixels than a
+  // simple vector glyph to actually be recognizable as a face at a glance, reported as too small to
+  // make out at the old size.
   const size = iconOnly ? 18 : 16;
-  const portraitHTML = `<img src="https://images.evetech.net/characters/${job.ownerCharId}/portrait?size=32" alt="" loading="lazy" style="width:${size}px;height:${size}px;border-radius:5px;flex-shrink:0;vertical-align:middle;" onerror="handleJobOwnerPortraitError(this, '${fallbackIcon}')">`;
+  const portraitHTML = `<img src="https://images.evetech.net/characters/${job.ownerCharId}/portrait?size=32" alt="" loading="lazy" style="width:${size}px;height:${size}px;border-radius:2px;flex-shrink:0;vertical-align:middle;" onerror="handleJobOwnerPortraitError(this, '${fallbackIcon}')">`;
   if (iconOnly) return `<span class="ml-1" style="display:inline-flex;vertical-align:middle;" title="${window.esc(title)}">${portraitHTML}</span>`;
   return `<span class="lp-badge" style="${CHIP_TRUNCATE_STYLE} display:inline-flex; align-items:center; gap:5px;" title="${window.esc(title)}">${portraitHTML}${window.esc(name)}</span>`;
 }
