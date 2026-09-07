@@ -2546,6 +2546,30 @@ async function syncWithEveIndustryJobs(silent) {
 
   loadJournalState();
 
+  // Backfill ownership onto jobs that are already tracked (isStarted + eveJobId) but still carry no
+  // scope - either synced before the ownership-tagging feature existed, or matched before this
+  // character was registered. Pass 1/2 below only ever touch UNtracked real jobs (see
+  // alreadyTrackedEveJobIds just below, which exists specifically to skip re-processing these) - so
+  // without this pass, an old in-progress job would carry scope:undefined forever no matter how many
+  // times you sync, which silently defeats the Personal/Corp filter for exactly the in-progress jobs
+  // it matters most for (reported directly: "the corp filter doesn't seem to be changing anything,
+  // even though most of the in-progress jobs are corp jobs"). Matches purely by eveJobId against this
+  // sync's own freshly-tagged real job list - the same _source/installer_id trust Pass 1 already
+  // applies to a brand-new match, just applied retroactively. A job whose real ESI job has since
+  // completed (no longer in the active list at all) can't be backfilled this way and keeps showing
+  // regardless of the filter, same as any other legacy/unassigned job.
+  let backfilledOwnershipCount = 0;
+  activeJobs.forEach(job => {
+    if (!job || !job.isStarted || job.eveJobId === undefined || job.scope) return;
+    const rj = activeRealJobs.find(r => r.job_id === job.eveJobId);
+    if (!rj) return;
+    job.scope = rj._source === 'corp' ? 'corp' : 'personal';
+    job.corpId = rj._source === 'corp' ? (activeCharRecord ? activeCharRecord.corpId : undefined) : undefined;
+    if (rj.installer_id !== undefined) job.ownerCharId = String(rj.installer_id);
+    backfilledOwnershipCount++;
+  });
+  if (backfilledOwnershipCount) console.info(`[JobSync] Backfilled character ownership onto ${backfilledOwnershipCount} already-tracked in-progress job(s) that predated ownership tracking.`);
+
   // Anything already tracked by an existing STARTED ledger job (from a previous sync), OR already
   // marked Built and moved to history, must be skipped here - otherwise every sync re-imports the
   // same real job as a brand new duplicate. History matters just as much as active jobs: if you mark
