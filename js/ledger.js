@@ -1535,15 +1535,13 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
            ondragover="handleJobDragOver(event)" ondragleave="handleJobDragLeave(event)" ondrop="handleJobDrop(event, ${job.id})">
         <div class="flex items-start justify-between">
           <div class="flex items-start space-x-3 min-w-0 flex-1">
-            <div class="relative flex-shrink-0" style="width:${isFocusMode ? 80 : 48}px; height:${isFocusMode ? 80 : 48}px;">
-              <img src="${jobIconUrl}" alt="${window.esc(jobDisplayName)}" class="${isFocusMode ? 'w-20 h-20' : 'w-12 h-12'} rounded-md" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
-              ${renderJobOwnerAvatarOverlayHTML(job, isFocusMode ? 80 : 48)}
-            </div>
+            <img src="${jobIconUrl}" alt="${window.esc(jobDisplayName)}" class="${isFocusMode ? 'w-20 h-20' : 'w-12 h-12'} rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${iconTypeId}/render?size=64';">
             <div class="min-w-0 flex-1">
               <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${!isFocusMode ? renderPrereqBadgeHTML(job, 'ml-1 text-xs align-middle') : ''}</h3>
               ${(job.isSubBuild && isFocusMode) ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">${window.svgIcon('gear')} Prerequisite for: ${window.esc(getPrereqLabel(job))}</div>` : ''}
               <div class="flex items-center gap-1.5 flex-wrap">
                 ${renderJobMetaChipHTML(job)}
+                ${renderJobOwnershipPillHTML(job)}
               </div>
             </div>
           </div>
@@ -1774,32 +1772,20 @@ function getPrereqLabel(job) {
   return job.parentJobName || 'another job';
 }
 
-// Personal/Corp visual identifier - lets you tell at a glance whose job this is now that several
-// characters can be registered at once (js/esi.js). A job with no scope at all predates that feature
-// and shows nothing here, same "no assumption made" treatment the ledger's own visibility filter
-// gives it (see renderActiveJobsList). A 'personal' job is only ever visible while its owner is the
-// active character (the filter already guarantees that), so there's nothing more useful to show than
-// the plain label; a 'corp' job's real installer can be a DIFFERENT character than whoever's active,
-// so its name is resolved and shown in the tooltip when that installer happens to also be registered.
-// iconOnly: the compact list-row's name column has no room for a full labeled badge without
-// disturbing its carefully fixed-width columns (see renderJobListRowHTML's own comments on why) - an
-// icon-only variant inline with the name, same treatment renderPrereqBadgeHTML's gear icon already
-// gets there, fits in that flexible space instead.
+// Character ownership tag - lets you tell at a glance whose job this is now that several characters
+// can be registered at once (js/esi.js). A job with no owner at all predates that feature, or was
+// added while logged out, and shows nothing here rather than an "Unassigned" badge cluttering every
+// such job. Every job stays visible regardless of scope/owner (see renderActiveJobsList's own
+// character filter, which is opt-in only, never automatic) - this is purely informational.
+//
 // Portrait fetch failed (rare - a deleted/renamed character, or a network hiccup) - swap in the old
 // generic person/building icon instead. A named handler, not an inline outerHTML string, because
 // svgIcon()'s own markup uses double quotes throughout, which would terminate an inline onerror="..."
 // attribute the moment it appeared (same reasoning js/lpstore.js's own handleLPIconLoadError already
 // documents for the identical problem there).
-// Preserves positioning-relevant inline styles from the failed <img> onto its replacement icon, not
-// just a bare span - the card-view overlay (see renderJobOwnerAvatarOverlayHTML below) is
-// position:absolute against its icon wrapper, and a fallback that reset to normal flow would jump to
-// a completely wrong spot on the card instead of just looking like a different icon in the same place.
 function handleJobOwnerPortraitError(imgEl, iconName) {
   const span = document.createElement('span');
-  const preserved = ['position', 'top', 'right', 'bottom', 'left', 'verticalAlign'];
-  let extraCss = '';
-  preserved.forEach(p => { if (imgEl.style[p]) extraCss += `${p.replace(/[A-Z]/g, m => '-' + m.toLowerCase())}:${imgEl.style[p]};`; });
-  span.style.cssText = `display:inline-flex; color:var(--text-mute); ${extraCss}`;
+  span.style.cssText = 'display:inline-flex; vertical-align:middle; color:var(--text-mute);';
   span.innerHTML = window.svgIcon(iconName);
   imgEl.replaceWith(span);
 }
@@ -1817,11 +1803,10 @@ function ownerNameAndTitle(job) {
   return { name, title, fallbackIcon: job.scope === 'corp' ? 'building' : 'user' };
 }
 
-// List view: a plain circular portrait inline with the item name (same treatment the pilot badge/
-// character switcher already use elsewhere - "the icon being round was fine" per direct feedback,
-// the earlier square-corner attempt solved a problem that didn't exist here). Sized decisively larger
-// than the first pass (24px, not a timid bump) and actually confirmed at that size in a real
-// screenshot before shipping it - a small nudge turned out to be imperceptible last time.
+// List view: a plain circular portrait, no name (the compact row has no room for one - see
+// renderJobListRowHTML's own comment), inline with the item name. Sized decisively larger than the
+// first pass (24px, not a timid bump) and actually confirmed at that size in a real screenshot before
+// shipping it - a small nudge turned out to be imperceptible last time.
 function renderJobOwnershipBadgeHTML(job) {
   if (!job.ownerCharId) return '';
   const { title, fallbackIcon } = ownerNameAndTitle(job);
@@ -1829,25 +1814,17 @@ function renderJobOwnershipBadgeHTML(job) {
   return `<span class="ml-1" style="display:inline-flex;vertical-align:middle;" title="${window.esc(title)}">${portraitHTML}</span>`;
 }
 
-// Card/Focus view: a small circular avatar overlapping the BOTTOM-RIGHT corner of the item's own
-// icon (same "avatar + status badge" pattern used all over consumer software - Discord's online-dot,
-// a phone app's notification badge), not squeezed into the header row next to the preset chip. That
-// row-sharing was the real problem reported, not just the portrait's own shape: two chips with
-// different width-to-corner-radius ratios (a short avatar+name pill vs. a long preset-label pill)
-// read as clashing regardless of how the avatar itself was drawn, since a badge system built from
-// text pills was never going to reconcile cleanly with a face. Anchoring to the icon instead means it
-// never has to visually negotiate with anything else on the row - and scales naturally with
-// isFocusMode's bigger icon, addressing "maximized card view" too without a separate treatment.
-// iconSize: the pixel width/height of the icon this overlays (48 normal, 80 focus mode).
-function renderJobOwnerAvatarOverlayHTML(job, iconSize) {
+// Card/Focus view: back to a labeled pill in the header row, same family as the preset chip next to
+// it - reported directly that overlapping it on the item's own icon looked "smashed together" and too
+// busy, and that a round portrait was never the problem in the first place (an earlier round-vs-square
+// fix here was solving the wrong thing). ml-2 (not ml-1) and its own flex-shrink-0 keep a clear gap
+// from the preset chip rather than crowding it - positioned AFTER it (to its right), not before, per
+// direct request.
+function renderJobOwnershipPillHTML(job) {
   if (!job.ownerCharId) return '';
-  const { title, fallbackIcon } = ownerNameAndTitle(job);
-  const size = Math.round(iconSize * 0.42);
-  // box-shadow ring (not a border) in the page's own base background token - creates a "cut out"
-  // separation from the icon underneath regardless of which theme's base color is active, without
-  // needing to match .lp-job-card's own translucent var(--glass-fill) pixel-for-pixel (impossible,
-  // since it's semi-transparent and shows whatever's actually behind the card).
-  return `<img src="https://images.evetech.net/characters/${job.ownerCharId}/portrait?size=64" alt="" loading="lazy" title="${window.esc(title)}" style="position:absolute; bottom:-3px; right:-3px; width:${size}px; height:${size}px; border-radius:50%; box-shadow:0 0 0 2px var(--bg-0);" onerror="handleJobOwnerPortraitError(this, '${fallbackIcon}')">`;
+  const { name, title, fallbackIcon } = ownerNameAndTitle(job);
+  const portraitHTML = `<img src="https://images.evetech.net/characters/${job.ownerCharId}/portrait?size=64" alt="" loading="lazy" style="width:16px;height:16px;border-radius:50%;flex-shrink:0;vertical-align:middle;" onerror="handleJobOwnerPortraitError(this, '${fallbackIcon}')">`;
+  return `<span class="lp-badge ml-2 flex-shrink-0" style="${CHIP_TRUNCATE_STYLE} display:inline-flex; align-items:center; gap:5px;" title="${window.esc(title)}">${portraitHTML}${window.esc(name)}</span>`;
 }
 
 // Distinguishes a multi-job plan from a normal combined multi-run job - same runsNeeded field,
