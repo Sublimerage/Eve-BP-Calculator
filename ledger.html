@@ -133,20 +133,16 @@
           <button onclick="setJobStatusFilter('started')" id="btn-status-started" class="lp-pill">In Progress</button>
           <button onclick="setJobStatusFilter('pending')" id="btn-status-pending" class="lp-pill"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.17a2 2 0 0 0-.59-1.41L12 12l-4.41 4.42A2 2 0 0 0 7 17.83V22"/><path d="M7 2v4.17a2 2 0 0 0 .59 1.41L12 12l4.41-4.42A2 2 0 0 0 17 6.17V2"/></svg>Pending</button>
         </div>
-        <!-- Job ownership visibility - same .pill-check pattern as the stock filter's own Personal/Corp
-             toggle (#use-char-assets/#use-corp-assets below) so the same concept looks the same in both
-             places on this page. Only meaningfully filters anything once more than one character is
-             registered/a corp job exists - both default checked, so a single-character user sees every
-             job exactly as before. -->
-        <div class="flex items-center gap-2">
-          <label class="pill-check">
-            <input type="checkbox" id="show-personal-jobs" checked onchange="setJobOwnershipFilter()">
-            <span class="pill-check-face"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>Personal</span>
-          </label>
-          <label class="pill-check">
-            <input type="checkbox" id="show-corp-jobs" checked onchange="setJobOwnershipFilter()">
-            <span class="pill-check-face"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V7a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v14"/><path d="M12 11h6a1 1 0 0 1 1 1v9"/><line x1="8" y1="9" x2="8" y2="9.01"/><line x1="8" y1="13" x2="8" y2="13.01"/><line x1="8" y1="17" x2="8" y2="17.01"/><line x1="16" y1="15" x2="16" y2="15.01"/><line x1="16" y1="19" x2="16" y2="19.01"/></svg>Corp</span>
-          </label>
+        <!-- Character filter - nothing is ever hidden by default (every job stays visible under "All
+             Characters" regardless of who it's tagged to, or whether it's tagged to anyone), this is
+             purely an opt-in narrowing control, same .field-line dropdown pattern as the Station filter
+             right next to it. Populated dynamically from registered characters (js/esi.js) and hidden
+             entirely when there's nothing meaningful to narrow to (0-1 registered characters) - see
+             populateCharacterFilterDropdown. -->
+        <div data-character-filter-wrap class="hidden">
+          <select id="character-filter-select" onchange="setCharacterFilter(this.value)" class="field-line text-xs font-bold" style="color:var(--accent); min-width:140px;" title="Show only jobs tagged to a specific character">
+            <option value="all">All Characters</option>
+          </select>
         </div>
         <div data-station-filter-wrap class="hidden">
           <select id="station-filter-select" onchange="setStationFilter(this.value)" class="field-line text-xs font-bold" style="color:var(--accent); min-width:140px;" title="Show only jobs planned for a specific production preset/station">
@@ -322,7 +318,7 @@
   <script src="js/esi.js?v=8.0.20" defer></script>
   <script src="js/tree.js?v=8.0.3" defer></script>
   <script src="js/optimizers.js?v=8.0.7" defer></script>
-  <script src="js/ledger.js?v=9.60.0" defer></script>
+  <script src="js/ledger.js?v=9.61.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
