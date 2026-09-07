@@ -1745,6 +1745,18 @@ function getJobMeTe(job) {
 // Sums a group of 2+ duplicate jobs' already-computed numbers into one job carrying jobs[0]'s
 // identity - shared by both merge passes in combineDuplicateJobs below, since the actual summing math
 // (materials, cost, runs, time) is identical whether the group shared a parent or not.
+// The multi-job-plan display fields (jobCount/runsPerJob - "N Jobs x R Runs", see runsDisplayHTML's
+// own comment for what they mean) are the one exception to "inherit everything from jobs[0]":
+// jobs[0].jobCount counted only its OWN pre-merge runs, so a merged row has to reconcile it against
+// the new combined runsNeeded or it silently under-reports how many real EVE installs the row now
+// stands for. Both merge passes now include per-job run size in their grouping key (normalized to ''
+// for ordinary continuous-run jobs - see their own comments), so every multi-job plan reaching here
+// shares one runsPerJob; jobCount is then re-derived straight from the summed runsNeeded
+// (Math.round(summedRunsNeeded / runsPerJob)), NOT by adding up the stored jobCount fields - the same
+// self-healing "derive from the run counts themselves" approach as syncWithEveIndustryJobs' split
+// logic (search this file for "perJobRuns" for the full reasoning), so an already-stale stored
+// jobCount corrects itself on the next merge instead of propagating. A group with no multi-job plan
+// in it keeps the plain "just show runsNeeded" path untouched.
 function mergeJobsInto(jobs) {
   const materialsMap = {};
   jobs.forEach(j => {
@@ -1760,15 +1772,37 @@ function mergeJobsInto(jobs) {
     });
   });
   const first = jobs[0];
+  const summedRunsNeeded = jobs.reduce((s, j) => s + (j.runsNeeded || 0), 0);
+
+  // Per-job run size of the multi-job plans in this group. With runsPerJob in both merge passes' keys
+  // this Set is size 0 (every job is an ordinary continuous-run job) or size 1 (every multi-job plan
+  // shares one per-job size) in practice. The size > 1 branch is a defensive fallback for a group
+  // that somehow ends up genuinely mixed - there's no honest single "N Jobs x R Runs" for it, so drop
+  // to the plain runsNeeded display rather than adopting one job's size arbitrarily (the bug this
+  // whole reconciliation fixes, just louder).
+  const perJobRunSizes = new Set(
+    jobs.filter(j => (j.jobCount || 1) > 1 && (j.runsPerJob || 0) > 0).map(j => j.runsPerJob)
+  );
+  let multiJobFields;
+  if (perJobRunSizes.size === 1) {
+    const runsPerJob = perJobRunSizes.values().next().value;
+    multiJobFields = { jobCount: Math.max(1, Math.round(summedRunsNeeded / runsPerJob)), runsPerJob };
+  } else if (perJobRunSizes.size > 1) {
+    multiJobFields = { jobCount: 1, runsPerJob: undefined };
+  } else {
+    multiJobFields = {};
+  }
+
   return {
     ...first,
-    runsNeeded: jobs.reduce((s, j) => s + (j.runsNeeded || 0), 0),
+    runsNeeded: summedRunsNeeded,
     qtyNeeded: jobs.reduce((s, j) => s + (j.qtyNeeded || 0), 0),
     calculatedCost: jobs.reduce((s, j) => s + (j.calculatedCost || 0), 0),
     netProfit: jobs.every(j => j.netProfit !== undefined) ? jobs.reduce((s, j) => s + j.netProfit, 0) : undefined,
     totalBuildSeconds: jobs.reduce((s, j) => s + (j.totalBuildSeconds || 0), 0),
     materials: Object.values(materialsMap),
-    addedAt: jobs.reduce((earliest, j) => (j.addedAt && j.addedAt < earliest) ? j.addedAt : earliest, first.addedAt)
+    addedAt: jobs.reduce((earliest, j) => (j.addedAt && j.addedAt < earliest) ? j.addedAt : earliest, first.addedAt),
+    ...multiJobFields
   };
 }
 
@@ -1918,6 +1952,13 @@ function tightMergeSameParentOnce() {
     // Personal/Corp scope filter. Keying on scope/ownerCharId/corpId means same-owner duplicates still
     // combine exactly as before, but different-owner ones simply never group together in the first
     // place, so mergeJobsInto never has to choose whose identity survives.
+    // Per-job run size (see runsDisplayHTML's own comment on jobCount/runsPerJob) is identity too, for
+    // the same reason: a "3 Jobs x 12 Runs" plan and a "2 Jobs x 25 Runs" plan of the same item are
+    // genuinely different real-world install patterns, not one combinable batch, and mergeJobsInto has
+    // no honest way to fold two different per-job sizes into a single "N Jobs x R Runs" row. Only a
+    // real multi-job plan (jobCount > 1) contributes this; an ordinary continuous-run job normalizes
+    // to '' so a stray runsPerJob left on it can't stop it combining with a plain duplicate as before.
+    const perJobRunsKey = (job.jobCount || 1) > 1 ? (job.runsPerJob || '') : '';
     const key = [
       job.productTypeId || job.typeId,
       job.isSubBuild ? 'sub' : 'final',
@@ -1927,7 +1968,8 @@ function tightMergeSameParentOnce() {
       meTe.te,
       job.scope || '',
       job.ownerCharId || '',
-      job.corpId || ''
+      job.corpId || '',
+      perJobRunsKey
     ].join('|');
     if (!groups[key]) groups[key] = [];
     groups[key].push(job);
@@ -1989,8 +2031,11 @@ function poolCrossParentDuplicatesOnce() {
     const meTe = getJobMeTe(job);
     // Same ownership reasoning as tightMergeSameParentOnce's own key above - a shared cross-parent
     // prerequisite still needs to stay a per-character thing, not get pooled onto whichever job
-    // happened to be jobs[0].
-    const key = [job.productTypeId || job.typeId, job.sellStrategy || '', meTe.me, meTe.te, job.scope || '', job.ownerCharId || '', job.corpId || ''].join('|');
+    // happened to be jobs[0]. Per-job run size is keyed for the same reason too (see that key's own
+    // perJobRunsKey comment): different multi-job plan shapes must never pool into one nonsensical
+    // "N Jobs x R Runs" row; an ordinary continuous-run job normalizes to '' so it still pools freely.
+    const perJobRunsKey = (job.jobCount || 1) > 1 ? (job.runsPerJob || '') : '';
+    const key = [job.productTypeId || job.typeId, job.sellStrategy || '', meTe.me, meTe.te, job.scope || '', job.ownerCharId || '', job.corpId || '', perJobRunsKey].join('|');
     if (!looseGroups[key]) looseGroups[key] = [];
     looseGroups[key].push(job);
     looseOrder.push({ key, job });
@@ -2670,6 +2715,29 @@ async function syncWithEveIndustryJobs(silent) {
       const remainingRuns = totalRuns - startRuns;
       const remainingRatio = remainingRuns / totalRuns;
 
+      // A multi-job plan (candidate.jobCount > 1 - see runsDisplayHTML's own comment on why this
+      // differs from an ordinary continuous-run job) is jobCount SEPARATE real jobs of runsPerJob
+      // runs each - one matched real job is exactly ONE of those jobs finishing, not a proportional
+      // slice of one giant job. Without this, both fragments below (built via `...candidate`) kept the
+      // ORIGINAL jobCount/runsPerJob completely unchanged - reported directly: starting 2 of 11
+      // planned 12-run jobs showed as "11 Jobs x 12 Runs" on BOTH newly-started fragments (should each
+      // read plain "12 Runs" - a single job) AND the still-pending remainder (should have dropped to
+      // "9 Jobs x 12 Runs", but visibly never shrank at all no matter how many real jobs synced).
+      // Derived from the run counts themselves (startRuns/remainingRuns divided by perJobRuns) rather
+      // than subtracting from candidate.jobCount directly - runsNeeded has always been tracked
+      // correctly through every split (only the jobCount/runsPerJob display metadata went stale), so
+      // deriving from it self-heals an already-corrupted pending entry the very next time a real job
+      // matches it, even one left over from before this fix existed, without needing its stored
+      // jobCount to already be right. An ordinary (non-multi-job) candidate has no runsPerJob at all,
+      // so perJobRuns falls back to its own full runsNeeded - that makes startedJobCount and
+      // remainingJobCount both come out as 1 (via the rounding below), which normalizes right back to
+      // today's plain-runs display for that case (see runsDisplayHTML: jobCount <= 1 is the same
+      // "just show runsNeeded" path whether jobCount is 1, 0, or absent) - no behavior change for the
+      // common single-job case.
+      const perJobRuns = candidate.runsPerJob || candidate.runsNeeded;
+      const startedJobCount = perJobRuns > 0 ? Math.max(1, Math.round(startRuns / perJobRuns)) : 1;
+      const remainingJobCount = perJobRuns > 0 ? Math.max(0, Math.round(remainingRuns / perJobRuns)) : 0;
+
       // Split each material's total between the two fragments WITHOUT rounding each side
       // independently. m.qtyNeeded already went through Math.ceil once (calculateInputQuantity, for
       // the full totalRuns) - re-ceiling BOTH ratio*qtyNeeded and (1-ratio)*qtyNeeded separately can
@@ -2700,6 +2768,8 @@ async function syncWithEveIndustryJobs(silent) {
         ...candidate,
         id: Date.now() + Math.floor(Math.random() * 1000),
         runsNeeded: startRuns,
+        jobCount: startedJobCount,
+        runsPerJob: perJobRuns,
         qtyNeeded: Math.round((candidate.qtyNeeded || 0) * ratio),
         calculatedCost: (candidate.calculatedCost || 0) * ratio,
         netProfit: candidate.netProfit !== undefined ? candidate.netProfit * ratio : undefined,
@@ -2714,6 +2784,8 @@ async function syncWithEveIndustryJobs(silent) {
         ...candidate,
         id: Date.now() + Math.floor(Math.random() * 1000) + 1,
         runsNeeded: remainingRuns,
+        jobCount: remainingJobCount,
+        runsPerJob: perJobRuns,
         qtyNeeded: Math.round((candidate.qtyNeeded || 0) * remainingRatio),
         calculatedCost: (candidate.calculatedCost || 0) * remainingRatio,
         netProfit: candidate.netProfit !== undefined ? candidate.netProfit * remainingRatio : undefined,
