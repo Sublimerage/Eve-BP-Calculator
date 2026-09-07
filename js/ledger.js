@@ -1823,8 +1823,8 @@ function renderJobOwnershipBadgeHTML(job) {
 function renderJobOwnershipPillHTML(job) {
   if (!job.ownerCharId) return '';
   const { name, title, fallbackIcon } = ownerNameAndTitle(job);
-  const portraitHTML = `<img src="https://images.evetech.net/characters/${job.ownerCharId}/portrait?size=64" alt="" loading="lazy" style="width:16px;height:16px;border-radius:50%;flex-shrink:0;vertical-align:middle;" onerror="handleJobOwnerPortraitError(this, '${fallbackIcon}')">`;
-  return `<span class="lp-badge ml-2 flex-shrink-0" style="${CHIP_TRUNCATE_STYLE} display:inline-flex; align-items:center; gap:5px;" title="${window.esc(title)}">${portraitHTML}${window.esc(name)}</span>`;
+  const portraitHTML = `<img src="https://images.evetech.net/characters/${job.ownerCharId}/portrait?size=64" alt="" loading="lazy" onerror="handleJobOwnerPortraitError(this, '${fallbackIcon}')">`;
+  return `<span class="lp-owner-pill ml-2 flex-shrink-0" title="${window.esc(title)}">${portraitHTML}${window.esc(name)}</span>`;
 }
 
 // Distinguishes a multi-job plan from a normal combined multi-run job - same runsNeeded field,
