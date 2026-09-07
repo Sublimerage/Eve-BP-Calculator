@@ -1496,6 +1496,35 @@ body.page-calc .lp-badge {
   line-height: 1.6;
 }
 body.page-calc .lp-badge-accent { background: rgba(var(--accent-rgb),0.18); color: var(--accent); }
+/* Job ownership tag (portrait + character name) - a dedicated class, not the generic .lp-badge above.
+   .lp-badge was built for short text-only labels: tight 2px vertical padding and a 999px pill radius
+   that only reads as a barely-rounded rectangle on a WIDE box like the preset selector sitting next
+   to it - on a SHORT box hosting a round portrait, that same 999px radius reads as a much more
+   pronounced stadium/capsule shape, clashing with the selector's own visual weight even though both
+   technically share the same border-radius value. Uses --radius-input instead - the same token the
+   preset <select> itself is styled with elsewhere - so the two read as the same family of shape
+   regardless of how each one's radius:width ratio plays out. Asymmetric padding (tight left, roomy
+   right) keeps the portrait snug against the pill's own edge while still giving the name room to
+   breathe, and align-items:center on a real flex row (not an inline-block relying on line-height/
+   vertical-align) keeps the portrait from ever looking "just barely fitted" no matter its exact size. */
+body.page-calc .lp-owner-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-soft);
+  border-radius: var(--radius-input);
+  padding: 3px 10px 3px 3px;
+  font-size: 11px;
+  font-weight: 700;
+}
+body.page-calc .lp-owner-pill img {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: block;
+  flex-shrink: 0;
+}
 body.page-calc .lp-badge-danger { background: rgba(var(--red-rgb),0.18); color: var(--red); }
 /* Order-type (BUY/SELL) badges need two genuinely different colors, not two shades of the same
    accent - a hardcoded blue rather than the --blue/--buy tokens, since theme-unify (ledger/
