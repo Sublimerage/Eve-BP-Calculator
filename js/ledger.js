@@ -19,6 +19,14 @@ let activeStationFilter = 'all';
 // this auto-hid jobs by ownership, which turned out to be the wrong default - explicitly reverted per
 // direct feedback: all jobs should stay visible, with a manual filter for narrowing to one character.
 let activeCharacterFilter = 'all';
+// Personal/Corp - a SEPARATE question from the character filter above: "what KIND of job is this",
+// not "whose is it" (a corp job installed by Bob is a different thing from Bob's own personal job,
+// even though both show under "Bob" in the character dropdown). Both default true so nothing is
+// hidden until the user actually unchecks one - restored after being removed once already, per direct
+// feedback that removing it lost real functionality rather than just being superseded by the
+// character filter.
+let activeShowPersonalJobs = true;
+let activeShowCorpJobs = true;
 // Job IDs checked to "isolate" - when non-empty, the Consolidated BOM/multibuy below only reflects
 // these jobs' materials instead of the whole queue, so you can shop for just what you're about to
 // build without also buying for everything else still queued. Session-only (resets on reload), same
@@ -566,6 +574,12 @@ function renderActiveJobsList(allocatedStock) {
     // visibility gate). Narrowing to one specific character hides jobs with no owner too, since an
     // unassigned job isn't "from" that character either.
     if (activeCharacterFilter !== 'all' && job.ownerCharId !== activeCharacterFilter) return false;
+    // Personal/Corp - combines with the character filter above (both must pass, not either/or). A
+    // job with no scope at all predates ownership tracking (or was added while logged out) and stays
+    // visible regardless of these toggles, same "no assumption made" treatment it already gets from
+    // the character filter.
+    if (job.scope === 'personal' && !activeShowPersonalJobs) return false;
+    if (job.scope === 'corp' && !activeShowCorpJobs) return false;
     return true;
   });
 
@@ -1641,6 +1655,17 @@ function setCharacterFilter(value) {
 }
 window.setCharacterFilter = setCharacterFilter;
 
+// Personal/Corp pill toggles - reuses the same .pill-check pattern already on this page for the
+// stock/location filter's own Personal/Corp toggle (#use-char-assets/#use-corp-assets).
+function setJobOwnershipFilter() {
+  const personalBox = document.getElementById('show-personal-jobs');
+  const corpBox = document.getElementById('show-corp-jobs');
+  activeShowPersonalJobs = personalBox ? personalBox.checked : true;
+  activeShowCorpJobs = corpBox ? corpBox.checked : true;
+  renderJournalPage();
+}
+window.setJobOwnershipFilter = setJobOwnershipFilter;
+
 // Switching the active character, or adding/removing one, changes what the character filter dropdown
 // itself should even list - re-render whenever it fires rather than requiring a manual refresh/reload.
 window.addEventListener('eve:active-character-changed', () => {
@@ -1701,9 +1726,13 @@ function getJobMeTe(job) {
 // ME3/10-run job and a ME5/12-run job of the same item are NOT the same plan and must never collapse
 // into one, reported directly: they were merging into a single job that silently lost one side's real
 // run count/research level), same build/buy config context (sub-build vs final, and which job it's a
-// prerequisite for), same sell strategy, and neither one already started. Jobs that differ in any of
-// these (e.g. one set to build, one to buy; one selling via buy order vs sell order) are deliberately
-// left alone, since merging those would silently lose information about which configuration applies
+// prerequisite for), same sell strategy, same character ownership (scope/ownerCharId/corpId - two
+// identical jobs for two different characters are two separate real installs, each character's own
+// job slot, not one either of them could run; reported directly that combining used to silently adopt
+// jobs[0]'s owner and swallow the other character's job under that identity), and neither one already
+// started. Jobs that differ in any of these (e.g. one set to build, one to buy; one selling via buy
+// order vs sell order; one planned for a different character) are deliberately left alone, since
+// merging those would silently lose information about which configuration - or which person - applies
 // to which materials.
 // Merging is a pure re-labeling of already-computed material lists (sum the qtyNeeded each ORIGINAL
 // job already worked out for its own run count) - it never rebuilds a tree for the new combined run
@@ -1881,13 +1910,24 @@ function tightMergeSameParentOnce() {
       ? ((job.parentJobId !== undefined && job.parentJobId !== null) ? `id:${job.parentJobId}` : `name:${job.parentJobName || ''}`)
       : '';
     const meTe = getJobMeTe(job);
+    // Ownership is part of the identity here, same tier as sellStrategy/parentKey/meTe above - two
+    // identical jobs for two different characters are two separate real EVE install actions (each
+    // character has their own job slots and has to personally install their own copy), not one bigger
+    // job either of them could run. Merging them used to silently adopt jobs[0]'s owner and drop the
+    // other character's job into that identity - invisible under a character filter, wrong under the
+    // Personal/Corp scope filter. Keying on scope/ownerCharId/corpId means same-owner duplicates still
+    // combine exactly as before, but different-owner ones simply never group together in the first
+    // place, so mergeJobsInto never has to choose whose identity survives.
     const key = [
       job.productTypeId || job.typeId,
       job.isSubBuild ? 'sub' : 'final',
       parentKey,
       job.sellStrategy || '',
       meTe.me,
-      meTe.te
+      meTe.te,
+      job.scope || '',
+      job.ownerCharId || '',
+      job.corpId || ''
     ].join('|');
     if (!groups[key]) groups[key] = [];
     groups[key].push(job);
@@ -1947,7 +1987,10 @@ function poolCrossParentDuplicatesOnce() {
   activeJobs.forEach(job => {
     if (!job || job.isStarted || !job.isSubBuild) { looseOrder.push({ key: null, job }); return; }
     const meTe = getJobMeTe(job);
-    const key = [job.productTypeId || job.typeId, job.sellStrategy || '', meTe.me, meTe.te].join('|');
+    // Same ownership reasoning as tightMergeSameParentOnce's own key above - a shared cross-parent
+    // prerequisite still needs to stay a per-character thing, not get pooled onto whichever job
+    // happened to be jobs[0].
+    const key = [job.productTypeId || job.typeId, job.sellStrategy || '', meTe.me, meTe.te, job.scope || '', job.ownerCharId || '', job.corpId || ''].join('|');
     if (!looseGroups[key]) looseGroups[key] = [];
     looseGroups[key].push(job);
     looseOrder.push({ key, job });
@@ -2022,7 +2065,7 @@ function combineDuplicateJobs() {
   renderJournalPage();
 
   if (combinedCount === 0) {
-    if (typeof window.showToast === 'function') window.showToast('No combinable duplicate jobs found. Jobs only combine when they match on item, build/buy context, and sell strategy, and neither is already started.', 'info');
+    if (typeof window.showToast === 'function') window.showToast('No combinable duplicate jobs found. Jobs only combine when they match on item, build/buy context, sell strategy, and character ownership, and neither is already started.', 'info');
   } else if (typeof window.showToast === 'function') {
     window.showToast(`Combined ${combinedCount} duplicate job${combinedCount > 1 ? 's' : ''}.`, 'success');
   }
