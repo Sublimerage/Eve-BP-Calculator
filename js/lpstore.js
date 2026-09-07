@@ -2045,8 +2045,8 @@ window.getLPOwnedBalances = getLPOwnedBalances;
 function renderLPOwnedContent() {
   const el = document.getElementById('lpstore-lp-owned-content');
   if (!el) return;
-  const charId = localStorage.getItem('esi_char_id');
-  const charName = localStorage.getItem('esi_char_name');
+  const charId = window.getActiveCharId ? window.getActiveCharId() : null;
+  const charName = charId && window.getActiveCharacterRecord ? (window.getActiveCharacterRecord() || {}).charName : null;
   const loginBtn = `
     <button onclick="startEsiSSOLogin()" class="btn-glass w-full py-2 text-xs flex items-center justify-center gap-1.5 mt-2">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>

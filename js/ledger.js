@@ -12,6 +12,14 @@ let activeJobStatusFilter = 'all'; // 'all' | 'started' | 'pending'
 // match a specific station and are hidden whenever one is selected, same as they're hidden from
 // the preset row/badge everywhere else.
 let activeStationFilter = 'all';
+// Job ownership visibility - 'personal' jobs (scope:'personal') are hidden unless they belong to the
+// currently active character, 'corp' jobs (scope:'corp') are hidden unless their corpId matches the
+// active character's own corp. A job with no scope at all (created before this feature existed) is
+// always visible regardless of these toggles - see renderActiveJobsList's own filter for why. Both
+// default on so a first-time user (or anyone who's only ever registered one character) sees no
+// change in behavior at all.
+let activeShowPersonalJobs = true;
+let activeShowCorpJobs = true;
 // Job IDs checked to "isolate" - when non-empty, the Consolidated BOM/multibuy below only reflects
 // these jobs' materials instead of the whole queue, so you can shop for just what you're about to
 // build without also buying for everything else still queued. Session-only (resets on reload), same
@@ -545,6 +553,8 @@ function renderActiveJobsList(allocatedStock) {
   }
 
   const q = (activeJobSearchQuery || '').toLowerCase().trim();
+  const activeCharId = window.getActiveCharId ? window.getActiveCharId() : null;
+  const activeCorpId = window.getActiveCharacterRecord ? (window.getActiveCharacterRecord() || {}).corpId : null;
 
   const visibleJobs = activeJobs.filter(job => {
     if (!job) return false;
@@ -552,6 +562,21 @@ function renderActiveJobsList(allocatedStock) {
     if (activeJobStatusFilter === 'started' && !job.isStarted) return false;
     if (activeJobStatusFilter === 'pending' && job.isStarted) return false;
     if (activeStationFilter !== 'all' && getJobStationLabel(job) !== activeStationFilter) return false;
+    // Ownership visibility - a job with no scope at all predates this feature and stays visible to
+    // everyone rather than silently disappearing (see activeShowPersonalJobs/activeShowCorpJobs's
+    // own comment). Only applied while SOME character is actually active - fully logged out (not
+    // just switched away) has no character context to filter against, so every job stays visible
+    // rather than a logout silently hiding everything you'd planned (there'd be no active character
+    // left to switch back to that would ever reveal them again).
+    if (activeCharId) {
+      if (job.scope === 'personal') {
+        if (!activeShowPersonalJobs) return false;
+        if (job.ownerCharId && job.ownerCharId !== activeCharId) return false;
+      } else if (job.scope === 'corp') {
+        if (!activeShowCorpJobs) return false;
+        if (job.corpId && job.corpId !== activeCorpId) return false;
+      }
+    }
     return true;
   });
 
@@ -729,7 +754,7 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth, 
                hover (title), same as a properly-nested (depth>0) sub-build already conveys via its own
                indentation + connector line - this just also covers an orphaned one (parent not present
                in the current filtered list) that has no indentation to lean on. -->
-          <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${renderPrereqBadgeHTML(job, 'ml-1 text-xs align-middle')}${(childCount > 0) ?`<button onclick="toggleClusterCollapse(event, ${job.id})" class="ml-1.5 lp-badge align-middle" style="cursor:pointer;" title="${collapsedClusterIds.has(job.id) ? `Show ${childCount} hidden prerequisite job${childCount > 1 ? 's' : ''}` : `Collapse ${childCount} prerequisite job${childCount > 1 ? 's' : ''} under this one`}">${window.svgIcon(collapsedClusterIds.has(job.id) ? 'chevron-right' : 'chevron-down')} ${childCount}</button>` : ''}</div>
+          <div class="font-bold text-sm truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${renderJobOwnershipBadgeHTML(job, true)}${renderPrereqBadgeHTML(job, 'ml-1 text-xs align-middle')}${(childCount > 0) ?`<button onclick="toggleClusterCollapse(event, ${job.id})" class="ml-1.5 lp-badge align-middle" style="cursor:pointer;" title="${collapsedClusterIds.has(job.id) ? `Show ${childCount} hidden prerequisite job${childCount > 1 ? 's' : ''}` : `Collapse ${childCount} prerequisite job${childCount > 1 ? 's' : ''} under this one`}">${window.svgIcon(collapsedClusterIds.has(job.id) ? 'chevron-right' : 'chevron-down')} ${childCount}</button>` : ''}</div>
         </div>
         <div class="flex items-center flex-shrink-0" style="margin-left:20px;">
           <!-- Edit icon lives INSIDE this same items-baseline row, right after "runs" - not as a
@@ -907,10 +932,37 @@ function renderJobMetaChipHTML(job, inline) {
   `;
 }
 
-// "Preset:" row + change control for the expanded job detail - skipped for auto-imported (real ESI)
-// jobs, whose cost/time/materials already come from EVE itself and shouldn't be replaced by a guess.
+// Small "ME: X% TE: Y%" readout for the expanded job detail - see getJobMeTe's own comment for where
+// each job type's real value actually lives. Shown for every job (previously this was only visible by
+// hovering the auto-imported chip's tooltip, and not shown anywhere at all for a manually-planned job)
+// since knowing which research level a job's materials/time were computed against matters for telling
+// two otherwise-identical-looking jobs apart, and for trusting the numbers below it.
+function renderJobMeTeRowHTML(job) {
+  const meTe = getJobMeTe(job);
+  return `
+    <div class="flex items-center gap-1 text-xs mono flex-shrink-0" style="color:var(--text-mute);" title="Material Efficiency / Time Efficiency this job's materials, cost, and build time are computed against">
+      <span style="color:var(--orange-400, #fb923c);">ME ${meTe.me}%</span>
+      <span>/</span>
+      <span style="color:var(--orange-400, #fb923c);">TE ${meTe.te}%</span>
+    </div>
+  `;
+}
+
+// "Preset:" row + change control for the expanded job detail, plus the ME/TE readout above - the
+// preset control itself is skipped for auto-imported (real ESI) jobs, whose cost/time/materials
+// already come from EVE itself and shouldn't be replaced by a guess, but the ME/TE readout still
+// applies to those too (see renderJobMeTeRowHTML).
 function renderJobPresetRowHTML(job) {
-  if (job.autoImported) return '';
+  if (job.autoImported) {
+    return `
+      <div class="flex items-center justify-between gap-2 mb-1.5 pb-1.5 flex-wrap" style="border-bottom:1px solid rgba(255,255,255,0.06);">
+        <span class="text-xs font-bold flex-shrink-0" style="color:var(--text-mute);" title="Real EVE job - cost/time/materials come from ESI directly, no preset assumption involved">
+          ${window.svgIcon('download')} From your active EVE job
+        </span>
+        ${renderJobMeTeRowHTML(job)}
+      </div>
+    `;
+  }
   const isAssumed = !job.productionSnapshot;
   const label = resolveProductionPresetLabel(job.productionSnapshot || getCurrentLiveProductionSnapshot());
   const presets = getSavedProductionPresetsLocal();
@@ -923,6 +975,7 @@ function renderJobPresetRowHTML(job) {
       <span class="text-xs font-bold flex-shrink-0" style="color:var(--text-mute);" title="${isAssumed ? 'This job predates preset tracking, or its preset no longer matches a saved one - showing your currently active setup as a best guess.' : 'Production preset this job\'s materials/cost/time assume'}">
         ${window.svgIcon('factory')} ${window.esc(label)}${isAssumed ? ' <span style="font-style:italic;">(assumed)</span>' : ''}
       </span>
+      ${renderJobMeTeRowHTML(job)}
       <select onchange="changeJobProductionPreset(${job.id}, this.value); this.value='';" class="field-line text-[10px] font-bold flex-shrink-0" style="max-width:170px; color:var(--accent);" ${presetNames.length === 0 ? 'disabled' : ''} title="Change which production preset this job assumes and recompute its materials/cost/time">
         <option value="" selected>Change preset...</option>
         ${optionsHTML}
@@ -1229,6 +1282,12 @@ async function addMaterialAsPrerequisiteJob(jobId, typeId, missingQty) {
       parentJobName: parentJob.name, // display-only (the "⚙ Prereq for: X" label) - parentJobId is the real link
       productionSnapshot: snapshot,
       buildConfigSnapshot: buildConfig,
+      // Same ownership as the parent - a prerequisite spun off from a personal job is personal too,
+      // one spun off from a corp job is corp-shared too, same as the buildConfigSnapshot inheritance
+      // just above.
+      scope: parentJob.scope,
+      ownerCharId: parentJob.ownerCharId,
+      corpId: parentJob.corpId,
       addedAt: new Date().toISOString()
     };
     const parentIndex = activeJobs.findIndex(j => j && j.id === jobId);
@@ -1491,7 +1550,10 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
             <div class="min-w-0 flex-1">
               <h3 class="font-bold ${isFocusMode ? 'text-2xl' : 'text-base'} truncate" style="color:var(--text);"><span class="copy-name" data-copy-name="${window.esc(jobDisplayName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(jobDisplayName)}">${window.esc(jobDisplayName)}</span>${!isFocusMode ? renderPrereqBadgeHTML(job, 'ml-1 text-xs align-middle') : ''}</h3>
               ${(job.isSubBuild && isFocusMode) ? `<div class="text-xs mono font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);" title="This is a sub-assembly required by another queued job - build it first.">${window.svgIcon('gear')} Prerequisite for: ${window.esc(getPrereqLabel(job))}</div>` : ''}
-              ${renderJobMetaChipHTML(job)}
+              <div class="flex items-center gap-1.5 flex-wrap">
+                ${renderJobOwnershipBadgeHTML(job)}
+                ${renderJobMetaChipHTML(job)}
+              </div>
             </div>
           </div>
           ${dragHandleHTML}
@@ -1561,6 +1623,24 @@ function setJobStatusFilter(status) {
 }
 window.setJobStatusFilter = setJobStatusFilter;
 
+// Personal/Corp job-ownership pill toggles - reuses the same .pill-check pattern already on this
+// page for the stock/location filter (#use-char-assets/#use-corp-assets).
+function setJobOwnershipFilter() {
+  const personalBox = document.getElementById('show-personal-jobs');
+  const corpBox = document.getElementById('show-corp-jobs');
+  activeShowPersonalJobs = personalBox ? personalBox.checked : true;
+  activeShowCorpJobs = corpBox ? corpBox.checked : true;
+  renderJournalPage();
+}
+window.setJobOwnershipFilter = setJobOwnershipFilter;
+
+// Switching the active character changes both WHICH jobs are visible (personal jobs scoped to a
+// different owner) and the corp a 'corp'-scoped job is checked against - re-render whenever it fires
+// rather than requiring a manual refresh/reload.
+window.addEventListener('eve:active-character-changed', () => {
+  if (typeof renderJournalPage === 'function') renderJournalPage();
+});
+
 // --- Minimize/maximize card details ---
 function toggleJobCardCollapse(jobId) {
   if (expandedJobCardIds.has(jobId)) expandedJobCardIds.delete(jobId);
@@ -1591,12 +1671,34 @@ function copyRunsToClipboard(e, runs) {
 }
 window.copyRunsToClipboard = copyRunsToClipboard;
 
+// A job's own ME/TE, from whichever of the two places it can live: an auto-imported (real ESI) job
+// carries its real researched level directly on meLevel/teLevel (see buildAutoImportedJob); a
+// manually-planned job has no such field - its ME/TE is whatever override was live in the Calculator
+// at add-time, captured in buildConfigSnapshot.customMEOverrides/customTEOverrides keyed by the
+// blueprint's own typeId (same convention tree.js's own node.customME/customTE default from - see its
+// own comment on why unset means 0). Shared by the merge-duplicate grouping below (so different
+// research levels never get merged into one job) and by the job detail view (so ME/TE is visible at
+// all for a plan, not just for an auto-imported real job).
+function getJobMeTe(job) {
+  if (!job) return { me: 0, te: 0 };
+  if (job.meLevel !== undefined || job.teLevel !== undefined) {
+    return { me: job.meLevel || 0, te: job.teLevel || 0 };
+  }
+  const snapshot = job.buildConfigSnapshot || {};
+  const me = (snapshot.customMEOverrides && snapshot.customMEOverrides[job.typeId] !== undefined) ? snapshot.customMEOverrides[job.typeId] : 0;
+  const te = (snapshot.customTEOverrides && snapshot.customTEOverrides[job.typeId] !== undefined) ? snapshot.customTEOverrides[job.typeId] : 0;
+  return { me, te };
+}
+
 // --- Combine duplicate jobs ---
-// Only merges jobs that are safely equivalent: same product, same build/buy config context
-// (sub-build vs final, and which job it's a prerequisite for), same sell strategy, and neither one
-// already started. Jobs that differ in any of these (e.g. one set to build, one to buy; one selling
-// via buy order vs sell order) are deliberately left alone, since merging those would silently lose
-// information about which configuration applies to which materials.
+// Only merges jobs that are safely equivalent: same product, same ME/TE (see getJobMeTe above - a
+// ME3/10-run job and a ME5/12-run job of the same item are NOT the same plan and must never collapse
+// into one, reported directly: they were merging into a single job that silently lost one side's real
+// run count/research level), same build/buy config context (sub-build vs final, and which job it's a
+// prerequisite for), same sell strategy, and neither one already started. Jobs that differ in any of
+// these (e.g. one set to build, one to buy; one selling via buy order vs sell order) are deliberately
+// left alone, since merging those would silently lose information about which configuration applies
+// to which materials.
 // Merging is a pure re-labeling of already-computed material lists (sum the qtyNeeded each ORIGINAL
 // job already worked out for its own run count) - it never rebuilds a tree for the new combined run
 // count. That matters: EVE applies ME rounding per job you actually run, so two separate jobs of, say,
@@ -1664,6 +1766,34 @@ function getPrereqLabel(job) {
   return job.parentJobName || 'another job';
 }
 
+// Personal/Corp visual identifier - lets you tell at a glance whose job this is now that several
+// characters can be registered at once (js/esi.js). A job with no scope at all predates that feature
+// and shows nothing here, same "no assumption made" treatment the ledger's own visibility filter
+// gives it (see renderActiveJobsList). A 'personal' job is only ever visible while its owner is the
+// active character (the filter already guarantees that), so there's nothing more useful to show than
+// the plain label; a 'corp' job's real installer can be a DIFFERENT character than whoever's active,
+// so its name is resolved and shown in the tooltip when that installer happens to also be registered.
+// iconOnly: the compact list-row's name column has no room for a full labeled badge without
+// disturbing its carefully fixed-width columns (see renderJobListRowHTML's own comments on why) - an
+// icon-only variant inline with the name, same treatment renderPrereqBadgeHTML's gear icon already
+// gets there, fits in that flexible space instead.
+function renderJobOwnershipBadgeHTML(job, iconOnly) {
+  if (job.scope === 'corp') {
+    const activeRecord = window.getActiveCharacterRecord ? window.getActiveCharacterRecord() : null;
+    const ticker = (activeRecord && activeRecord.corpId === job.corpId) ? activeRecord.corpTicker : '';
+    const installer = (job.ownerCharId && window.getCharacterRecord) ? window.getCharacterRecord(job.ownerCharId) : null;
+    const title = installer ? `Corp job - installed by ${installer.charName}, shared with every registered character in the same corp` : 'Corp job - shared with every registered character in the same corp';
+    if (iconOnly) return `<span class="ml-1 align-middle" style="color:var(--text-mute);" title="${window.esc(title)}">${window.svgIcon('building')}</span>`;
+    return `<span class="lp-badge" style="${CHIP_TRUNCATE_STYLE}" title="${window.esc(title)}">${window.svgIcon('building')} Corp${ticker ? ' ' + window.esc(ticker) : ''}</span>`;
+  }
+  if (job.scope === 'personal') {
+    const title = 'Personal - only visible while you\'re active as this character';
+    if (iconOnly) return `<span class="ml-1 align-middle" style="color:var(--text-mute);" title="${title}">${window.svgIcon('user')}</span>`;
+    return `<span class="lp-badge" style="${CHIP_TRUNCATE_STYLE}" title="${title}">${window.svgIcon('user')} Personal</span>`;
+  }
+  return '';
+}
+
 // Distinguishes a multi-job plan from a normal combined multi-run job - same runsNeeded field,
 // completely different real-world meaning (see js/tree.js's own comment on node.jobCount, and
 // js/app.js's on job.jobCount/job.runsPerJob). Without this, "5,000
@@ -1717,11 +1847,14 @@ function tightMergeSameParentOnce() {
     const parentKey = job.isSubBuild
       ? ((job.parentJobId !== undefined && job.parentJobId !== null) ? `id:${job.parentJobId}` : `name:${job.parentJobName || ''}`)
       : '';
+    const meTe = getJobMeTe(job);
     const key = [
       job.productTypeId || job.typeId,
       job.isSubBuild ? 'sub' : 'final',
       parentKey,
-      job.sellStrategy || ''
+      job.sellStrategy || '',
+      meTe.me,
+      meTe.te
     ].join('|');
     if (!groups[key]) groups[key] = [];
     groups[key].push(job);
@@ -1780,7 +1913,8 @@ function poolCrossParentDuplicatesOnce() {
   const looseOrder = [];
   activeJobs.forEach(job => {
     if (!job || job.isStarted || !job.isSubBuild) { looseOrder.push({ key: null, job }); return; }
-    const key = [job.productTypeId || job.typeId, job.sellStrategy || ''].join('|');
+    const meTe = getJobMeTe(job);
+    const key = [job.productTypeId || job.typeId, job.sellStrategy || '', meTe.me, meTe.te].join('|');
     if (!looseGroups[key]) looseGroups[key] = [];
     looseGroups[key].push(job);
     looseOrder.push({ key, job });
@@ -2266,6 +2400,18 @@ async function syncWithEveIndustryJobs(silent) {
     return;
   }
 
+  const activeCharId = window.getActiveCharId ? window.getActiveCharId() : null;
+  const activeCharRecord = window.getActiveCharacterRecord ? window.getActiveCharacterRecord() : null;
+
+  // Tag each raw job with which endpoint it came from BEFORE merging - personal (this character's
+  // own /characters/{id}/industry/jobs/) vs. corp (any corp member's, via /corporations/{id}/
+  // industry/jobs/, requires Factory Manager). The merge below used to discard this distinction
+  // entirely, which meant an auto-imported job had no way to know whether it should be tagged
+  // personal-to-this-character or shared-corp-wide (see buildAutoImportedJob below, and the ledger
+  // visibility filter in renderActiveJobsList).
+  (charJobs || []).forEach(j => { if (j) j._source = 'personal'; });
+  (corpJobs || []).forEach(j => { if (j) j._source = 'corp'; });
+
   // Merge character jobs (this character's own) with corp jobs (any corp member's, if this character
   // has the Factory Manager role) - dedupe by job_id in case the same job appears in both.
   const seenJobIds = new Set();
@@ -2296,6 +2442,31 @@ async function syncWithEveIndustryJobs(silent) {
       blueprintMeTeMap[bp.item_id] = { me: bp.material_efficiency || 0, te: bp.time_efficiency || 0 };
     }
   });
+
+  // A corp job's blueprint may be personally owned by whichever corp-mate ran it, not a corp asset -
+  // charBps/corpBps above only ever see the ACTIVE character's own blueprints plus the corp's own
+  // assets, never a registered corp-mate's personal one. Widen visibility by also fetching every
+  // OTHER registered character sharing this corp's own blueprint list, using each one's own stored
+  // token (read-only, no token/character gets switched active by this). Closes the exact gap behind
+  // "a corp job auto-imported instead of matching a pending job with the right ME/TE" for any
+  // corp-mate who's also registered in this tool.
+  if (typeof window.getRegisteredCharactersInActiveCorp === 'function' && typeof window.fetchCharacterBlueprints === 'function') {
+    const corpMates = window.getRegisteredCharactersInActiveCorp().filter(c => c.charId !== activeCharId);
+    if (corpMates.length) {
+      const corpMateBps = await Promise.all(corpMates.map(c => window.fetchCharacterBlueprints(c.charId, c.accessToken)));
+      let addedCount = 0;
+      corpMateBps.forEach((bps, i) => {
+        (bps || []).forEach(bp => {
+          if (bp && bp.item_id !== undefined && blueprintMeTeMap[bp.item_id] === undefined) {
+            blueprintMeTeMap[bp.item_id] = { me: bp.material_efficiency || 0, te: bp.time_efficiency || 0 };
+            addedCount++;
+          }
+        });
+        console.info(`[JobSync] Fetched ${(bps || []).length} blueprint(s) owned by registered corp-mate "${corpMates[i].charName}".`);
+      });
+      if (addedCount) console.info(`[JobSync] ${addedCount} blueprint(s) newly visible via registered corp-mates (not already covered by your own or the corp's blueprints).`);
+    }
+  }
 
   loadJournalState();
 
@@ -2342,13 +2513,24 @@ async function syncWithEveIndustryJobs(silent) {
       .sort((a, b) => a.runsNeeded - b.runsNeeded); // smallest sufficient fit first, to avoid attributing a small job to a much larger unrelated one
     const candidate = candidates[0];
     if (!candidate) {
-      // Distinguishes "no candidate at all" from "candidate existed but ME/TE didn't match" in the
-      // console log, since the latter used to be a silent, hard-to-diagnose mismatch before this check
-      // existed (see the conversation that led here: a 32-run pending job not absorbing a 57-run real
-      // job looked identical to this in the log either way without this line).
-      const sameProductPending = activeJobs.filter(j => j && !j.isStarted && (j.productTypeId || j.typeId) === targetProductId);
+      // Logs WHY each same-product pending job was rejected (too few runs vs. ME/TE mismatch vs.
+      // already started), not just that none fit - the combined boolean filter above can't tell them
+      // apart on its own, and guessing which one applied from outside the browser is not possible.
+      // See the conversation that led here: a 32-run pending job silently not absorbing a 57-run real
+      // job looked identical in the log to a genuine ME/TE mismatch until this existed.
+      const sameProductPending = activeJobs.filter(j => j && (j.productTypeId || j.typeId) === targetProductId);
       if (sameProductPending.length) {
-        console.info(`[JobSync]   ⚠ Real job_id=${rj.job_id} (ME=${realBpInfo.me}%, TE=${realBpInfo.te}%) found ${sameProductPending.length} pending job(s) for the same product, but none matched on runs+ME/TE - falling through to auto-import.`);
+        console.info(`[JobSync]   ⚠ Real job_id=${rj.job_id} (blueprint_id=${rj.blueprint_id}, ME=${realBpInfo.me}%, TE=${realBpInfo.te}%, runs=${rj.runs}) found ${sameProductPending.length} pending/active job(s) for the same product, but none matched - falling through to auto-import. Detail:`);
+        sameProductPending.forEach(j => {
+          const snapshot = j.buildConfigSnapshot || {};
+          const jobME = (snapshot.customMEOverrides && snapshot.customMEOverrides[j.typeId] !== undefined) ? snapshot.customMEOverrides[j.typeId] : 0;
+          const jobTE = (snapshot.customTEOverrides && snapshot.customTEOverrides[j.typeId] !== undefined) ? snapshot.customTEOverrides[j.typeId] : 0;
+          const reasons = [];
+          if (j.isStarted) reasons.push('already started');
+          if (j.runsNeeded < rj.runs) reasons.push(`too few runs (has ${j.runsNeeded}, real job needs ${rj.runs})`);
+          if (jobME !== realBpInfo.me || jobTE !== realBpInfo.te) reasons.push(`ME/TE mismatch (ledger assumed ME=${jobME}%/TE=${jobTE}%, real blueprint is ME=${realBpInfo.me}%/TE=${realBpInfo.te}%)`);
+          console.info(`[JobSync]     - "${j.name}" (id=${j.id}, runs=${j.runsNeeded}): ${reasons.length ? reasons.join('; ') : 'unknown reason'}`);
+        });
       }
       return; // no fit among pending jobs - falls through to auto-import in pass 2
     }
@@ -2360,6 +2542,17 @@ async function syncWithEveIndustryJobs(silent) {
 
     const startedAt = new Date(rj.start_date).getTime();
     const totalBuildSeconds = Math.max(0, (new Date(rj.end_date).getTime() - startedAt) / 1000);
+
+    // A manually-planned job defaults to 'personal' (whoever planned it) at add-time, since there's no
+    // way yet to know it'll turn out to be a corp job - upgrade it here now that a real match confirms
+    // it actually came from the corp jobs endpoint, so it becomes visible to every registered
+    // character sharing that corp, not just whoever happened to plan/sync it. candidate and
+    // activeJobs[jobIndex] are the same object (candidate came from filtering activeJobs), so this
+    // mutation is picked up by both the full-match branch below and the split-fragment spread.
+    if (rj._source === 'corp' && candidate.scope !== 'corp') {
+      candidate.scope = 'corp';
+      candidate.corpId = window.getActiveCharacterRecord ? (window.getActiveCharacterRecord() || {}).corpId : undefined;
+    }
 
     if (rj.runs >= candidate.runsNeeded) {
       console.info(`[JobSync]   ✔ MATCHED "${candidate.name}" (full ${candidate.runsNeeded} runs) to real job_id=${rj.job_id}`);
@@ -2528,6 +2721,18 @@ async function buildAutoImportedJob(realJob, blueprintMeTeMap) {
     const totalBuildSeconds = Math.max(0, (new Date(realJob.end_date).getTime() - new Date(realJob.start_date).getTime()) / 1000);
     const materials = typeof window.extractJobMaterialsForNode === 'function' ? window.extractJobMaterialsForNode(root) : [];
 
+    // Ownership tag: 'personal' jobs came from THIS character's own /industry/jobs/ endpoint (realJob
+    // was tagged _source:'personal' before the charJobs/corpJobs merge, above) and stay scoped to
+    // whoever is logged in when the sync ran; 'corp' jobs came from the corp endpoint (any member,
+    // requires Factory Manager) and become visible to every registered character sharing that corp -
+    // see renderActiveJobsList's own visibility filter. installer_id (who actually ran it in-game) is
+    // ESI's own field, kept for personal jobs' ownerCharId even though today it's always the active
+    // character for a 'personal'-sourced job (their own jobs endpoint can only ever return jobs THEY
+    // installed) - corp jobs use it for real, since the installer is often a different corp-mate.
+    const activeCharId = window.getActiveCharId ? window.getActiveCharId() : null;
+    const activeCorpId = window.getActiveCharacterRecord ? (window.getActiveCharacterRecord() || {}).corpId : null;
+    const scope = realJob._source === 'corp' ? 'corp' : 'personal';
+
     return {
       id: Date.now() + Math.floor(Math.random() * 1000) + realJob.job_id,
       typeId: blueprintTypeId,
@@ -2547,6 +2752,9 @@ async function buildAutoImportedJob(realJob, blueprintMeTeMap) {
       autoImported: true,
       meLevel: bpInfo.me,
       teLevel: bpInfo.te,
+      scope: scope,
+      ownerCharId: scope === 'personal' ? activeCharId : (realJob.installer_id !== undefined ? String(realJob.installer_id) : activeCharId),
+      corpId: scope === 'corp' ? activeCorpId : undefined,
       addedAt: new Date().toISOString()
     };
   } catch (e) {
@@ -2595,6 +2803,11 @@ function markJobAsBuilt(jobId) {
     // right now" the moment it's ever recomputed (run count/preset change) after being re-queued.
     productionSnapshot: job.productionSnapshot,
     buildConfigSnapshot: job.buildConfigSnapshot,
+    // Same reason - a re-queued job should stay scoped to whoever it originally belonged to, not
+    // silently become visible to everyone (or nobody) just because it round-tripped through history.
+    scope: job.scope,
+    ownerCharId: job.ownerCharId,
+    corpId: job.corpId,
     completedAt: new Date().toISOString()
   };
 
@@ -2626,6 +2839,9 @@ function requeueCompletedJob(recordId) {
     totalBuildSeconds: record.totalBuildSeconds,
     productionSnapshot: record.productionSnapshot,
     buildConfigSnapshot: record.buildConfigSnapshot,
+    scope: record.scope,
+    ownerCharId: record.ownerCharId,
+    corpId: record.corpId,
     addedAt: new Date().toISOString()
   };
 
@@ -3040,7 +3256,7 @@ setInterval(() => { if (typeof updateStockLastSyncedDisplay === 'function') upda
 // hand back fresher asset data than that no matter how often this polls), so this can't outrun what
 // EVE's own backend is willing to report.
 setInterval(() => {
-  if (!localStorage.getItem('esi_char_id')) return; // not logged in - nothing to sync
+  if (!(window.getActiveCharId && window.getActiveCharId())) return; // not logged in - nothing to sync
   if (typeof window.handleEsiSSOCallback === 'function') {
     window.handleEsiSSOCallback()
       .then(() => { if (typeof window.syncWithEveIndustryJobs === 'function') return window.syncWithEveIndustryJobs(true); })

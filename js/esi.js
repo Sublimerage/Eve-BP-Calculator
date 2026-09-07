@@ -116,11 +116,154 @@ function isShipType(typeId) {
   return shipTerms.some(term => t.includes(term));
 }
 
+// --- Multi-character session store -----------------------------------------------------------
+// Every logged-in character's token bundle lives in ONE localStorage key, keyed by character id -
+// this replaces the old scheme (a single flat esi_access_token/esi_char_id/etc. set, overwritten by
+// every new login) so several characters can stay logged in simultaneously with instant switching
+// between them, rather than requiring a fresh SSO login every time. eve_esi_active_char_id is a
+// separate pointer at which one is currently "active" (whose data the rest of the app reads/renders).
+function loadCharacterStore() {
+  try {
+    const raw = localStorage.getItem('eve_esi_characters');
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+function saveCharacterStore(store) {
+  localStorage.setItem('eve_esi_characters', JSON.stringify(store));
+}
+function getActiveCharId() {
+  return localStorage.getItem('eve_esi_active_char_id') || null;
+}
+window.getActiveCharId = getActiveCharId;
+function getCharacterRecord(charId) {
+  if (!charId) return null;
+  return loadCharacterStore()[charId] || null;
+}
+window.getCharacterRecord = getCharacterRecord;
+function getActiveCharacterRecord() {
+  return getCharacterRecord(getActiveCharId());
+}
+window.getActiveCharacterRecord = getActiveCharacterRecord;
+// The one function nearly every existing "read esi_access_token from localStorage" call site swaps
+// in for that flat read - resolves to whichever character is currently active.
+function getActiveCharacterToken() {
+  const record = getActiveCharacterRecord();
+  return record ? record.accessToken : null;
+}
+window.getActiveCharacterToken = getActiveCharacterToken;
+function upsertCharacter(tokenData) {
+  const store = loadCharacterStore();
+  store[tokenData.charId] = { ...(store[tokenData.charId] || {}), ...tokenData };
+  saveCharacterStore(store);
+}
+function updateCharacterFields(charId, fields) {
+  const store = loadCharacterStore();
+  if (!store[charId]) return;
+  store[charId] = { ...store[charId], ...fields };
+  saveCharacterStore(store);
+}
+
+// One-time migration from the old single-character flat keys into the new multi-character store -
+// runs harmlessly every load (no-ops once eve_esi_characters exists) so a user already logged in
+// when this feature ships is never forced to re-authenticate.
+function migrateSingleCharacterStorage() {
+  if (localStorage.getItem('eve_esi_characters')) return;
+  const charId = localStorage.getItem('esi_char_id');
+  const accessToken = localStorage.getItem('esi_access_token');
+  if (!charId || !accessToken) return; // nothing to migrate
+  const store = {};
+  store[charId] = {
+    charId,
+    charName: localStorage.getItem('esi_char_name') || '',
+    accessToken,
+    refreshToken: localStorage.getItem('esi_refresh_token') || '',
+    tokenExpiry: parseInt(localStorage.getItem('esi_token_expiry')) || 0,
+    corpId: localStorage.getItem('esi_corp_id') || null,
+    corpName: localStorage.getItem('esi_corp_name') || '',
+    corpTicker: localStorage.getItem('esi_corp_ticker') || ''
+  };
+  saveCharacterStore(store);
+  localStorage.setItem('eve_esi_active_char_id', charId);
+}
+
+// Swaps which character is "active" - re-renders the header instantly, then refetches that
+// character's live data (skills/assets/LP balances/stock map) the same way a fresh login already
+// does, via fetchUserAndCorpAssets. Identity + the Ledger's job-visibility filter update immediately;
+// live data shows the same brief refresh a login always has (see the plan's own note on why this
+// wasn't fully namespaced per character - simpler, reuses an already-proven fetch path).
+async function setActiveChar(charId) {
+  const record = getCharacterRecord(charId);
+  if (!record) return;
+  localStorage.setItem('eve_esi_active_char_id', charId);
+  updateEsiUserUI(record.charName, record.charId, record.corpName, record.corpTicker);
+  window.dispatchEvent(new CustomEvent('eve:active-character-changed', { detail: { charId } }));
+  let token = record.accessToken;
+  const expiry = record.tokenExpiry || 0;
+  if (record.refreshToken && Date.now() >= expiry - 30000) {
+    const refreshed = await refreshEsiAccessToken(charId);
+    if (refreshed) token = refreshed;
+  }
+  await fetchUserAndCorpAssets(charId, token);
+}
+window.setActiveChar = setActiveChar;
+
+// Drops one character from the store. If it was the active one, switches to another registered
+// character if any remain, otherwise falls back to a full logged-out state (same reset logoutEsiSSO
+// used to always do unconditionally).
+function removeCharacter(charId) {
+  const store = loadCharacterStore();
+  delete store[charId];
+  saveCharacterStore(store);
+  const remainingIds = Object.keys(store);
+  if (getActiveCharId() !== charId) {
+    renderCharacterSwitcherPopover(); // a non-active character's row changed - refresh the list if open
+    return;
+  }
+  if (remainingIds.length > 0) {
+    setActiveChar(remainingIds[0]);
+    return;
+  }
+  localStorage.removeItem('eve_esi_active_char_id');
+  localStorage.removeItem('eve_code_verifier');
+  localStorage.removeItem('esi_code_verifier');
+  localStorage.removeItem('esi_auth_state');
+  localStorage.removeItem('eve_char_lp_balances');
+  window.rawAssetItems = [];
+  window.userStockMap = {};
+  window.corpDivisionNames = {};
+  const container = document.getElementById('esi-login-container');
+  if (container) {
+    container.innerHTML = `
+      <button onclick="startEsiSSOLogin()" class="btn-glass btn-glass-muted px-3.5 py-2 text-xs flex items-center gap-1.5" title="Login with EVE Online to import your character assets">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+        EVE SSO Login
+      </button>
+    `;
+  }
+  window.dispatchEvent(new CustomEvent('eve:active-character-changed', { detail: { charId: null } }));
+  if (typeof updateStockDisplayCount === 'function') updateStockDisplayCount();
+  if (typeof populateLocationDropdown === 'function') populateLocationDropdown();
+  if (typeof updateJournalStockCountBadge === 'function') updateJournalStockCountBadge();
+  if (typeof populateJournalLocationDropdown === 'function') populateJournalLocationDropdown();
+  if (typeof recalculate === 'function') {
+    recalculate();
+  } else if (typeof renderJournalPage === 'function') {
+    renderJournalPage();
+  }
+}
+window.removeCharacter = removeCharacter;
+
 // Unified fetch wrapper that validates active login sessions and handles auth decay.
 // suppressLogout: for auxiliary/non-essential calls (corp division names, corp assets, skills) whose
 // failure (missing scope, missing corp role, etc.) is a normal, expected outcome for many characters
 // and must never be treated as "the whole session is invalid."
-async function fetchWithAuth(url, options = {}, token, suppressLogout = false) {
+// charId: which character's refresh token to use if this call 401s - defaults to the active
+// character, but a background call made on behalf of a SPECIFIC registered character (e.g. the
+// multi-character blueprint merge in syncWithEveIndustryJobs) should pass that character's own id so
+// a failed refresh/logout only ever affects THAT character, not whichever one happens to be active.
+async function fetchWithAuth(url, options = {}, token, suppressLogout = false, charId = null) {
   if (!options.headers) options.headers = {};
   options.headers['Authorization'] = `Bearer ${token}`;
   try {
@@ -128,7 +271,7 @@ async function fetchWithAuth(url, options = {}, token, suppressLogout = false) {
     if (res.status === 401) {
       // The access token may have simply expired since it was handed to this function - try one
       // silent refresh-and-retry before giving up, instead of immediately logging the character out.
-      const refreshed = await refreshEsiAccessToken();
+      const refreshed = await refreshEsiAccessToken(charId);
       if (refreshed) {
         options.headers['Authorization'] = `Bearer ${refreshed}`;
         res = await fetch(url, options);
@@ -139,7 +282,7 @@ async function fetchWithAuth(url, options = {}, token, suppressLogout = false) {
           return null;
         }
         console.warn("SSO Token expired or unauthorized (401), and refresh failed. Executing clean logout.");
-        logoutEsiSSO();
+        logoutEsiSSO(charId);
         return null;
       }
     }
@@ -150,16 +293,19 @@ async function fetchWithAuth(url, options = {}, token, suppressLogout = false) {
   }
 }
 
-// Exchanges the stored refresh_token for a new access token. EVE SSO access tokens expire in
-// ~20 minutes; without this, any reload or long session inevitably hits a 401 and gets logged out.
-async function refreshEsiAccessToken() {
-  const refreshToken = localStorage.getItem('esi_refresh_token');
-  if (!refreshToken) return null;
+// Exchanges one character's stored refresh_token for a new access token. EVE SSO access tokens
+// expire in ~20 minutes; without this, any reload or long session inevitably hits a 401 and gets
+// logged out. charId defaults to the active character - see fetchWithAuth's own comment on why a
+// caller acting on behalf of a specific non-active character should pass its id explicitly.
+async function refreshEsiAccessToken(charId) {
+  charId = charId || getActiveCharId();
+  const record = getCharacterRecord(charId);
+  if (!record || !record.refreshToken) return null;
   try {
     const body = new URLSearchParams({
       grant_type: 'refresh_token',
       client_id: window.HARDCODED_CLIENT_ID,
-      refresh_token: refreshToken
+      refresh_token: record.refreshToken
     });
     const res = await fetch('https://login.eveonline.com/v2/oauth/token', {
       method: 'POST',
@@ -170,9 +316,11 @@ async function refreshEsiAccessToken() {
     const tokenData = await res.json();
     if (!tokenData.access_token) return null;
     const expiresAt = Date.now() + ((parseInt(tokenData.expires_in) || 1200) * 1000);
-    localStorage.setItem('esi_access_token', tokenData.access_token);
-    localStorage.setItem('esi_token_expiry', String(expiresAt));
-    if (tokenData.refresh_token) localStorage.setItem('esi_refresh_token', tokenData.refresh_token);
+    updateCharacterFields(charId, {
+      accessToken: tokenData.access_token,
+      tokenExpiry: expiresAt,
+      ...(tokenData.refresh_token ? { refreshToken: tokenData.refresh_token } : {})
+    });
     return tokenData.access_token;
   } catch (err) {
     console.warn('ESI token refresh failed:', err);
@@ -284,7 +432,12 @@ function base64urlEncode(a) {
   return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-async function startEsiSSOLogin() {
+// intent: 'add' when this is "log in another character" while one is already active (the callback
+// upserts the new character into the store rather than treating it as the only one) - omitted/any
+// other value for a normal first login. Stashed in sessionStorage (not the URL) since it needs to
+// survive the full-page redirect to login.eveonline.com and back.
+async function startEsiSSOLogin(intent) {
+  sessionStorage.setItem('esi_login_intent', intent === 'add' ? 'add' : 'primary');
   const clientId = window.HARDCODED_CLIENT_ID;
   const verifier = generateRandomString(32);
   localStorage.setItem('esi_code_verifier', verifier);
@@ -324,25 +477,23 @@ async function handleEsiSSOCallback() {
   }
   const code = urlParams.get('code');
   if (!code) {
-    const charName = localStorage.getItem('esi_char_name');
-    const charId = localStorage.getItem('esi_char_id');
-    let token = localStorage.getItem('esi_access_token');
-    if (charName && charId && token) {
-      const expiry = parseInt(localStorage.getItem('esi_token_expiry')) || 0;
-      const hasRefreshToken = !!localStorage.getItem('esi_refresh_token');
-      if (hasRefreshToken && Date.now() >= expiry - 30000) {
-        const refreshed = await refreshEsiAccessToken();
+    migrateSingleCharacterStorage();
+    const record = getActiveCharacterRecord();
+    if (record) {
+      let token = record.accessToken;
+      if (record.refreshToken && Date.now() >= (record.tokenExpiry || 0) - 30000) {
+        const refreshed = await refreshEsiAccessToken(record.charId);
         if (refreshed) {
           token = refreshed;
         } else {
           // Refresh token is invalid/revoked, so the cached access token is stale too - log out
           // cleanly instead of showing a "logged in" button that will immediately fail on any call.
-          logoutEsiSSO();
+          logoutEsiSSO(record.charId);
           return;
         }
       }
-      updateEsiUserUI(charName, charId);
-      await fetchUserAndCorpAssets(charId, token);
+      updateEsiUserUI(record.charName, record.charId, record.corpName, record.corpTicker);
+      await fetchUserAndCorpAssets(record.charId, token);
     }
     return;
   }
@@ -372,13 +523,17 @@ async function handleEsiSSOCallback() {
         const charId = String(jwtPayload.sub.split(':')[2]).trim();
         const charName = jwtPayload.name;
         const expiresAt = Date.now() + ((parseInt(tokenData.expires_in) || 1200) * 1000);
-        localStorage.setItem('esi_access_token', accessToken);
-        localStorage.setItem('esi_token_expiry', String(expiresAt));
-        if (tokenData.refresh_token) localStorage.setItem('esi_refresh_token', tokenData.refresh_token);
-        localStorage.setItem('esi_char_id', charId);
-        localStorage.setItem('esi_char_name', charName);
-        updateEsiUserUI(charName, charId);
-        await fetchUserAndCorpAssets(charId, accessToken);
+        migrateSingleCharacterStorage(); // in case an old single-character session is still on flat keys
+        upsertCharacter({
+          charId, charName, accessToken,
+          tokenExpiry: expiresAt,
+          ...(tokenData.refresh_token ? { refreshToken: tokenData.refresh_token } : {})
+        });
+        sessionStorage.removeItem('esi_login_intent');
+        // The just-authenticated character always becomes active, whether this was the first login
+        // or "add another character" - matches "I just logged in as X" expectations rather than
+        // silently registering it in the background (confirmed with the user).
+        await setActiveChar(charId);
       }
     } else {
       console.error("SSO Code Exchange Failed:", res.status, await res.text());
@@ -398,13 +553,18 @@ function reportSsoLoginFailure(message) {
   if (typeof window.showToast === 'function') window.showToast(message, 'error');
 }
 
+// The pilot badge now also carries a small switcher caret - opens a popover listing every
+// REGISTERED character (not just this one), so switching never needs a fresh SSO login. Built
+// entirely here (not in the 4 HTML files) since container.innerHTML replacement already means every
+// page picks this up for free - same reasoning the pilot badge itself was originally added with.
 function updateEsiUserUI(charName, charId, corpName, corpTicker) {
   const container = document.getElementById('esi-login-container');
   if (!container) return;
   const safeName = window.esc(charName);
-  const ticker = corpTicker || localStorage.getItem('esi_corp_ticker') || '';
+  const record = getCharacterRecord(charId);
+  const ticker = corpTicker || (record && record.corpTicker) || '';
   const safeTicker = window.esc(ticker);
-  const safeCorpName = window.esc(corpName || localStorage.getItem('esi_corp_name') || '');
+  const safeCorpName = window.esc(corpName || (record && record.corpName) || '');
   container.innerHTML = `
     <div class="pilot-badge mono" title="${safeName}${safeCorpName ? ' — ' + safeCorpName : ''}">
       <img src="https://images.evetech.net/characters/${charId}/portrait?size=128" alt="${safeName}" class="pilot-portrait" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/characters/1/portrait?size=128';">
@@ -412,52 +572,84 @@ function updateEsiUserUI(charName, charId, corpName, corpTicker) {
         <span class="pilot-name">${safeName}</span>
         ${ticker ? `<span class="pilot-corp">[${safeTicker}]</span>` : ''}
       </div>
+      <button type="button" onclick="toggleCharacterSwitcherPopover(event)" class="pilot-switch-btn" title="Switch character">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
       <span class="pilot-dot"></span>
-      <button onclick="logoutEsiSSO()" class="pilot-logout" title="Log out ESI Character">
+      <button onclick="logoutEsiSSO()" class="pilot-logout" title="Log out this character">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" style="width:12px;height:12px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="esi-char-switcher-popover" class="pilot-switcher-popover glass-card hidden">
+      <div id="esi-char-switcher-list" class="pilot-switcher-list"></div>
+      <button type="button" onclick="startEsiSSOLogin('add')" class="pilot-switcher-add">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Character
       </button>
     </div>
   `;
 }
 
-function logoutEsiSSO() {
-  localStorage.removeItem('esi_access_token');
-  localStorage.removeItem('esi_refresh_token');
-  localStorage.removeItem('esi_token_expiry');
-  localStorage.removeItem('esi_char_id');
-  localStorage.removeItem('esi_char_name');
-  localStorage.removeItem('esi_corp_id');
-  localStorage.removeItem('esi_corp_name');
-  localStorage.removeItem('esi_corp_ticker');
-  localStorage.removeItem('esi_code_verifier');
-  localStorage.removeItem('esi_auth_state');
-  localStorage.removeItem('eve_char_lp_balances');
-  window.rawAssetItems = [];
-  window.userStockMap = {};
-  window.corpDivisionNames = {};
+// Rebuilds the switcher popover's character list from the store - called whenever it's opened, and
+// whenever a non-active character is added/removed while it's already open.
+function renderCharacterSwitcherPopover() {
+  const list = document.getElementById('esi-char-switcher-list');
+  if (!list) return; // popover isn't in the DOM at all (logged out) - nothing to refresh
+  const store = loadCharacterStore();
+  const activeId = getActiveCharId();
+  const chars = Object.values(store).sort((a, b) => (a.charName || '').localeCompare(b.charName || ''));
+  list.innerHTML = chars.length ? chars.map(c => `
+    <div class="pilot-switcher-row${c.charId === activeId ? ' pilot-switcher-row-active' : ''}" ${c.charId === activeId ? '' : `onclick="setActiveChar('${c.charId}')"`}>
+      <img src="https://images.evetech.net/characters/${c.charId}/portrait?size=64" alt="" class="pilot-switcher-portrait" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/characters/1/portrait?size=64';">
+      <div class="pilot-switcher-meta">
+        <span class="pilot-switcher-name">${window.esc(c.charName || 'Unknown')}</span>
+        ${c.corpTicker ? `<span class="pilot-switcher-ticker">[${window.esc(c.corpTicker)}]</span>` : ''}
+      </div>
+      ${c.charId === activeId
+        ? '<span class="pilot-switcher-active-dot" title="Currently active"></span>'
+        : `<button type="button" onclick="event.stopPropagation(); removeCharacter('${c.charId}');" class="pilot-switcher-remove" title="Log out this character">&times;</button>`}
+    </div>
+  `).join('') : `<div class="pilot-switcher-empty">No other characters registered.</div>`;
+}
+
+function openCharacterSwitcherPopover() {
+  renderCharacterSwitcherPopover();
+  document.getElementById('esi-char-switcher-popover')?.classList.remove('hidden');
+}
+function closeCharacterSwitcherPopover() {
+  document.getElementById('esi-char-switcher-popover')?.classList.add('hidden');
+}
+function toggleCharacterSwitcherPopover(e) {
+  if (e) e.stopPropagation();
+  const popover = document.getElementById('esi-char-switcher-popover');
+  if (!popover) return;
+  if (popover.classList.contains('hidden')) openCharacterSwitcherPopover();
+  else closeCharacterSwitcherPopover();
+}
+window.toggleCharacterSwitcherPopover = toggleCharacterSwitcherPopover;
+
+// Click-outside-to-close - composedPath() captured at dispatch time (not container.contains(e.target)),
+// same reasoning js/lpstore.js's own corp-popover listener already documents: a re-render triggered by
+// the same click (e.g. setActiveChar rebuilding this exact container) can detach the original target
+// from the DOM before a plain .contains() check would run, making it always return false.
+document.addEventListener('click', (e) => {
+  const popover = document.getElementById('esi-char-switcher-popover');
+  if (!popover || popover.classList.contains('hidden')) return;
   const container = document.getElementById('esi-login-container');
-  if (container) {
-    container.innerHTML = `
-      <button onclick="startEsiSSOLogin()" class="btn-glass btn-glass-muted px-3.5 py-2 text-xs flex items-center gap-1.5" title="Login with EVE Online to import your character assets">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
-        EVE SSO Login
-      </button>
-    `;
-  }
-  if (typeof updateStockDisplayCount === 'function') updateStockDisplayCount();
-  if (typeof populateLocationDropdown === 'function') populateLocationDropdown();
-  if (typeof updateJournalStockCountBadge === 'function') updateJournalStockCountBadge();
-  if (typeof populateJournalLocationDropdown === 'function') populateJournalLocationDropdown();
-  if (typeof recalculate === 'function') {
-    recalculate();
-  } else if (typeof renderJournalPage === 'function') {
-    renderJournalPage();
-  }
+  const path = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
+  if (!container || !path.includes(container)) closeCharacterSwitcherPopover();
+});
+
+// Logs out ONE character - defaults to the active one (the pilot badge's own logout button, and
+// fetchWithAuth's unrecoverable-401 path, both rely on this default). See removeCharacter for the
+// actual store mutation + "switch to another registered character if any remain" logic.
+function logoutEsiSSO(charId) {
+  removeCharacter(charId || getActiveCharId());
 }
 
 async function refreshLiveAssets() {
-  const charId = localStorage.getItem('esi_char_id');
-  const token = localStorage.getItem('esi_access_token');
+  const charId = getActiveCharId();
+  const token = getActiveCharacterToken();
   if (!charId || !token) {
     startEsiSSOLogin();
     return;
@@ -485,7 +677,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
     if (charRes.ok) {
       const charData = await charRes.json();
       corpId = charData.corporation_id;
-      if (corpId) localStorage.setItem('esi_corp_id', String(corpId));
+      if (corpId) updateCharacterFields(charId, { corpId: String(corpId) });
       // Public endpoint, no auth needed - just the corp name/ticker for the header's pilot badge.
       // Fired off without blocking the asset fetch below; updates the badge in place once it lands.
       if (corpId) {
@@ -493,10 +685,11 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
           .then(r => r.ok ? r.json() : null)
           .then(corpData => {
             if (!corpData || !corpData.ticker) return;
-            localStorage.setItem('esi_corp_name', corpData.name || '');
-            localStorage.setItem('esi_corp_ticker', corpData.ticker);
-            const charName = localStorage.getItem('esi_char_name');
-            if (charName) updateEsiUserUI(charName, charId, corpData.name, corpData.ticker);
+            updateCharacterFields(charId, { corpName: corpData.name || '', corpTicker: corpData.ticker });
+            // Only re-render the badge if this fetch is still for the ACTIVE character - it's fired
+            // off async and the user may have switched characters (or logged this one out) by the
+            // time it resolves.
+            if (getActiveCharId() === charId) updateEsiUserUI(getCharacterRecord(charId).charName, charId, corpData.name, corpData.ticker);
           })
           .catch(e => console.warn('[ESI] Corp info fetch failed:', e));
       }
@@ -778,7 +971,7 @@ async function resolveLocationIds(locationIds, accessToken = null) {
     }
   }
 
-  const token = accessToken || localStorage.getItem('esi_access_token');
+  const token = accessToken || getActiveCharacterToken();
   const unresolvedStructureIds = uniqueIds.filter(id => id > 1000000000000 && !window.resolvedLocationNames[id]);
   if (unresolvedStructureIds.length > 0 && token) {
     await Promise.all(unresolvedStructureIds.map(async (structId) => {
@@ -1241,8 +1434,8 @@ window.resolveStationByName = resolveStationByName;
 // made here). Returns {} (empty categories) on any failure so callers can treat "not logged in" and
 // "no results" the same way.
 async function esiCharacterSearch(searchTerm, categories) {
-  const charId = localStorage.getItem('esi_char_id');
-  const accessToken = localStorage.getItem('esi_access_token');
+  const charId = getActiveCharId();
+  const accessToken = getActiveCharacterToken();
   if (!charId || !accessToken) {
     console.warn('[ESISearch] No results possible - ESI search requires being logged in via EVE SSO (the old public /search/ endpoint was removed by CCP).');
     return { __notLoggedIn: true };
@@ -1412,8 +1605,8 @@ window.fetchMarketComparison = fetchMarketComparison;
 // job queued in the ledger has actually been started in-game, using the REAL start time and duration
 // EVE calculated, rather than this app's own estimate.
 async function fetchActiveIndustryJobs() {
-  const charId = localStorage.getItem('esi_char_id');
-  const accessToken = localStorage.getItem('esi_access_token');
+  const charId = getActiveCharId();
+  const accessToken = getActiveCharacterToken();
   if (!charId || !accessToken) return null; // not logged in
   try {
     // no-store - without it, a second click of "Sync EVE Jobs" within the browser's own HTTP cache
@@ -1422,7 +1615,7 @@ async function fetchActiveIndustryJobs() {
     // anything about ESI's OWN server-side cache on this endpoint (CCP's, not this app's, and
     // unavoidable by any client) - a freshly-started job can still take a few minutes to appear no
     // matter what - but it guarantees a manual sync always at least ASKS ESI fresh.
-    const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/industry/jobs/?datasource=tranquility`, { cache: 'no-store' }, accessToken, true);
+    const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/industry/jobs/?datasource=tranquility`, { cache: 'no-store' }, accessToken, true, charId);
     if (!res || !res.ok) return null;
     return await res.json();
   } catch (e) {
@@ -1438,11 +1631,12 @@ window.fetchActiveIndustryJobs = fetchActiveIndustryJobs;
 // whether corp access is available - a character without Factory Manager simply contributes nothing
 // here rather than breaking the whole sync.
 async function fetchActiveCorpIndustryJobs() {
-  const corpId = localStorage.getItem('esi_corp_id');
-  const accessToken = localStorage.getItem('esi_access_token');
+  const activeRecord = getActiveCharacterRecord();
+  const corpId = activeRecord && activeRecord.corpId;
+  const accessToken = activeRecord && activeRecord.accessToken;
   if (!corpId || !accessToken) return [];
   try {
-    const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/industry/jobs/?datasource=tranquility`, { cache: 'no-store' }, accessToken, true);
+    const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/industry/jobs/?datasource=tranquility`, { cache: 'no-store' }, accessToken, true, activeRecord.charId);
     if (!res || !res.ok) return [];
     const data = await res.json();
     return Array.isArray(data) ? data : [];
@@ -1463,16 +1657,21 @@ window.fetchActiveCorpIndustryJobs = fetchActiveCorpIndustryJobs;
 // page 1 here. That's what made blueprints sitting in a well-stocked can look like "some show, some
 // don't" - which ones were missing depended only on where they fell in ESI's own paging, not on
 // anything about the can itself.
-async function fetchCharacterBlueprints() {
-  const charId = localStorage.getItem('esi_char_id');
-  const accessToken = localStorage.getItem('esi_access_token');
+// overrideCharId/overrideToken: lets a caller fetch a SPECIFIC registered character's blueprints
+// (not just the active one) - used by the Ledger's multi-character blueprintMeTeMap merge, which
+// loops over every character sharing the active one's corp to see personally-owned blueprints a
+// corp-mate might have used for a job, invisible via just the active character's own token. Defaults
+// to the active character so every existing call site (which passes neither) is unaffected.
+async function fetchCharacterBlueprints(overrideCharId, overrideToken) {
+  const charId = overrideCharId || getActiveCharId();
+  const accessToken = overrideToken || getActiveCharacterToken();
   if (!charId || !accessToken) return [];
   const results = [];
   let page = 1;
   let hasMore = true;
   try {
     while (hasMore) {
-      const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/blueprints/?datasource=tranquility&page=${page}`, {}, accessToken, true);
+      const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/blueprints/?datasource=tranquility&page=${page}`, {}, accessToken, true, charId);
       if (!res || !res.ok) break;
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
@@ -1491,15 +1690,16 @@ async function fetchCharacterBlueprints() {
 window.fetchCharacterBlueprints = fetchCharacterBlueprints;
 
 async function fetchCorpBlueprints() {
-  const corpId = localStorage.getItem('esi_corp_id');
-  const accessToken = localStorage.getItem('esi_access_token');
+  const activeRecord = getActiveCharacterRecord();
+  const corpId = activeRecord && activeRecord.corpId;
+  const accessToken = activeRecord && activeRecord.accessToken;
   if (!corpId || !accessToken) return [];
   const results = [];
   let page = 1;
   let hasMore = true;
   try {
     while (hasMore) {
-      const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/blueprints/?datasource=tranquility&page=${page}`, {}, accessToken, true);
+      const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/blueprints/?datasource=tranquility&page=${page}`, {}, accessToken, true, activeRecord.charId);
       if (!res || !res.ok) break;
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
@@ -1516,6 +1716,16 @@ async function fetchCorpBlueprints() {
   }
 }
 window.fetchCorpBlueprints = fetchCorpBlueprints;
+
+// Every character in the store sharing the active character's corp id - used to widen blueprint
+// visibility for ME/TE matching (see fetchCharacterBlueprints's own comment) without needing a full
+// simultaneous multi-character job sync.
+function getRegisteredCharactersInActiveCorp() {
+  const activeRecord = getActiveCharacterRecord();
+  if (!activeRecord || !activeRecord.corpId) return [];
+  return Object.values(loadCharacterStore()).filter(c => c.corpId === activeRecord.corpId);
+}
+window.getRegisteredCharactersInActiveCorp = getRegisteredCharactersInActiveCorp;
 
 async function fetchMarketPrices(typeIds) {
   const homeStationId = localStorage.getItem('eve_home_station_id') || '60003760'; // defaults to Jita IV - Moon 4

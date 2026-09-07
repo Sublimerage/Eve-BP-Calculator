@@ -2284,6 +2284,10 @@ function addCurrentJobToLedger(e) {
   // already accounts for the savings from building these instead of buying them, so giving each
   // sub-build its own "profit" figure would double-count the same value. The ledger's profit totals
   // already skip any job where netProfit is undefined, so this "just works" without extra bookkeeping.
+  // A manually-planned job is personal to whoever's active when it's added - not corp-shared, since
+  // there's no way yet to know it'll turn out to match a real corp job (js/ledger.js's sync upgrades
+  // it to scope:'corp' automatically once/if it actually does - see its own comment on that).
+  const addedByCharId = window.getActiveCharId ? window.getActiveCharId() : null;
   const subBuildNodes = collectSubBuildNodes(window.recipeTreeRoot);
   const subBuildJobs = subBuildNodes.map(node => ({
     id: Date.now() + Math.floor(Math.random() * 1000) + node.instanceId,
@@ -2301,6 +2305,8 @@ function addCurrentJobToLedger(e) {
     parentJobName: rootJobName, // display-only now (the "⚙ Prereq for: X" label) - parentJobId is the real link
     productionSnapshot: productionSnapshot,
     buildConfigSnapshot: buildConfigSnapshot,
+    scope: 'personal',
+    ownerCharId: addedByCharId,
     addedAt: new Date().toISOString()
   }));
 
@@ -2340,6 +2346,8 @@ function addCurrentJobToLedger(e) {
     buildConfigSnapshot: buildConfigSnapshot,
     jobCount: jobCount,
     runsPerJob: runsPerJob,
+    scope: 'personal',
+    ownerCharId: addedByCharId,
     addedAt: new Date().toISOString()
   };
 
