@@ -1783,6 +1783,19 @@ function getPrereqLabel(job) {
 // disturbing its carefully fixed-width columns (see renderJobListRowHTML's own comments on why) - an
 // icon-only variant inline with the name, same treatment renderPrereqBadgeHTML's gear icon already
 // gets there, fits in that flexible space instead.
+// Portrait fetch failed (rare - a deleted/renamed character, or a network hiccup) - swap in the old
+// generic person/building icon instead. A named handler, not an inline outerHTML string, because
+// svgIcon()'s own markup uses double quotes throughout, which would terminate an inline onerror="..."
+// attribute the moment it appeared (same reasoning js/lpstore.js's own handleLPIconLoadError already
+// documents for the identical problem there).
+function handleJobOwnerPortraitError(imgEl, iconName) {
+  const span = document.createElement('span');
+  span.style.cssText = 'display:inline-flex; vertical-align:middle; color:var(--text-mute);';
+  span.innerHTML = window.svgIcon(iconName);
+  imgEl.replaceWith(span);
+}
+window.handleJobOwnerPortraitError = handleJobOwnerPortraitError;
+
 function renderJobOwnershipBadgeHTML(job, iconOnly) {
   // No character planned for it - a legitimate state on its own (e.g. added while logged out, or
   // before multi-character support existed), shown as the plain absence of a tag rather than a
@@ -1791,12 +1804,19 @@ function renderJobOwnershipBadgeHTML(job, iconOnly) {
   const record = window.getCharacterRecord ? window.getCharacterRecord(job.ownerCharId) : null;
   // The owner might be a real EVE character not registered in THIS tool (e.g. a corp-mate's
   // installer_id from a matched/auto-imported corp job) - still worth showing something rather than
-  // silently dropping the tag, just without a resolvable name.
+  // silently dropping the tag, just without a resolvable name. The portrait itself works either way -
+  // images.evetech.net only needs a real character id, not a login - so even an unregistered corp-
+  // mate still gets a real recognizable face, just no resolvable name text next to it.
   const name = record ? record.charName : `Pilot ${job.ownerCharId}`;
-  const icon = job.scope === 'corp' ? 'building' : 'user';
+  const fallbackIcon = job.scope === 'corp' ? 'building' : 'user';
   const title = job.scope === 'corp' ? `Corp job - installed by ${name}` : `Planned for ${name}`;
-  if (iconOnly) return `<span class="ml-1 align-middle" style="color:var(--text-mute);" title="${window.esc(title)}">${window.svgIcon(icon)}</span>`;
-  return `<span class="lp-badge" style="${CHIP_TRUNCATE_STYLE}" title="${window.esc(title)}">${window.svgIcon(icon)} ${window.esc(name)}</span>`;
+  // Real ESI character portrait instead of a generic person/building glyph - same
+  // images.evetech.net/characters/{id}/portrait endpoint the pilot badge and character switcher
+  // already use, so a job's owner is recognizable by face, not just by hovering a tooltip.
+  const size = iconOnly ? 14 : 15;
+  const portraitHTML = `<img src="https://images.evetech.net/characters/${job.ownerCharId}/portrait?size=32" alt="" loading="lazy" style="width:${size}px;height:${size}px;border-radius:50%;flex-shrink:0;vertical-align:middle;" onerror="handleJobOwnerPortraitError(this, '${fallbackIcon}')">`;
+  if (iconOnly) return `<span class="ml-1" style="display:inline-flex;vertical-align:middle;" title="${window.esc(title)}">${portraitHTML}</span>`;
+  return `<span class="lp-badge" style="${CHIP_TRUNCATE_STYLE} display:inline-flex; align-items:center; gap:4px;" title="${window.esc(title)}">${portraitHTML}${window.esc(name)}</span>`;
 }
 
 // Distinguishes a multi-job plan from a normal combined multi-run job - same runsNeeded field,

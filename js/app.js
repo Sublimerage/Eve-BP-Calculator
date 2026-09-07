@@ -1930,7 +1930,24 @@ function createNodeCard(node) {
             <div class="text-xs text-green-400 text-right font-bold mt-1">${Math.round(window.rootCustomPrice || 0).toLocaleString()} ISK</div>
           </div>
         ` : ''}
-        <button onclick="addCurrentJobToLedger(event)" class="btn-glass w-full mt-2 py-1.5 text-sm flex items-center justify-center gap-1.5">
+        <!-- onmousedown, not onclick - reported bug: clicking this sometimes did nothing. Root cause:
+             recalculate() (called by at least two background completions unrelated to this click -
+             selectItem's own market-price fetch, and fetchAdjustedPrices' EIV fetch, both on their own
+             network timing) unconditionally wipes and rebuilds every card via renderTreeDiagram's
+             container.innerHTML = ''. If that lands between mousedown and mouseup on this button, the
+             original element is gone by the time the browser would fire click - real browsers don't
+             synthesize a click for a mousedown target that's no longer in the document, so the action
+             silently never happens. mousedown fires the instant the button is pressed instead of after
+             a full press-release cycle, closing almost all of that window - same defense this file
+             already uses for search-result rows (see selectRigForSlot's own comment) against a
+             different trigger of the same underlying class of race. A separate onclick stopper is
+             still needed alongside it: addCurrentJobToLedger's own recalculate() call replaces this
+             very button (and its ancestor card) as one of its first steps, so the browser's click event
+             (fired after mouseup, targeting whatever's now in that same screen position) would
+             otherwise bubble unblocked into the card's own onclick (card.onclick = onNodeClick,
+             assigned in createNodeCard) and toggle that card's selection highlight as an unwanted side
+             effect of every single use, not just the race case. -->
+        <button onmousedown="addCurrentJobToLedger(event)" onclick="event.stopPropagation()" class="btn-glass w-full mt-2 py-1.5 text-sm flex items-center justify-center gap-1.5">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Add to Job Queue
         </button>
