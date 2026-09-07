@@ -12,14 +12,13 @@ let activeJobStatusFilter = 'all'; // 'all' | 'started' | 'pending'
 // match a specific station and are hidden whenever one is selected, same as they're hidden from
 // the preset row/badge everywhere else.
 let activeStationFilter = 'all';
-// Job ownership visibility - 'personal' jobs (scope:'personal') are hidden unless they belong to the
-// currently active character, 'corp' jobs (scope:'corp') are hidden unless their corpId matches the
-// active character's own corp. A job with no scope at all (created before this feature existed) is
-// always visible regardless of these toggles - see renderActiveJobsList's own filter for why. Both
-// default on so a first-time user (or anyone who's only ever registered one character) sees no
-// change in behavior at all.
-let activeShowPersonalJobs = true;
-let activeShowCorpJobs = true;
+// Which character's jobs to show - 'all' (default) or a specific registered charId. Deliberately
+// opt-in only: every job is ALWAYS visible under 'all' regardless of who it's tagged to (or whether
+// it's tagged to anyone at all) - character ownership is shown as an informational tag on each job
+// (see renderJobOwnershipBadgeHTML), not something that hides jobs on its own. An earlier version of
+// this auto-hid jobs by ownership, which turned out to be the wrong default - explicitly reverted per
+// direct feedback: all jobs should stay visible, with a manual filter for narrowing to one character.
+let activeCharacterFilter = 'all';
 // Job IDs checked to "isolate" - when non-empty, the Consolidated BOM/multibuy below only reflects
 // these jobs' materials instead of the whole queue, so you can shop for just what you're about to
 // build without also buying for everything else still queued. Session-only (resets on reload), same
@@ -553,8 +552,7 @@ function renderActiveJobsList(allocatedStock) {
   }
 
   const q = (activeJobSearchQuery || '').toLowerCase().trim();
-  const activeCharId = window.getActiveCharId ? window.getActiveCharId() : null;
-  const activeCorpId = window.getActiveCharacterRecord ? (window.getActiveCharacterRecord() || {}).corpId : null;
+  populateCharacterFilterDropdown();
 
   const visibleJobs = activeJobs.filter(job => {
     if (!job) return false;
@@ -562,21 +560,12 @@ function renderActiveJobsList(allocatedStock) {
     if (activeJobStatusFilter === 'started' && !job.isStarted) return false;
     if (activeJobStatusFilter === 'pending' && job.isStarted) return false;
     if (activeStationFilter !== 'all' && getJobStationLabel(job) !== activeStationFilter) return false;
-    // Ownership visibility - a job with no scope at all predates this feature and stays visible to
-    // everyone rather than silently disappearing (see activeShowPersonalJobs/activeShowCorpJobs's
-    // own comment). Only applied while SOME character is actually active - fully logged out (not
-    // just switched away) has no character context to filter against, so every job stays visible
-    // rather than a logout silently hiding everything you'd planned (there'd be no active character
-    // left to switch back to that would ever reveal them again).
-    if (activeCharId) {
-      if (job.scope === 'personal') {
-        if (!activeShowPersonalJobs) return false;
-        if (job.ownerCharId && job.ownerCharId !== activeCharId) return false;
-      } else if (job.scope === 'corp') {
-        if (!activeShowCorpJobs) return false;
-        if (job.corpId && job.corpId !== activeCorpId) return false;
-      }
-    }
+    // Character filter - deliberately opt-in only (picked from the dropdown), never an automatic
+    // hide. Every job stays visible under "All" regardless of which character owns it or whether it
+    // has no owner at all ("planned for" is informational - see renderJobOwnershipBadgeHTML - not a
+    // visibility gate). Narrowing to one specific character hides jobs with no owner too, since an
+    // unassigned job isn't "from" that character either.
+    if (activeCharacterFilter !== 'all' && job.ownerCharId !== activeCharacterFilter) return false;
     return true;
   });
 
@@ -1625,18 +1614,35 @@ window.setJobStatusFilter = setJobStatusFilter;
 
 // Personal/Corp job-ownership pill toggles - reuses the same .pill-check pattern already on this
 // page for the stock/location filter (#use-char-assets/#use-corp-assets).
-function setJobOwnershipFilter() {
-  const personalBox = document.getElementById('show-personal-jobs');
-  const corpBox = document.getElementById('show-corp-jobs');
-  activeShowPersonalJobs = personalBox ? personalBox.checked : true;
-  activeShowCorpJobs = corpBox ? corpBox.checked : true;
+// Same "hide the dropdown entirely if there's nothing to filter by" pattern populateStationFilter
+// Dropdown already uses - a single registered character (or none) has nothing meaningful to narrow
+// to, so the control disappears rather than showing an empty/useless "All Characters" dropdown. Lists
+// every REGISTERED character (js/esi.js), not just the ones with jobs, since narrowing to a character
+// with zero jobs right now is still a meaningful thing to check.
+function populateCharacterFilterDropdown() {
+  const select = document.getElementById('character-filter-select');
+  if (!select) return;
+  const store = window.loadCharacterStore ? window.loadCharacterStore() : {};
+  const chars = Object.values(store).sort((a, b) => (a.charName || '').localeCompare(b.charName || ''));
+  if (chars.length < 2) {
+    select.closest('[data-character-filter-wrap]')?.classList.add('hidden');
+    return;
+  }
+  select.closest('[data-character-filter-wrap]')?.classList.remove('hidden');
+  // A removed character falls back to "all" instead of silently filtering to a now-meaningless id.
+  if (activeCharacterFilter !== 'all' && !chars.some(c => c.charId === activeCharacterFilter)) activeCharacterFilter = 'all';
+  select.innerHTML = `<option value="all">All Characters</option>` +
+    chars.map(c => `<option value="${window.esc(c.charId)}" ${c.charId === activeCharacterFilter ? 'selected' : ''}>${window.esc(c.charName)}</option>`).join('');
+}
+
+function setCharacterFilter(value) {
+  activeCharacterFilter = value || 'all';
   renderJournalPage();
 }
-window.setJobOwnershipFilter = setJobOwnershipFilter;
+window.setCharacterFilter = setCharacterFilter;
 
-// Switching the active character changes both WHICH jobs are visible (personal jobs scoped to a
-// different owner) and the corp a 'corp'-scoped job is checked against - re-render whenever it fires
-// rather than requiring a manual refresh/reload.
+// Switching the active character, or adding/removing one, changes what the character filter dropdown
+// itself should even list - re-render whenever it fires rather than requiring a manual refresh/reload.
 window.addEventListener('eve:active-character-changed', () => {
   if (typeof renderJournalPage === 'function') renderJournalPage();
 });
@@ -1778,20 +1784,19 @@ function getPrereqLabel(job) {
 // icon-only variant inline with the name, same treatment renderPrereqBadgeHTML's gear icon already
 // gets there, fits in that flexible space instead.
 function renderJobOwnershipBadgeHTML(job, iconOnly) {
-  if (job.scope === 'corp') {
-    const activeRecord = window.getActiveCharacterRecord ? window.getActiveCharacterRecord() : null;
-    const ticker = (activeRecord && activeRecord.corpId === job.corpId) ? activeRecord.corpTicker : '';
-    const installer = (job.ownerCharId && window.getCharacterRecord) ? window.getCharacterRecord(job.ownerCharId) : null;
-    const title = installer ? `Corp job - installed by ${installer.charName}, shared with every registered character in the same corp` : 'Corp job - shared with every registered character in the same corp';
-    if (iconOnly) return `<span class="ml-1 align-middle" style="color:var(--text-mute);" title="${window.esc(title)}">${window.svgIcon('building')}</span>`;
-    return `<span class="lp-badge" style="${CHIP_TRUNCATE_STYLE}" title="${window.esc(title)}">${window.svgIcon('building')} Corp${ticker ? ' ' + window.esc(ticker) : ''}</span>`;
-  }
-  if (job.scope === 'personal') {
-    const title = 'Personal - only visible while you\'re active as this character';
-    if (iconOnly) return `<span class="ml-1 align-middle" style="color:var(--text-mute);" title="${title}">${window.svgIcon('user')}</span>`;
-    return `<span class="lp-badge" style="${CHIP_TRUNCATE_STYLE}" title="${title}">${window.svgIcon('user')} Personal</span>`;
-  }
-  return '';
+  // No character planned for it - a legitimate state on its own (e.g. added while logged out, or
+  // before multi-character support existed), shown as the plain absence of a tag rather than a
+  // separate "Unassigned" badge cluttering every such job.
+  if (!job.ownerCharId) return '';
+  const record = window.getCharacterRecord ? window.getCharacterRecord(job.ownerCharId) : null;
+  // The owner might be a real EVE character not registered in THIS tool (e.g. a corp-mate's
+  // installer_id from a matched/auto-imported corp job) - still worth showing something rather than
+  // silently dropping the tag, just without a resolvable name.
+  const name = record ? record.charName : `Pilot ${job.ownerCharId}`;
+  const icon = job.scope === 'corp' ? 'building' : 'user';
+  const title = job.scope === 'corp' ? `Corp job - installed by ${name}` : `Planned for ${name}`;
+  if (iconOnly) return `<span class="ml-1 align-middle" style="color:var(--text-mute);" title="${window.esc(title)}">${window.svgIcon(icon)}</span>`;
+  return `<span class="lp-badge" style="${CHIP_TRUNCATE_STYLE}" title="${window.esc(title)}">${window.svgIcon(icon)} ${window.esc(name)}</span>`;
 }
 
 // Distinguishes a multi-job plan from a normal combined multi-run job - same runsNeeded field,
@@ -2543,16 +2548,18 @@ async function syncWithEveIndustryJobs(silent) {
     const startedAt = new Date(rj.start_date).getTime();
     const totalBuildSeconds = Math.max(0, (new Date(rj.end_date).getTime() - startedAt) / 1000);
 
-    // A manually-planned job defaults to 'personal' (whoever planned it) at add-time, since there's no
-    // way yet to know it'll turn out to be a corp job - upgrade it here now that a real match confirms
-    // it actually came from the corp jobs endpoint, so it becomes visible to every registered
-    // character sharing that corp, not just whoever happened to plan/sync it. candidate and
-    // activeJobs[jobIndex] are the same object (candidate came from filtering activeJobs), so this
+    // A manually-planned job is tagged with whoever's active at add-time (or nobody, if planned while
+    // logged out) since there's no way yet to know who'll actually run it - now that a real match
+    // confirms it, the REAL data wins: update the scope/owner to what ESI actually reports rather than
+    // trusting the original guess. installer_id is the real character who ran it (for a corp job this
+    // is very often a DIFFERENT character than whoever's active/synced it) - this is what lets a
+    // previously-unassigned or differently-guessed job show "which character the job is on" once it's
+    // actually started, same as a fresh auto-import already does (see buildAutoImportedJob). candidate
+    // and activeJobs[jobIndex] are the same object (candidate came from filtering activeJobs), so this
     // mutation is picked up by both the full-match branch below and the split-fragment spread.
-    if (rj._source === 'corp' && candidate.scope !== 'corp') {
-      candidate.scope = 'corp';
-      candidate.corpId = window.getActiveCharacterRecord ? (window.getActiveCharacterRecord() || {}).corpId : undefined;
-    }
+    candidate.scope = rj._source === 'corp' ? 'corp' : 'personal';
+    candidate.corpId = rj._source === 'corp' ? (window.getActiveCharacterRecord ? (window.getActiveCharacterRecord() || {}).corpId : undefined) : undefined;
+    if (rj.installer_id !== undefined) candidate.ownerCharId = String(rj.installer_id);
 
     if (rj.runs >= candidate.runsNeeded) {
       console.info(`[JobSync]   ✔ MATCHED "${candidate.name}" (full ${candidate.runsNeeded} runs) to real job_id=${rj.job_id}`);
@@ -2753,7 +2760,7 @@ async function buildAutoImportedJob(realJob, blueprintMeTeMap) {
       meLevel: bpInfo.me,
       teLevel: bpInfo.te,
       scope: scope,
-      ownerCharId: scope === 'personal' ? activeCharId : (realJob.installer_id !== undefined ? String(realJob.installer_id) : activeCharId),
+      ownerCharId: realJob.installer_id !== undefined ? String(realJob.installer_id) : activeCharId,
       corpId: scope === 'corp' ? activeCorpId : undefined,
       addedAt: new Date().toISOString()
     };
