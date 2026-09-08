@@ -769,6 +769,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
       const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/assets/?datasource=tranquility&page=${page}`, { cache: 'no-store' }, accessToken);
       if (res && res.ok) {
         assetsFetchOk = true;
+        recordEsiAssetsExpiry(res);
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           data.forEach(ast => {
@@ -802,6 +803,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
         // no-store - see the character assets fetch above for why.
         const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/assets/?datasource=tranquility&page=${page}`, { cache: 'no-store' }, accessToken, true);
         if (res && res.ok) {
+          recordEsiAssetsExpiry(res);
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
             data.forEach(ast => {
@@ -1601,6 +1603,51 @@ async function fetchMarketComparison(typeId) {
 }
 window.fetchMarketComparison = fetchMarketComparison;
 
+// Tracks the earliest moment ESI says FRESH industry-jobs data will actually exist, parsed from the
+// standard HTTP `Expires` response header CCP's own server-side cache sits behind (confirmed present
+// on these endpoints; `Expires` is one of the handful of response headers a browser always exposes to
+// fetch() cross-origin, no Access-Control-Expose-Headers needed - unlike ESI's custom X-* headers,
+// which it does explicitly list). Reading and respecting this - rather than guessing a fixed poll
+// interval - is exactly what ESI's own best-practices guidance recommends: asking again before this
+// timestamp can't possibly return anything newer (the cache hasn't turned over on CCP's side yet, no
+// matter how this tool asks), while waiting meaningfully past it costs real freshness for no reason.
+// Reported directly: a freshly-installed corp job took a long time to appear, and "a long wait is not
+// good at all... needs to be a lot quicker" - keyed per endpoint kind ('char-industry'/'corp-industry')
+// since character and corp jobs each have their own independent cache window on CCP's side. Consumed
+// by js/ledger.js's background re-sync timer to schedule the next automatic check exactly when fresh
+// data can exist, instead of a blind fixed delay.
+window.esiIndustryJobsExpiry = window.esiIndustryJobsExpiry || {};
+function recordEsiIndustryJobsExpiry(kind, res) {
+  const header = res && res.headers && res.headers.get ? res.headers.get('expires') : null;
+  if (!header) return;
+  const ts = Date.parse(header);
+  if (!isNaN(ts)) window.esiIndustryJobsExpiry[kind] = ts;
+}
+
+// Same Expires-header technique as recordEsiIndustryJobsExpiry above, but for the assets endpoints -
+// which sit behind a much longer server-side cache window ("on the order of an hour" per
+// fetchUserAndCorpAssets' own comment below). js/ledger.js's stock-allocation math manually subtracts
+// every already-STARTED job's materials from the raw asset figure, to compensate for exactly that lag
+// (a job you started 2 minutes ago has its materials gone in reality, even though ESI's cached asset
+// snapshot won't say so for a while) - but that compensation has to stop being applied once a REAL,
+// later ESI snapshot actually confirms the consumption, or it silently double-subtracts on top of an
+// already-correct number and understates real stock. Directly reported: "the actual stock I have in
+// the game should take absolute precedence above anything else... if I refresh stock and the game
+// stock has changed the tool should take that into account above anything else." Recording only the
+// LATEST (max) Expires ever observed - a stale response landing out of order (e.g. an in-flight
+// request that started before a newer one finished) should never move this backward. Only ONE shared
+// timestamp, not split by char/corp like the industry-jobs version - stock is merged from both sources
+// into a single pool anyway (see userStockMap), so there's nothing to gain from tracking their cache
+// windows separately, and it keeps the "has a newer generation appeared" check in ledger.js a single
+// comparison rather than one per source.
+window.esiAssetsExpiry = window.esiAssetsExpiry || null;
+function recordEsiAssetsExpiry(res) {
+  const header = res && res.headers && res.headers.get ? res.headers.get('expires') : null;
+  if (!header) return;
+  const ts = Date.parse(header);
+  if (!isNaN(ts) && (window.esiAssetsExpiry === null || ts > window.esiAssetsExpiry)) window.esiAssetsExpiry = ts;
+}
+
 // Fetches the character's real active/recent industry jobs from ESI - used to auto-detect when a
 // job queued in the ledger has actually been started in-game, using the REAL start time and duration
 // EVE calculated, rather than this app's own estimate.
@@ -1617,6 +1664,7 @@ async function fetchActiveIndustryJobs() {
     // matter what - but it guarantees a manual sync always at least ASKS ESI fresh.
     const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/industry/jobs/?datasource=tranquility`, { cache: 'no-store' }, accessToken, true, charId);
     if (!res || !res.ok) return null;
+    recordEsiIndustryJobsExpiry('char-industry', res);
     return await res.json();
   } catch (e) {
     console.warn('Industry jobs fetch failed:', e);
@@ -1638,6 +1686,7 @@ async function fetchActiveCorpIndustryJobs() {
   try {
     const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/industry/jobs/?datasource=tranquility`, { cache: 'no-store' }, accessToken, true, activeRecord.charId);
     if (!res || !res.ok) return [];
+    recordEsiIndustryJobsExpiry('corp-industry', res);
     const data = await res.json();
     return Array.isArray(data) ? data : [];
   } catch (e) {

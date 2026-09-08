@@ -241,6 +241,39 @@ function renderJournalPage() {
   const materialsCostEl = document.getElementById('journal-materials-cost');
   const totalProfitEl = document.getElementById('journal-total-profit');
 
+  const deductModeInput = document.getElementById('deduct-stock-mode');
+  const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
+
+  // Stock allocation - computed ONCE here, for EVERY job in the queue, before any of the filtered/
+  // isolated/collapsed views below get built from it. A started job's materials are already gone in
+  // reality (the job is running in EVE right now) regardless of what ESI's own possibly-stale asset
+  // snapshot currently reports - see applyJobMaterialsToStock's own comment for the full reasoning,
+  // and the exact bug this closes: reported directly as "extremely bad" - a job's real consumption
+  // went completely uncounted whenever its card, its whole status group, or the current search/filter
+  // view happened to leave it un-rendered (which, for a collapsed "In Progress" section, is the
+  // DEFAULT state), so a later job's own material line showed stock as if nothing had claimed it.
+  // Every started job is deducted FIRST, in one pass, regardless of where filters/search would place
+  // it - it already happened, so it isn't a "priority" choice the way splitting what's left across
+  // several PENDING plans is. This feeds BOTH the Consolidated BOM sidebar below (so "what do I still
+  // need to buy" accounts for stock already claimed by jobs you've already installed, not the raw ESI
+  // figure) and, after every pending job depletes what's left in its own stored order (same order
+  // "drag to reorder" changes - see the drag handle's own tooltip), each job card's own stock
+  // indicator further down. Nothing past this point ever calls applyJobMaterialsToStock again -
+  // renderActiveJobsList and everything under it only ever look up an already-computed result here.
+  const allocatedStock = { ...userStockMap };
+  const materialStockInfoByJobId = new Map();
+  activeJobs.filter(j => j && j.isStarted).forEach(job => {
+    // A strictly NEWER asset-cache generation than the one active when this job started (see
+    // job.assetsExpiryAtStart's own stamping comment) proves a real ESI refresh has landed since -
+    // that fresh snapshot already excludes this job's consumption, so manually subtracting it again
+    // here would double-count. A job with no stamp at all (started before this existed) falls back to
+    // always compensating, same as before - the safe default.
+    const alreadyReflectedByFreshAssets = job.assetsExpiryAtStart !== undefined && job.assetsExpiryAtStart !== null
+      && window.esiAssetsExpiry !== undefined && window.esiAssetsExpiry !== null
+      && window.esiAssetsExpiry > job.assetsExpiryAtStart;
+    materialStockInfoByJobId.set(job.id, applyJobMaterialsToStock(job, allocatedStock, isStockDeductEnabled, !alreadyReflectedByFreshAssets));
+  });
+
   let totalActiveCost = 0;
   let totalPotentialProfit = 0;
   let profitDataMissing = false;
@@ -332,11 +365,11 @@ function renderJournalPage() {
   let aggregatedMissingCost = 0;
   let totalMaterialsVolume = 0;
 
-  const deductModeInput = document.getElementById('deduct-stock-mode');
-  const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-
   bomItems.forEach(item => {
-    const stockQty = isStockDeductEnabled ? (userStockMap[item.typeId] || 0) : 0;
+    // allocatedStock, not raw userStockMap - already reduced by every STARTED job's real consumption
+    // (see the pass at the top of this function), so "what's actually available for pending work" is
+    // honest even while ESI's own asset snapshot hasn't caught up to reflect that consumption yet.
+    const stockQty = isStockDeductEnabled ? (allocatedStock[item.typeId] || 0) : 0;
     const netMissing = Math.max(0, item.totalQtyNeeded - stockQty);
     item.stockQty = stockQty;
     item.netMissingQty = netMissing;
@@ -355,9 +388,17 @@ function renderJournalPage() {
     materialsCostEl.title = Math.round(aggregatedMissingCost).toLocaleString() + ' ISK';
   }
 
-  const allocatedStock = { ...userStockMap };
+  // Every PENDING job now claims what's left of the same pool, in their own stored order (drag-to-
+  // reorder priority) - completes materialStockInfoByJobId for every job in the queue. Deliberately
+  // walks ALL of activeJobs here, not just relevantJobsForBOM (isolation) or any search/status/
+  // character filter currently applied to the view below - a job hidden from the CURRENT view still
+  // really needs its own materials, and still has to claim its share of stock before jobs rendered
+  // after it get to see what's left, exactly the same as if nothing were filtered/collapsed at all.
+  activeJobs.filter(j => j && !j.isStarted).forEach(job => {
+    materialStockInfoByJobId.set(job.id, applyJobMaterialsToStock(job, allocatedStock, isStockDeductEnabled));
+  });
 
-  renderActiveJobsList(allocatedStock);
+  renderActiveJobsList(materialStockInfoByJobId);
   renderConsolidatedBOMList(bomItems, aggregatedMissingCost);
   renderBuildHistoryLedger();
 }
@@ -416,13 +457,13 @@ window.clearJobIsolation = clearJobIsolation;
 // (which already carries the preset row, unclipped material list with "+ Build" actions, and a
 // working "Start Job" control) rather than a new layout - focus mode is a different FILTER + SCALE
 // over the same cards, not a new component.
-function renderFocusedJobView(container, jobId, allocatedStock, isStockDeductEnabled) {
+function renderFocusedJobView(container, jobId, materialStockInfoByJobId) {
   const focusedJob = activeJobs.find(j => j && j.id === jobId);
   if (!focusedJob) {
     // The focused job was built/deleted while focus was active - fall back to the normal queue
     // view instead of leaving the page on a dead end pointing at a job that no longer exists.
     focusedJobId = null;
-    renderActiveJobsList(allocatedStock);
+    renderActiveJobsList(materialStockInfoByJobId);
     return;
   }
 
@@ -457,7 +498,7 @@ function renderFocusedJobView(container, jobId, allocatedStock, isStockDeductEna
   // change to the card (that's what the collapse toggle itself is for).
   const priorExpandState = focusJobs.map(j => expandedJobCardIds.has(j.id));
   focusJobs.forEach(j => expandedJobCardIds.add(j.id));
-  const cardsHTML = focusJobs.map(j => renderJobCardHTML(j, allocatedStock, isStockDeductEnabled, true)).join('');
+  const cardsHTML = focusJobs.map(j => renderJobCardHTML(j, materialStockInfoByJobId, true)).join('');
   focusJobs.forEach((j, i) => { if (!priorExpandState[i]) expandedJobCardIds.delete(j.id); });
 
   const prereqCount = focusJobs.length - 1;
@@ -533,7 +574,7 @@ function renderJobClusterHTML(job, childrenOf, depth, renderJob) {
   return `<div class="job-cluster">${ownHTML}<div class="job-cluster-children">${kidsHTML}</div></div>`;
 }
 
-function renderActiveJobsList(allocatedStock) {
+function renderActiveJobsList(materialStockInfoByJobId) {
   const container = document.getElementById('active-jobs-list');
   if (!container) return;
 
@@ -548,14 +589,11 @@ function renderActiveJobsList(allocatedStock) {
     return;
   }
 
-  const deductModeInput = document.getElementById('deduct-stock-mode');
-  const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-
   // Focus mode overrides everything below (search/status filters, grouping) - it's an explicit
   // "show me just this one" request, so it wins even if the focused job wouldn't otherwise match
   // the current filters.
   if (focusedJobId !== null) {
-    renderFocusedJobView(container, focusedJobId, allocatedStock, isStockDeductEnabled);
+    renderFocusedJobView(container, focusedJobId, materialStockInfoByJobId);
     return;
   }
 
@@ -605,9 +643,9 @@ function renderActiveJobsList(allocatedStock) {
   // rather than physical nesting.
   const renderGroup = (jobs) => {
     if (!isListMode) {
-      return jobs.map(job => renderJobCardHTML(job, allocatedStock, isStockDeductEnabled)).join('');
+      return jobs.map(job => renderJobCardHTML(job, materialStockInfoByJobId)).join('');
     }
-    const renderJob = (job, depth, childCount) => renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth, childCount);
+    const renderJob = (job, depth, childCount) => renderJobListRowHTML(job, materialStockInfoByJobId, depth, childCount);
     // Only the ROOTS of each cluster (see buildJobClusters) become items of the outer list - a
     // cluster with children renders as one self-contained block (row, then its nested children
     // indented underneath), so the list never sees individual parent/child rows separately.
@@ -667,7 +705,7 @@ window.toggleQueueViewMode = toggleQueueViewMode;
 // Compact single-line-per-job view. Shows the essentials (icon/name, runs, status, cost, profit,
 // actions) with a chevron to expand the same BOM/details block used in grid view, reusing the same
 // collapse state so switching views doesn't lose whether you had a job's details open.
-function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth, childCount) {
+function renderJobListRowHTML(job, materialStockInfoByJobId, depth, childCount) {
   const iconTypeId = job.productTypeId || job.typeId;
   const isJobReady = job.isStarted && job.startedAt && ((Date.now() - job.startedAt) / 1000 >= (job.totalBuildSeconds || 0));
   const jobIconUrl = window.getItemIconUrl(iconTypeId, window.TYPE_ID_TO_NAME[iconTypeId] || job.name, 64);
@@ -717,10 +755,14 @@ function renderJobListRowHTML(job, allocatedStock, isStockDeductEnabled, depth, 
     </label>
   `;
   const focusButtonHTML = renderFocusButtonHTML(job);
+  // Looked up, not computed - already deducted once, for every job, up front in renderJournalPage
+  // (see applyJobMaterialsToStock's own comment for why that must happen regardless of any collapse/
+  // filter state down here).
+  const materialStockInfo = materialStockInfoByJobId.get(job.id) || [];
 
   const expandedDetailHTML = isExpanded ? `
     <div class="px-3 pb-3 pt-1" onclick="event.stopPropagation()">
-      ${renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled)}
+      ${renderJobBOMBlockHTML(job, materialStockInfo)}
       ${!job.isStarted ? `
         <div class="lp-inset flex items-center gap-1.5 mt-2">
           <span class="text-xs font-bold flex-shrink-0" style="color:var(--text-mute);">Runs to start:</span>
@@ -1305,7 +1347,41 @@ async function addMaterialAsPrerequisiteJob(jobId, typeId, missingQty) {
 }
 window.addMaterialAsPrerequisiteJob = addMaterialAsPrerequisiteJob;
 
-function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocusMode) {
+// Computes AND deducts one job's material needs against the shared stock pool, decoupled from any
+// HTML generation - this must run exactly once per job, in display order, for EVERY job regardless of
+// whether its card happens to be visually expanded. It used to live entirely inside
+// renderJobBOMBlockHTML below, which renderJobCardHTML/renderJobListRowHTML only ever called for an
+// EXPANDED card - meaning a COLLAPSED job (the default state for every card, started or pending, until
+// you personally click to expand it) silently never touched allocatedStock at all. Its real material
+// consumption was invisible to every job rendered after it, so later jobs saw the full undiminished
+// stock as if nothing had claimed it. Reported directly as "extremely bad": 5 already-started 10-run
+// jobs of the same item (very plausibly sitting collapsed, since there's nothing to do with a job
+// that's already running) never subtracted their 50 units from the shared pool, so a later job's own
+// material line showed 60 in stock instead of the real 10 - exactly this bug, not an ESI-freshness
+// issue. Returns one entry per material ({mat, consumedQty, netMissing, isAcquired}) so
+// renderJobBOMBlockHTML can render from these already-computed numbers instead of re-deriving (and
+// re-deducting) them a second time when the card IS expanded.
+// deductFromPool (default true) - set false when a NEWER asset-cache generation has been confirmed
+// since this job started (see job.assetsExpiryAtStart's own stamping comment, at every isStarted:true
+// call site) - meaning the current allocatedStock figure is real, fresh ESI data that ALREADY excludes
+// this job's consumption. Subtracting it again on top of an already-correct number would silently
+// understate real stock for every job rendered after it - the opposite of this function's whole
+// purpose. The job's own per-material numbers below are still computed and returned either way (so its
+// own card still shows something sensible), just without mutating the shared pool when skipped.
+function applyJobMaterialsToStock(job, allocatedStock, isStockDeductEnabled, deductFromPool = true) {
+  return (Array.isArray(job.materials) ? job.materials : []).map(mat => {
+    if (!mat) return null;
+    const availableInStock = isStockDeductEnabled ? (allocatedStock[mat.typeId] || 0) : 0;
+    const consumedQty = Math.min(mat.qtyNeeded, availableInStock);
+    if (deductFromPool && isStockDeductEnabled && allocatedStock[mat.typeId] !== undefined) {
+      allocatedStock[mat.typeId] = Math.max(0, allocatedStock[mat.typeId] - consumedQty);
+    }
+    const netMissing = Math.max(0, mat.qtyNeeded - consumedQty);
+    return { mat, consumedQty, netMissing, isAcquired: netMissing === 0 };
+  }).filter(Boolean);
+}
+
+function renderJobBOMBlockHTML(job, materialStockInfo, isFocusMode) {
     // Focus mode trades the compact per-card list (small text, no icons, clipped to a few rows -
     // right for a grid full of cards) for a much roomier one (item icons, larger text, no clip) -
     // it's the whole reason Focus mode exists, so this is the one place that distinction matters.
@@ -1314,17 +1390,7 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
     const buildBtnStyle = isFocusMode ? '' : 'font-size:9px; padding:2px 6px;';
     const queuedTextClass = isFocusMode ? 'text-xs' : 'text-[9px]';
 
-    const individualBOMHTML = Array.isArray(job.materials) ? job.materials.map(mat => {
-      if (!mat) return '';
-      const availableInStock = isStockDeductEnabled ? (allocatedStock[mat.typeId] || 0) : 0;
-      const consumedQty = Math.min(mat.qtyNeeded, availableInStock);
-
-      if (isStockDeductEnabled && allocatedStock[mat.typeId] !== undefined) {
-        allocatedStock[mat.typeId] = Math.max(0, allocatedStock[mat.typeId] - consumedQty);
-      }
-
-      const netMissing = Math.max(0, mat.qtyNeeded - consumedQty);
-      const isAcquired = netMissing === 0;
+    const individualBOMHTML = materialStockInfo.length ? materialStockInfo.map(({ mat, netMissing, isAcquired }) => {
 
       // "+ Build" lets a buildable material become its own prerequisite job in one click - resolved
       // the same way buildRecursiveRecipeTree resolves it for its own children, so "buildable" here
@@ -1459,10 +1525,14 @@ function renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocu
     `;
 }
 
-function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMode) {
+function renderJobCardHTML(job, materialStockInfoByJobId, isFocusMode) {
     const iconTypeId = job.productTypeId || job.typeId;
     const isJobReady = job.isStarted && job.startedAt && ((Date.now() - job.startedAt) / 1000 >= (job.totalBuildSeconds || 0));
     const isCollapsed = !expandedJobCardIds.has(job.id);
+    // Looked up, not computed - already deducted once, for every job, up front in renderJournalPage
+    // (see applyJobMaterialsToStock's own comment for why that must happen regardless of any collapse/
+    // filter state down here).
+    const materialStockInfo = materialStockInfoByJobId.get(job.id) || [];
 
     // Isolation only makes sense for a real root job that still has materials to shop for - a sub-
     // build is pulled in automatically whenever its parent is isolated (see renderJournalPage), and
@@ -1589,7 +1659,7 @@ function renderJobCardHTML(job, allocatedStock, isStockDeductEnabled, isFocusMod
           <span class="text-sm mono" style="color:var(--text-mute);">${job.qtyNeeded.toLocaleString()} units total</span>
         </div>
 
-        ${!isCollapsed ? renderJobBOMBlockHTML(job, allocatedStock, isStockDeductEnabled, isFocusMode) : `
+        ${!isCollapsed ? renderJobBOMBlockHTML(job, materialStockInfo, isFocusMode) : `
           <div class="lp-inset text-xs italic text-center" style="color:var(--text-mute);">
             Details minimized - click the chevron above to expand
           </div>
@@ -2125,34 +2195,42 @@ function copyIndividualJobMultibuy(e, jobId) {
   const deductModeInput = document.getElementById('deduct-stock-mode');
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
 
+  // "Missing Qty" on this clipboard text MUST agree with what the job's own card shows for the same
+  // material, so this deducts stock in the EXACT ordering renderJournalPage's materialStockInfoByJobId
+  // pass uses (and via the same applyJobMaterialsToStock helper, not a third reimplementation of the
+  // math): every STARTED job first, then every PENDING job, each group in its own stored relative
+  // order. This function used to instead walk activeJobs in raw storage index order up to the target
+  // job - which mixes started/pending as stored and can hand a pending job stored before a started
+  // job first claim on stock that the on-screen card correctly gives to the started job, so the
+  // copied Missing Qty and the rendered card disagreed for that material.
   const allocatedStock = { ...userStockMap };
-  const targetIndex = activeJobs.findIndex(j => j && j.id === jobId);
-  
-  for (let i = 0; i < targetIndex; i++) {
-    const prevJob = activeJobs[i];
-    if (prevJob && Array.isArray(prevJob.materials)) {
-      prevJob.materials.forEach(mat => {
-        const availableInStock = isStockDeductEnabled ? (allocatedStock[mat.typeId] || 0) : 0;
-        const consumed = Math.min(mat.qtyNeeded, availableInStock);
-        if (allocatedStock[mat.typeId] !== undefined) {
-          allocatedStock[mat.typeId] = Math.max(0, allocatedStock[mat.typeId] - consumed);
-        }
-      });
+  const orderedJobs = [
+    ...activeJobs.filter(j => j && j.isStarted),
+    ...activeJobs.filter(j => j && !j.isStarted)
+  ];
+  let targetMaterialStockInfo = [];
+  for (const j of orderedJobs) {
+    // Same alreadyReflectedByFreshAssets check as renderJournalPage's own pass (see
+    // job.assetsExpiryAtStart's stamping comment) - without it, a started job whose consumption a
+    // fresh asset refresh has already confirmed would still get double-subtracted HERE even though the
+    // card itself stopped double-subtracting it, right back to the two disagreeing.
+    const alreadyReflectedByFreshAssets = j.isStarted && j.assetsExpiryAtStart !== undefined && j.assetsExpiryAtStart !== null
+      && window.esiAssetsExpiry !== undefined && window.esiAssetsExpiry !== null
+      && window.esiAssetsExpiry > j.assetsExpiryAtStart;
+    const info = applyJobMaterialsToStock(j, allocatedStock, isStockDeductEnabled, !alreadyReflectedByFreshAssets);
+    if (j.id === jobId) {
+      targetMaterialStockInfo = info;
+      break;
     }
   }
 
-  const textList = job.materials
-    .filter(m => {
-      if (!m) return false;
-      if (m.strategy === 'lp') return false; // acquired via an LP Store redemption, not a market purchase
-      const availableInStock = isStockDeductEnabled ? (allocatedStock[m.typeId] || 0) : 0;
-      return (m.qtyNeeded - availableInStock) > 0;
+  const textList = targetMaterialStockInfo
+    .filter(({ mat, netMissing }) => {
+      if (!mat) return false;
+      if (mat.strategy === 'lp') return false; // acquired via an LP Store redemption, not a market purchase
+      return netMissing > 0;
     })
-    .map(m => {
-      const availableInStock = isStockDeductEnabled ? (allocatedStock[m.typeId] || 0) : 0;
-      const netMissing = m.qtyNeeded - availableInStock;
-      return `${m.name} x${netMissing}`;
-    })
+    .map(({ mat, netMissing }) => `${mat.name} x${netMissing}`)
     .join('\n');
 
   if (!textList.trim()) return;
@@ -2320,6 +2398,16 @@ function startJobRuns(jobId) {
   if (startRuns >= totalRuns) {
     job.startedAt = Date.now();
     job.isStarted = true;
+    // Stamps which asset-cache "generation" (see js/esi.js's recordEsiAssetsExpiry) was current the
+    // moment this job started - applyJobMaterialsToStock only keeps manually compensating for this
+    // job's real consumption while window.esiAssetsExpiry hasn't advanced past this value yet. Once a
+    // LATER asset refresh lands (a strictly newer Expires - proof CCP's own cache has actually turned
+    // over since this job started, not a guess about how long that usually takes), that fresh ESI
+    // number is trusted to already reflect the consumption, and the compensation stops - see that
+    // function's own comment for the full reasoning. undefined (never observed an Expires header yet,
+    // e.g. never logged in this session) falls back to always compensating, same as before this
+    // existed - the safe default.
+    job.assetsExpiryAtStart = window.esiAssetsExpiry === undefined ? null : window.esiAssetsExpiry;
     localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
     renderJournalPage();
     return;
@@ -2366,6 +2454,8 @@ function startJobRuns(jobId) {
     materials: startedMaterials,
     startedAt: Date.now(),
     isStarted: true,
+    // See the full-start branch above for what this stamps and why.
+    assetsExpiryAtStart: window.esiAssetsExpiry === undefined ? null : window.esiAssetsExpiry,
     splitFromId: job.id
   };
 
@@ -2704,6 +2794,8 @@ async function syncWithEveIndustryJobs(silent) {
     if (rj.runs >= candidate.runsNeeded) {
       console.info(`[JobSync]   ✔ MATCHED "${candidate.name}" (full ${candidate.runsNeeded} runs) to real job_id=${rj.job_id}`);
       activeJobs[jobIndex].isStarted = true;
+      // See startJobRuns' own comment on job.assetsExpiryAtStart for what this stamps and why.
+      activeJobs[jobIndex].assetsExpiryAtStart = window.esiAssetsExpiry === undefined ? null : window.esiAssetsExpiry;
       activeJobs[jobIndex].startedAt = startedAt;
       activeJobs[jobIndex].totalBuildSeconds = totalBuildSeconds;
       activeJobs[jobIndex].eveJobId = rj.job_id;
@@ -2777,6 +2869,8 @@ async function syncWithEveIndustryJobs(silent) {
         materials: startedMaterials,
         startedAt: startedAt,
         isStarted: true,
+        // See startJobRuns' own comment on job.assetsExpiryAtStart for what this stamps and why.
+        assetsExpiryAtStart: window.esiAssetsExpiry === undefined ? null : window.esiAssetsExpiry,
         eveJobId: rj.job_id,
         splitFromId: candidate.id
       };
@@ -2921,6 +3015,8 @@ async function buildAutoImportedJob(realJob, blueprintMeTeMap) {
       unitSellPrice: outputPrices.sell,
       materials: materials,
       isStarted: true,
+      // See startJobRuns' own comment on job.assetsExpiryAtStart for what this stamps and why.
+      assetsExpiryAtStart: window.esiAssetsExpiry === undefined ? null : window.esiAssetsExpiry,
       startedAt: new Date(realJob.start_date).getTime(),
       eveJobId: realJob.job_id,
       autoImported: true,
@@ -3418,25 +3514,46 @@ window.updateStockLastSyncedDisplay = updateStockLastSyncedDisplay;
 // Keep the "Xm ago" text current while the ledger sits open, same idea as the job countdown timers.
 setInterval(() => { if (typeof updateStockLastSyncedDisplay === 'function') updateStockLastSyncedDisplay(); }, 60000);
 
-// Real re-sync (not just the age label above), on a timer, for as long as the Ledger tab stays open.
-// Both asset stock and EVE job status were previously only ever refreshed once, on page load (inside
+// Real re-sync (not just the age label above), for as long as the Ledger tab stays open. Both asset
+// stock and EVE job status were previously only ever refreshed once, on page load (inside
 // handleEsiSSOCallback's "no OAuth code, just check if we're already logged in" branch, chained into
 // syncWithEveIndustryJobs) - correct while the tab gets reloaded often, but a long manufacturing
 // session where the Ledger just sits open in a tab across many real jobs starting/finishing would
 // never see fresher data until a manual reload or a click on "Sync EVE Jobs"/"Refresh" stock. That's
 // what was actually behind "stock syncing takes a very long time" - not the sync being slow once
-// triggered, but nothing ever re-triggering it. 10 minutes: frequent enough to matter within an active
-// session, and well under CCP's own ~1hr server-side cache on the assets endpoint (ESI itself won't
-// hand back fresher asset data than that no matter how often this polls), so this can't outrun what
-// EVE's own backend is willing to report.
-setInterval(() => {
-  if (!(window.getActiveCharId && window.getActiveCharId())) return; // not logged in - nothing to sync
+// triggered, but nothing ever re-triggering it.
+//
+// This used to be a blind flat 10-minute setInterval - reported directly that a freshly-installed
+// corp job still took a long time to show up, and "a long wait is not good at all... needs to be a
+// lot quicker." A fixed interval is a guess in both directions: CCP's own server-side cache on the
+// industry-jobs endpoints (recorded per-fetch as an exact timestamp by esi.js's
+// recordEsiIndustryJobsExpiry, parsed from ESI's own `Expires` response header) says precisely when
+// fresh data will actually exist, so this reschedules itself to fire right at that moment instead of
+// up to ~10 extra minutes late on a fixed timer - the fastest this tool can honestly get without
+// re-asking ESI before it has anything new to say, which ESI's own best-practices guidance calls out
+// as "circumventing ESI caching." Falls back to the old 10-minute cadence whenever no Expires info is
+// available yet (nothing fetched yet this session, every fetch has failed so far, or not logged in),
+// and never fires sooner than 30s even if a header comes back already-expired or malformed, so this
+// can never hot-loop.
+function scheduleNextEsiJobSync() {
+  const expiryMap = window.esiIndustryJobsExpiry || {};
+  const knownExpiries = [expiryMap['char-industry'], expiryMap['corp-industry']]
+    .filter(t => typeof t === 'number' && t > Date.now());
+  const delay = knownExpiries.length ? Math.max(30000, Math.min(...knownExpiries) - Date.now() + 2000) : 600000;
+  setTimeout(runScheduledEsiJobSync, delay);
+}
+function runScheduledEsiJobSync() {
+  if (!(window.getActiveCharId && window.getActiveCharId())) { setTimeout(runScheduledEsiJobSync, 600000); return; } // not logged in - check back later rather than stopping forever
   if (typeof window.handleEsiSSOCallback === 'function') {
     window.handleEsiSSOCallback()
       .then(() => { if (typeof window.syncWithEveIndustryJobs === 'function') return window.syncWithEveIndustryJobs(true); })
-      .catch(err => console.error('[Ledger] Periodic background sync error:', err));
+      .catch(err => console.error('[Ledger] Periodic background sync error:', err))
+      .then(scheduleNextEsiJobSync);
+  } else {
+    scheduleNextEsiJobSync();
   }
-}, 600000);
+}
+scheduleNextEsiJobSync();
 
 function applyJournalStockFilter() {
   const filterVal = document.getElementById('stock-location-filter')?.value || 'all';
