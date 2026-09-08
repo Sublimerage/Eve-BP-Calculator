@@ -1384,8 +1384,24 @@ function applyJobMaterialsToStock(job, allocatedStock, isStockDeductEnabled, ded
 // next render.
 function isJobConsumptionAlreadyReflectedByFreshAssets(job) {
   const currentExpiry = window.getEsiAssetsExpiry ? window.getEsiAssetsExpiry() : null;
-  return job.assetsExpiryAtStart !== undefined && job.assetsExpiryAtStart !== null
-    && currentExpiry !== null && currentExpiry > job.assetsExpiryAtStart;
+  if (currentExpiry === null) return false;
+  // A job stamped with a known assetsExpiryAtStart (every isStarted:true call site does this) compares
+  // against that exact value - proof a NEW cache generation appeared since the job started (Expires
+  // only advances when CCP's cache genuinely turns over, never otherwise, see getEsiAssetsExpiry's own
+  // comment). A job with NO stamp at all predates this tracking entirely (started before this feature
+  // shipped this session, or before any asset fetch had ever happened) - falls back to the job's own
+  // real startedAt time instead of refusing forever. Reported directly: several real jobs that started
+  // before this feature existed were having their materials permanently double-subtracted on top of
+  // stock data that had long since caught up, with no way for them to ever stop - the tool has to age
+  // out of "just started, can't confirm yet" the same way a stamped job does, using the only real
+  // timestamp it has. Slightly less airtight than the stamped comparison (if the CURRENT cache
+  // generation happened to already be active when the job started, this can trust it a little early -
+  // bounded by one ESI cache window, "on the order of an hour") but permanently refusing to trust fresh
+  // data for any job older than this feature is strictly worse.
+  const baseline = (job.assetsExpiryAtStart !== undefined && job.assetsExpiryAtStart !== null)
+    ? job.assetsExpiryAtStart
+    : job.startedAt;
+  return baseline !== undefined && baseline !== null && currentExpiry > baseline;
 }
 
 function renderJobBOMBlockHTML(job, materialStockInfo, isFocusMode) {

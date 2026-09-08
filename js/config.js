@@ -380,8 +380,15 @@ function computeStockAfterLedgerClaims(rawStockMap) {
   };
 
   jobs.filter(j => j && j.isStarted).forEach(job => {
-    const alreadyReflected = job.assetsExpiryAtStart !== undefined && job.assetsExpiryAtStart !== null
-      && currentAssetsExpiry !== null && currentAssetsExpiry > job.assetsExpiryAtStart;
+    // Falls back to the job's own real startedAt when it has no assetsExpiryAtStart stamp at all
+    // (started before this freshness feature existed) - see
+    // isJobConsumptionAlreadyReflectedByFreshAssets' own comment in js/ledger.js for the full
+    // reasoning, and why the alternative (refusing to ever trust fresh data for an older job) is worse.
+    const baseline = (job.assetsExpiryAtStart !== undefined && job.assetsExpiryAtStart !== null)
+      ? job.assetsExpiryAtStart
+      : job.startedAt;
+    const alreadyReflected = baseline !== undefined && baseline !== null
+      && currentAssetsExpiry !== null && currentAssetsExpiry > baseline;
     deductJob(job, !alreadyReflected);
   });
   jobs.filter(j => j && !j.isStarted).forEach(job => deductJob(job, true));
