@@ -336,6 +336,54 @@ function safeParseJSON(str, fallback) {
 }
 window.safeParseJSON = safeParseJSON;
 
+// How much of the raw ESI stock figure is ALREADY claimed by jobs sitting in the Ledger's own queue -
+// shared here (config.js loads on every page) rather than duplicated per-page, so the Calculator's own
+// "do I have enough" display and the Ledger's own job cards can never silently disagree about "how
+// much do I actually still have" - the same class of bug already caught once between the Ledger's card
+// display and its own Copy BOM button. Reported directly: the Ledger's own BOM correctly accounts for
+// jobs already queued/started, but "the calculator still thinks I have all the items needed" - the
+// Calculator page never loads js/ledger.js at all, so it had no way to know those jobs existed. Reads
+// eve_ledger_jobs fresh from localStorage every call (not some other page's in-memory activeJobs array,
+// which the Calculator never has) so this works correctly from any page. Returns a NEW object (never
+// mutates rawStockMap) - the caller should treat this as ITS OWN starting stock pool instead of the raw
+// ESI figure, then deplete further for whatever it's calculating (its own build, its own tree, etc.).
+//
+// Mirrors the SAME priority order and freshness logic js/ledger.js's own renderJournalPage pass uses
+// (started jobs first, then pending, each in their own stored relative order; a started job whose
+// consumption a newer confirmed ESI asset refresh already reflects - see job.assetsExpiryAtStart's own
+// stamping comment in ledger.js - isn't subtracted again here either) - deliberately re-implemented
+// here rather than shared code, since js/ledger.js's own version (applyJobMaterialsToStock) also
+// returns rich per-job/per-material detail for rendering each job's own BOM block, which nothing outside
+// the Ledger page needs; this only ever needs the final depleted pool.
+function computeStockAfterLedgerClaims(rawStockMap) {
+  const pool = { ...(rawStockMap || {}) };
+  const jobs = safeParseJSON(localStorage.getItem('eve_ledger_jobs'), []);
+  if (!Array.isArray(jobs)) return pool;
+
+  const deductJob = (job, deductFromPool) => {
+    if (!job || !Array.isArray(job.materials)) return;
+    job.materials.forEach(mat => {
+      if (!mat || mat.typeId === undefined) return;
+      const available = pool[mat.typeId] || 0;
+      const consumed = Math.min(mat.qtyNeeded || 0, available);
+      if (deductFromPool && pool[mat.typeId] !== undefined) {
+        pool[mat.typeId] = Math.max(0, pool[mat.typeId] - consumed);
+      }
+    });
+  };
+
+  jobs.filter(j => j && j.isStarted).forEach(job => {
+    const alreadyReflectedByFreshAssets = job.assetsExpiryAtStart !== undefined && job.assetsExpiryAtStart !== null
+      && window.esiAssetsExpiry !== undefined && window.esiAssetsExpiry !== null
+      && window.esiAssetsExpiry > job.assetsExpiryAtStart;
+    deductJob(job, !alreadyReflectedByFreshAssets);
+  });
+  jobs.filter(j => j && !j.isStarted).forEach(job => deductJob(job, true));
+
+  return pool;
+}
+window.computeStockAfterLedgerClaims = computeStockAfterLedgerClaims;
+
 function formatDuration(seconds) {
   if (!seconds || isNaN(seconds) || seconds <= 0) return '0s';
   const days = Math.floor(seconds / 86400);

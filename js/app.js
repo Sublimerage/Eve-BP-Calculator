@@ -567,7 +567,11 @@ function computeBlueprintReadiness(bp) {
     const perRunQty = window.calculateInputQuantity
       ? window.calculateInputQuantity(baseQty, 1, me, facilityBonus, isReaction, rigMEBonus)
       : Math.ceil(baseQty);
-    const owned = (window.userStockMap && window.userStockMap[m.typeId]) || 0;
+    // stockAfterLedgerClaims, not raw userStockMap - materials already claimed by the Ledger's own
+    // queued/started jobs aren't actually free to build with (see computeStockAfterLedgerClaims'
+    // own comment in js/config.js).
+    const stockPool = window.stockAfterLedgerClaims || window.userStockMap || {};
+    const owned = stockPool[m.typeId] || 0;
     const runsThisAllows = perRunQty > 0 ? Math.floor(owned / perRunQty) : Infinity;
     if (runsThisAllows < maxRunsFromStock) maxRunsFromStock = runsThisAllows;
   });
@@ -1667,7 +1671,10 @@ function recalculate() {
     if (rootStrategy === 'buy') { unitPrice = unitPrice * (1 + brokerFee); }
     const deductModeInput = document.getElementById('deduct-stock-mode');
     const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-    const stockQty = isStockDeductEnabled ? (window.userStockMap[productTypeId] || window.userStockMap[window.recipeTreeRoot.typeId] || 0) : 0;
+    // stockAfterLedgerClaims, not raw userStockMap - see computeStockAfterLedgerClaims' own comment
+    // in js/config.js.
+    const rootStockPool = window.stockAfterLedgerClaims || window.userStockMap || {};
+    const stockQty = isStockDeductEnabled ? (rootStockPool[productTypeId] || rootStockPool[window.recipeTreeRoot.typeId] || 0) : 0;
     const netRootQty = Math.max(0, totalRootOutputQty - stockQty);
     rawMaterialCost = unitPrice * netRootQty;
   }
@@ -1866,7 +1873,10 @@ function createNodeCard(node) {
   const isIsolated = node.instanceId === window.isolatedInstanceId;
   const deductModeInput = document.getElementById('deduct-stock-mode');
   const isStockDeductEnabled = deductModeInput ? deductModeInput.value === 'true' : true;
-  const stockQty = isStockDeductEnabled ? (window.userStockMap[productTypeId] || window.userStockMap[node.typeId] || 0) : 0;
+  // stockAfterLedgerClaims, not raw userStockMap - see computeStockAfterLedgerClaims' own comment in
+  // js/config.js.
+  const nodeStockPool = window.stockAfterLedgerClaims || window.userStockMap || {};
+  const stockQty = isStockDeductEnabled ? (nodeStockPool[productTypeId] || nodeStockPool[node.typeId] || 0) : 0;
 
   const card = document.createElement('div');
   card.id = `node-card-${node.instanceId}`;
@@ -2821,8 +2831,12 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
   // Shared pool that gets decremented as materials are claimed across the WHOLE tree - reading
   // window.userStockMap directly per-leaf (the previous approach) let the same physical stock get
   // counted as covering multiple different sub-components' needs simultaneously, whenever the same
-  // raw material (e.g. Tritanium) was needed in more than one place in the build.
-  const allocatedStockPool = { ...window.userStockMap };
+  // raw material (e.g. Tritanium) was needed in more than one place in the build. Starts from
+  // stockAfterLedgerClaims, not raw userStockMap - materials already claimed by the Ledger's own
+  // queued/started jobs aren't actually free to use here either (see computeStockAfterLedgerClaims'
+  // own comment in js/config.js - reported directly: the Ledger's own BOM correctly accounted for
+  // this, but "the calculator still thinks I have all the items needed").
+  const allocatedStockPool = { ...(window.stockAfterLedgerClaims || window.userStockMap) };
 
   function generateBOM(node) {
     if (!node) return;
@@ -2868,7 +2882,9 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
   } else {
     const rootTypeId = rootNode.productTypeId || rootNode.typeId;
     const strategy = getNodeStrategyOnly(rootNode); // safe strategy getter
-    const stockQty = isStockDeductEnabled ? (window.userStockMap[rootTypeId] || window.userStockMap[rootNode.typeId] || 0) : 0;
+    // stockAfterLedgerClaims, not raw userStockMap - see computeStockAfterLedgerClaims' own comment
+    // in js/config.js.
+    const stockQty = isStockDeductEnabled ? (allocatedStockPool[rootTypeId] || allocatedStockPool[rootNode.typeId] || 0) : 0;
     const netQtyNeeded = Math.max(0, rootNode.qtyNeeded - stockQty);
 
     bomMap[rootTypeId] = { typeId: rootTypeId, name: rootNode.productName || rootNode.name.replace(' Blueprint', ''), qty: netQtyNeeded, totalQtyNeeded: rootNode.qtyNeeded, strategy: strategy };

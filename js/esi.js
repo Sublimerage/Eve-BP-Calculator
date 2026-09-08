@@ -1210,6 +1210,14 @@ function applyStockLocationFilter() {
       window.userStockMap[item.type_id] = (window.userStockMap[item.type_id] || 0) + item.quantity;
     }
   });
+  // Recomputed every time userStockMap itself changes, so it's never more than one filter-change/
+  // asset-refresh stale - see computeStockAfterLedgerClaims' own comment (js/config.js) for why this
+  // exists: without it, this page has no idea materials already claimed by the Ledger's own queued/
+  // started jobs aren't actually free to use, and shows "you have enough" for stock that's really
+  // already spoken for.
+  window.stockAfterLedgerClaims = (typeof window.computeStockAfterLedgerClaims === 'function')
+    ? window.computeStockAfterLedgerClaims(window.userStockMap)
+    : { ...window.userStockMap };
   updateStockDisplayCount();
   // This same function backs both pages that use it directly (index.html's own checkbox/select
   // onchange handlers, which already worked) - each page's actual recalculation entry point has a
