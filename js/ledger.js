@@ -998,6 +998,16 @@ function renderJobPresetRowHTML(job) {
           ${window.svgIcon('download')} From your active EVE job
         </span>
         ${renderJobMeTeRowHTML(job)}
+        <!-- Same "reserve the width even when nothing goes here" trick this file already uses for the
+             Shop pill and the runs-edit icon. A non-auto-imported job's row below has THREE children
+             (label, ME/TE, "Change preset..." select), so justify-between lands ME/TE in the middle.
+             An auto-imported job has no preset to change - skipped on purpose, its numbers come
+             straight from EVE, not a guess (see the label above) - but without a third child here,
+             justify-between treats ME/TE as the LAST child instead and shoves it to the far right,
+             landing it in a completely different spot than every other job's row. Matching the
+             select's own max-width keeps the ME/TE readout's own position consistent between the two
+             instead of jumping based on which kind of job it is. -->
+        <span class="flex-shrink-0" style="width:170px; visibility:hidden;" aria-hidden="true"></span>
       </div>
     `;
   }

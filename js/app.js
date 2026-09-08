@@ -884,6 +884,68 @@ function getProductionPresets() {
   return window.safeParseJSON(localStorage.getItem('eve_production_presets'), {});
 }
 
+// Reads the LIVE current system/structure/rigs directly from the same localStorage keys
+// saveProductionPreset itself reads when saving one - a plain snapshot object, not tied to whether it
+// matches any saved preset. Ported from js/ledger.js's own getCurrentLiveProductionSnapshot (that page
+// doesn't load this file, so it keeps its own copy reading the same shared keys) - used here so the
+// card-level quick-select below can show what's ACTUALLY active right now even when it isn't a saved
+// preset, not just "no preset selected."
+function getCurrentLiveProductionSnapshot() {
+  const sel = window.safeParseJSON(localStorage.getItem('eve_selected_system'), {});
+  return {
+    systemId: sel.id || null, systemName: sel.name || null,
+    facilityKey: localStorage.getItem('eve_active_facility_key') || 'sotiyo',
+    rig1: localStorage.getItem('eve_rig_slot_1') || '',
+    rig2: localStorage.getItem('eve_rig_slot_2') || '',
+    rig3: localStorage.getItem('eve_rig_slot_3') || ''
+  };
+}
+
+// Turns a snapshot into a friendly label: the name of a currently-saved preset if all fields still
+// match exactly, otherwise a synthesized "Structure @ System, N rigs" description - so there's always
+// something readable on the card even for a combo that was never saved as a named preset. Ported from
+// js/ledger.js's own resolveProductionPresetLabel (same reasoning - that page re-reads presets
+// directly rather than depending on this file).
+function resolveProductionPresetLabel(snapshot) {
+  if (!snapshot) return 'Unknown';
+  const presets = getProductionPresets();
+  const matchName = Object.keys(presets).find(name => {
+    const p = presets[name];
+    return p && p.systemId === snapshot.systemId && p.facilityKey === snapshot.facilityKey &&
+      (p.rig1 || '') === (snapshot.rig1 || '') && (p.rig2 || '') === (snapshot.rig2 || '') && (p.rig3 || '') === (snapshot.rig3 || '');
+  });
+  if (matchName) return matchName;
+  const structureLabel = (window.STRUCTURE_TYPES && window.STRUCTURE_TYPES[snapshot.facilityKey] && window.STRUCTURE_TYPES[snapshot.facilityKey].shortLabel) || snapshot.facilityKey || '?';
+  const rigCount = [snapshot.rig1, snapshot.rig2, snapshot.rig3].filter(Boolean).length;
+  const rigLabel = rigCount > 0 ? `, ${rigCount} rig${rigCount > 1 ? 's' : ''}` : ', no rigs';
+  return snapshot.systemName ? `${structureLabel} @ ${snapshot.systemName}${rigLabel}` : `${structureLabel}${rigLabel}`;
+}
+
+// Quick station switcher for the root card itself - editing (save/delete) still lives in the left
+// Structure flyout, but SELECTING one now also lives right on the card: reported directly that the
+// flyout wasn't useful for this specifically because (1) it never shows what's currently active unless
+// you open it, and (2) switching meant leaving the card to go find it. The select's own "current"
+// option always reflects the LIVE system/structure/rigs (via resolveProductionPresetLabel above), not
+// just whichever saved preset (if any) happens to match - same pattern the Ledger's own per-job preset
+// chip already uses for exactly this reason (see renderJobMetaChipHTML in js/ledger.js).
+function renderCardStationSelectorHTML() {
+  const label = resolveProductionPresetLabel(getCurrentLiveProductionSnapshot());
+  const presets = getProductionPresets();
+  const presetNames = Object.keys(presets).sort();
+  const currentOptionHTML = `<option value="" selected>${window.esc(label)}</option>`;
+  const optionsHTML = presetNames.map(name => `<option value="${window.esc(name)}">${window.esc(name)}</option>`).join('');
+  return `
+    <div class="flex items-center gap-1.5 min-w-0" onclick="event.stopPropagation()" title="Current production station - pick a saved preset to switch instantly. Manage (save/rename/delete) presets from the Structure panel on the left.">
+      <span class="text-slate-400 flex-shrink-0" style="width:13px;">${window.svgIcon('factory')}</span>
+      <select onchange="if (this.value) loadProductionPreset(this.value);" class="field-line flex-1 min-w-0 font-bold text-xs" style="max-width:220px; overflow:hidden; text-overflow:ellipsis;" ${presetNames.length === 0 ? 'disabled' : ''}>
+        ${currentOptionHTML}
+        ${optionsHTML}
+      </select>
+    </div>
+  `;
+}
+window.renderCardStationSelectorHTML = renderCardStationSelectorHTML;
+
 function renderProductionPresetDropdown() {
   const select = document.getElementById('production-preset-select');
   if (!select) return;
@@ -959,6 +1021,14 @@ async function loadProductionPreset(name) {
     localStorage.setItem(`eve_rig_slot_${slot}`, rigTypeId || '');
   });
   restoreRigSlotInputs();
+
+  // Keeps the left Structure flyout's own dropdown in sync too - it only updates itself for free when
+  // IT is the one used to pick a preset (the native select's value already matches by the time onchange
+  // fires); loading one from the card's own quick-select (a different element) wouldn't otherwise touch
+  // it, and it'd keep showing whatever was selected there last.
+  renderProductionPresetDropdown();
+  const presetSelect = document.getElementById('production-preset-select');
+  if (presetSelect) presetSelect.value = name;
 
   if (typeof window.recalculate === 'function') window.recalculate();
 }
@@ -2049,6 +2119,11 @@ function createNodeCard(node) {
     </div>
 
     <div class="space-y-2.5">
+      ${isRoot ? `
+        <div class="border-t border-[#3a3025] pt-2.5">
+          ${renderCardStationSelectorHTML()}
+        </div>
+      ` : ''}
       ${isRoot ? `
         <div class="border-t border-[#3a3025] pt-2.5 flex items-center ${node.isLPIsolatedRoot ? 'justify-between' : 'gap-3'} text-sm mono" onclick="event.stopPropagation()">
           ${node.isLPIsolatedRoot ? `
