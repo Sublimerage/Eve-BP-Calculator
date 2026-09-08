@@ -1632,29 +1632,36 @@ function recordEsiIndustryJobsExpiry(kind, res) {
   if (!isNaN(ts)) window.esiIndustryJobsExpiry[kind] = ts;
 }
 
-// Same Expires-header technique as recordEsiIndustryJobsExpiry above, but for the assets endpoints -
-// which sit behind a much longer server-side cache window ("on the order of an hour" per
-// fetchUserAndCorpAssets' own comment below). js/ledger.js's stock-allocation math manually subtracts
-// every already-STARTED job's materials from the raw asset figure, to compensate for exactly that lag
-// (a job you started 2 minutes ago has its materials gone in reality, even though ESI's cached asset
-// snapshot won't say so for a while) - but that compensation has to stop being applied once a REAL,
-// later ESI snapshot actually confirms the consumption, or it silently double-subtracts on top of an
-// already-correct number and understates real stock. Directly reported: "the actual stock I have in
-// the game should take absolute precedence above anything else... if I refresh stock and the game
-// stock has changed the tool should take that into account above anything else." Recording only the
-// LATEST (max) Expires ever observed - a stale response landing out of order (e.g. an in-flight
-// request that started before a newer one finished) should never move this backward. Only ONE shared
-// timestamp, not split by char/corp like the industry-jobs version - stock is merged from both sources
-// into a single pool anyway (see userStockMap), so there's nothing to gain from tracking their cache
-// windows separately, and it keeps the "has a newer generation appeared" check in ledger.js a single
-// comparison rather than one per source.
-window.esiAssetsExpiry = window.esiAssetsExpiry || null;
+// Same Expires-header idea as recordEsiIndustryJobsExpiry above, but for the assets endpoints - and,
+// unlike that one, stored in localStorage rather than a plain window.* variable, specifically so every
+// open tab (the Ledger, the Calculator, any page) reads the exact SAME answer to "has a fresh assets
+// snapshot arrived yet?" A first version of this lived in each tab's own private memory - two tabs
+// could independently reach a DIFFERENT answer for the exact same real job, so js/ledger.js's stock
+// math and js/config.js's own copy of it would silently disagree about how much was left (reported
+// directly, and confirmed by testing two separate tabs against identical data). getEsiAssetsExpiry()
+// always re-reads localStorage live (never caches the value in a variable), so a refresh done in one
+// tab is picked up by any other tab's very next render - no cross-tab messaging needed. Consumed by
+// js/ledger.js's applyJobMaterialsToStock and js/config.js's computeStockAfterLedgerClaims to decide
+// whether a started job's consumption is already reflected in the current stock figure, or still needs
+// manually subtracting to compensate for ESI's own cache lag - see either of those for the full
+// reasoning on why that distinction matters. Recording only the LATEST (max) Expires ever observed - a
+// stale response landing out of order (e.g. an in-flight request that started before a newer one
+// finished) should never move this backward.
+function getEsiAssetsExpiry() {
+  const raw = localStorage.getItem('eve_esi_assets_expiry');
+  const ts = raw ? parseInt(raw, 10) : NaN;
+  return isNaN(ts) ? null : ts;
+}
 function recordEsiAssetsExpiry(res) {
   const header = res && res.headers && res.headers.get ? res.headers.get('expires') : null;
   if (!header) return;
   const ts = Date.parse(header);
-  if (!isNaN(ts) && (window.esiAssetsExpiry === null || ts > window.esiAssetsExpiry)) window.esiAssetsExpiry = ts;
+  if (isNaN(ts)) return;
+  const current = getEsiAssetsExpiry();
+  if (current === null || ts > current) localStorage.setItem('eve_esi_assets_expiry', String(ts));
 }
+window.getEsiAssetsExpiry = getEsiAssetsExpiry;
+window.recordEsiAssetsExpiry = recordEsiAssetsExpiry;
 
 // Fetches the character's real active/recent industry jobs from ESI - used to auto-detect when a
 // job queued in the ledger has actually been started in-game, using the REAL start time and duration

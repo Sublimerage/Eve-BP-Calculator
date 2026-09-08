@@ -263,15 +263,8 @@ function renderJournalPage() {
   const allocatedStock = { ...userStockMap };
   const materialStockInfoByJobId = new Map();
   activeJobs.filter(j => j && j.isStarted).forEach(job => {
-    // A strictly NEWER asset-cache generation than the one active when this job started (see
-    // job.assetsExpiryAtStart's own stamping comment) proves a real ESI refresh has landed since -
-    // that fresh snapshot already excludes this job's consumption, so manually subtracting it again
-    // here would double-count. A job with no stamp at all (started before this existed) falls back to
-    // always compensating, same as before - the safe default.
-    const alreadyReflectedByFreshAssets = job.assetsExpiryAtStart !== undefined && job.assetsExpiryAtStart !== null
-      && window.esiAssetsExpiry !== undefined && window.esiAssetsExpiry !== null
-      && window.esiAssetsExpiry > job.assetsExpiryAtStart;
-    materialStockInfoByJobId.set(job.id, applyJobMaterialsToStock(job, allocatedStock, isStockDeductEnabled, !alreadyReflectedByFreshAssets));
+    const deductFromPool = !isJobConsumptionAlreadyReflectedByFreshAssets(job);
+    materialStockInfoByJobId.set(job.id, applyJobMaterialsToStock(job, allocatedStock, isStockDeductEnabled, deductFromPool));
   });
 
   let totalActiveCost = 0;
@@ -1362,12 +1355,16 @@ window.addMaterialAsPrerequisiteJob = addMaterialAsPrerequisiteJob;
 // renderJobBOMBlockHTML can render from these already-computed numbers instead of re-deriving (and
 // re-deducting) them a second time when the card IS expanded.
 // deductFromPool (default true) - set false when a NEWER asset-cache generation has been confirmed
-// since this job started (see job.assetsExpiryAtStart's own stamping comment, at every isStarted:true
-// call site) - meaning the current allocatedStock figure is real, fresh ESI data that ALREADY excludes
-// this job's consumption. Subtracting it again on top of an already-correct number would silently
-// understate real stock for every job rendered after it - the opposite of this function's whole
-// purpose. The job's own per-material numbers below are still computed and returned either way (so its
-// own card still shows something sensible), just without mutating the shared pool when skipped.
+// since this job started (see job.assetsExpiryAtStart's own stamping comment) - meaning the current
+// allocatedStock figure is real, fresh ESI data that ALREADY excludes this job's consumption.
+// Subtracting it again on top of an already-correct number would silently understate real stock for
+// every job rendered after it - the opposite of this function's whole purpose. The job's own per-
+// material numbers below are still computed and returned either way (so its own card still shows
+// something sensible), just without mutating the shared pool when skipped. A version of this freshness
+// check briefly lived entirely in each tab's own private memory (window.esiAssetsExpiry) instead of
+// shared storage - two tabs could independently reach a DIFFERENT answer to "has fresh data arrived
+// yet?" for the exact same job, so they'd silently disagree outright. getEsiAssetsExpiry() (js/esi.js)
+// now reads a value shared via localStorage instead, so every tab agrees.
 function applyJobMaterialsToStock(job, allocatedStock, isStockDeductEnabled, deductFromPool = true) {
   return (Array.isArray(job.materials) ? job.materials : []).map(mat => {
     if (!mat) return null;
@@ -1379,6 +1376,16 @@ function applyJobMaterialsToStock(job, allocatedStock, isStockDeductEnabled, ded
     const netMissing = Math.max(0, mat.qtyNeeded - consumedQty);
     return { mat, consumedQty, netMissing, isAcquired: netMissing === 0 };
   }).filter(Boolean);
+}
+
+// Shared by renderJournalPage's own allocation pass and copyIndividualJobMultibuy, so the two can never
+// diverge on the decision itself even if they diverge on which jobs they're looking at. Read fresh
+// every call (never cached) so a "Refresh Assets" click in ANOTHER tab is picked up on this tab's very
+// next render.
+function isJobConsumptionAlreadyReflectedByFreshAssets(job) {
+  const currentExpiry = window.getEsiAssetsExpiry ? window.getEsiAssetsExpiry() : null;
+  return job.assetsExpiryAtStart !== undefined && job.assetsExpiryAtStart !== null
+    && currentExpiry !== null && currentExpiry > job.assetsExpiryAtStart;
 }
 
 function renderJobBOMBlockHTML(job, materialStockInfo, isFocusMode) {
@@ -2210,14 +2217,12 @@ function copyIndividualJobMultibuy(e, jobId) {
   ];
   let targetMaterialStockInfo = [];
   for (const j of orderedJobs) {
-    // Same alreadyReflectedByFreshAssets check as renderJournalPage's own pass (see
-    // job.assetsExpiryAtStart's stamping comment) - without it, a started job whose consumption a
-    // fresh asset refresh has already confirmed would still get double-subtracted HERE even though the
-    // card itself stopped double-subtracting it, right back to the two disagreeing.
-    const alreadyReflectedByFreshAssets = j.isStarted && j.assetsExpiryAtStart !== undefined && j.assetsExpiryAtStart !== null
-      && window.esiAssetsExpiry !== undefined && window.esiAssetsExpiry !== null
-      && window.esiAssetsExpiry > j.assetsExpiryAtStart;
-    const info = applyJobMaterialsToStock(j, allocatedStock, isStockDeductEnabled, !alreadyReflectedByFreshAssets);
+    // Same isJobConsumptionAlreadyReflectedByFreshAssets check as renderJournalPage's own pass, so the
+    // two can never diverge - without it, a started job whose consumption a fresh asset refresh has
+    // already confirmed would still get double-subtracted HERE even though the card itself doesn't,
+    // right back to Copy BOM and the card disagreeing.
+    const deductFromPool = !(j.isStarted && isJobConsumptionAlreadyReflectedByFreshAssets(j));
+    const info = applyJobMaterialsToStock(j, allocatedStock, isStockDeductEnabled, deductFromPool);
     if (j.id === jobId) {
       targetMaterialStockInfo = info;
       break;
@@ -2398,16 +2403,13 @@ function startJobRuns(jobId) {
   if (startRuns >= totalRuns) {
     job.startedAt = Date.now();
     job.isStarted = true;
-    // Stamps which asset-cache "generation" (see js/esi.js's recordEsiAssetsExpiry) was current the
-    // moment this job started - applyJobMaterialsToStock only keeps manually compensating for this
-    // job's real consumption while window.esiAssetsExpiry hasn't advanced past this value yet. Once a
-    // LATER asset refresh lands (a strictly newer Expires - proof CCP's own cache has actually turned
-    // over since this job started, not a guess about how long that usually takes), that fresh ESI
-    // number is trusted to already reflect the consumption, and the compensation stops - see that
-    // function's own comment for the full reasoning. undefined (never observed an Expires header yet,
-    // e.g. never logged in this session) falls back to always compensating, same as before this
-    // existed - the safe default.
-    job.assetsExpiryAtStart = window.esiAssetsExpiry === undefined ? null : window.esiAssetsExpiry;
+    // Stamps which shared asset-cache "generation" (see js/esi.js's getEsiAssetsExpiry, backed by
+    // localStorage so every tab agrees) was current the moment this job started -
+    // isJobConsumptionAlreadyReflectedByFreshAssets only keeps manually compensating for this job's
+    // real consumption while that shared value hasn't advanced past this stamp yet. null (never
+    // observed an Expires header at all, e.g. never logged in this session) falls back to always
+    // compensating - the safe default.
+    job.assetsExpiryAtStart = window.getEsiAssetsExpiry ? window.getEsiAssetsExpiry() : null;
     localStorage.setItem('eve_ledger_jobs', JSON.stringify(activeJobs));
     renderJournalPage();
     return;
@@ -2455,7 +2457,7 @@ function startJobRuns(jobId) {
     startedAt: Date.now(),
     isStarted: true,
     // See the full-start branch above for what this stamps and why.
-    assetsExpiryAtStart: window.esiAssetsExpiry === undefined ? null : window.esiAssetsExpiry,
+    assetsExpiryAtStart: window.getEsiAssetsExpiry ? window.getEsiAssetsExpiry() : null,
     splitFromId: job.id
   };
 
@@ -2795,7 +2797,7 @@ async function syncWithEveIndustryJobs(silent) {
       console.info(`[JobSync]   ✔ MATCHED "${candidate.name}" (full ${candidate.runsNeeded} runs) to real job_id=${rj.job_id}`);
       activeJobs[jobIndex].isStarted = true;
       // See startJobRuns' own comment on job.assetsExpiryAtStart for what this stamps and why.
-      activeJobs[jobIndex].assetsExpiryAtStart = window.esiAssetsExpiry === undefined ? null : window.esiAssetsExpiry;
+      activeJobs[jobIndex].assetsExpiryAtStart = window.getEsiAssetsExpiry ? window.getEsiAssetsExpiry() : null;
       activeJobs[jobIndex].startedAt = startedAt;
       activeJobs[jobIndex].totalBuildSeconds = totalBuildSeconds;
       activeJobs[jobIndex].eveJobId = rj.job_id;
@@ -2870,7 +2872,7 @@ async function syncWithEveIndustryJobs(silent) {
         startedAt: startedAt,
         isStarted: true,
         // See startJobRuns' own comment on job.assetsExpiryAtStart for what this stamps and why.
-        assetsExpiryAtStart: window.esiAssetsExpiry === undefined ? null : window.esiAssetsExpiry,
+        assetsExpiryAtStart: window.getEsiAssetsExpiry ? window.getEsiAssetsExpiry() : null,
         eveJobId: rj.job_id,
         splitFromId: candidate.id
       };
@@ -3016,7 +3018,7 @@ async function buildAutoImportedJob(realJob, blueprintMeTeMap) {
       materials: materials,
       isStarted: true,
       // See startJobRuns' own comment on job.assetsExpiryAtStart for what this stamps and why.
-      assetsExpiryAtStart: window.esiAssetsExpiry === undefined ? null : window.esiAssetsExpiry,
+      assetsExpiryAtStart: window.getEsiAssetsExpiry ? window.getEsiAssetsExpiry() : null,
       startedAt: new Date(realJob.start_date).getTime(),
       eveJobId: realJob.job_id,
       autoImported: true,

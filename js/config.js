@@ -348,17 +348,24 @@ window.safeParseJSON = safeParseJSON;
 // mutates rawStockMap) - the caller should treat this as ITS OWN starting stock pool instead of the raw
 // ESI figure, then deplete further for whatever it's calculating (its own build, its own tree, etc.).
 //
-// Mirrors the SAME priority order and freshness logic js/ledger.js's own renderJournalPage pass uses
-// (started jobs first, then pending, each in their own stored relative order; a started job whose
-// consumption a newer confirmed ESI asset refresh already reflects - see job.assetsExpiryAtStart's own
-// stamping comment in ledger.js - isn't subtracted again here either) - deliberately re-implemented
-// here rather than shared code, since js/ledger.js's own version (applyJobMaterialsToStock) also
-// returns rich per-job/per-material detail for rendering each job's own BOM block, which nothing outside
-// the Ledger page needs; this only ever needs the final depleted pool.
+// Started jobs are deducted first (in their own stored order), then pending jobs claim what's left
+// (also in their own stored order) - same priority convention as js/ledger.js's own renderJournalPage
+// pass. A started job whose consumption a fresh ESI asset refresh has already confirmed isn't
+// subtracted again - see getEsiAssetsExpiry (js/esi.js) and job.assetsExpiryAtStart (js/ledger.js) for
+// the full reasoning; critically, that freshness signal lives in localStorage (shared across every
+// tab), not a plain window.* variable, specifically so this function and js/ledger.js's own
+// applyJobMaterialsToStock always reach the SAME answer for the same job - an earlier version that
+// used a per-tab in-memory variable let the two pages disagree outright (reported directly: the Ledger
+// showing an item as entirely missing while the Calculator showed almost all of it covered, for the
+// same real stock). Deliberately re-implemented here rather than sharing js/ledger.js's own
+// applyJobMaterialsToStock, since that version also returns rich per-job/per-material detail for
+// rendering each job's own BOM block, which nothing outside the Ledger page needs; this only ever
+// needs the final depleted pool.
 function computeStockAfterLedgerClaims(rawStockMap) {
   const pool = { ...(rawStockMap || {}) };
   const jobs = safeParseJSON(localStorage.getItem('eve_ledger_jobs'), []);
   if (!Array.isArray(jobs)) return pool;
+  const currentAssetsExpiry = window.getEsiAssetsExpiry ? window.getEsiAssetsExpiry() : null;
 
   const deductJob = (job, deductFromPool) => {
     if (!job || !Array.isArray(job.materials)) return;
@@ -373,10 +380,9 @@ function computeStockAfterLedgerClaims(rawStockMap) {
   };
 
   jobs.filter(j => j && j.isStarted).forEach(job => {
-    const alreadyReflectedByFreshAssets = job.assetsExpiryAtStart !== undefined && job.assetsExpiryAtStart !== null
-      && window.esiAssetsExpiry !== undefined && window.esiAssetsExpiry !== null
-      && window.esiAssetsExpiry > job.assetsExpiryAtStart;
-    deductJob(job, !alreadyReflectedByFreshAssets);
+    const alreadyReflected = job.assetsExpiryAtStart !== undefined && job.assetsExpiryAtStart !== null
+      && currentAssetsExpiry !== null && currentAssetsExpiry > job.assetsExpiryAtStart;
+    deductJob(job, !alreadyReflected);
   });
   jobs.filter(j => j && !j.isStarted).forEach(job => deductJob(job, true));
 
