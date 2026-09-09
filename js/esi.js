@@ -1518,36 +1518,6 @@ async function resolveStationRegion(stationId) {
 }
 window.resolveStationRegion = resolveStationRegion;
 
-// Same walk as resolveStationRegion above, but entering at the SYSTEM level directly (skips the
-// station->system hop) - for js/marketseeding.js, which only ever has a system_id to start from (from
-// /universe/system_jumps//system_kills/, not a station). Also captures security_status off the same
-// first call, since a system's own region and security status never change once resolved - cached
-// permanently (in-memory here, plus localStorage on the caller's side) rather than re-walked every scan.
-let _systemRegionCache = {};
-async function resolveSystemRegionAndSecurity(systemId) {
-  if (_systemRegionCache[systemId] !== undefined) return _systemRegionCache[systemId];
-  try {
-    const systemRes = await fetch(`https://esi.evetech.net/latest/universe/systems/${systemId}/?datasource=tranquility`);
-    if (!systemRes.ok) { _systemRegionCache[systemId] = null; return null; }
-    const systemData = await systemRes.json();
-    const constellationId = systemData.constellation_id;
-    const securityStatus = systemData.security_status;
-    if (!constellationId) { _systemRegionCache[systemId] = null; return null; }
-
-    const constRes = await fetch(`https://esi.evetech.net/latest/universe/constellations/${constellationId}/?datasource=tranquility`);
-    if (!constRes.ok) { _systemRegionCache[systemId] = null; return null; }
-    const constData = await constRes.json();
-    const result = { regionId: constData.region_id, constellationId, securityStatus };
-    _systemRegionCache[systemId] = result;
-    return result;
-  } catch (e) {
-    console.warn('System region/security resolution failed:', e);
-    _systemRegionCache[systemId] = null;
-    return null;
-  }
-}
-window.resolveSystemRegionAndSecurity = resolveSystemRegionAndSecurity;
-
 // Real daily trade volume (not just what's currently listed) comes from ESI market history, averaged
 // over the most recent several days - this is the actual liquidity signal, distinct from Fuzzwork's
 // order-book aggregates which only show what's currently for sale, not how fast it moves.
@@ -1609,90 +1579,6 @@ async function fetchRegionName(regionId) {
   }
 }
 window.fetchRegionName = fetchRegionName;
-
-// Every system with ANY ship-jump activity in the last hour, in one call - public, no auth needed.
-// Raw rows out ([{system_id, ship_jumps}]), no ranking/classification here - that's
-// js/marketseeding.js's job, same separation fetchMarketHistoryRaw above already keeps (raw data from
-// the ESI layer, stats computed by the caller).
-async function fetchSystemJumps() {
-  try {
-    const res = await fetch(`https://esi.evetech.net/latest/universe/system_jumps/?datasource=tranquility`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return Array.isArray(data) ? data : null;
-  } catch (e) {
-    console.warn('System jumps fetch failed:', e);
-    return null;
-  }
-}
-window.fetchSystemJumps = fetchSystemJumps;
-
-// Every system with ANY kill activity (ship/pod/NPC) in the last hour, in one call - public, no auth.
-// npc_kills is the closest available proxy for "mission running happens here" (incursions/ratting can
-// also produce NPC kills - this is an inference, not a certain label, same as this function's sibling
-// above); ship_kills/pod_kills is a solid PvP-activity signal.
-async function fetchSystemKills() {
-  try {
-    const res = await fetch(`https://esi.evetech.net/latest/universe/system_kills/?datasource=tranquility`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return Array.isArray(data) ? data : null;
-  } catch (e) {
-    console.warn('System kills fetch failed:', e);
-    return null;
-  }
-}
-window.fetchSystemKills = fetchSystemKills;
-
-// A region's ENTIRE current order book (no type_id filter) - the only bulk-discovery endpoint ESI
-// offers, and deliberately used as one: js/marketseeding.js needs to discover which items are actually
-// trading in a candidate region WITHOUT a pre-picked item list, and this is the only call that can
-// answer "what's listed here" for every item at once instead of one type_id at a time.
-// Confirmed live (2026-09-09): each order object carries system_id directly, so callers can filter to
-// one system with zero extra resolution calls, and the X-Pages response header IS exposed to browser
-// fetch() (present in Access-Control-Expose-Headers) - safe to read and parallelize on, unlike the
-// sequential "page until empty" pattern this file's asset-fetching functions use (deliberately
-// different from that pattern here: a region's order book can run into hundreds of pages, where
-// sequential fetching would be too slow for a single scan). pageCap bounds worst-case request count
-// for an unexpectedly huge/undedected region rather than trusting X-Pages blindly.
-async function fetchRegionOrders(regionId, pageCap = 20) {
-  const firstUrl = `https://esi.evetech.net/latest/markets/${regionId}/orders/?datasource=tranquility&order_type=all&page=1`;
-  try {
-    const firstRes = await fetch(firstUrl);
-    if (!firstRes.ok) return { orders: [], truncated: false, totalPages: 0 };
-    const firstPage = await firstRes.json();
-    const orders = Array.isArray(firstPage) ? firstPage.slice() : [];
-    const totalPagesHeader = parseInt(firstRes.headers.get('x-pages'), 10);
-    const totalPages = isNaN(totalPagesHeader) ? 1 : totalPagesHeader;
-    const pagesToFetch = Math.min(totalPages, pageCap);
-    const truncated = totalPages > pageCap;
-
-    if (pagesToFetch > 1) {
-      const remainingPageNumbers = [];
-      for (let p = 2; p <= pagesToFetch; p++) remainingPageNumbers.push(p);
-      const chunkSize = 5; // region order pages are heavier than fetchMarketPrices' per-id lookups, so a narrower chunk
-      for (let i = 0; i < remainingPageNumbers.length; i += chunkSize) {
-        const chunk = remainingPageNumbers.slice(i, i + chunkSize);
-        const chunkResults = await Promise.all(chunk.map(async (p) => {
-          try {
-            const res = await fetch(`https://esi.evetech.net/latest/markets/${regionId}/orders/?datasource=tranquility&order_type=all&page=${p}`);
-            if (!res.ok) return [];
-            const data = await res.json();
-            return Array.isArray(data) ? data : [];
-          } catch (e) {
-            return [];
-          }
-        }));
-        chunkResults.forEach(rows => orders.push(...rows));
-      }
-    }
-    return { orders, truncated, totalPages };
-  } catch (e) {
-    console.warn('Region orders fetch failed:', e);
-    return { orders: [], truncated: false, totalPages: 0 };
-  }
-}
-window.fetchRegionOrders = fetchRegionOrders;
 
 // Fetches price + liquidity for one item across every tracked market in parallel, for the Compare
 // Markets panel. Price comes from Fuzzwork (per-station), volume from ESI history (per-region) -
