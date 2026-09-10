@@ -59,8 +59,27 @@ function saveTaxSettings() {
 function onStructureTypeChange() {
   const facilityKey = document.getElementById('facility-select')?.value || 'sotiyo';
   localStorage.setItem('eve_active_facility_key', facilityKey);
+  renderStructureBonusChips();
 }
 window.onStructureTypeChange = onStructureTypeChange;
+
+// The selected structure's ME / TE / job-cost bonuses as three readable chips under the dropdown -
+// the <option> text used to carry "(1% ME / 30% TE / 5% Fee)" inline, which was dense and easy to
+// miss. A zero bonus is shown greyed (.is-off) rather than hidden, so the set always reads the same.
+function renderStructureBonusChips() {
+  const host = document.getElementById('structure-bonuses');
+  if (!host) return;
+  const s = window.getActiveStructureType ? window.getActiveStructureType() : { meBonus: 0, teBonus: 0, costBonus: 0 };
+  const chip = (label, val, sign) => {
+    const off = !val ? ' is-off' : '';
+    return `<span class="struct-chip${off}">${label} <b>${val ? sign + val + '%' : '—'}</b></span>`;
+  };
+  host.innerHTML =
+    chip('ME', s.meBonus, '+') +
+    chip('TE', s.teBonus, '+') +
+    chip('Job cost', s.costBonus, '−');
+}
+window.renderStructureBonusChips = renderStructureBonusChips;
 
 function loadTaxSettings() {
   try {
@@ -108,11 +127,20 @@ function selectRigForSlot(slotNum, typeId, name) {
   const resultsEl = document.getElementById(`rig-slot-${slotNum}-results`);
   if (inputEl) inputEl.value = typeId ? name : '';
   if (resultsEl) resultsEl.classList.add('hidden');
+  setRigSlotFilledState(slotNum, !!typeId);
   localStorage.setItem(`eve_rig_slot_${slotNum}`, typeId ? String(typeId) : '');
   saveTaxSettings();
   recalculate();
 }
 window.selectRigForSlot = selectRigForSlot;
+
+// Toggles the .is-filled class on a rig slot row so its number chip lights up and the clear (✕)
+// button appears - purely visual, the real saved state is the typeId in localStorage.
+function setRigSlotFilledState(slotNum, filled) {
+  const row = document.querySelector(`.rig-slot[data-slot="${slotNum}"]`);
+  if (row) row.classList.toggle('is-filled', !!filled);
+}
+window.setRigSlotFilledState = setRigSlotFilledState;
 
 // Restores each rig slot's search input to show the saved rig's real name (looked up by the stored
 // typeId), since the input just displays text - the typeId in localStorage is the actual saved state.
@@ -1061,7 +1089,9 @@ function restoreRigSlotInputs() {
   for (let slot = 1; slot <= 3; slot++) {
     const rigTypeId = parseInt(localStorage.getItem(`eve_rig_slot_${slot}`));
     const inputEl = document.getElementById(`rig-slot-${slot}-input`);
-    if (inputEl) inputEl.value = (rigTypeId && window.EVE_ITEMS && window.EVE_ITEMS[rigTypeId]) ? window.EVE_ITEMS[rigTypeId] : '';
+    const name = (rigTypeId && window.EVE_ITEMS && window.EVE_ITEMS[rigTypeId]) ? window.EVE_ITEMS[rigTypeId] : '';
+    if (inputEl) inputEl.value = name;
+    setRigSlotFilledState(slot, !!name);
   }
 }
 
@@ -3259,6 +3289,7 @@ window.addEventListener('load', async () => {
       window.ensureDefaultTrackedMarkets().then(() => renderTrackedMarketsList()).catch(err => console.warn('Default market seeding failed:', err));
     }
     loadTaxSettings(); // Load custom taxes from localStorage!
+    renderStructureBonusChips(); // ME/TE/cost chips under the structure dropdown (after loadTaxSettings sets the <select>)
     loadSavedState(); // Load previous product & overrides persistently from localStorage!
     updateHeaderLedgerCount(); // Update badge on load!
   } catch (err) {

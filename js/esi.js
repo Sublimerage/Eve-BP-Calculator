@@ -330,8 +330,7 @@ async function refreshEsiAccessToken(charId) {
 
 // Strict ESI Adjusted Price Fetcher
 async function fetchAdjustedPrices() {
-  const statusEl = document.getElementById('eiv-status-text');
-  if (statusEl) statusEl.innerHTML = `EIV Prices: <span class="text-amber-400 font-bold">Fetching...</span>`;
+  if (typeof updateEivIndicator === 'function') updateEivIndicator('loading');
   const targetUrl = 'https://esi.evetech.net/latest/markets/prices/?datasource=tranquility';
   const tryUrls = [targetUrl, `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`];
   for (const url of tryUrls) {
@@ -346,15 +345,13 @@ async function fetchAdjustedPrices() {
           try { data = JSON.parse(data.contents); } catch(e){}
         }
         if (Array.isArray(data) && data.length > 0) {
-          let loadedCount = 0;
           window.eivCache = {};
           data.forEach(item => {
             if (item.adjusted_price !== undefined && item.adjusted_price !== null) {
               window.eivCache[item.type_id] = parseFloat(item.adjusted_price);
-              loadedCount++;
             }
           });
-          if (statusEl) statusEl.innerHTML = `EIV Prices: <span class="text-green-400 font-bold">Loaded (${loadedCount.toLocaleString()})</span>`;
+          if (typeof updateEivIndicator === 'function') updateEivIndicator('ready');
           if (window.recipeTreeRoot && typeof recalculate === 'function') {
             recalculate();
           }
@@ -365,7 +362,7 @@ async function fetchAdjustedPrices() {
       console.warn('ESI price fetch attempt failed for ' + url, e);
     }
   }
-  if (statusEl) statusEl.innerHTML = `EIV Prices: <span class="text-red-400 font-bold">ESI Offline</span>`;
+  if (typeof updateEivIndicator === 'function') updateEivIndicator('offline');
 }
 
 function getEIV(typeId) {
@@ -1356,6 +1353,85 @@ async function resolveSystemSCI(systemName) {
   }
 }
 
+// System -> region name, resolved via the constellation the system sits in. A system's region never
+// changes, so this is cached permanently for the page session (keyed by constellation id, since that
+// is what the /universe/systems/ response hands us). Non-fatal - the readout just omits the region
+// line if this can't resolve.
+let _constellationRegionCache = {};
+async function resolveRegionNameForConstellation(constellationId) {
+  if (!constellationId) return null;
+  if (_constellationRegionCache[constellationId] !== undefined) return _constellationRegionCache[constellationId];
+  try {
+    const cRes = await fetch(`https://esi.evetech.net/latest/universe/constellations/${constellationId}/?datasource=tranquility`);
+    if (!cRes.ok) { _constellationRegionCache[constellationId] = null; return null; }
+    const cData = await cRes.json();
+    const name = typeof fetchRegionName === 'function' ? await fetchRegionName(cData.region_id) : null;
+    _constellationRegionCache[constellationId] = name || null;
+    return _constellationRegionCache[constellationId];
+  } catch (e) {
+    _constellationRegionCache[constellationId] = null;
+    return null;
+  }
+}
+
+// Small helper so the EIV health dot in the System readout can be updated from fetchAdjustedPrices()
+// (which knows the load state) without that function needing to know the readout's markup.
+function updateEivIndicator(state) {
+  const wrap = document.getElementById('sysinfo-eiv');
+  const text = document.getElementById('sysinfo-eiv-text');
+  if (!wrap) return;
+  wrap.classList.remove('is-loading', 'is-ready', 'is-offline');
+  if (state === 'ready') { wrap.classList.add('is-ready'); if (text) text.textContent = 'EIV ready'; }
+  else if (state === 'offline') { wrap.classList.add('is-offline'); if (text) text.textContent = 'EIV offline'; }
+  else { wrap.classList.add('is-loading'); if (text) text.textContent = 'EIV loading'; }
+}
+window.updateEivIndicator = updateEivIndicator;
+
+// Paints the System dossier in the Structure flyout (index.html #system-readout). Pure DOM render
+// off already-fetched values - all elements are guarded, so this is a no-op on pages that don't have
+// the readout (Ledger/Invention).
+function renderSystemReadout({ systemName, mfgSCI, reactSCI, inventionSCI, security, regionName }) {
+  const pct = (v) => `${(v * 100).toFixed(2)}%`;
+  const nameEl = document.getElementById('sysinfo-name');
+  if (nameEl) nameEl.textContent = (systemName || '—').toUpperCase();
+
+  const secEl = document.getElementById('sysinfo-sec');
+  if (secEl) {
+    secEl.classList.remove('is-high', 'is-low', 'is-null');
+    if (typeof security === 'number') {
+      const rounded = Math.round(security * 10) / 10;
+      let band = 'is-null', word = 'NULL';
+      if (rounded >= 0.5) { band = 'is-high'; word = 'HIGH'; }
+      else if (rounded > 0.0) { band = 'is-low'; word = 'LOW'; }
+      secEl.classList.add(band);
+      secEl.textContent = `${rounded.toFixed(1)} · ${word}`;
+    } else {
+      secEl.textContent = '—';
+    }
+  }
+
+  const regionEl = document.getElementById('sysinfo-region');
+  if (regionEl) {
+    if (regionName) { regionEl.textContent = regionName; regionEl.hidden = false; }
+    else { regionEl.hidden = true; }
+  }
+
+  const mfgEl = document.getElementById('sysinfo-sci-mfg');
+  if (mfgEl) mfgEl.textContent = pct(mfgSCI);
+  const reactEl = document.getElementById('sysinfo-sci-react');
+  if (reactEl) reactEl.textContent = pct(reactSCI);
+  const invEl = document.getElementById('sysinfo-sci-inv');
+  if (invEl) invEl.textContent = pct(inventionSCI);
+
+  const rigEl = document.getElementById('sysinfo-rigmult');
+  if (rigEl) {
+    const mult = typeof window.getSecurityMultiplier === 'function' ? window.getSecurityMultiplier() : 1.0;
+    const zone = mult >= 2.1 ? 'null/WH' : (mult >= 1.9 ? 'lowsec' : 'highsec');
+    rigEl.textContent = `Rig ×${mult.toFixed(1)} · ${zone}`;
+  }
+}
+window.renderSystemReadout = renderSystemReadout;
+
 async function fetchSystemSCIById(systemId, systemName) {
   try {
     const sysRes = await fetch('https://esi.evetech.net/latest/industry/systems/?datasource=tranquility');
@@ -1375,26 +1451,21 @@ async function fetchSystemSCIById(systemId, systemName) {
     window.activeInventionSCI = inventionSCI;
 
     // Security status drives the rig bonus multiplier (highsec x1.0, lowsec x1.9, null/WH x2.1).
-    let secLabel = '';
+    let constellationId = null;
     try {
       const secRes = await fetch(`https://esi.evetech.net/latest/universe/systems/${systemId}/?datasource=tranquility`);
       if (secRes.ok) {
         const secData = await secRes.json();
         window.activeSystemSecurity = typeof secData.security_status === 'number' ? secData.security_status : null;
-        if (window.activeSystemSecurity !== null) {
-          const sec = window.activeSystemSecurity;
-          secLabel = sec >= 0.45 ? ` | ${sec.toFixed(1)} (Highsec)` : (sec > 0.0 ? ` | ${sec.toFixed(1)} (Lowsec)` : ` | ${sec.toFixed(1)} (Null/WH)`);
-        }
+        constellationId = secData.constellation_id || null;
       }
     } catch (secErr) {
       window.activeSystemSecurity = null;
       console.warn('System security status fetch error:', secErr);
     }
 
-    const sciBadgeEl = document.getElementById('sci-badge');
-    if (sciBadgeEl) {
-      sciBadgeEl.textContent = `System: ${systemName.toUpperCase()}${secLabel} | SCI: ${(mfgSCI * 100).toFixed(2)}% (Mfg) / ${(reactSCI * 100).toFixed(2)}% (React) / ${(inventionSCI * 100).toFixed(2)}% (Invention)`;
-    }
+    const regionName = await resolveRegionNameForConstellation(constellationId);
+    renderSystemReadout({ systemName, mfgSCI, reactSCI, inventionSCI, security: window.activeSystemSecurity, regionName });
     // Awaited (not fire-and-forget) so this function's own promise doesn't resolve until the
     // recalculation triggered by the system change is actually done. This matters beyond just this
     // page: loadProductionPreset (js/app.js) awaits selectSolarSystem (which awaits this) and then
