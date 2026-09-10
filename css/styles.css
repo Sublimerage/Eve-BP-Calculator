@@ -2071,3 +2071,237 @@ body.page-calc .hero-num.loss { background: linear-gradient(135deg, #f3c0a8, var
     max-width: none;
   }
 }
+
+/* ============================================================
+   System & Structure flyout - redesigned. Replaces the old cramped 10px mono "SCI: / Stock: / EIV:"
+   strip (which showed two useless counts and truncated the one number that matters) and the three
+   bare underline-only rig inputs. Three pieces:
+     .sys-readout   - a real system dossier card: name + security band, region, and the industry
+                      cost indices with Manufacturing given the emphasis it deserves.
+     .struct-chip   - the structure's ME/TE/cost bonuses parsed out as readable chips instead of
+                      being crammed into the <option> text.
+     .rig-slot      - numbered slot rows with a clear filled/empty state and a one-click clear.
+   ============================================================ */
+body.page-calc .sys-readout {
+  background: rgba(0,0,0,0.22);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--radius-btn);
+  padding: 11px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+body.page-calc .sys-readout-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+body.page-calc .sys-readout-name {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.page-calc .sys-sec-pill {
+  flex-shrink: 0;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.08);
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+body.page-calc .sys-sec-pill.is-high { background: rgba(76,196,145,0.16); color: var(--green-300); }
+body.page-calc .sys-sec-pill.is-low  { background: rgba(217,184,74,0.16); color: #e7cd77; }
+body.page-calc .sys-sec-pill.is-null { background: rgba(221,107,100,0.16); color: var(--red-300); }
+body.page-calc .sys-readout-region {
+  font-size: 11px;
+  color: var(--text-mute);
+  margin-top: -4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.page-calc .sys-ci-primary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(var(--accent-rgb),0.10);
+}
+body.page-calc .sys-ci-primary .sys-ci-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+body.page-calc .sys-ci-primary .sys-ci-value {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--accent);
+}
+body.page-calc .sys-ci-secondary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+body.page-calc .sys-ci-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 9px;
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.035);
+}
+body.page-calc .sys-ci-sub .sys-ci-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+body.page-calc .sys-ci-sub .sys-ci-value {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+body.page-calc .sys-readout-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  font-size: 10px;
+  color: var(--text-mute);
+}
+body.page-calc .sys-eiv {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+body.page-calc .sys-eiv-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-mute);
+  flex-shrink: 0;
+}
+body.page-calc .sys-eiv.is-ready   .sys-eiv-dot { background: var(--green-400); box-shadow: 0 0 6px rgba(76,196,145,0.6); }
+body.page-calc .sys-eiv.is-loading .sys-eiv-dot { background: #e7cd77; }
+body.page-calc .sys-eiv.is-offline .sys-eiv-dot { background: var(--red-400); }
+body.page-calc .sys-rigmult {
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.02em;
+}
+
+body.page-calc .struct-bonus-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+body.page-calc .struct-chip {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.05);
+  color: var(--text-mute);
+}
+body.page-calc .struct-chip b {
+  color: var(--text-soft);
+  font-weight: 700;
+}
+body.page-calc .struct-chip.is-off { opacity: 0.45; }
+
+body.page-calc .rig-slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+body.page-calc .rig-slot {
+  display: flex;
+  align-items: stretch;
+  gap: 7px;
+}
+body.page-calc .rig-slot-num {
+  flex-shrink: 0;
+  width: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.05);
+  color: var(--text-mute);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+body.page-calc .rig-slot.is-filled .rig-slot-num {
+  background: rgba(var(--accent-rgb),0.18);
+  color: var(--accent);
+}
+body.page-calc .rig-slot-main {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+body.page-calc .rig-slot-input {
+  width: 100%;
+  background: rgba(255,255,255,0.035) !important;
+  border: 1px solid rgba(255,255,255,0.07) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 7px 9px !important;
+  font-size: 11px;
+  color: var(--text);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+body.page-calc .rig-slot-input::placeholder { color: var(--text-mute); }
+body.page-calc .rig-slot-input:hover { background: rgba(255,255,255,0.055) !important; }
+body.page-calc .rig-slot-input:focus {
+  outline: none;
+  border-color: rgba(var(--accent-rgb),0.55) !important;
+  background: rgba(255,255,255,0.06) !important;
+}
+body.page-calc .rig-slot.is-filled .rig-slot-input {
+  border-color: rgba(var(--accent-rgb),0.28) !important;
+  font-weight: 600;
+}
+body.page-calc .rig-slot-clear {
+  flex-shrink: 0;
+  width: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-mute);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+body.page-calc .rig-slot-clear:hover { color: var(--red-400); background: rgba(221,107,100,0.14); }
+body.page-calc .rig-slot:not(.is-filled) .rig-slot-clear { display: none; }
+body.page-calc .rig-slot-hint {
+  margin-top: 7px;
+  font-size: 10px;
+  color: var(--text-mute);
+}
