@@ -9,7 +9,7 @@
 <title>EVE LP Store Calculator</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8ff4d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='5'/%3E%3Cpath d='M8.5 12.5L7 21l5-3 5 3-1.5-8.5'/%3E%3C/svg%3E">
 <link class="cache-bust" rel="stylesheet" href="css/tailwind-build.css?v=1.0.7">
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.67.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.68.0">
 <script>(function(){try{var t=localStorage.getItem('eve_color_theme');if(t&&t!=='lime')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
@@ -114,12 +114,16 @@
         <div class="flyout-panel-body">
 
           <div id="flyout-pricing" class="flyout-section">
-            <div class="fo-group">
-              <label class="lp-label fo-group-label" for="input-price-mode">Material Pricing (isolated tree)</label>
-              <select id="input-price-mode" onchange="if(typeof recalculate==='function') recalculate();" class="field-line w-full font-bold text-xs">
-                <option value="sell" selected>Sell (Instant)</option>
-                <option value="buy">Buy Order</option>
-              </select>
+            <div class="fo-card">
+              <div class="fo-card-title">Pricing Basis</div>
+              <div class="fo-row">
+                <span class="fo-row-label">Material cost</span>
+                <select id="input-price-mode" onchange="if(typeof recalculate==='function') recalculate();" class="field-line fo-row-select" title="Whether component material prices use the instant sell price or the (cheaper, slower) buy-order price.">
+                  <option value="sell" selected>Sell (Instant)</option>
+                  <option value="buy">Buy Order</option>
+                </select>
+              </div>
+              <div class="fo-card-note">Applies to the isolated build tree for the offer you've drilled into.</div>
             </div>
           </div>
 
@@ -129,102 +133,120 @@
                tab already doubles as the SAME field these functions read/write (both persist to
                eve_tax_settings). -->
           <div id="flyout-station" class="flyout-section">
-            <div class="fo-group">
-              <label class="lp-label fo-group-label" for="production-preset-select">Production Preset</label>
-              <div class="lp-inset space-y-1.5">
-                <div class="flex items-center gap-1.5">
-                  <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="field-line flex-1 min-w-0 font-bold text-xs">
-                    <option value="">— Load a saved production station —</option>
-                  </select>
-                  <button onclick="deleteProductionPreset()" class="toggle-btn" title="Delete the currently-selected preset">
-                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-                  </button>
-                </div>
-                <button onclick="saveProductionPreset()" class="btn-glass w-full py-1.5 text-xs flex items-center justify-center gap-1.5" title="Saves your current system, structure type, rig fitting, and facility tax as a named preset you can switch back to instantly">
-                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
-                  Save Current as Preset
+            <div class="fo-card">
+              <div class="fo-card-title">Structure</div>
+              <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); if(typeof recalculate==='function') recalculate();" class="field-line w-full text-white font-semibold text-xs" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
+                <option value="npc">NPC Station</option>
+                <option value="raitaru">Raitaru — M Engineering Complex</option>
+                <option value="azbel">Azbel — L Engineering Complex</option>
+                <option value="sotiyo" selected>Sotiyo — XL Engineering Complex</option>
+                <option value="athanor">Athanor — M Refinery</option>
+                <option value="tatara">Tatara — L Refinery</option>
+              </select>
+              <div id="structure-bonuses" class="struct-bonus-row"></div>
+              <div class="fo-row">
+                <span class="fo-row-label">Active</span>
+                <span id="lpstore-active-station-label" class="fo-row-value">—</span>
+              </div>
+              <div class="fo-card-note">System &amp; rig fitting follow whatever's active on the Calculator — loading a preset that saved them applies them here too.</div>
+            </div>
+
+            <div class="fo-card">
+              <div class="fo-card-title">Production Preset</div>
+              <div class="flex items-center gap-1.5">
+                <select id="production-preset-select" onchange="loadProductionPreset(this.value)" class="field-line flex-1 min-w-0 font-bold text-xs">
+                  <option value="">— Load a saved production station —</option>
+                </select>
+                <button onclick="deleteProductionPreset()" class="toggle-btn" title="Delete the currently-selected preset">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
                 </button>
               </div>
-            </div>
-            <div class="fo-group">
-              <label class="lp-label fo-group-label" for="facility-select">Structure</label>
-              <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); if(typeof recalculate==='function') recalculate();" class="field-line w-full text-white font-semibold text-xs" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
-                <option value="npc">NPC Station (0% ME / 0% TE / 0% Fee)</option>
-                <option value="raitaru">Raitaru - M EC (1% ME / 15% TE / 3% Fee)</option>
-                <option value="azbel">Azbel - L EC (1% ME / 20% TE / 4% Fee)</option>
-                <option value="sotiyo" selected>Sotiyo - XL EC (1% ME / 30% TE / 5% Fee)</option>
-                <option value="athanor">Athanor - M Refinery (0% ME / 20% TE / 3% Fee)</option>
-                <option value="tatara">Tatara - L Refinery (0% ME / 30% TE / 5% Fee)</option>
-              </select>
-              <div class="text-[10px] mono mt-1.5" style="color:var(--text-mute);">Currently: <span id="lpstore-active-station-label" style="color:var(--accent); font-weight:bold;">—</span></div>
-              <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--text-mute);">System and rig fitting still follow whatever's active from the Calculator (no search box for those here yet) - loading a preset that has them saved applies them correctly regardless.</p>
+              <button onclick="saveProductionPreset()" class="btn-glass w-full py-1.5 text-xs flex items-center justify-center gap-1.5" title="Saves your current system, structure type, rig fitting, and facility tax as a named preset you can switch back to instantly">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
+                Save Current as Preset
+              </button>
             </div>
           </div>
 
           <!-- Build Optimizers - same Actions/Auto-Build/Smart Optimizer controls as the Calculator's
                own Build flyout (js/optimizers.js), operating on whatever's currently isolated. -->
           <div id="flyout-build" class="flyout-section">
-            <div class="fo-group">
-              <label class="lp-label fo-group-label">Actions (isolated tree)</label>
-              <div class="grid grid-cols-2 gap-1.5">
+            <div class="fo-card">
+              <div class="fo-card-title">Bulk Actions</div>
+              <div class="fo-btn-row">
                 <button onclick="buildAllComponents()" class="btn-glass py-2 px-3 text-xs">Build All</button>
                 <button onclick="buyAllSubComponents()" class="btn-glass btn-glass-muted py-2 px-3 text-xs">Buy All</button>
               </div>
+              <div class="fo-card-note">Acts on the isolated build tree for the current offer.</div>
             </div>
-            <div class="fo-group">
-              <label class="lp-label fo-group-label" for="build-profit-threshold">Auto-Build Threshold</label>
-              <div class="lp-inset flex items-center gap-1.5" title="Build Margin Threshold">
-                <span class="fo-inline-label">Min Profit</span>
-                <input type="text" inputmode="decimal" id="build-profit-threshold" value="5.0" oninput="sanitizeDecimalInput(event)" class="field-line w-14 text-center font-bold p-1 text-xs">
-                <span class="fo-inline-suffix">%</span>
-                <button onclick="applyBuildProfitOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] mono flex-shrink-0">Optimize</button>
+
+            <div class="fo-card">
+              <div class="fo-card-title">Auto-Build by Margin</div>
+              <div class="fo-card-note">Switch every component whose own build margin beats this to Build.</div>
+              <div class="fo-row">
+                <span class="fo-row-label">Min profit</span>
+                <div class="fo-row-ctl">
+                  <input type="text" inputmode="decimal" id="build-profit-threshold" value="5.0" oninput="sanitizeDecimalInput(event)" class="fo-num">
+                  <span class="fo-num-suffix">%</span>
+                  <button onclick="applyBuildProfitOptimizer()" class="fo-mini-btn">Optimize</button>
+                </div>
               </div>
             </div>
-            <div class="fo-group">
-              <label class="lp-label fo-group-label">Smart Optimizers</label>
-              <div class="space-y-1.5">
-                <div class="lp-inset flex items-center gap-1.5" title="Component Market Spread Threshold">
-                  <span class="fo-inline-label">Spread</span>
-                  <input type="text" inputmode="decimal" id="buy-savings-threshold" value="5.0" oninput="sanitizeDecimalInput(event)" class="field-line w-14 text-center font-bold p-1 text-xs">
-                  <span class="fo-inline-suffix">%</span>
-                  <button onclick="applyComponentSpreadOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] flex-shrink-0">Optimize</button>
+
+            <div class="fo-card">
+              <div class="fo-card-title">Smart Optimizers</div>
+              <div class="fo-row" title="Switch a component to Buy when its cheapest tracked market beats building it by at least this margin.">
+                <span class="fo-row-label">Market spread</span>
+                <div class="fo-row-ctl">
+                  <input type="text" inputmode="decimal" id="buy-savings-threshold" value="5.0" oninput="sanitizeDecimalInput(event)" class="fo-num">
+                  <span class="fo-num-suffix">%</span>
+                  <button onclick="applyComponentSpreadOptimizer()" class="fo-mini-btn">Optimize</button>
                 </div>
-                <div class="lp-inset flex items-center gap-1.5" title="Build Cost Savings Impact Threshold">
-                  <span class="fo-inline-label">Budget</span>
-                  <input type="text" inputmode="decimal" id="total-cost-savings-threshold" value="1.0" oninput="sanitizeDecimalInput(event)" class="field-line w-14 text-center font-bold p-1 text-xs">
-                  <span class="fo-inline-suffix">%</span>
-                  <button onclick="applyBudgetImpactOptimizer()" class="btn-glass ml-auto py-1 px-2 text-[10px] flex-shrink-0">Optimize</button>
-                </div>
-                <button onclick="resetSmartBuyModes()" class="btn-glass btn-glass-muted w-full py-1.5 text-[11px] mono">Reset Buy Modes</button>
               </div>
+              <div class="fo-row" title="Only act on a Buy switch when it moves the total build cost by at least this much.">
+                <span class="fo-row-label">Budget impact</span>
+                <div class="fo-row-ctl">
+                  <input type="text" inputmode="decimal" id="total-cost-savings-threshold" value="1.0" oninput="sanitizeDecimalInput(event)" class="fo-num">
+                  <span class="fo-num-suffix">%</span>
+                  <button onclick="applyBudgetImpactOptimizer()" class="fo-mini-btn">Optimize</button>
+                </div>
+              </div>
+              <button onclick="resetSmartBuyModes()" class="btn-glass btn-glass-muted w-full py-1.5 text-[11px] mono">Reset Buy Modes</button>
             </div>
           </div>
 
-          <!-- Same .fo-group/.lp-inset/.fo-inline-* Taxes & Fees block as index.html/invention.html -
-               shared via the eve_tax_settings localStorage key, editing here updates it everywhere. -->
+          <!-- Taxes & Fees - shared with the main calculator via the eve_tax_settings localStorage
+               key, editing here updates it everywhere. -->
           <div id="flyout-fees" class="flyout-section">
-            <div class="fo-group">
-              <label class="lp-label fo-group-label" title="Shared with the main calculator - editing here updates it there too.">Market Orders</label>
-              <div class="grid grid-cols-2 gap-1.5 text-[11px] mono">
-                <div class="lp-inset flex items-center gap-1.5" title="Facility/structure tax applied to every manufacturing job's installation cost.">
-                  <span class="fo-inline-label">Fac</span>
-                  <input type="text" inputmode="decimal" id="facility-tax" value="1.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettingsFromLPStore();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
-                  <span class="fo-inline-suffix">%</span>
+            <div class="fo-card">
+              <div class="fo-card-title">Market Orders</div>
+              <div class="fo-card-note">Shared with the Calculator — editing here updates it there too.</div>
+              <div class="fo-row" title="Facility/structure tax applied to every manufacturing job's installation cost.">
+                <span class="fo-row-label">Facility tax</span>
+                <div class="fo-row-ctl">
+                  <input type="text" inputmode="decimal" id="facility-tax" value="1.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettingsFromLPStore();" class="fo-num">
+                  <span class="fo-num-suffix">%</span>
                 </div>
-                <div class="lp-inset flex items-center gap-1.5" title="SCC surcharge applied to every manufacturing job's installation cost.">
-                  <span class="fo-inline-label">SCC</span>
-                  <input type="text" inputmode="decimal" id="scc-surcharge" value="4.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettingsFromLPStore();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
-                  <span class="fo-inline-suffix">%</span>
+              </div>
+              <div class="fo-row" title="SCC surcharge applied to every manufacturing job's installation cost.">
+                <span class="fo-row-label">SCC surcharge</span>
+                <div class="fo-row-ctl">
+                  <input type="text" inputmode="decimal" id="scc-surcharge" value="4.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettingsFromLPStore();" class="fo-num">
+                  <span class="fo-num-suffix">%</span>
                 </div>
-                <div class="lp-inset flex items-center gap-1.5" title="Sales tax deducted when selling the item/manufactured output.">
-                  <span class="fo-inline-label">Sales</span>
-                  <input type="text" inputmode="decimal" id="sales-tax" value="3.6" oninput="sanitizeDecimalInput(event); saveSharedTaxSettingsFromLPStore();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
-                  <span class="fo-inline-suffix">%</span>
+              </div>
+              <div class="fo-row" title="Sales tax deducted when selling the item / manufactured output.">
+                <span class="fo-row-label">Sales tax</span>
+                <div class="fo-row-ctl">
+                  <input type="text" inputmode="decimal" id="sales-tax" value="3.6" oninput="sanitizeDecimalInput(event); saveSharedTaxSettingsFromLPStore();" class="fo-num">
+                  <span class="fo-num-suffix">%</span>
                 </div>
-                <div class="lp-inset flex items-center gap-1.5" title="Broker fee, applied when selling AND when buying materials/required items via market orders.">
-                  <span class="fo-inline-label">Broker</span>
-                  <input type="text" inputmode="decimal" id="broker-fee" value="1.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettingsFromLPStore();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
-                  <span class="fo-inline-suffix">%</span>
+              </div>
+              <div class="fo-row" title="Broker fee, applied when selling AND when buying materials / required items via market orders.">
+                <span class="fo-row-label">Broker fee</span>
+                <div class="fo-row-ctl">
+                  <input type="text" inputmode="decimal" id="broker-fee" value="1.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettingsFromLPStore();" class="fo-num">
+                  <span class="fo-num-suffix">%</span>
                 </div>
               </div>
             </div>
