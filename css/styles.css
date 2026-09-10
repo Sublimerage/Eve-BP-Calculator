@@ -1,11 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
-/* Readability fix for high-DPI/4K displays: Tailwind's default text-* utility classes (text-xs,
-   text-sm, text-base, etc.) are rem-based, so scaling the root font-size scales all of them
-   proportionally in one place. Does NOT affect classes using literal pixel values like
-   text-[10px] - those are intentionally absolute and stay fixed size. */
+/* Fluid root font-size. Almost every size in this app is rem-based (Tailwind's text-*, p-*, gap-*,
+   space-y-*, w-*, m-* utilities all are), so this one value is the master density control for the
+   whole UI - shrink it and every panel, gap and label shrinks proportionally.
+
+   It used to be a flat 118%, which was tuned for a big 4K canvas and left 1080p / laptop screens
+   badly cramped (e.g. the rem-based BOM sidebar rendered ~453px wide instead of 384px). Now it
+   scales with the window width instead:
+       ~1920px viewport  -> ~100%   (1080p: no inflation, everything breathes)
+       ~3072px viewport  -> ~118%   (4K at 125% OS scaling: unchanged from before)
+       wider             -> up to ~131%, then capped
+   The `rem + vw` form (not pure vw) keeps browser zoom working. Literal-pixel classes like
+   text-[10px] are unaffected by design - they stay fixed. Clamped 15px..21px at the extremes. */
 html {
-  font-size: 118%;
+  font-size: clamp(0.9375rem, 0.7rem + 0.25vw, 1.3125rem);
 }
 
 /* ============================================================
@@ -120,8 +128,11 @@ body {
   font-family: 'Inter', sans-serif;
   height: 100vh;
   box-sizing: border-box;
-  padding: 28px;
-  gap: 12px;
+  /* Outer canvas inset + gaps between the floating panels - fluid for the same reason as the root
+     font above. Near-unchanged (~27px / 12px) on a wide 4K canvas, tightened to ~17px / 8px at
+     1080p so the middle viewport keeps its width. */
+  padding: clamp(16px, 0.9vw, 28px);
+  gap: clamp(8px, 0.4vw, 12px);
   user-select: none;
   -webkit-user-select: none;
   -webkit-font-smoothing: antialiased;
