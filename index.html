@@ -10,7 +10,7 @@
 <title>EVE Deep-Industry Engine</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d3915a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='5' r='2.6'/%3E%3Ccircle cx='6' cy='18.5' r='2.6'/%3E%3Ccircle cx='12' cy='18.5' r='2.6'/%3E%3Ccircle cx='18' cy='18.5' r='2.6'/%3E%3Cpath d='M12 7.6v2.6M12 10.2L6 15.9M12 10.2v5.7M12 10.2l6 5.7'/%3E%3C/svg%3E">
 <link class="cache-bust" rel="stylesheet" href="css/tailwind-build.css?v=1.0.7">
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.64.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.65.0">
 <script>(function(){try{var t=localStorage.getItem('eve_color_theme');if(t&&t!=='lime')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body class="page-calc flex flex-col min-h-screen text-slate-200">
@@ -251,25 +251,58 @@
                 </button>
               </div>
             </div>
+
             <div class="fo-group">
               <label class="lp-label fo-group-label" for="system-search">System</label>
               <div class="relative">
-                <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="System..."
+                <input type="text" id="system-search" value="JITA" autocomplete="off" placeholder="Search a solar system..."
                   class="field-line w-full font-bold mono uppercase text-sm">
                 <div id="system-results" class="fixed bg-black/25 border border-orange-500 max-h-52 overflow-y-auto hidden z-50 shadow-2xl"></div>
               </div>
+
+              <!-- System dossier: security band, region, and the industry cost indices that actually
+                   drive job installation fees. Populated by fetchSystemSCIById() in js/esi.js. -->
+              <div id="system-readout" class="sys-readout mt-2">
+                <div class="sys-readout-head">
+                  <span id="sysinfo-name" class="sys-readout-name">JITA</span>
+                  <span id="sysinfo-sec" class="sys-sec-pill">—</span>
+                </div>
+                <div id="sysinfo-region" class="sys-readout-region">Resolving region…</div>
+                <div class="sys-ci-primary" title="Manufacturing system cost index - the system-driven component of every manufacturing job's installation fee. Rises the more industry runs in this system.">
+                  <span class="sys-ci-label">Manufacturing Index</span>
+                  <span id="sysinfo-sci-mfg" class="sys-ci-value">—</span>
+                </div>
+                <div class="sys-ci-secondary">
+                  <div class="sys-ci-sub" title="Reaction system cost index.">
+                    <span class="sys-ci-label">Reaction</span>
+                    <span id="sysinfo-sci-react" class="sys-ci-value">—</span>
+                  </div>
+                  <div class="sys-ci-sub" title="Invention system cost index.">
+                    <span class="sys-ci-label">Invention</span>
+                    <span id="sysinfo-sci-inv" class="sys-ci-value">—</span>
+                  </div>
+                </div>
+                <div class="sys-readout-foot">
+                  <span id="sysinfo-eiv" class="sys-eiv is-loading" title="Estimated Item Value (ESI adjusted prices) feeds the job installation fee. If this is offline, job fees fall back to zero and profit is overstated.">
+                    <span class="sys-eiv-dot"></span><span id="sysinfo-eiv-text">EIV loading</span>
+                  </span>
+                  <span id="sysinfo-rigmult" class="sys-rigmult" title="Structure rig bonuses are multiplied by this factor based on the system's security: x1.0 highsec, x1.9 lowsec, x2.1 null/wormhole.">Rig ×1.0</span>
+                </div>
+              </div>
             </div>
+
             <div class="fo-group">
               <label class="lp-label fo-group-label" for="facility-select">Structure</label>
               <div class="space-y-1.5">
                 <select id="facility-select" onchange="onStructureTypeChange(); saveTaxSettings(); recalculate();" class="field-line w-full text-white font-semibold text-xs" title="A structure is one thing at a time - this single selection drives ME, TE, AND job-fee bonuses together.">
-                  <option value="npc">NPC Station (0% ME / 0% TE / 0% Fee)</option>
-                  <option value="raitaru">Raitaru - M EC (1% ME / 15% TE / 3% Fee)</option>
-                  <option value="azbel">Azbel - L EC (1% ME / 20% TE / 4% Fee)</option>
-                  <option value="sotiyo" selected>Sotiyo - XL EC (1% ME / 30% TE / 5% Fee)</option>
-                  <option value="athanor">Athanor - M Refinery (0% ME / 20% TE / 3% Fee)</option>
-                  <option value="tatara">Tatara - L Refinery (0% ME / 30% TE / 5% Fee)</option>
+                  <option value="npc">NPC Station</option>
+                  <option value="raitaru">Raitaru — M Engineering Complex</option>
+                  <option value="azbel">Azbel — L Engineering Complex</option>
+                  <option value="sotiyo" selected>Sotiyo — XL Engineering Complex</option>
+                  <option value="athanor">Athanor — M Refinery</option>
+                  <option value="tatara">Tatara — L Refinery</option>
                 </select>
+                <div id="structure-bonuses" class="struct-bonus-row"></div>
                 <div class="lp-inset flex items-center gap-1.5" title="Facility Structure Tax % - set by whoever owns the structure, so it varies station to station independent of the structure's tier. Lives here (not in Taxes & Fees) so it saves and loads together with the rest of this production preset.">
                   <span class="fo-inline-label">Job Tax</span>
                   <input type="text" inputmode="decimal" id="facility-tax" value="1.0" oninput="sanitizeDecimalInput(event); saveTaxSettings(); recalculate();" class="field-line w-full text-center font-bold p-1 text-[11px]">
@@ -277,33 +310,48 @@
                 </div>
               </div>
             </div>
+
             <div class="fo-group" title="Search and select the actual rigs fitted in your structure (Engineering Complexes and Refineries both have 3 rig slots). Rigs only affect the specific item category and ship size they're built for. Bonus strength scales with your system's security status automatically.">
-              <label class="lp-label fo-group-label">Rig Slots (search to fit)</label>
-              <div class="space-y-1.5">
-                <div class="relative">
-                  <input type="text" id="rig-slot-1-input" placeholder="Rig Slot 1: None" autocomplete="off"
-                    oninput="searchRigSlot(1, this.value)" onfocus="searchRigSlot(1, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-1-results'); if (el) el.classList.add('hidden'); }, 200)"
-                    class="field-line w-full font-semibold text-[11px]">
-                  <div id="rig-slot-1-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+              <label class="lp-label fo-group-label">Rig Slots</label>
+              <div class="rig-slot-list">
+                <div class="rig-slot" data-slot="1">
+                  <span class="rig-slot-num">1</span>
+                  <div class="rig-slot-main">
+                    <input type="text" id="rig-slot-1-input" placeholder="Search to fit a rig…" autocomplete="off"
+                      oninput="searchRigSlot(1, this.value)" onfocus="searchRigSlot(1, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-1-results'); if (el) el.classList.add('hidden'); }, 200)"
+                      class="rig-slot-input">
+                    <div id="rig-slot-1-results" class="absolute top-full left-0 right-0 border max-h-48 overflow-y-auto hidden shadow-2xl text-[10px]"></div>
+                  </div>
+                  <button type="button" class="rig-slot-clear" onclick="selectRigForSlot(1, 0, '')" title="Clear rig slot 1" aria-label="Clear rig slot 1">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="width:11px;height:11px;"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+                  </button>
                 </div>
-                <div class="relative">
-                  <input type="text" id="rig-slot-2-input" placeholder="Rig Slot 2: None" autocomplete="off"
-                    oninput="searchRigSlot(2, this.value)" onfocus="searchRigSlot(2, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-2-results'); if (el) el.classList.add('hidden'); }, 200)"
-                    class="field-line w-full font-semibold text-[11px]">
-                  <div id="rig-slot-2-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+                <div class="rig-slot" data-slot="2">
+                  <span class="rig-slot-num">2</span>
+                  <div class="rig-slot-main">
+                    <input type="text" id="rig-slot-2-input" placeholder="Search to fit a rig…" autocomplete="off"
+                      oninput="searchRigSlot(2, this.value)" onfocus="searchRigSlot(2, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-2-results'); if (el) el.classList.add('hidden'); }, 200)"
+                      class="rig-slot-input">
+                    <div id="rig-slot-2-results" class="absolute top-full left-0 right-0 border max-h-48 overflow-y-auto hidden shadow-2xl text-[10px]"></div>
+                  </div>
+                  <button type="button" class="rig-slot-clear" onclick="selectRigForSlot(2, 0, '')" title="Clear rig slot 2" aria-label="Clear rig slot 2">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="width:11px;height:11px;"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+                  </button>
                 </div>
-                <div class="relative">
-                  <input type="text" id="rig-slot-3-input" placeholder="Rig Slot 3: None" autocomplete="off"
-                    oninput="searchRigSlot(3, this.value)" onfocus="searchRigSlot(3, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-3-results'); if (el) el.classList.add('hidden'); }, 200)"
-                    class="field-line w-full font-semibold text-[11px]">
-                  <div id="rig-slot-3-results" class="absolute top-full left-0 right-0 bg-black/25 border border-orange-500 max-h-48 overflow-y-auto hidden z-50 shadow-2xl text-[10px]"></div>
+                <div class="rig-slot" data-slot="3">
+                  <span class="rig-slot-num">3</span>
+                  <div class="rig-slot-main">
+                    <input type="text" id="rig-slot-3-input" placeholder="Search to fit a rig…" autocomplete="off"
+                      oninput="searchRigSlot(3, this.value)" onfocus="searchRigSlot(3, this.value)" onblur="setTimeout(() => { const el = document.getElementById('rig-slot-3-results'); if (el) el.classList.add('hidden'); }, 200)"
+                      class="rig-slot-input">
+                    <div id="rig-slot-3-results" class="absolute top-full left-0 right-0 border max-h-48 overflow-y-auto hidden shadow-2xl text-[10px]"></div>
+                  </div>
+                  <button type="button" class="rig-slot-clear" onclick="selectRigForSlot(3, 0, '')" title="Clear rig slot 3" aria-label="Clear rig slot 3">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="width:11px;height:11px;"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+                  </button>
                 </div>
               </div>
-            </div>
-            <div class="lp-inset space-y-1 text-[10px] mono">
-              <div class="flex justify-between gap-2"><span class="fo-inline-label">SCI:</span><span id="sci-badge" class="font-bold text-right truncate" style="color:var(--text);">SCI: 4.25% (Mfg) / 1.10% (React)</span></div>
-              <div class="flex justify-between gap-2"><span class="fo-inline-label">Stock:</span><span id="stock-status-text" class="font-bold text-right truncate" style="color:var(--text);"><span id="stock-count-display">0 items</span> in Stock</span></div>
-              <div class="flex justify-between gap-2"><span class="fo-inline-label">EIV:</span><span id="eiv-status-text" class="font-bold text-right truncate" style="color:var(--text);">Fetching...</span></div>
+              <div class="rig-slot-hint">Each rig only affects the item category &amp; ship size named in its own name.</div>
             </div>
           </div>
 
@@ -647,10 +695,10 @@
        they execute in this exact order once parsing completes - same behavior, faster to get there. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
   <script src="js/config.js?v=15.8.22" defer></script>
-  <script src="js/esi.js?v=15.8.19" defer></script>
+  <script src="js/esi.js?v=15.8.20" defer></script>
   <script src="js/tree.js?v=15.1.2" defer></script>
   <script src="js/optimizers.js?v=15.4.3" defer></script>
-  <script src="js/app.js?v=15.41.0" defer></script>
+  <script src="js/app.js?v=15.42.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
