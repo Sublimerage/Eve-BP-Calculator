@@ -526,8 +526,13 @@ svg[viewBox] { stroke: currentColor; }
   position: absolute;
   left: 88px;
   top: 12px;
-  max-height: min(640px, calc(100vh - 140px));
-  width: 340px;
+  /* Was capped at 640px, which forced the (now taller) System & Structure section to scroll inside
+     the panel on every screen. The panel top sits ~211px below the viewport top (header + stat
+     strip); no hard cap now, so on a normal-height screen every section fits without an inner
+     scrollbar. Very short screens (<800px tall) can still scroll the Structure section - that's the
+     one section that can't be shortened further without dropping information. */
+  max-height: calc(100vh - 210px);
+  width: 344px;
   border-radius: var(--radius-panel);
   z-index: 100;
   padding: 14px 16px;
@@ -578,7 +583,7 @@ svg[viewBox] { stroke: currentColor; }
 /* One shared vocabulary for every field group across all five sections, replacing what used to be
    a different one-off spacing/label pattern per flyout (uppercase tracked-wide divs in Structure/
    Markets, plain unlabeled rows in Pricing, bold colored spans in Taxes/Contract). */
-.fo-group + .fo-group { margin-top: 14px; }
+.fo-group + .fo-group { margin-top: 12px; }
 .fo-group-label { display: block; margin-bottom: 6px; }
 .fo-inline-label { color: var(--text-soft); flex-shrink: 0; }
 .fo-inline-suffix { color: var(--text-mute); flex-shrink: 0; }
@@ -2086,10 +2091,10 @@ body.page-calc .sys-readout {
   background: rgba(0,0,0,0.22);
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: var(--radius-btn);
-  padding: 11px 12px 10px;
+  padding: 8px 9px;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 6px;
 }
 body.page-calc .sys-readout-head {
   display: flex;
@@ -2136,7 +2141,7 @@ body.page-calc .sys-ci-primary {
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 7px 9px;
   border-radius: var(--radius-sm);
   background: rgba(var(--accent-rgb),0.10);
 }
@@ -2163,7 +2168,7 @@ body.page-calc .sys-ci-sub {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 6px 9px;
+  padding: 5px 8px;
   border-radius: var(--radius-sm);
   background: rgba(255,255,255,0.035);
 }
@@ -2185,7 +2190,7 @@ body.page-calc .sys-readout-foot {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding-top: 8px;
+  padding-top: 6px;
   border-top: 1px solid rgba(255,255,255,0.06);
   font-size: 10px;
   color: var(--text-mute);
@@ -2236,12 +2241,12 @@ body.page-calc .struct-chip.is-off { opacity: 0.45; }
 body.page-calc .rig-slot-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 body.page-calc .rig-slot {
   display: flex;
   align-items: stretch;
-  gap: 7px;
+  gap: 6px;
 }
 body.page-calc .rig-slot-num {
   flex-shrink: 0;
@@ -2265,19 +2270,26 @@ body.page-calc .rig-slot-main {
   min-width: 0;
   position: relative;
 }
-body.page-calc .rig-slot-input {
+/* Shared bordered text input - rig slots, the system search, and the market search boxes all use
+   this so every free-text field in the flyout looks the same (a real box at rest, not .field-line's
+   invisible-until-focus underline). */
+body.page-calc .rig-slot-input,
+body.page-calc .fo-input {
   width: 100%;
   background: rgba(255,255,255,0.035) !important;
   border: 1px solid rgba(255,255,255,0.07) !important;
   border-radius: var(--radius-sm) !important;
-  padding: 7px 9px !important;
+  padding: 6px 9px !important;
   font-size: 11px;
-  color: var(--text);
+  color: var(--text) !important;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
-body.page-calc .rig-slot-input::placeholder { color: var(--text-mute); }
-body.page-calc .rig-slot-input:hover { background: rgba(255,255,255,0.055) !important; }
-body.page-calc .rig-slot-input:focus {
+body.page-calc .rig-slot-input::placeholder,
+body.page-calc .fo-input::placeholder { color: var(--text-mute); }
+body.page-calc .rig-slot-input:hover,
+body.page-calc .fo-input:hover { background: rgba(255,255,255,0.055) !important; }
+body.page-calc .rig-slot-input:focus,
+body.page-calc .fo-input:focus {
   outline: none;
   border-color: rgba(var(--accent-rgb),0.55) !important;
   background: rgba(255,255,255,0.06) !important;
@@ -2300,8 +2312,110 @@ body.page-calc .rig-slot-clear {
 }
 body.page-calc .rig-slot-clear:hover { color: var(--red-400); background: rgba(221,107,100,0.14); }
 body.page-calc .rig-slot:not(.is-filled) .rig-slot-clear { display: none; }
-body.page-calc .rig-slot-hint {
-  margin-top: 7px;
+
+/* ============================================================
+   Shared flyout-section vocabulary. Every section (Pricing / Build / Structure / Fees / Markets)
+   is now built from the same two primitives the redesigned Structure section introduced, so moving
+   between the icon-rail tabs shows one consistent language instead of five near-identical ones:
+     .fo-card  - a titled sub-panel grouping one topic's controls.
+     .fo-row   - a single labelled control line: label on the left, control(s) right-aligned.
+   ============================================================ */
+body.page-calc .fo-card {
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--radius-btn);
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+body.page-calc .fo-card + .fo-card { margin-top: 8px; }
+body.page-calc .fo-card-title {
   font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
   color: var(--text-mute);
+}
+body.page-calc .fo-card-note {
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--text-mute);
+  margin-top: -2px;
+}
+body.page-calc .fo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 26px;
+}
+body.page-calc .fo-row-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-soft);
+  flex-shrink: 0;
+}
+body.page-calc .fo-row-ctl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Compact right-aligned numeric field (the tax / threshold %s). Its own box, not .field-line's
+   invisible-until-focus underline - a settings value the user edits should look editable at rest. */
+body.page-calc .fo-num {
+  width: 4.2em;
+  text-align: right;
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 5px 7px !important;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text) !important;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+body.page-calc .fo-num:focus {
+  outline: none;
+  border-color: rgba(var(--accent-rgb),0.55) !important;
+  background: rgba(255,255,255,0.06) !important;
+}
+body.page-calc .fo-num-suffix { font-size: 11px; color: var(--text-mute); }
+
+/* Select that sits on the right of a .fo-row - sizes to its content instead of filling the row.
+   The class rides onto js/custom-select.js's .csel-trigger too (it copies the <select>'s className),
+   so both the hidden native control and the visible trigger pick this up. */
+body.page-calc .fo-row select.fo-row-select,
+body.page-calc .csel-trigger.fo-row-select {
+  width: auto !important;
+  min-width: 132px;
+  max-width: 190px;
+  font-size: 12px;
+}
+
+/* Small inline action (the optimizer "Optimize" buttons) - lighter than .btn-glass, reads as a
+   secondary action attached to the field beside it. */
+body.page-calc .fo-mini-btn {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(var(--accent-rgb),0.14);
+  color: var(--accent);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+body.page-calc .fo-mini-btn:hover { background: rgba(var(--accent-rgb),0.24); }
+
+/* Row of equal-width primary buttons (Build All / Buy All). */
+body.page-calc .fo-btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
