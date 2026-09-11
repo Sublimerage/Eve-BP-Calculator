@@ -32,6 +32,7 @@
 
 const INVENTION_QUEUE_KEY = 'eve_invention_queue_v1';
 const INVENTION_VIEW_MODE_KEY = 'eve_invention_view_mode';
+const INVENTION_COLLAPSED_GROUPS_KEY = 'eve_invention_collapsed_groups';
 
 function loadInventionQueue() {
   return window.safeParseJSON(localStorage.getItem(INVENTION_QUEUE_KEY), []);
@@ -39,6 +40,17 @@ function loadInventionQueue() {
 function saveInventionQueue(queue) {
   localStorage.setItem(INVENTION_QUEUE_KEY, JSON.stringify(queue));
 }
+
+// Which Started/Queued groups are collapsed - same Set-in-localStorage pattern js/ledger.js's own
+// In Progress/Pending group headers use (collapsedJobGroups).
+let inventionCollapsedGroups = new Set(window.safeParseJSON(localStorage.getItem(INVENTION_COLLAPSED_GROUPS_KEY), []));
+function toggleInventionGroupCollapse(groupKey) {
+  if (inventionCollapsedGroups.has(groupKey)) inventionCollapsedGroups.delete(groupKey);
+  else inventionCollapsedGroups.add(groupKey);
+  localStorage.setItem(INVENTION_COLLAPSED_GROUPS_KEY, JSON.stringify([...inventionCollapsedGroups]));
+  renderInventionQueue();
+}
+window.toggleInventionGroupCollapse = toggleInventionGroupCollapse;
 
 function inventionBatchRunsDone(batch) {
   return batch.attempts.reduce((sum, a) => sum + (a.runs || 1), 0);
@@ -428,7 +440,7 @@ function renderInventionQueueBatchCard(batch) {
           <img src="https://images.evetech.net/types/${batch.t2ProductTypeId || batch.t2BlueprintTypeId}/icon?size=64" alt="" class="w-10 h-10 rounded flex-shrink-0" loading="lazy" onerror="this.style.visibility='hidden'">
           <div class="min-w-0">
             <div class="font-bold truncate text-base" style="color:var(--text);">${window.esc(batch.t2ProductName)}${batch.autoImported ? ' <span class="text-xs font-normal" style="color:var(--text-mute);">(detected, not planned)</span>' : ''}</div>
-            <div class="text-xs mono truncate mt-0.5" style="color:var(--text-mute);">${window.esc(decLabel)} &middot; ${window.esc(resultLabel)}</div>
+            <div class="text-xs mono truncate mt-0.5"><span class="font-bold" style="color:var(--cost);" title="Decryptor used">${window.esc(decLabel)}</span> <span style="color:var(--text-mute);">&middot; ${window.esc(resultLabel)}</span></div>
           </div>
         </div>
         <div class="flex-shrink-0 text-right">${badgeHTML}${timerHTML}</div>
@@ -490,26 +502,28 @@ function renderInventionQueue() {
   const queuedBatches = sorted.filter(b => b.status === 'planned');
   let html = '';
   if (startedBatches.length > 0) {
+    const isCollapsed = inventionCollapsedGroups.has('started');
     html += `
       <div class="mb-2.5">
-        <div class="lp-group-header is-active mb-2.5">
-          <span class="flex-shrink-0" style="color:var(--accent);">${window.svgIcon('activity')}</span>
-          <span class="font-extrabold text-base rajdhani uppercase tracking-wider" style="color:var(--accent);">Started</span>
+        <div class="lp-group-header is-active mb-2.5 cursor-pointer select-none" onclick="toggleInventionGroupCollapse('started')">
+          <span class="flex-shrink-0" style="color:var(--accent);">${window.svgIcon(isCollapsed ? 'chevron-right' : 'chevron-down')}</span>
+          <span class="font-extrabold text-base rajdhani uppercase tracking-wider" style="color:var(--accent);">${window.svgIcon('activity')} Started</span>
           <span class="font-bold text-sm mono" style="color:var(--accent);">(${startedBatches.length})</span>
         </div>
-        <div class="space-y-2.5">${startedBatches.map(renderInventionQueueBatchCard).join('')}</div>
+        ${isCollapsed ? '' : `<div class="space-y-2.5">${startedBatches.map(renderInventionQueueBatchCard).join('')}</div>`}
       </div>
     `;
   }
   if (queuedBatches.length > 0) {
+    const isCollapsed = inventionCollapsedGroups.has('queued');
     html += `
       <div>
-        <div class="lp-group-header mb-2.5">
-          <span class="flex-shrink-0" style="color:var(--text-mute);">${window.svgIcon('hourglass')}</span>
-          <span class="font-extrabold text-base rajdhani uppercase tracking-wider" style="color:var(--text);">Queued</span>
+        <div class="lp-group-header mb-2.5 cursor-pointer select-none" onclick="toggleInventionGroupCollapse('queued')">
+          <span class="flex-shrink-0" style="color:var(--text-mute);">${window.svgIcon(isCollapsed ? 'chevron-right' : 'chevron-down')}</span>
+          <span class="font-extrabold text-base rajdhani uppercase tracking-wider" style="color:var(--text);">${window.svgIcon('hourglass')} Queued</span>
           <span class="font-bold text-sm mono" style="color:var(--text-mute);">(${queuedBatches.length})</span>
         </div>
-        <div class="space-y-2.5">${queuedBatches.map(renderInventionQueueBatchCard).join('')}</div>
+        ${isCollapsed ? '' : `<div class="space-y-2.5">${queuedBatches.map(renderInventionQueueBatchCard).join('')}</div>`}
       </div>
     `;
   }
