@@ -248,24 +248,49 @@
         <div class="lp-card p-4">
           <div class="flex items-center justify-between mb-2.5">
             <h2 class="text-sm font-bold uppercase tracking-wider rajdhani" style="color:var(--accent);">Invention Job Queue</h2>
-            <button id="btn-sync-invention-jobs" onclick="syncInventionQueueWithEve()" class="btn-glass btn-glass-muted px-2.5 py-1 text-[10px] flex items-center gap-1.5" title="Check your real in-game invention jobs (character and, if you have Factory Manager role, corp) and match them to your queued plans, or detect unplanned ones.">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;flex-shrink:0;"><path d="M21 12a9 9 0 11-2.2-5.9"/><polyline points="21,3 21,9 15,9"/></svg>
+            <button id="btn-sync-invention-jobs" onclick="syncInventionQueueWithEve()" class="btn-glass btn-glass-muted px-3 py-1.5 text-xs flex items-center gap-1.5" title="Check your real in-game invention jobs (character and, if you have Factory Manager role, corp) and match them to your queued plans, or detect unplanned ones.">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;flex-shrink:0;"><path d="M21 12a9 9 0 11-2.2-5.9"/><polyline points="21,3 21,9 15,9"/></svg>
               <span id="btn-sync-invention-jobs-label">Sync EVE Jobs</span>
             </button>
           </div>
           <div id="invention-queue-empty" class="text-sm italic hidden" style="color:var(--text-mute);">Nothing queued yet - go to Compare Decryptors and click Queue on a row.</div>
-          <div id="invention-queue-list" class="space-y-2"></div>
-        </div>
-        <div id="invention-queue-bom-card" class="lp-card p-4 hidden">
-          <div class="flex items-center justify-between mb-2">
-            <h2 class="text-sm font-bold uppercase tracking-wider rajdhani" style="color:var(--accent);">Bill of Materials - Remaining Queued Runs</h2>
-            <button id="invention-queue-bom-copy-btn" onclick="copyInventionQueueBom()" class="lp-chip-btn" title="Copy the full multibuy list for every planned/active batch's remaining runs"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy Multibuy</button>
-          </div>
-          <p class="text-[11px] mb-2" style="color:var(--text-mute);">Datacores + decryptors for every run still needed to reach each batch's target, respecting Deduct Stock on the left. Batches detected from unplanned real jobs (decryptor unknown) still contribute their datacores, just no decryptor line.</p>
-          <div id="invention-queue-bom" class="overflow-x-auto"></div>
+          <div id="invention-queue-list" class="space-y-2.5"></div>
         </div>
       </div>
     </main>
+
+    <!-- Right: Bill of Materials - same card/header/footer language and column position as the
+         Calculator's own #bom-sidebar (index.html) and the Ledger's Consolidated BOM, so all three
+         pages read as the same tool. Deliberately lighter than that widget though: it aggregates
+         across several independent queued batches rather than walking one build tree, so there's no
+         Order Type / Category filter (every line here is something you buy, always datacores or a
+         decryptor) and no click-to-focus-diagram (no diagram on this page). Stock & Location and
+         Material Pricing stay on the left (Stock & Pricing card) - this sidebar only ever displays
+         what those already-existing controls compute, same as it did inside the Queue view before. -->
+    <aside id="invention-bom-sidebar" class="lp-card w-80 md:w-96 flex flex-col overflow-hidden flex-shrink-0 m-4 ml-0 p-4">
+      <div class="lp-row flex justify-between items-center" style="padding-top:0; margin-top:0; border-top:none;">
+        <div class="min-w-0">
+          <h2 class="font-bold rajdhani tracking-wider text-sm uppercase truncate" style="color:var(--text);">Bill of Materials</h2>
+          <div class="text-[9px] mono truncate" style="color:var(--text-mute);">REMAINING QUEUED RUNS</div>
+        </div>
+        <button id="invention-queue-bom-copy-btn" onclick="copyInventionQueueBom()" class="btn-glass px-3.5 py-1.5 text-xs flex-shrink-0" title="Copy the full multibuy list for every planned/active batch's remaining runs">Copy Multibuy</button>
+      </div>
+
+      <div id="invention-queue-bom-empty" class="lp-row text-sm italic" style="color:var(--text-mute);">Nothing queued yet. Queue a decryptor from Compare Decryptors to see what to buy.</div>
+
+      <div id="invention-queue-bom" class="lp-row flex-1 min-h-0 overflow-y-auto space-y-2 text-xs" style="margin-bottom:0;"></div>
+
+      <div class="lp-row mono">
+        <div class="flex justify-between text-xs" style="color:var(--text-mute);">
+          <span>Unique Item Types:</span>
+          <span id="invention-bom-type-count" class="font-bold" style="color:var(--text);">0</span>
+        </div>
+        <div class="mt-2">
+          <div class="text-[10.5px] uppercase tracking-wide" style="color:var(--text-mute);">Grand Total</div>
+          <div id="invention-bom-total-isk" class="font-bold text-base" style="color:var(--cost);">0 ISK</div>
+        </div>
+      </div>
+    </aside>
   </div>
 
   <!-- defer lets the browser fetch all of these in parallel (eve_db.js is the big one) instead of
@@ -277,7 +302,7 @@
   <script src="js/tree.js?v=8.0.4" defer></script>
   <script src="js/optimizers.js?v=8.0.7" defer></script>
   <script src="js/invention.js?v=9.16.0" defer></script>
-  <script src="js/invention-queue.js?v=1.3.0" defer></script>
+  <script src="js/invention-queue.js?v=1.4.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
