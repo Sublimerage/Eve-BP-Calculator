@@ -146,6 +146,18 @@
           </div>
         </div>
 
+        <!-- The single biggest lever on this page - attempts needed, total cost, and profit all
+             scale directly from this number - so it gets the loudest visual treatment on the
+             sidebar (accent border + a genuinely large number), same "impossible to miss" idea
+             Stock & Pricing above already uses, not just another .fo-row like every other setting. -->
+        <div class="fo-card" style="border-left:2px solid var(--accent);" title="How many successful T2 BPCs you want to end up with. For each decryptor, the tool works out how many invention attempts that requires on average given its success chance, then totals the cost of all those attempts (successes AND failures) plus the manufacturing cost for your target BPCs.">
+          <div class="fo-card-title" style="color:var(--accent);">Target: T2 BPCs Wanted</div>
+          <div class="flex items-end gap-2 mt-1">
+            <input type="number" id="invention-target-bpcs" min="1" value="1" class="fo-num" style="width:4.2em; font-size:26px; font-weight:800; padding:5px 8px; text-align:center; color:var(--accent) !important;" oninput="recalculateInvention()">
+            <span class="fo-num-suffix pb-1">successful BPC(s)</span>
+          </div>
+        </div>
+
         <div class="fo-card">
           <div class="flex items-center justify-between">
             <span class="fo-card-title">Base Success Chance</span>
@@ -154,15 +166,6 @@
           <div class="flex items-end gap-2">
             <input type="text" inputmode="decimal" id="invention-base-chance" class="fo-num" style="width:4.4em; font-size:16px; color:var(--accent) !important;" oninput="sanitizeDecimalInput(event); recalculateInvention()">
             <span class="fo-num-suffix pb-0.5">%</span>
-          </div>
-        </div>
-
-        <div class="fo-card" title="How many successful T2 BPCs you want to end up with. For each decryptor, the tool works out how many invention attempts that requires on average given its success chance, then totals the cost of all those attempts (successes AND failures) plus the manufacturing cost for your target BPCs.">
-          <div class="fo-row">
-            <span class="fo-row-label">Target T2 BPCs wanted</span>
-            <div class="fo-row-ctl">
-              <input type="number" id="invention-target-bpcs" min="1" value="1" class="fo-num" style="width:4.4em;" oninput="recalculateInvention()">
-            </div>
           </div>
         </div>
 
@@ -273,8 +276,8 @@
   <script src="js/esi.js?v=8.0.30" defer></script>
   <script src="js/tree.js?v=8.0.4" defer></script>
   <script src="js/optimizers.js?v=8.0.7" defer></script>
-  <script src="js/invention.js?v=9.14.0" defer></script>
-  <script src="js/invention-queue.js?v=1.1.0" defer></script>
+  <script src="js/invention.js?v=9.15.0" defer></script>
+  <script src="js/invention-queue.js?v=1.2.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
