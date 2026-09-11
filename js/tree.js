@@ -1,5 +1,15 @@
 'use strict';
 
+// A fresh node with no explicit customMEOverrides/customTEOverrides entry used to always default
+// to 0%/0% (an unresearched blueprint) - now it defaults to the best BPO you actually own for that
+// blueprint (js/esi.js refreshOwnedBpoIndex), since that's what you'd really build it at. Manually
+// editing a card's ME/TE still overrides this, same as it always has. Falls back to {me:0, te:0}
+// (identical to the old hardcoded default) when nothing's owned or you're not logged in.
+function getDefaultMeTeForBlueprint(blueprintTypeId) {
+  const owned = typeof window.getBestOwnedBpoMeTe === 'function' ? window.getBestOwnedBpoMeTe(blueprintTypeId) : null;
+  return owned || { me: 0, te: 0 };
+}
+
 // Robust SDE Suffix Strip-and-Match Helper to resolve Product ID from any Blueprint Name
 function resolveProductIdFromBlueprintName(blueprintName) {
   if (!blueprintName) return null;
@@ -369,8 +379,8 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
     batchYield: 1,
     runsNeeded: 1,
     isBuildingSelf: isBuildingSelf,
-    customME: customMEOverrides[blueprintTypeId] !== undefined ? customMEOverrides[blueprintTypeId] : 0,
-    customTE: customTEOverrides[blueprintTypeId] !== undefined ? customTEOverrides[blueprintTypeId] : 0,
+    customME: customMEOverrides[blueprintTypeId] !== undefined ? customMEOverrides[blueprintTypeId] : getDefaultMeTeForBlueprint(blueprintTypeId).me,
+    customTE: customTEOverrides[blueprintTypeId] !== undefined ? customTEOverrides[blueprintTypeId] : getDefaultMeTeForBlueprint(blueprintTypeId).te,
     unitEIV: 0,
     jobEIV: 0,
     jobFee: 0,

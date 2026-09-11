@@ -665,11 +665,67 @@ async function refreshLiveAssets() {
   }
 }
 
+// Builds a { [blueprintTypeId]: {me, te} } index of the BEST-researched BPO (a true blueprint
+// original - ESI quantity === -1, never a BPC, which is consumed on use and whose runs might
+// already be earmarked for something else) the active character or their corp owns, across every
+// station. This is what lets clicking "Build" on a component default its Job ME/TE to what you'd
+// ACTUALLY build it at instead of an unresearched 0%/0% guess - see getBestOwnedBpoMeTe's callers
+// in js/tree.js (fresh nodes) and js/app.js's syncTreeOverrides (existing nodes, every recalculate).
+// Character + corp blueprints merged the same way js/ledger.js's own blueprintMeTeMap already does
+// for matching a real EVE job back to the blueprint that ran it - reusing the same two fetchers.
+async function refreshOwnedBpoIndex() {
+  const charId = getActiveCharId();
+  const token = getActiveCharacterToken();
+  if (!charId || !token) return;
+  try {
+    const [charBps, corpBps] = await Promise.all([fetchCharacterBlueprints(), fetchCorpBlueprints()]);
+    const index = {};
+    [...(charBps || []), ...(corpBps || [])].forEach(bp => {
+      if (bp.quantity !== -1) return; // BPOs only - see the comment above on why BPCs don't count
+      const me = bp.material_efficiency || 0;
+      const te = bp.time_efficiency || 0;
+      const existing = index[bp.type_id];
+      if (!existing || me > existing.me || (me === existing.me && te > existing.te)) {
+        index[bp.type_id] = { me, te };
+      }
+    });
+    window.ownedBpoMeTeIndex = index;
+    localStorage.setItem('eve_owned_bpo_index_v1', JSON.stringify({ index, fetchedAt: Date.now() }));
+  } catch (e) {
+    console.warn('Owned BPO index refresh failed:', e);
+  }
+}
+window.refreshOwnedBpoIndex = refreshOwnedBpoIndex;
+
+// Instant repaint on page load, before the live re-fetch above lands - same "show the cached
+// answer immediately, then refresh in the background" pattern the rest of this app already uses
+// for prices/assets, rather than a fresh manufacturable node defaulting to 0/0 for a few seconds
+// while ESI is still being asked.
+function restoreOwnedBpoIndexFromCache() {
+  try {
+    const raw = localStorage.getItem('eve_owned_bpo_index_v1');
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.index) window.ownedBpoMeTeIndex = parsed.index;
+  } catch (e) { /* ignore - falls back to 0/0 same as never having fetched */ }
+}
+window.restoreOwnedBpoIndexFromCache = restoreOwnedBpoIndexFromCache;
+
+// The single canonical read - null (not 0/0) when nothing owned or not logged in, so callers can
+// tell "genuinely defaults to 0/0" apart from "owns a 0%/0% unresearched BPO" if they ever need to.
+function getBestOwnedBpoMeTe(blueprintTypeId) {
+  return (window.ownedBpoMeTeIndex && window.ownedBpoMeTeIndex[blueprintTypeId]) || null;
+}
+window.getBestOwnedBpoMeTe = getBestOwnedBpoMeTe;
+
 async function fetchUserAndCorpAssets(charId, accessToken) {
   let assetsFetchOk = false;
   try {
     window.rawAssetItems = [];
     let corpId = null;
+    // Fired in parallel, not awaited - blueprint ownership has nothing to do with the asset walk
+    // below and shouldn't hold up "ASSETS REFRESHED" landing.
+    refreshOwnedBpoIndex().catch(e => console.warn('Owned BPO index refresh failed:', e));
     const charRes = await fetch(`https://esi.evetech.net/latest/characters/${charId}/?datasource=tranquility`);
     if (charRes.ok) {
       const charData = await charRes.json();

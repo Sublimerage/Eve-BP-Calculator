@@ -17,11 +17,35 @@ function syncTreeOverrides(node) {
   const tId = node.typeId;
   const meMap = window.customMEOverrides || {};
   const teMap = window.customTEOverrides || {};
-  node.customME = meMap[tId] !== undefined ? meMap[tId] : 0;
-  node.customTE = teMap[tId] !== undefined ? teMap[tId] : 0;
+  // Same "default to your best owned BPO instead of 0/0" rule js/tree.js applies to brand-new
+  // nodes - this is the re-sync path that runs on every recalculate for nodes that already exist,
+  // so it needs the identical fallback or a node's ME/TE would revert to 0/0 the moment anything
+  // else triggered a recalculate.
+  const owned = typeof window.getBestOwnedBpoMeTe === 'function' ? window.getBestOwnedBpoMeTe(tId) : null;
+  node.customME = meMap[tId] !== undefined ? meMap[tId] : (owned ? owned.me : 0);
+  node.customTE = teMap[tId] !== undefined ? teMap[tId] : (owned ? owned.te : 0);
   if (node.children) {
     node.children.forEach(syncTreeOverrides);
   }
+}
+
+// Whether a node's current Job ME/TE came from an owned BPO rather than a manual edit - drives the
+// small accent dot next to "Job ME/TE:" on its card (see the card template below).
+function meTeIsAutoFilled(node) {
+  const hasManualOverride = window.customMEOverrides && window.customMEOverrides[node.typeId] !== undefined;
+  if (hasManualOverride) return false;
+  return typeof window.getBestOwnedBpoMeTe === 'function' && !!window.getBestOwnedBpoMeTe(node.typeId);
+}
+
+// Tooltip text for that same row - explains WHERE the shown ME/TE came from, since a number that
+// just appears with no explanation (especially the first time this shipped, when it used to always
+// be 0/0) reads as a bug rather than the deliberate "use what you actually own" default it is.
+function meTeSourceHint(node) {
+  const hasManualOverride = window.customMEOverrides && window.customMEOverrides[node.typeId] !== undefined;
+  if (hasManualOverride) return 'Manually set for this blueprint - edit to change, or clear localStorage\'s customMEOverrides to reset.';
+  const owned = typeof window.getBestOwnedBpoMeTe === 'function' ? window.getBestOwnedBpoMeTe(node.typeId) : null;
+  if (owned) return `Auto-filled from your best owned BPO (${owned.me}% ME / ${owned.te}% TE) - edit to override just this build.`;
+  return 'No owned BPO found for this blueprint (or not logged in) - defaults to 0%/0% until you edit it.';
 }
 
 function saveTaxSettings() {
@@ -2225,8 +2249,8 @@ function createNodeCard(node) {
             </div>
           ` : ''}
           ${node.isBuildingSelf && node.isManufacturable && !node.isReaction ? `
-            <div class="flex items-center justify-between text-xs mono" onmousedown="event.stopPropagation()">
-              <span class="text-slate-400 font-semibold">Job ME/TE:</span>
+            <div class="flex items-center justify-between text-xs mono" onmousedown="event.stopPropagation()" title="${window.esc(meTeSourceHint(node))}">
+              <span class="text-slate-400 font-semibold">Job ME/TE:${meTeIsAutoFilled(node) ? ' <span style="color:var(--accent);" title="Auto-filled from your best owned BPO">●</span>' : ''}</span>
               <div class="flex items-center space-x-1">
                 <input type="number" id="card-me-${node.instanceId}" min="0" max="10" value="${node.customME}" onchange="onCardMEChange(event, ${node.typeId}, ${node.instanceId})" class="field-line w-10 text-center text-orange-400 font-bold p-0.5">
                 <span class="text-slate-500">%</span>
@@ -3282,6 +3306,10 @@ window.addEventListener('load', async () => {
   // Load static local states instantly so the app is interactive immediately!
   try {
     restoreRigSlotInputs(); // Show each rig slot's saved rig name (if any) before restoring other tax settings
+    // Repaint the last-known owned-BPO ME/TE index instantly (before the live re-fetch in
+    // fetchUserAndCorpAssets lands) so loadSavedState() below builds its tree with real ME/TE
+    // defaults from the start, not 0/0 for a few seconds until ESI answers.
+    if (typeof window.restoreOwnedBpoIndexFromCache === 'function') window.restoreOwnedBpoIndexFromCache();
     renderProductionPresetDropdown();
     restoreHomeMarketInput();
     renderTrackedMarketsList();

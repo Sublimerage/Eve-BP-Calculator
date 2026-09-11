@@ -425,20 +425,25 @@ async function recalculateInventionImpl() {
     const multibuyItems = [];
     let totalInventionCost = 0;
     if (isFinite(requiredAttempts)) {
+      // Cost/profit below always reflects the FULL amount of datacores/decryptor needed, regardless
+      // of what's already in stock - same rule js/optimizers.js's calculateTreeNodeCost already
+      // applies to this page's own manufacturing-side cost (see that function's own comment).
+      // "Deduct Stock" only ever changes multibuyItems (the shopping list / Copy Multibuy below) -
+      // what you still need to go acquire - never the profit math itself.
       datacores.forEach(m => {
         const totalNeeded = m.qty * requiredAttempts;
+        const unitPrice = getInventionInputPrice(m.typeId);
+        totalInventionCost += totalNeeded * unitPrice;
         const owned = deductStock ? (window.userStockMap[m.typeId] || 0) : 0;
         const netToBuy = Math.max(0, totalNeeded - owned);
-        const unitPrice = getInventionInputPrice(m.typeId);
-        totalInventionCost += netToBuy * unitPrice;
         if (netToBuy > 0) multibuyItems.push({ name: m.name, qty: netToBuy });
       });
       if (dec.name !== 'No Decryptor' && decEntry) {
         const totalNeeded = requiredAttempts;
+        const unitPrice = getInventionInputPrice(decEntry.id);
+        totalInventionCost += totalNeeded * unitPrice;
         const owned = deductStock ? (window.userStockMap[decEntry.id] || 0) : 0;
         const netToBuy = Math.max(0, totalNeeded - owned);
-        const unitPrice = getInventionInputPrice(decEntry.id);
-        totalInventionCost += netToBuy * unitPrice;
         if (netToBuy > 0) multibuyItems.push({ name: dec.name, qty: netToBuy });
       }
 
