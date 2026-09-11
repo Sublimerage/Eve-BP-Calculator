@@ -410,7 +410,7 @@ function renderInventionQueueBatchCard(batch) {
   const decLabel = batch.decryptorName || 'Unknown decryptor (detected in-game)';
   const bestResult = inventionBatchBestResult(batch);
   const resultLabel = bestResult
-    ? `${bestResult.runs} run${bestResult.runs > 1 ? 's' : ''}/BPC &middot; ME${bestResult.me >= 0 ? '+' : ''}${bestResult.me}/TE${bestResult.te >= 0 ? '+' : ''}${bestResult.te}${bestResult.isReal ? ' &middot; confirmed' : ''}`
+    ? `${bestResult.runs} run${bestResult.runs > 1 ? 's' : ''}/BPC · ME${bestResult.me >= 0 ? '+' : ''}${bestResult.me}/TE${bestResult.te >= 0 ? '+' : ''}${bestResult.te}${bestResult.isReal ? ' · confirmed' : ''}`
     : 'ME/TE unknown';
   const canSendToCalc = successes > 0 && batch.t2BlueprintTypeId && bestResult;
   const disp = inventionBatchDisplayStatus(batch);
@@ -447,7 +447,7 @@ function renderInventionQueueBatchCard(batch) {
     <div class="lp-inset p-3.5" style="border-left:3px solid ${disp.border}; ${disp.key === 'needs_more' ? 'background:rgba(221,107,100,0.05);' : ''}">
       <div class="flex items-start justify-between gap-3">
         <div class="flex items-center gap-3 min-w-0 flex-1">
-          <img src="https://images.evetech.net/types/${batch.t2ProductTypeId || batch.t2BlueprintTypeId}/icon?size=40" alt="" class="w-10 h-10 rounded flex-shrink-0" loading="lazy" onerror="this.style.visibility='hidden'">
+          <img src="https://images.evetech.net/types/${batch.t2ProductTypeId || batch.t2BlueprintTypeId}/icon?size=64" alt="" class="w-10 h-10 rounded flex-shrink-0" loading="lazy" onerror="this.style.visibility='hidden'">
           <div class="min-w-0">
             <div class="font-bold truncate text-base" style="color:var(--text);">${window.esc(batch.t2ProductName)}${batch.autoImported ? ' <span class="text-xs font-normal" style="color:var(--text-mute);">(detected, not planned)</span>' : ''}</div>
             <div class="text-xs mono truncate mt-0.5" style="color:var(--text-mute);">${window.esc(decLabel)} &middot; ${window.esc(resultLabel)}</div>
