@@ -166,25 +166,6 @@ function abandonInventionQueueBatch(id) {
 }
 window.abandonInventionQueueBatch = abandonInventionQueueBatch;
 
-// Manual fallback for when you're not logged in, haven't synced yet, or want to correct the tally -
-// logs ONE resolved entry of "N attempts, M succeeded" (matching how EVE itself only ever reports an
-// invention job's outcome as a single final tally, never per-attempt), not a per-attempt click.
-function manualLogInventionRuns(id) {
-  const runsInput = document.getElementById(`inv-manual-runs-${id}`);
-  const successInput = document.getElementById(`inv-manual-success-${id}`);
-  const runs = Math.max(1, parseInt(runsInput?.value) || 0);
-  const successes = Math.max(0, Math.min(runs, parseInt(successInput?.value) || 0));
-  if (!runs) return;
-  const queue = loadInventionQueue();
-  const batch = queue.find(b => b.id === id);
-  if (!batch) return;
-  batch.attempts.push({ eveJobId: null, runs, status: 'resolved', successfulRuns: successes, startDate: null, endDate: null, completedAt: new Date().toISOString(), resultBPC: null });
-  batch.status = inventionBatchSuccesses(batch) >= batch.targetBPCs ? 'complete' : 'active';
-  saveInventionQueue(queue);
-  renderInventionQueue();
-}
-window.manualLogInventionRuns = manualLogInventionRuns;
-
 function sendInventionQueueBatchToCalculator(id) {
   const batch = loadInventionQueue().find(b => b.id === id);
   if (!batch) return;
@@ -427,21 +408,15 @@ function renderInventionQueueBatchCard(batch) {
     timerHTML = `<div class="inv-job-timer text-xs font-bold mono mt-1" data-end-ms="${endMs}" style="color:var(--blue-300);">${window.formatDurationCompact(Math.max(0, (endMs - Date.now()) / 1000))} remaining${extra}</div>`;
   }
 
-  // Manual log defaults to however many runs the plan still expects (falls back to 1 with no plan
-  // to go on) - so logging a batch you just ran in-game doesn't need retyping that number. Only
-  // shown for a batch that isn't already Complete - nothing left to log once the target's hit.
+  // The headline number: how many MORE runs to start in-game to hit the target, given anything
+  // Sync EVE Jobs has already matched. No plan exists for an auto-imported batch (decryptor/target
+  // were never chosen here) - falls back to showing runs done instead, since "needed" has no answer.
   const runsNeeded = inventionBatchRunsNeeded(batch);
-  const manualDefaultRuns = runsNeeded !== null && runsNeeded > 0 ? runsNeeded : 1;
-  const logFormHTML = disp.key === 'complete' ? '' : `
-      <div class="mt-3 pt-3 flex items-center gap-2 text-sm flex-wrap" style="border-top:1px solid rgba(255,255,255,0.06);">
-        <span style="color:var(--text-mute);" title="EVE only reports an invention job's outcome as one final tally (runs started, how many succeeded) once it completes - never per-run - so this logs a batch, not a single click.">Log a result:</span>
-        <input type="number" id="inv-manual-runs-${batch.id}" min="1" value="${manualDefaultRuns}" title="Runs started" class="fo-num" style="width:4.2em;padding:6px 8px;font-size:13px;">
-        <span style="color:var(--text-mute);">runs,</span>
-        <input type="number" id="inv-manual-success-${batch.id}" min="0" value="0" title="How many succeeded" class="fo-num" style="width:4.2em;padding:6px 8px;font-size:13px;">
-        <span style="color:var(--text-mute);">succeeded</span>
-        <button onclick="manualLogInventionRuns('${batch.id}')" class="btn-glass btn-glass-muted px-3 py-1.5 text-xs">Log</button>
-      </div>
-  `;
+  const showRunsNeeded = runsNeeded !== null;
+  const statLabel = showRunsNeeded ? 'Runs To Start' : 'Runs Done';
+  const statValue = showRunsNeeded ? runsNeeded : runsDone;
+  const statColor = showRunsNeeded && runsNeeded === 0 ? 'var(--green)' : 'var(--text)';
+  const progressTitle = `${runsDone} run${runsDone !== 1 ? 's' : ''} done so far${failedRuns ? `, ${failedRuns} failed` : ''}`;
 
   return `
     <div class="lp-inset p-3.5" style="border-left:3px solid ${disp.border}; ${disp.key === 'needs_more' ? 'background:rgba(221,107,100,0.05);' : ''}">
@@ -455,14 +430,17 @@ function renderInventionQueueBatchCard(batch) {
         </div>
         <div class="flex-shrink-0 text-right">${badgeHTML}${timerHTML}</div>
       </div>
-      <div class="mt-3 flex items-center justify-between gap-2 text-sm flex-wrap">
-        <span class="font-semibold" style="color:var(--text);">${successes}/${batch.targetBPCs} successful BPC${batch.targetBPCs > 1 ? 's' : ''} <span class="font-normal" style="color:var(--text-mute);">&middot; ${runsDone} run${runsDone !== 1 ? 's' : ''} done${failedRuns ? `, ${failedRuns} failed` : ''}</span></span>
-        <div class="flex items-center gap-2">
-          <button onclick="sendInventionQueueBatchToCalculator('${batch.id}')" class="btn-glass px-3 py-1.5 text-xs" ${canSendToCalc ? '' : 'disabled'} title="${canSendToCalc ? (bestResult.isReal ? 'Uses the CONFIRMED real ME/TE/runs read from your blueprint list' : 'Uses the PLANNED ME/TE/runs (no confirmed real result matched yet)') : 'No confirmed success with known ME/TE yet'}">Send to Calculator</button>
-          <button onclick="abandonInventionQueueBatch('${batch.id}')" class="btn-glass btn-glass-muted px-3 py-1.5 text-xs" title="Remove from queue">Remove</button>
+      <div class="mt-3 flex items-center justify-between gap-3">
+        <div title="${progressTitle}">
+          <div class="text-[10px] font-bold uppercase tracking-wide" style="color:var(--text-mute);">${statLabel}</div>
+          <div class="text-3xl font-black mono leading-none mt-0.5" style="color:${statColor};">${statValue.toLocaleString()}</div>
         </div>
+        <div class="text-right text-xs" style="color:var(--text-mute);" title="${progressTitle}">${successes}/${batch.targetBPCs} successful BPC${batch.targetBPCs > 1 ? 's' : ''}</div>
       </div>
-      ${logFormHTML}
+      <div class="mt-3 flex items-center gap-2">
+        <button onclick="sendInventionQueueBatchToCalculator('${batch.id}')" class="btn-glass px-3 py-1.5 text-xs" ${canSendToCalc ? '' : 'disabled'} title="${canSendToCalc ? (bestResult.isReal ? 'Uses the CONFIRMED real ME/TE/runs read from your blueprint list' : 'Uses the PLANNED ME/TE/runs (no confirmed real result matched yet)') : 'No confirmed success with known ME/TE yet'}">Send to Calculator</button>
+        <button onclick="abandonInventionQueueBatch('${batch.id}')" class="btn-glass btn-glass-muted px-3 py-1.5 text-xs" title="Remove from queue">Remove</button>
+      </div>
     </div>
   `;
 }
