@@ -537,8 +537,11 @@ async function recalculateInventionImpl() {
   renderInventionSummaryTiles(rows);
   renderInventionActiveStationLabel();
 
+  document.getElementById('invention-mode-switch').classList.remove('hidden');
   document.getElementById('invention-empty-state').classList.add('hidden');
-  document.getElementById('invention-results-area').classList.remove('hidden');
+  // A fresh search result always takes you to Compare (that's what you just asked to see) - you can
+  // still flip to Job Queue afterward, same as any other time.
+  if (typeof window.setInventionViewMode === 'function') window.setInventionViewMode('compare');
 }
 let _recalculateInventionDebounceTimer = null;
 // The public name every HTML oninput handler calls. Debouncing serializes rapid repeated triggers
@@ -661,6 +664,12 @@ function queueInventionRow(rowIndex) {
   if (typeof window.addInventionQueueBatch !== 'function') return;
   const t1Recipe = _inventionCurrentBlueprint;
   const t1BlueprintName = window.EVE_ITEMS[t1Recipe.blueprintTypeID] || `${t1Recipe.productName || 'T1 item'} Blueprint`;
+  // Datacores needed are a property of the T1 blueprint's OWN invention recipe, not the decryptor
+  // (decryptors change success chance/output ME-TE-runs, never which materials are consumed) - safe
+  // to snapshot once here regardless of which decryptor this particular row is for, and reused by
+  // js/invention-queue.js's aggregate shopping list for however many attempts are still needed.
+  const invMaterials = (t1Recipe.inventionMaterials || []).map(m => ({ typeId: m.typeId, name: m.name, qty: m.qty }));
+  const decEntry = window.IDX && window.IDX[row.dec.name.toLowerCase()];
   window.addInventionQueueBatch({
     t2BlueprintTypeId: row.t2BlueprintTypeId,
     t2ProductTypeId: _inventionCurrentProduct ? _inventionCurrentProduct.typeId : null,
@@ -668,16 +677,36 @@ function queueInventionRow(rowIndex) {
     t1BlueprintTypeId: t1Recipe.blueprintTypeID,
     t1BlueprintName: t1BlueprintName,
     decryptorName: row.dec.name,
+    decryptorTypeId: decEntry ? decEntry.id : null,
     resultME: row.resultME,
     resultTE: row.resultTE,
     resultRuns: row.resultRuns,
     targetBPCs: Math.max(1, parseInt(document.getElementById('invention-target-bpcs')?.value) || 1),
     successChance: row.successChance,
     plannedAttempts: isFinite(row.requiredAttempts) ? row.requiredAttempts : null,
-    estimatedCost: isFinite(row.totalInventionCost) ? row.totalInventionCost : null
+    estimatedCost: isFinite(row.totalInventionCost) ? row.totalInventionCost : null,
+    invMaterials: invMaterials
   });
 }
 window.queueInventionRow = queueInventionRow;
+
+// For an auto-imported batch (a real invention job ESI reported that wasn't queued ahead of time) -
+// js/invention-queue.js knows the T1 blueprint's type id from the job itself, but needs this reverse
+// lookup to find its invention materials for the aggregate shopping list. Built off the same
+// T2->T1 map searchInventionItem already builds (recipe.blueprintTypeID is on every entry there),
+// just re-keyed by blueprint id and cached the same lazy way.
+let _inventionT1BlueprintIdToRecipe = null;
+function getInventionMaterialsForT1Blueprint(t1BlueprintTypeId) {
+  if (!_inventionT1BlueprintIdToRecipe) {
+    _inventionT1BlueprintIdToRecipe = {};
+    Object.values(getInventionT2ToT1Map()).forEach(recipe => {
+      if (recipe && recipe.blueprintTypeID !== undefined) _inventionT1BlueprintIdToRecipe[recipe.blueprintTypeID] = recipe;
+    });
+  }
+  const recipe = _inventionT1BlueprintIdToRecipe[t1BlueprintTypeId];
+  return recipe ? (recipe.inventionMaterials || []).map(m => ({ typeId: m.typeId, name: m.name, qty: m.qty })) : [];
+}
+window.getInventionMaterialsForT1Blueprint = getInventionMaterialsForT1Blueprint;
 
 function renderInventionComparisonTable(rows) {
   const container = document.getElementById('invention-comparison-table');
