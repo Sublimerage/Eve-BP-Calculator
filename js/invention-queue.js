@@ -410,24 +410,11 @@ function renderInventionQueueBatchCard(batch) {
   const decLabel = batch.decryptorName || 'Unknown decryptor (detected in-game)';
   const bestResult = inventionBatchBestResult(batch);
   const resultLabel = bestResult
-    ? `${bestResult.runs} run${bestResult.runs > 1 ? 's' : ''}/BPC, ME${bestResult.me >= 0 ? '+' : ''}${bestResult.me}/TE${bestResult.te >= 0 ? '+' : ''}${bestResult.te}${bestResult.isReal ? ' (confirmed)' : ' (planned)'}`
+    ? `${bestResult.runs} run${bestResult.runs > 1 ? 's' : ''}/BPC &middot; ME${bestResult.me >= 0 ? '+' : ''}${bestResult.me}/TE${bestResult.te >= 0 ? '+' : ''}${bestResult.te}${bestResult.isReal ? ' &middot; confirmed' : ''}`
     : 'ME/TE unknown';
   const canSendToCalc = successes > 0 && batch.t2BlueprintTypeId && bestResult;
   const disp = inventionBatchDisplayStatus(batch);
-  const badgeHTML = `<span class="lp-badge" style="background:${disp.badgeBg};color:${disp.badgeColor};">${disp.icon ? window.svgIcon(disp.icon) + ' ' : ''}${disp.label}</span>`;
-
-  // How many MORE runs the original plan estimated you'd still need to start in-game, netted
-  // against what's already been run - the single most actionable number on this card (go start
-  // this many runs in the Industry window), so it gets its own prominent stat block, not a clause
-  // buried in a sentence. null when there's nothing to estimate from (auto-imported, decryptor
-  // never confirmed).
-  const runsNeeded = inventionBatchRunsNeeded(batch);
-  const runsNeededHTML = `
-    <div class="flex-shrink-0 text-center px-3" title="${runsNeeded !== null ? 'How many more invention runs to start in-game to stay on track for this plan\'s target.' : 'No plan to estimate from - this batch was detected from a real job, not queued from a decryptor comparison.'}">
-      <div class="font-bold mono" style="color:${runsNeeded ? 'var(--accent)' : 'var(--text-mute)'}; font-size:22px; line-height:1;">${runsNeeded !== null ? runsNeeded : '—'}</div>
-      <div class="text-[8px] font-bold uppercase tracking-wide mt-0.5" style="color:var(--text-mute);">Runs Needed</div>
-    </div>
-  `;
+  const badgeHTML = `<span class="lp-badge" style="background:${disp.badgeBg};color:${disp.badgeColor};font-size:11px;padding:4px 10px;">${disp.icon ? window.svgIcon(disp.icon) + ' ' : ''}${disp.label}</span>`;
 
   // In-progress runs each carry their own end_date (several jobs can run in parallel across job
   // slots) - show the soonest, with a count if more than one is running.
@@ -437,41 +424,45 @@ function renderInventionQueueBatchCard(batch) {
     const soonest = inProgressAttempts.reduce((a, b) => new Date(a.endDate).getTime() < new Date(b.endDate).getTime() ? a : b);
     const endMs = new Date(soonest.endDate).getTime();
     const extra = inProgressAttempts.length > 1 ? ` (+${inProgressAttempts.length - 1} more running)` : '';
-    timerHTML = `<div class="inv-job-timer text-[11px] font-bold mono" data-end-ms="${endMs}" style="color:var(--blue-300);">${window.formatDurationCompact(Math.max(0, (endMs - Date.now()) / 1000))} remaining</div><div class="text-[10px]" style="color:var(--text-mute);">${extra}</div>`;
+    timerHTML = `<div class="inv-job-timer text-xs font-bold mono mt-1" data-end-ms="${endMs}" style="color:var(--blue-300);">${window.formatDurationCompact(Math.max(0, (endMs - Date.now()) / 1000))} remaining${extra}</div>`;
   }
 
   // Manual log defaults to however many runs the plan still expects (falls back to 1 with no plan
-  // to go on) - so logging a batch you just ran in-game doesn't need retyping that number.
+  // to go on) - so logging a batch you just ran in-game doesn't need retyping that number. Only
+  // shown for a batch that isn't already Complete - nothing left to log once the target's hit.
+  const runsNeeded = inventionBatchRunsNeeded(batch);
   const manualDefaultRuns = runsNeeded !== null && runsNeeded > 0 ? runsNeeded : 1;
+  const logFormHTML = disp.key === 'complete' ? '' : `
+      <div class="mt-3 pt-3 flex items-center gap-2 text-sm flex-wrap" style="border-top:1px solid rgba(255,255,255,0.06);">
+        <span style="color:var(--text-mute);" title="EVE only reports an invention job's outcome as one final tally (runs started, how many succeeded) once it completes - never per-run - so this logs a batch, not a single click.">Log a result:</span>
+        <input type="number" id="inv-manual-runs-${batch.id}" min="1" value="${manualDefaultRuns}" title="Runs started" class="fo-num" style="width:4.2em;padding:6px 8px;font-size:13px;">
+        <span style="color:var(--text-mute);">runs,</span>
+        <input type="number" id="inv-manual-success-${batch.id}" min="0" value="0" title="How many succeeded" class="fo-num" style="width:4.2em;padding:6px 8px;font-size:13px;">
+        <span style="color:var(--text-mute);">succeeded</span>
+        <button onclick="manualLogInventionRuns('${batch.id}')" class="btn-glass btn-glass-muted px-3 py-1.5 text-xs">Log</button>
+      </div>
+  `;
 
   return `
-    <div class="lp-inset p-3" style="border-left:3px solid ${disp.border}; ${disp.key === 'needs_more' ? 'background:rgba(221,107,100,0.05);' : ''}">
-      <div class="flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2 min-w-0 flex-1">
-          <img src="https://images.evetech.net/types/${batch.t2ProductTypeId || batch.t2BlueprintTypeId}/icon?size=32" alt="" class="w-8 h-8 rounded flex-shrink-0" loading="lazy" onerror="this.style.visibility='hidden'">
+    <div class="lp-inset p-3.5" style="border-left:3px solid ${disp.border}; ${disp.key === 'needs_more' ? 'background:rgba(221,107,100,0.05);' : ''}">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <img src="https://images.evetech.net/types/${batch.t2ProductTypeId || batch.t2BlueprintTypeId}/icon?size=40" alt="" class="w-10 h-10 rounded flex-shrink-0" loading="lazy" onerror="this.style.visibility='hidden'">
           <div class="min-w-0">
-            <div class="font-bold truncate text-sm" style="color:var(--text);">${window.esc(batch.t2ProductName)}${batch.autoImported ? ' <span class="text-[9px] font-normal" style="color:var(--text-mute);">(detected, not planned)</span>' : ''}</div>
-            <div class="text-[10px] mono truncate" style="color:var(--text-mute);">${window.esc(decLabel)} &middot; target ${batch.targetBPCs} BPC${batch.targetBPCs > 1 ? 's' : ''} &middot; ${window.esc(resultLabel)}</div>
+            <div class="font-bold truncate text-base" style="color:var(--text);">${window.esc(batch.t2ProductName)}${batch.autoImported ? ' <span class="text-xs font-normal" style="color:var(--text-mute);">(detected, not planned)</span>' : ''}</div>
+            <div class="text-xs mono truncate mt-0.5" style="color:var(--text-mute);">${window.esc(decLabel)} &middot; ${window.esc(resultLabel)}</div>
           </div>
         </div>
-        ${runsNeededHTML}
         <div class="flex-shrink-0 text-right">${badgeHTML}${timerHTML}</div>
       </div>
-      <div class="mt-2 flex items-center justify-between gap-2 text-xs mono flex-wrap">
-        <span style="color:var(--text-mute);">${successes}/${batch.targetBPCs} successful BPCs &middot; ${runsDone} run${runsDone !== 1 ? 's' : ''} done${failedRuns ? ` (${failedRuns} failed)` : ''}</span>
-        <div class="flex items-center gap-1.5">
-          <button onclick="sendInventionQueueBatchToCalculator('${batch.id}')" class="lp-chip-btn" style="padding:4px 7px;" ${canSendToCalc ? '' : 'disabled'} title="${canSendToCalc ? (bestResult.isReal ? 'Open the resulting BPC in the Calculator, using its CONFIRMED real ME/TE/runs read from your blueprint list' : 'Open the resulting BPC in the Calculator, using the PLANNED ME/TE/runs (no confirmed real result matched yet)') : 'No confirmed success with known ME/TE yet'}">${window.svgIcon('trending')}</button>
-          <button onclick="abandonInventionQueueBatch('${batch.id}')" class="lp-chip-btn" style="padding:4px 7px;" title="Remove from queue">${window.svgIcon('x')}</button>
+      <div class="mt-3 flex items-center justify-between gap-2 text-sm flex-wrap">
+        <span class="font-semibold" style="color:var(--text);">${successes}/${batch.targetBPCs} successful BPC${batch.targetBPCs > 1 ? 's' : ''} <span class="font-normal" style="color:var(--text-mute);">&middot; ${runsDone} run${runsDone !== 1 ? 's' : ''} done${failedRuns ? `, ${failedRuns} failed` : ''}</span></span>
+        <div class="flex items-center gap-2">
+          <button onclick="sendInventionQueueBatchToCalculator('${batch.id}')" class="btn-glass px-3 py-1.5 text-xs" ${canSendToCalc ? '' : 'disabled'} title="${canSendToCalc ? (bestResult.isReal ? 'Uses the CONFIRMED real ME/TE/runs read from your blueprint list' : 'Uses the PLANNED ME/TE/runs (no confirmed real result matched yet)') : 'No confirmed success with known ME/TE yet'}">Send to Calculator</button>
+          <button onclick="abandonInventionQueueBatch('${batch.id}')" class="btn-glass btn-glass-muted px-3 py-1.5 text-xs" title="Remove from queue">Remove</button>
         </div>
       </div>
-      <div class="mt-2 pt-2 flex items-center gap-1.5 text-[11px]" style="border-top:1px solid rgba(255,255,255,0.06);">
-        <span style="color:var(--text-mute);" title="EVE only reports an invention job's outcome as one final tally (runs started, how many succeeded) once it completes - never per-run - so this logs a batch, not a single click.">Log result:</span>
-        <input type="number" id="inv-manual-runs-${batch.id}" min="1" value="${manualDefaultRuns}" placeholder="Runs" class="fo-num" style="width:3.4em;padding:3px 5px;">
-        <span style="color:var(--text-mute);">runs,</span>
-        <input type="number" id="inv-manual-success-${batch.id}" min="0" value="0" placeholder="Successes" class="fo-num" style="width:3.4em;padding:3px 5px;">
-        <span style="color:var(--text-mute);">succeeded</span>
-        <button onclick="manualLogInventionRuns('${batch.id}')" class="lp-chip-btn" style="padding:3px 8px;">Log</button>
-      </div>
+      ${logFormHTML}
     </div>
   `;
 }
@@ -525,18 +516,27 @@ function inventionQueueRemainingRunsNeeded(batch) {
   return Math.ceil(remainingBPCs / (batch.successChance / 100));
 }
 
+// Same row language as the Calculator's own #bom-sidebar (js/app.js buildBOMRowElement, "detailed"
+// card mode) - icon, name + ISK on one line, a badge, then a qty x unit-price line - so this reads
+// as the same tool, not a lookalike table.
 let _inventionQueueBomLines = [];
 async function renderInventionQueueBom() {
-  const bomCard = document.getElementById('invention-queue-bom-card');
+  const emptyEl = document.getElementById('invention-queue-bom-empty');
   const bomEl = document.getElementById('invention-queue-bom');
-  if (!bomCard || !bomEl) return;
+  const typeCountEl = document.getElementById('invention-bom-type-count');
+  const totalIskEl = document.getElementById('invention-bom-total-isk');
+  if (!bomEl) return;
   const queue = loadInventionQueue().filter(b => b.status === 'planned' || b.status === 'active');
   const openWithEstimate = queue.filter(b => inventionQueueRemainingRunsNeeded(b) !== null && inventionQueueRemainingRunsNeeded(b) > 0);
   if (openWithEstimate.length === 0) {
-    bomCard.classList.add('hidden');
+    if (emptyEl) emptyEl.classList.remove('hidden');
+    bomEl.innerHTML = '';
+    if (typeCountEl) typeCountEl.textContent = '0';
+    if (totalIskEl) totalIskEl.textContent = '0 ISK';
+    _inventionQueueBomLines = [];
     return;
   }
-  bomCard.classList.remove('hidden');
+  if (emptyEl) emptyEl.classList.add('hidden');
 
   const deductStock = (document.getElementById('invention-deduct-stock')?.value ?? 'true') === 'true';
   const totals = {}; // typeId -> { name, qty }
@@ -564,35 +564,36 @@ async function renderInventionQueueBom() {
     const unitPrice = typeof window.getInventionInputPrice === 'function' ? window.getInventionInputPrice(typeId) : 0;
     const lineCost = netToBuy * unitPrice;
     grandTotal += lineCost;
-    return { typeId, name: totals[typeId].name, needed: totals[typeId].qty, owned, netToBuy, lineCost };
+    return { typeId, name: totals[typeId].name, needed: totals[typeId].qty, owned, netToBuy, unitPrice, lineCost };
   }).sort((a, b) => b.lineCost - a.lineCost);
 
   _inventionQueueBomLines = rows.filter(r => r.netToBuy > 0);
+  if (typeCountEl) typeCountEl.textContent = String(rows.length);
+  if (totalIskEl) totalIskEl.textContent = `${Math.round(grandTotal).toLocaleString()} ISK`;
 
   const skipped = queue.length - openWithEstimate.length;
-  bomEl.innerHTML = `
-    <table class="lp-table text-xs mono">
-      <thead><tr><th>Item</th><th class="text-right">Needed</th><th class="text-right">Owned</th><th class="text-right">To Buy</th><th class="text-right">Est. Cost</th></tr></thead>
-      <tbody>
-        ${rows.map(r => `
-          <tr>
-            <td>
-              <div class="flex items-center gap-2">
-                <img src="https://images.evetech.net/types/${r.typeId}/icon?size=32" alt="" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.style.visibility='hidden'">
-                <span>${window.esc(r.name)}</span>
-              </div>
-            </td>
-            <td class="text-right" style="color:var(--text-mute);">${r.needed.toLocaleString()}</td>
-            <td class="text-right" style="color:var(--text-mute);">${r.owned.toLocaleString()}</td>
-            <td class="text-right font-bold" style="color:${r.netToBuy > 0 ? 'var(--text)' : 'var(--text-mute)'};">${r.netToBuy.toLocaleString()}</td>
-            <td class="text-right" style="color:var(--cost);">${Math.round(r.lineCost).toLocaleString()} ISK</td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-    <div class="text-right font-bold text-sm mt-2" style="color:var(--cost);">Grand Total: ${Math.round(grandTotal).toLocaleString()} ISK</div>
-    ${skipped > 0 ? `<p class="text-[10px] mt-1" style="color:var(--text-mute);">${skipped} queued batch${skipped > 1 ? 'es are' : ' is'} not included above (already at target, or no known success chance to estimate remaining runs from - e.g. an unplanned detected job whose decryptor was never confirmed).</p>` : ''}
-  `;
+  bomEl.innerHTML = rows.map(r => {
+    const isAcquired = r.netToBuy === 0;
+    return `
+      <div class="lp-card p-2.5">
+        <div class="flex items-start gap-2.5">
+          <img src="https://images.evetech.net/types/${r.typeId}/icon?size=32" alt="" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.style.visibility='hidden'">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-semibold truncate" style="color:var(--text-soft);">${window.esc(r.name)}</span>
+              ${isAcquired
+                ? `<span class="font-bold mono flex-shrink-0" style="color:var(--text-mute);">${window.svgIcon('check')} In Stock</span>`
+                : `<span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(r.lineCost).toLocaleString()} ISK</span>`}
+            </div>
+            <div class="flex items-center gap-1 mt-1.5">
+              <span class="lp-badge lp-badge-accent">BUY</span>
+            </div>
+            ${isAcquired ? '' : `<div class="text-xs mono mt-1.5" style="color:var(--text-mute);">Qty: ${r.netToBuy.toLocaleString()} &times; ${Math.round(r.unitPrice).toLocaleString()} ISK</div>`}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('') + (skipped > 0 ? `<p class="text-[10px] mt-1" style="color:var(--text-mute);">${skipped} queued batch${skipped > 1 ? 'es' : ''} not included above (already at target, or no known success chance to estimate remaining runs from).</p>` : '');
 }
 window.renderInventionQueueBom = renderInventionQueueBom;
 
