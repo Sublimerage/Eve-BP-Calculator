@@ -86,7 +86,7 @@
           </div>
         </div>
 
-        <div class="fo-card" title="Invention consumes one copy of this blueprint per attempt (win or lose) - its own run count doesn't matter, it's used up either way.">
+        <div class="fo-card" title="Invention consumes one whole copy of this blueprint per invention run (win or lose) - the copy's own manufacturing run count doesn't matter, it's used up either way.">
           <div class="fo-card-title">T1 Blueprint Copy Needed</div>
           <div class="flex items-center gap-2.5">
             <img id="invention-t1-icon" src="" alt="" class="w-9 h-9 rounded-md border border-white/10 bg-[#070b0f] flex-shrink-0">
@@ -146,11 +146,11 @@
           </div>
         </div>
 
-        <!-- The single biggest lever on this page - attempts needed, total cost, and profit all
+        <!-- The single biggest lever on this page - runs needed, total cost, and profit all
              scale directly from this number - so it gets the loudest visual treatment on the
              sidebar (accent border + a genuinely large number), same "impossible to miss" idea
              Stock & Pricing above already uses, not just another .fo-row like every other setting. -->
-        <div class="fo-card" style="border-left:2px solid var(--accent);" title="How many successful T2 BPCs you want to end up with. For each decryptor, the tool works out how many invention attempts that requires on average given its success chance, then totals the cost of all those attempts (successes AND failures) plus the manufacturing cost for your target BPCs.">
+        <div class="fo-card" style="border-left:2px solid var(--accent);" title="How many successful T2 BPCs you want to end up with. For each decryptor, the tool works out how many invention runs that requires on average given its success chance, then totals the cost of all those runs (successes AND failures) plus the manufacturing cost for your target BPCs.">
           <div class="fo-card-title" style="color:var(--accent);">Target: T2 BPCs Wanted</div>
           <div class="flex items-end gap-2 mt-1">
             <input type="number" id="invention-target-bpcs" min="1" value="1" class="fo-num" style="width:4.2em; font-size:26px; font-weight:800; padding:5px 8px; text-align:center; color:var(--accent) !important;" oninput="recalculateInvention()">
@@ -236,7 +236,7 @@
         <div class="lp-card p-4">
           <h2 class="text-sm font-bold uppercase tracking-wider text-purple-300 rajdhani mb-2">Decryptor Profit Comparison</h2>
           <p class="text-[11px] text-slate-400 mb-3 leading-relaxed">
-            Set your target number of successful T2 BPCs on the left. For each decryptor, this works out how many invention attempts that actually takes given its success chance - the risk is visible directly in <b>Attempts Needed</b>, not hidden inside a single averaged number.
+            Set your target number of successful T2 BPCs on the left. For each decryptor, this works out how many invention runs that actually takes given its success chance - the risk is visible directly in <b>Runs Needed</b>, not hidden inside a single averaged number.
           </p>
           <div id="invention-comparison-table" class="overflow-x-auto"></div>
         </div>
@@ -258,10 +258,10 @@
         </div>
         <div id="invention-queue-bom-card" class="lp-card p-4 hidden">
           <div class="flex items-center justify-between mb-2">
-            <h2 class="text-sm font-bold uppercase tracking-wider rajdhani" style="color:var(--accent);">Shopping List - Remaining Queued Attempts</h2>
-            <button id="invention-queue-bom-copy-btn" onclick="copyInventionQueueBom()" class="lp-chip-btn" title="Copy the full multibuy list for every planned/active batch's remaining attempts"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy Multibuy</button>
+            <h2 class="text-sm font-bold uppercase tracking-wider rajdhani" style="color:var(--accent);">Bill of Materials - Remaining Queued Runs</h2>
+            <button id="invention-queue-bom-copy-btn" onclick="copyInventionQueueBom()" class="lp-chip-btn" title="Copy the full multibuy list for every planned/active batch's remaining runs"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy Multibuy</button>
           </div>
-          <p class="text-[11px] mb-2" style="color:var(--text-mute);">Datacores + decryptors for every attempt still needed to reach each batch's target, respecting Deduct Stock on the left. Batches detected from unplanned real jobs (decryptor unknown) still contribute their datacores, just no decryptor line.</p>
+          <p class="text-[11px] mb-2" style="color:var(--text-mute);">Datacores + decryptors for every run still needed to reach each batch's target, respecting Deduct Stock on the left. Batches detected from unplanned real jobs (decryptor unknown) still contribute their datacores, just no decryptor line.</p>
           <div id="invention-queue-bom" class="overflow-x-auto"></div>
         </div>
       </div>
@@ -276,8 +276,8 @@
   <script src="js/esi.js?v=8.0.30" defer></script>
   <script src="js/tree.js?v=8.0.4" defer></script>
   <script src="js/optimizers.js?v=8.0.7" defer></script>
-  <script src="js/invention.js?v=9.15.0" defer></script>
-  <script src="js/invention-queue.js?v=1.2.0" defer></script>
+  <script src="js/invention.js?v=9.16.0" defer></script>
+  <script src="js/invention-queue.js?v=1.3.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
