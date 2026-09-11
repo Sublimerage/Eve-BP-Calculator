@@ -424,19 +424,19 @@ async function recalculateInventionImpl() {
     // attempts, not per-attempt - owning 5 datacores covers part of attempt 1 AND part of attempt 2,
     // it doesn't reset each time.
     const successProbability = successChance / 100;
-    const requiredAttempts = successProbability > 0 ? Math.ceil(targetBPCs / successProbability) : Infinity;
+    const requiredRuns = successProbability > 0 ? Math.ceil(targetBPCs / successProbability) : Infinity;
 
     // Build the multibuy line items with stock deducted from the TOTAL need, not per-attempt.
     const multibuyItems = [];
     let totalInventionCost = 0;
-    if (isFinite(requiredAttempts)) {
+    if (isFinite(requiredRuns)) {
       // Cost/profit below always reflects the FULL amount of datacores/decryptor needed, regardless
       // of what's already in stock - same rule js/optimizers.js's calculateTreeNodeCost already
       // applies to this page's own manufacturing-side cost (see that function's own comment).
       // "Deduct Stock" only ever changes multibuyItems (the shopping list / Copy Multibuy below) -
       // what you still need to go acquire - never the profit math itself.
       datacores.forEach(m => {
-        const totalNeeded = m.qty * requiredAttempts;
+        const totalNeeded = m.qty * requiredRuns;
         const unitPrice = getInventionInputPrice(m.typeId);
         totalInventionCost += totalNeeded * unitPrice;
         const owned = deductStock ? (window.userStockMap[m.typeId] || 0) : 0;
@@ -444,7 +444,7 @@ async function recalculateInventionImpl() {
         if (netToBuy > 0) multibuyItems.push({ name: m.name, qty: netToBuy });
       });
       if (dec.name !== 'No Decryptor' && decEntry) {
-        const totalNeeded = requiredAttempts;
+        const totalNeeded = requiredRuns;
         const unitPrice = getInventionInputPrice(decEntry.id);
         totalInventionCost += totalNeeded * unitPrice;
         const owned = deductStock ? (window.userStockMap[decEntry.id] || 0) : 0;
@@ -460,7 +460,7 @@ async function recalculateInventionImpl() {
       const inventionSCI = window.activeInventionSCI !== undefined ? window.activeInventionSCI : 0.02;
       const attemptEIV = datacores.reduce((sum, m) => sum + (window.eivCache && window.eivCache[m.typeId] ? window.eivCache[m.typeId] * m.qty : 0), 0);
       const inventionJobFeePerAttempt = attemptEIV * (inventionSCI * (1 - structureRoleBonusForInv) + facilityTax + sccSurcharge);
-      totalInventionCost += inventionJobFeePerAttempt * requiredAttempts;
+      totalInventionCost += inventionJobFeePerAttempt * requiredRuns;
     } else {
       totalInventionCost = Infinity;
     }
@@ -527,7 +527,7 @@ async function recalculateInventionImpl() {
     // as more TIME too, not just more cost. null (not 0) when the database has no inventionTime for
     // this blueprint, so "unknown" never silently displays as "instant" - regenerate the database to
     // pick up this field for older data.
-    const totalInventionSeconds = !baseInventionTime ? null : (isFinite(requiredAttempts) ? requiredAttempts * perAttemptInventionSeconds : Infinity);
+    const totalInventionSeconds = !baseInventionTime ? null : (isFinite(requiredRuns) ? requiredRuns * perAttemptInventionSeconds : Infinity);
     const totalTimeSeconds = totalInventionSeconds === null ? null : (isFinite(totalInventionSeconds) ? totalInventionSeconds + totalBuildSeconds : Infinity);
     const iskPerHour = totalBuildSeconds > 0 && isFinite(totalProfit) ? totalProfit / (totalBuildSeconds / 3600) : null;
     // Normalizes to a single manufacturing run (not a single attempt) so decryptors producing
@@ -535,7 +535,7 @@ async function recalculateInventionImpl() {
     const totalRunsProduced = targetBPCs * resultRuns;
     const profitPerRun = (isFinite(totalProfit) && totalRunsProduced > 0) ? totalProfit / totalRunsProduced : (isFinite(totalProfit) ? totalProfit : -Infinity);
 
-    return { dec, successChance, resultRuns, resultME, resultTE, requiredAttempts, totalInventionCost, totalManufacturingCost, totalRevenue, totalProfit, totalBuildSeconds, totalInventionSeconds, totalTimeSeconds, iskPerHour, profitPerRun, multibuyItems, profitDetail, t2BlueprintTypeId, t2ProductName: _inventionCurrentProduct.name };
+    return { dec, successChance, resultRuns, resultME, resultTE, requiredRuns, totalInventionCost, totalManufacturingCost, totalRevenue, totalProfit, totalBuildSeconds, totalInventionSeconds, totalTimeSeconds, iskPerHour, profitPerRun, multibuyItems, profitDetail, t2BlueprintTypeId, t2ProductName: _inventionCurrentProduct.name };
   }));
 
   renderInventionComparisonTable(rows);
@@ -551,6 +551,12 @@ async function recalculateInventionImpl() {
   // restoreInventionViewModeOnLoad() on page load.
   document.getElementById('invention-mode-switch').classList.remove('hidden');
   document.getElementById('invention-empty-state').classList.add('hidden');
+
+  // The Job Queue's aggregate BOM (js/invention-queue.js) prices off the SAME settings this function
+  // just used (Deduct Stock, Material Pricing, tax) - without this it only ever refreshed when you
+  // switched INTO the Queue view, so toggling Deduct Stock while already looking at it appeared to do
+  // nothing at all. Cheap no-op when the Queue view has nothing to show (bomCard stays hidden).
+  if (typeof window.renderInventionQueueBom === 'function') window.renderInventionQueueBom();
 }
 let _recalculateInventionDebounceTimer = null;
 // The public name every HTML oninput handler calls. Debouncing serializes rapid repeated triggers
@@ -581,8 +587,8 @@ function renderInventionSummaryTiles(rows) {
       <div class="text-xs mt-0.5" style="color:var(--text-mute);">${best.successChance.toFixed(1)}% success chance</div>
     </div>
     <div class="lp-tile">
-      <div class="lp-label truncate">Attempts Needed</div>
-      <div class="text-lg font-bold mono leading-tight" style="color:var(--text);">${isFinite(best.requiredAttempts) ? best.requiredAttempts.toLocaleString() : '—'}</div>
+      <div class="lp-label truncate">Runs Needed</div>
+      <div class="text-lg font-bold mono leading-tight" style="color:var(--text);">${isFinite(best.requiredRuns) ? best.requiredRuns.toLocaleString() : '—'}</div>
       <div class="text-xs mt-0.5" style="color:var(--text-mute);">to get ${targetBPCs} successful BPC${targetBPCs > 1 ? 's' : ''}</div>
     </div>
     <div class="lp-tile">
@@ -692,7 +698,7 @@ function queueInventionRow(rowIndex) {
     resultRuns: row.resultRuns,
     targetBPCs: Math.max(1, parseInt(document.getElementById('invention-target-bpcs')?.value) || 1),
     successChance: row.successChance,
-    plannedAttempts: isFinite(row.requiredAttempts) ? row.requiredAttempts : null,
+    plannedRuns: isFinite(row.requiredRuns) ? row.requiredRuns : null,
     estimatedCost: isFinite(row.totalInventionCost) ? row.totalInventionCost : null,
     invMaterials: invMaterials
   });
@@ -743,7 +749,7 @@ function renderInventionComparisonTable(rows) {
           <th>Decryptor</th>
           ${sortHeader('successChance', 'Success %', 'right')}
           <th class="text-right">Result BPC</th>
-          ${sortHeader('requiredAttempts', `Attempts Needed (for ${targetBPCs})`, 'right')}
+          ${sortHeader('requiredRuns', `Runs Needed (for ${targetBPCs})`, 'right')}
           ${sortHeader('totalTimeSeconds', 'Total Time', 'right')}
           ${sortHeader('totalInventionCost', 'Total Invention Cost', 'right')}
           ${sortHeader('totalManufacturingCost', 'Total Mfg Cost', 'right')}
@@ -759,16 +765,16 @@ function renderInventionComparisonTable(rows) {
         ${sortedRows.map(r => {
           const isBest = r.totalProfit === bestProfit && bestProfit > -Infinity;
           const rowIndex = rows.indexOf(r);
-          const perAttemptSeconds = r.requiredAttempts > 0 ? r.totalInventionSeconds / r.requiredAttempts : 0;
+          const perAttemptSeconds = r.requiredRuns > 0 ? r.totalInventionSeconds / r.requiredRuns : 0;
           const timeTitle = (r.totalTimeSeconds !== null && isFinite(r.totalTimeSeconds))
-            ? `${window.formatDuration(r.totalInventionSeconds)} inventing (${r.requiredAttempts} attempt${r.requiredAttempts > 1 ? 's' : ''} x ${window.formatDuration(perAttemptSeconds)} each) + ${window.formatDuration(r.totalBuildSeconds)} manufacturing`
+            ? `${window.formatDuration(r.totalInventionSeconds)} inventing (${r.requiredRuns} run${r.requiredRuns > 1 ? 's' : ''} x ${window.formatDuration(perAttemptSeconds)} each) + ${window.formatDuration(r.totalBuildSeconds)} manufacturing`
             : 'No invention time data for this blueprint - regenerate the database to pick it up';
           return `
           <tr class="${isBest ? 'lp-table-best' : ''}" title="${window.esc(r.profitDetail)}">
             <td class="font-bold" style="color:${isBest ? 'var(--accent)' : 'var(--text)'};">${isBest ? window.svgIcon('award') + ' ' : ''}${window.esc(r.dec.name)}</td>
             <td class="text-right font-bold" style="color:var(--text);">${r.successChance.toFixed(1)}%</td>
             <td class="text-right" style="color:var(--text-mute);">${r.resultRuns} run${r.resultRuns > 1 ? 's' : ''}, ME${r.resultME >= 0 ? '+' : ''}${r.resultME}, TE${r.resultTE >= 0 ? '+' : ''}${r.resultTE}</td>
-            <td class="text-right font-bold" style="color:var(--accent);">${isFinite(r.requiredAttempts) ? r.requiredAttempts.toLocaleString() : '—'}</td>
+            <td class="text-right font-bold" style="color:var(--accent);">${isFinite(r.requiredRuns) ? r.requiredRuns.toLocaleString() : '—'}</td>
             <td class="text-right font-bold" style="color:var(--text);" title="${window.esc(timeTitle)}">${r.totalTimeSeconds !== null && isFinite(r.totalTimeSeconds) ? window.formatDuration(r.totalTimeSeconds) : '—'}</td>
             <td class="text-right" style="color:var(--cost);">${isFinite(r.totalInventionCost) ? Math.round(r.totalInventionCost).toLocaleString() + ' ISK' : '—'}</td>
             <td class="text-right" style="color:var(--cost);">${Math.round(r.totalManufacturingCost).toLocaleString()} ISK</td>
@@ -776,13 +782,13 @@ function renderInventionComparisonTable(rows) {
             <td class="text-right font-bold" style="color:${r.iskPerHour !== null ? (r.iskPerHour >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--text-mute)'};">${r.iskPerHour !== null ? Math.round(r.iskPerHour).toLocaleString() + ' ISK' : '—'}</td>
             <td class="text-right font-bold" style="color:${isFinite(r.profitPerRun) && r.profitPerRun >= 0 ? 'var(--green)' : 'var(--red)'};">${isFinite(r.profitPerRun) ? Math.round(r.profitPerRun).toLocaleString() + ' ISK' : '—'}</td>
             <td class="text-right">
-              <button id="invention-multibuy-btn-${rowIndex}" onclick="copyInventionMultibuy(${rowIndex})" class="lp-chip-btn" title="Copy datacores + decryptor needed for this decryptor's Attempts Needed, minus whatever stock you already own"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy</button>
+              <button id="invention-multibuy-btn-${rowIndex}" onclick="copyInventionMultibuy(${rowIndex})" class="lp-chip-btn" title="Copy datacores + decryptor needed for this decryptor's Runs Needed, minus whatever stock you already own"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>Copy</button>
             </td>
             <td class="text-right">
               <button onclick="sendInventionRowToCalculator(${rowIndex})" class="lp-chip-btn" style="padding:5px 7px;" ${r.t2BlueprintTypeId ? '' : 'disabled'} title="Open this decryptor's resulting BPC in the Calculator, already set to its ${r.resultRuns} max run${r.resultRuns > 1 ? 's' : ''} and ME${r.resultME >= 0 ? '+' : ''}${r.resultME}/TE${r.resultTE >= 0 ? '+' : ''}${r.resultTE}"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg></button>
             </td>
             <td class="text-right">
-              <button onclick="queueInventionRow(${rowIndex})" class="lp-chip-btn" style="padding:5px 7px;" title="Add this decryptor + target to the Invention Job Queue below - tracks your real in-game invention attempts against it via EVE SSO once you run them"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M12 5v14M5 12h14"/></svg></button>
+              <button onclick="queueInventionRow(${rowIndex})" class="lp-chip-btn" style="padding:5px 7px;" title="Add this decryptor + target to the Invention Job Queue - tracks your real in-game invention runs against it via EVE SSO once you start them"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M12 5v14M5 12h14"/></svg></button>
             </td>
           </tr>
         `; }).join('')}
@@ -790,9 +796,9 @@ function renderInventionComparisonTable(rows) {
     </table>
     <p class="text-xs mt-2 leading-relaxed" style="color:var(--text-mute);">
       Click any column header to sort by it (click again to reverse).
-      <b>Attempts Needed</b> = the average number of invention tries (successes AND failures) to reach your target of ${targetBPCs} successful BPC${targetBPCs > 1 ? 's' : ''}, given this decryptor's success chance - this is where the success rate actually shows up: a worse chance means more attempts, more failed datacores/decryptors spent, and a higher Total Invention Cost for the same goal.
-      <b>Buy List</b> copies the datacores + decryptors needed for that many attempts in EVE multibuy format, with your owned stock (from the location filter on the left) already deducted.
-      <b>Total Invention Cost</b> = Attempts Needed × (datacores + decryptor cost per attempt), the FULL amount regardless of stock on hand - you pay this on every attempt, win or lose. Deduct Stock (left) only affects the Buy List above, never this figure.
+      <b>Runs Needed</b> = the average number of invention runs (successes AND failures) to reach your target of ${targetBPCs} successful BPC${targetBPCs > 1 ? 's' : ''}, given this decryptor's success chance - this is where the success rate actually shows up: a worse chance means more runs, more failed datacores/decryptors spent, and a higher Total Invention Cost for the same goal.
+      <b>Buy List</b> copies the datacores + decryptors needed for that many runs in EVE multibuy format, with your owned stock (from the location filter on the left) already deducted.
+      <b>Total Invention Cost</b> = Runs Needed × (datacores + decryptor cost per run), the FULL amount regardless of stock on hand - you pay this on every run, win or lose. Deduct Stock (left) only affects the Buy List above, never this figure.
       <b>Total Mfg Cost / Total Profit</b> = manufacturing your ${targetBPCs} target BPC${targetBPCs > 1 ? 's' : ''} worth of production, at your chosen Jita buy/sell pricing, minus Total Invention Cost.
       <b>Profit / 1 Run</b> normalizes Total Profit to a single manufacturing run, so decryptors with different run counts per BPC compare fairly.
       Total Invention Cost already includes the invention job's own installation fee, and Total Mfg Cost already includes the manufacturing job's installation fee (facility tax + SCC + system cost index) - not just raw material cost. Materials/decryptors/datacores are priced by the Material Pricing setting on the left (Jita Sell = instant buy price, Jita Buy Order = cheaper but not guaranteed to fill); the resulting BPC's output is always valued at Jita Sell, as if you list it yourself (net of sales tax + broker fee) - real fills can be lower if you have to undercut competition. Not included: the T1 BPC's own acquisition cost (its price if bought fresh, or nothing if you already own the BPO and use it repeatedly).
