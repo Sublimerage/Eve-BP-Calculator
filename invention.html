@@ -56,11 +56,15 @@
 
   <div class="content-row flex-1 flex overflow-hidden relative">
 
-    <!-- Left: Search + Config -->
+    <!-- Left: Search + Config - rebuilt with the same .fo-card/.fo-row/.fo-num vocabulary the
+         Calculator's icon-rail flyout (index.html) and LP Store's own left menu (lpstore.html) use,
+         so all three pages read as one consistent control language instead of this page's own
+         earlier .lp-row/.lp-inset one-offs (dense 3-letter tax labels, a bespoke accent-bordered
+         box for Stock & Pricing that no other page had a twin for). -->
     <aside id="invention-sidebar" class="lp-card w-full md:w-[380px] flex flex-col overflow-y-auto flex-shrink-0 p-4">
 
-      <div class="lp-row">
-        <div class="lp-label mb-2">Search T2 Item to Produce</div>
+      <div class="fo-group">
+        <label class="lp-label fo-group-label" for="invention-item-search">Search T2 Item to Produce</label>
         <div class="relative">
           <input type="text" id="invention-item-search" placeholder="Search item name (e.g. Wolf)..." autocomplete="off"
             oninput="searchInventionItem(this.value)" onfocus="searchInventionItem(this.value)"
@@ -68,20 +72,22 @@
             class="field-box w-full px-3 py-2.5 text-white font-bold mono text-sm">
           <div id="invention-search-results" class="fixed bg-[#0d1922] rounded-lg max-h-60 overflow-y-auto hidden z-50 shadow-2xl"></div>
         </div>
-        <p class="text-[10px] text-slate-500 mt-2 leading-relaxed">Search for the <b>Tech 2</b> item you want to produce (e.g. "Wolf"), not the T1 item it's invented from - the T1 source and its ME/TE requirements are resolved automatically.</p>
+        <p class="fo-card-note mt-2">Search for the <b>Tech 2</b> item you want to produce (e.g. "Wolf"), not the T1 item it's invented from — the T1 source and its ME/TE requirements are resolved automatically.</p>
       </div>
 
-      <div id="invention-config-panel" class="hidden">
+      <div id="invention-config-panel" class="hidden mt-3">
 
-        <div class="lp-row flex items-center gap-3">
-          <img id="invention-item-icon" src="" alt="" class="w-12 h-12 rounded-md border border-white/10 bg-[#070b0f] flex-shrink-0">
-          <div class="min-w-0 flex-1">
-            <div id="invention-item-name" class="font-bold text-white truncate"></div>
+        <div class="fo-card">
+          <div class="flex items-center gap-3">
+            <img id="invention-item-icon" src="" alt="" class="w-12 h-12 rounded-md border border-white/10 bg-[#070b0f] flex-shrink-0">
+            <div class="min-w-0 flex-1">
+              <div id="invention-item-name" class="font-bold text-white truncate"></div>
+            </div>
           </div>
         </div>
 
-        <div class="lp-row" title="Invention consumes one copy of this blueprint per attempt (win or lose) - its own run count doesn't matter, it's used up either way.">
-          <div class="lp-label mb-2">T1 Blueprint Copy Needed</div>
+        <div class="fo-card" title="Invention consumes one copy of this blueprint per attempt (win or lose) - its own run count doesn't matter, it's used up either way.">
+          <div class="fo-card-title">T1 Blueprint Copy Needed</div>
           <div class="flex items-center gap-2.5">
             <img id="invention-t1-icon" src="" alt="" class="w-9 h-9 rounded-md border border-white/10 bg-[#070b0f] flex-shrink-0">
             <div id="invention-t1-name" class="font-bold text-sm truncate" style="color:var(--text);"></div>
@@ -93,33 +99,33 @@
              no way to see or change that here. This picker reuses the same saved presets the
              Calculator/Ledger already offer; the label under it always shows what's actually active,
              preset picked or not. -->
-        <div class="lp-row">
-          <label class="lp-label mb-2 block" for="invention-preset-select">Production Station</label>
+        <div class="fo-card">
+          <div class="fo-card-title">Production Station</div>
           <select id="invention-preset-select" onchange="applyInventionProductionPreset(this.value)" class="field-line w-full font-bold text-xs">
             <option value="">— Load a saved production station —</option>
           </select>
-          <div class="text-[10px] mono mt-1.5" style="color:var(--text-mute);">Currently: <span id="invention-active-station-label" style="color:var(--accent); font-weight:bold;">—</span></div>
+          <div class="fo-row">
+            <span class="fo-row-label">Active</span>
+            <span id="invention-active-station-label" class="fo-row-value">—</span>
+          </div>
         </div>
 
         <!-- Deduct Stock + Material Pricing lead the sidebar, not bury it below skills/datacores -
              these two settings change every number below by a wide margin, so they get the same
              "impossible to miss" treatment the other two pages already give Deduct Stock, plus an
-             accent-bordered panel here to stand out further since Material Pricing has no equivalent
+             accent-bordered card here to stand out further since Material Pricing has no equivalent
              big-button affordance of its own to lean on. -->
-        <div class="lp-row lp-inset" style="border-left:2px solid var(--accent);">
-          <div class="flex items-center justify-between mb-2.5">
-            <span class="lp-label" style="color:var(--accent);">Stock &amp; Pricing</span>
-            <button onclick="refreshLiveAssets()" class="btn-glass px-2.5 py-1 text-[10px]">Refresh Assets</button>
+        <div class="fo-card" style="border-left:2px solid var(--accent);">
+          <div class="flex items-center justify-between">
+            <div class="fo-card-title" style="color:var(--accent);">Stock &amp; Pricing</div>
+            <button onclick="refreshLiveAssets()" class="fo-mini-btn">Refresh Assets</button>
           </div>
           <!-- Exact same classes toggleDeductStockButton()/updateDeductStockButtonVisual() (config.js)
                already hardcode for the other two pages' version of this button - matching them exactly
                means the size doesn't jump on the first click, since that shared function resets
-               className to its own literal string every time it toggles (which would also silently
-               strip any margin class added here directly - the gap below is on the wrapper instead). -->
-          <div class="mb-2.5">
-            <button id="invention-deduct-stock" value="true" onclick="toggleDeductStockButton(this, 'recalculateInvention')" class="btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5" title="Materials you already own are excluded from the cost/profit math below - click to price the full amount needed instead"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg> Deducting Stock</button>
-          </div>
-          <div class="flex items-center gap-2 mb-2.5">
+               className to its own literal string every time it toggles. -->
+          <button id="invention-deduct-stock" value="true" onclick="toggleDeductStockButton(this, 'recalculateInvention')" class="btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5" title="Materials you already own are excluded from the shopping list/multibuy below - click to show the full list instead. Cost/profit above always reflects the full amount needed either way."><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg> Deducting Stock</button>
+          <div class="flex items-center gap-2">
             <label class="pill-check">
               <input type="checkbox" id="use-char-assets" checked onchange="applyStockLocationFilter()">
               <span class="pill-check-face"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/></svg>Personal</span>
@@ -129,62 +135,66 @@
               <span class="pill-check-face"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V7a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v14"/><path d="M12 11h6a1 1 0 0 1 1 1v9"/><line x1="8" y1="9" x2="8" y2="9.01"/><line x1="8" y1="13" x2="8" y2="13.01"/><line x1="8" y1="17" x2="8" y2="17.01"/><line x1="16" y1="15" x2="16" y2="15.01"/><line x1="16" y1="19" x2="16" y2="19.01"/></svg>Corp</span>
             </label>
           </div>
-          <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterLocationDropdownOptions()"
-            class="field-line w-full mb-2 text-slate-200 text-[11px] mono">
-          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="field-line w-full font-bold text-[11px] truncate mb-2.5" style="color:var(--accent);">
+          <input type="text" id="location-filter-search" autocomplete="off" placeholder="Filter locations..." oninput="filterLocationDropdownOptions()" class="fo-input">
+          <select id="stock-location-filter" onchange="applyStockLocationFilter()" class="field-line w-full font-bold text-[11px] truncate" style="color:var(--accent);">
             <option value="all" selected>All Locations (Combined Assets)</option>
             <option value="industry_system">Current System Only (JITA)</option>
           </select>
-          <div class="pt-2.5" style="border-top:1px solid rgba(255,255,255,0.06);">
-            <label class="lp-label mb-2 block" for="input-price-mode" title="How input materials/datacores/decryptor for this page's calculations are priced.">Material Pricing</label>
+          <div class="pt-2" style="border-top:1px solid rgba(255,255,255,0.06);">
+            <div class="fo-row-label mb-1.5" title="How input materials/datacores/decryptor for this page's calculations are priced.">Material Pricing</div>
             <button id="input-price-mode" value="sell" onclick="toggleMaterialPricingButton(this, 'recalculateInvention')" class="btn-glass w-full px-3 py-1.5 text-xs flex items-center justify-center gap-1.5" title="Materials/datacores/decryptor priced at the Jita sell/instant-buy price - what it actually costs to acquire them right now. Click to switch to buy order pricing."><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg> Jita Sell (Instant Buy)</button>
           </div>
         </div>
 
-        <div class="lp-row">
-          <div class="flex items-center justify-between mb-2">
-            <span class="lp-label">Base Success Chance</span>
-            <span class="text-[9px] text-slate-500" title="Auto-classified from item type. Override if you know the exact value from the in-game invention window.">auto-detected</span>
+        <div class="fo-card">
+          <div class="flex items-center justify-between">
+            <span class="fo-card-title">Base Success Chance</span>
+            <span class="fo-card-note" style="margin-top:0;" title="Auto-classified from item type. Override if you know the exact value from the in-game invention window.">auto-detected</span>
           </div>
           <div class="flex items-end gap-2">
-            <input type="text" inputmode="decimal" id="invention-base-chance" class="field-line field-editable mono w-20 text-lg font-bold" style="color:var(--accent);" oninput="sanitizeDecimalInput(event); recalculateInvention()">
-            <span class="text-xs pb-0.5" style="color:var(--text-mute);">%</span>
+            <input type="text" inputmode="decimal" id="invention-base-chance" class="fo-num" style="width:4.4em; font-size:16px; color:var(--accent) !important;" oninput="sanitizeDecimalInput(event); recalculateInvention()">
+            <span class="fo-num-suffix pb-0.5">%</span>
           </div>
         </div>
 
-        <div class="lp-row" title="How many successful T2 BPCs you want to end up with. For each decryptor, the tool works out how many invention attempts that requires on average given its success chance, then totals the cost of all those attempts (successes AND failures) plus the manufacturing cost for your target BPCs.">
-          <div class="lp-label mb-2">Target: T2 BPCs Wanted</div>
-          <div class="flex items-end gap-2">
-            <input type="number" id="invention-target-bpcs" min="1" value="1" class="field-line field-editable mono w-20 text-lg font-bold" style="color:var(--accent);" oninput="recalculateInvention()">
-            <span class="text-xs pb-0.5" style="color:var(--text-mute);">successful T2 BPCs</span>
+        <div class="fo-card" title="How many successful T2 BPCs you want to end up with. For each decryptor, the tool works out how many invention attempts that requires on average given its success chance, then totals the cost of all those attempts (successes AND failures) plus the manufacturing cost for your target BPCs.">
+          <div class="fo-row">
+            <span class="fo-row-label">Target T2 BPCs wanted</span>
+            <div class="fo-row-ctl">
+              <input type="number" id="invention-target-bpcs" min="1" value="1" class="fo-num" style="width:4.4em;" oninput="recalculateInvention()">
+            </div>
           </div>
         </div>
 
-        <!-- Same .fo-group/.lp-inset/.fo-inline-* layout the Calculator's own Taxes & Fees flyout
-             already uses for these exact 4 shared fields (index.html) - was previously reinvented
-             here with its own one-off grid + a scatter of cyan/amber colors that didn't match. -->
-        <div class="lp-row">
-          <div class="lp-label mb-2" title="Shared with the main calculator - editing here updates it there too.">Taxes &amp; Fees</div>
-          <div class="grid grid-cols-2 gap-1.5 text-[11px] mono">
-            <div class="lp-inset flex items-center gap-1.5" title="Facility/structure tax applied to every manufacturing AND invention job's installation cost.">
-              <span class="fo-inline-label">Fac</span>
-              <input type="text" inputmode="decimal" id="facility-tax" value="1.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettings(); recalculateInvention();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
-              <span class="fo-inline-suffix">%</span>
+        <div class="fo-card">
+          <div class="fo-card-title">Taxes &amp; Fees</div>
+          <div class="fo-card-note">Shared with the Calculator — editing here updates it there too.</div>
+          <div class="fo-row" title="Facility/structure tax applied to every manufacturing AND invention job's installation cost.">
+            <span class="fo-row-label">Facility tax</span>
+            <div class="fo-row-ctl">
+              <input type="text" inputmode="decimal" id="facility-tax" value="1.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettings(); recalculateInvention();" class="fo-num">
+              <span class="fo-num-suffix">%</span>
             </div>
-            <div class="lp-inset flex items-center gap-1.5" title="SCC surcharge applied to every manufacturing AND invention job's installation cost.">
-              <span class="fo-inline-label">SCC</span>
-              <input type="text" inputmode="decimal" id="scc-surcharge" value="4.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettings(); recalculateInvention();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
-              <span class="fo-inline-suffix">%</span>
+          </div>
+          <div class="fo-row" title="SCC surcharge applied to every manufacturing AND invention job's installation cost.">
+            <span class="fo-row-label">SCC surcharge</span>
+            <div class="fo-row-ctl">
+              <input type="text" inputmode="decimal" id="scc-surcharge" value="4.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettings(); recalculateInvention();" class="fo-num">
+              <span class="fo-num-suffix">%</span>
             </div>
-            <div class="lp-inset flex items-center gap-1.5" title="Sales tax deducted when selling the manufactured output.">
-              <span class="fo-inline-label">Sales</span>
-              <input type="text" inputmode="decimal" id="sales-tax" value="3.6" oninput="sanitizeDecimalInput(event); saveSharedTaxSettings(); recalculateInvention();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
-              <span class="fo-inline-suffix">%</span>
+          </div>
+          <div class="fo-row" title="Sales tax deducted when selling the manufactured output.">
+            <span class="fo-row-label">Sales tax</span>
+            <div class="fo-row-ctl">
+              <input type="text" inputmode="decimal" id="sales-tax" value="3.6" oninput="sanitizeDecimalInput(event); saveSharedTaxSettings(); recalculateInvention();" class="fo-num">
+              <span class="fo-num-suffix">%</span>
             </div>
-            <div class="lp-inset flex items-center gap-1.5" title="Broker fee, applied when selling AND when buying materials via buy orders.">
-              <span class="fo-inline-label">Broker</span>
-              <input type="text" inputmode="decimal" id="broker-fee" value="1.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettings(); recalculateInvention();" class="field-line field-editable w-full text-center font-bold p-1 text-[11px]">
-              <span class="fo-inline-suffix">%</span>
+          </div>
+          <div class="fo-row" title="Broker fee, applied when selling AND when buying materials via buy orders.">
+            <span class="fo-row-label">Broker fee</span>
+            <div class="fo-row-ctl">
+              <input type="text" inputmode="decimal" id="broker-fee" value="1.0" oninput="sanitizeDecimalInput(event); saveSharedTaxSettings(); recalculateInvention();" class="fo-num">
+              <span class="fo-num-suffix">%</span>
             </div>
           </div>
         </div>
@@ -192,13 +202,13 @@
         <!-- Collapsed by default and deliberately compact (a wrapping chip row, not one full-width
              row per skill) - these rarely need touching once auto-filled from ESI, so they no longer
              claim permanent vertical space above settings you actually adjust often. -->
-        <details class="lp-row group">
-          <summary class="cursor-pointer flex items-center justify-between list-none" style="color:var(--text-mute);">
-            <span class="lp-label">Skill Levels</span>
+        <details class="fo-card group">
+          <summary class="cursor-pointer flex items-center justify-between list-none">
+            <span class="fo-card-title">Skill Levels</span>
             <span class="group-open:rotate-90 transition-transform" style="color:var(--text-mute);"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"/></svg></span>
           </summary>
           <div id="invention-skill-inputs" class="flex flex-wrap gap-2 pt-2"></div>
-          <p class="text-[10px] mt-2" style="color:var(--text-mute);">Auto-filled from your ESI skill sheet if logged in. Edit manually otherwise.</p>
+          <p class="fo-card-note mt-2">Auto-filled from your ESI skill sheet if logged in. Edit manually otherwise.</p>
         </details>
 
       </div>
@@ -227,10 +237,10 @@
        they execute in this exact order once parsing completes - same behavior, faster to get there. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
   <script src="js/config.js?v=8.0.30" defer></script>
-  <script src="js/esi.js?v=8.0.28" defer></script>
-  <script src="js/tree.js?v=8.0.3" defer></script>
+  <script src="js/esi.js?v=8.0.29" defer></script>
+  <script src="js/tree.js?v=8.0.4" defer></script>
   <script src="js/optimizers.js?v=8.0.7" defer></script>
-  <script src="js/invention.js?v=9.11.0" defer></script>
+  <script src="js/invention.js?v=9.12.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
