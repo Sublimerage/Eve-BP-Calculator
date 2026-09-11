@@ -393,7 +393,10 @@ function renderInventionQueueBatchCard(batch) {
   const resultLabel = bestResult
     ? `${bestResult.runs} run${bestResult.runs > 1 ? 's' : ''}/BPC · ME${bestResult.me >= 0 ? '+' : ''}${bestResult.me}/TE${bestResult.te >= 0 ? '+' : ''}${bestResult.te}${bestResult.isReal ? ' · confirmed' : ''}`
     : 'ME/TE unknown';
-  const canSendToCalc = successes > 0 && batch.t2BlueprintTypeId && bestResult;
+  // Enabled off a PLANNED result too, not just a confirmed one - this queue exists to plan invention,
+  // not to gate on having already succeeded, so "Send to Calculator" should work the moment a decryptor
+  // choice gives a result to plan the follow-on build around.
+  const canSendToCalc = batch.t2BlueprintTypeId && !!bestResult;
   const disp = inventionBatchDisplayStatus(batch);
   const badgeHTML = `<span class="lp-badge" style="background:${disp.badgeBg};color:${disp.badgeColor};font-size:11px;padding:4px 10px;">${disp.icon ? window.svgIcon(disp.icon) + ' ' : ''}${disp.label}</span>`;
 
@@ -413,7 +416,7 @@ function renderInventionQueueBatchCard(batch) {
   // were never chosen here) - falls back to showing runs done instead, since "needed" has no answer.
   const runsNeeded = inventionBatchRunsNeeded(batch);
   const showRunsNeeded = runsNeeded !== null;
-  const statLabel = showRunsNeeded ? 'Runs To Start' : 'Runs Done';
+  const statLabel = showRunsNeeded ? 'Runs To Start' : 'Runs Started';
   const statValue = showRunsNeeded ? runsNeeded : runsDone;
   const statColor = showRunsNeeded && runsNeeded === 0 ? 'var(--green)' : 'var(--text)';
   const progressTitle = `${runsDone} run${runsDone !== 1 ? 's' : ''} done so far${failedRuns ? `, ${failedRuns} failed` : ''}`;
@@ -438,8 +441,8 @@ function renderInventionQueueBatchCard(batch) {
         <div class="text-right text-xs" style="color:var(--text-mute);" title="${progressTitle}">${successes}/${batch.targetBPCs} successful BPC${batch.targetBPCs > 1 ? 's' : ''}</div>
       </div>
       <div class="mt-3 flex items-center gap-2">
-        <button onclick="sendInventionQueueBatchToCalculator('${batch.id}')" class="btn-glass px-3 py-1.5 text-xs" ${canSendToCalc ? '' : 'disabled'} title="${canSendToCalc ? (bestResult.isReal ? 'Uses the CONFIRMED real ME/TE/runs read from your blueprint list' : 'Uses the PLANNED ME/TE/runs (no confirmed real result matched yet)') : 'No confirmed success with known ME/TE yet'}">Send to Calculator</button>
-        <button onclick="abandonInventionQueueBatch('${batch.id}')" class="btn-glass btn-glass-muted px-3 py-1.5 text-xs" title="Remove from queue">Remove</button>
+        <button onclick="sendInventionQueueBatchToCalculator('${batch.id}')" class="btn-glass px-2.5 py-1 text-[11px]" ${canSendToCalc ? '' : 'disabled'} title="${canSendToCalc ? (bestResult.isReal ? 'Uses the CONFIRMED real ME/TE/runs read from your blueprint list' : 'Uses the PLANNED ME/TE/runs (no confirmed real result matched yet)') : 'No planned or confirmed result to build yet'}">Send to Calculator</button>
+        <button onclick="abandonInventionQueueBatch('${batch.id}')" class="btn-glass btn-glass-muted px-2.5 py-1 text-[11px]" title="Remove from queue">Remove</button>
       </div>
     </div>
   `;
@@ -478,7 +481,39 @@ function renderInventionQueue() {
     const rank = s => s === 'complete' ? 2 : s === 'active' ? 0 : 1;
     return rank(a.status) - rank(b.status) || (b.addedAt || '').localeCompare(a.addedAt || '');
   });
-  list.innerHTML = sorted.map(renderInventionQueueBatchCard).join('');
+
+  // Same Started/Queued split as the Ledger's own In Progress/Pending groups (js/ledger.js
+  // renderJournalPage) - a batch moves into "Started" the moment Sync EVE Jobs matches a real
+  // attempt against it (see syncInventionQueueWithEve setting batch.status = 'active'/'complete'),
+  // so this reads as "what's actually running or done in-game" vs "still just a plan".
+  const startedBatches = sorted.filter(b => b.status === 'active' || b.status === 'complete');
+  const queuedBatches = sorted.filter(b => b.status === 'planned');
+  let html = '';
+  if (startedBatches.length > 0) {
+    html += `
+      <div class="mb-2.5">
+        <div class="lp-group-header is-active mb-2.5">
+          <span class="flex-shrink-0" style="color:var(--accent);">${window.svgIcon('activity')}</span>
+          <span class="font-extrabold text-base rajdhani uppercase tracking-wider" style="color:var(--accent);">Started</span>
+          <span class="font-bold text-sm mono" style="color:var(--accent);">(${startedBatches.length})</span>
+        </div>
+        <div class="space-y-2.5">${startedBatches.map(renderInventionQueueBatchCard).join('')}</div>
+      </div>
+    `;
+  }
+  if (queuedBatches.length > 0) {
+    html += `
+      <div>
+        <div class="lp-group-header mb-2.5">
+          <span class="flex-shrink-0" style="color:var(--text-mute);">${window.svgIcon('hourglass')}</span>
+          <span class="font-extrabold text-base rajdhani uppercase tracking-wider" style="color:var(--text);">Queued</span>
+          <span class="font-bold text-sm mono" style="color:var(--text-mute);">(${queuedBatches.length})</span>
+        </div>
+        <div class="space-y-2.5">${queuedBatches.map(renderInventionQueueBatchCard).join('')}</div>
+      </div>
+    `;
+  }
+  list.innerHTML = html;
   renderInventionQueueBom();
 }
 window.renderInventionQueue = renderInventionQueue;
