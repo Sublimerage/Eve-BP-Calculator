@@ -1838,6 +1838,45 @@ async function fetchActiveCorpIndustryJobs() {
 }
 window.fetchActiveCorpIndustryJobs = fetchActiveCorpIndustryJobs;
 
+// include_completed=true variants of the two functions above - needed to see a job AFTER it leaves
+// the active list. This is the only way to learn whether an INVENTION job actually succeeded:
+// ESI's job object carries a `successful_runs` field, confirmed via the ESI schema docs, described
+// as "Number of successful runs for this job. Equal to runs unless this is an invention job" - so
+// for invention specifically it's the real win/lose signal (0 = failed, >0 = succeeded), available
+// once the job's status becomes 'delivered'. Used by js/invention-queue.js, not the manufacturing
+// Ledger (which only cares whether a job is currently active).
+async function fetchCompletedIndustryJobs() {
+  const charId = getActiveCharId();
+  const accessToken = getActiveCharacterToken();
+  if (!charId || !accessToken) return null; // not logged in
+  try {
+    const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/industry/jobs/?datasource=tranquility&include_completed=true`, { cache: 'no-store' }, accessToken, true, charId);
+    if (!res || !res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    console.warn('Completed industry jobs fetch failed:', e);
+    return null;
+  }
+}
+window.fetchCompletedIndustryJobs = fetchCompletedIndustryJobs;
+
+async function fetchCompletedCorpIndustryJobs() {
+  const activeRecord = getActiveCharacterRecord();
+  const corpId = activeRecord && activeRecord.corpId;
+  const accessToken = activeRecord && activeRecord.accessToken;
+  if (!corpId || !accessToken) return [];
+  try {
+    const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/industry/jobs/?datasource=tranquility&include_completed=true`, { cache: 'no-store' }, accessToken, true, activeRecord.charId);
+    if (!res || !res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.warn('Completed corp industry jobs fetch failed (likely missing Factory Manager role):', e);
+    return [];
+  }
+}
+window.fetchCompletedCorpIndustryJobs = fetchCompletedCorpIndustryJobs;
+
 // Fetches the character's owned blueprints (with real ME/TE research levels) from ESI. A job's
 // blueprint_id references a specific blueprint item instance - this is the only place its actual
 // researched ME/TE lives, since the industry jobs endpoint itself doesn't carry that data.

@@ -647,6 +647,38 @@ function sendInventionRowToCalculator(rowIndex) {
 }
 window.sendInventionRowToCalculator = sendInventionRowToCalculator;
 
+// Queues this decryptor's plan into the Invention Job Queue (js/invention-queue.js) - separate
+// storage from the manufacturing Ledger, since an invention "job" is a batch of probabilistic
+// attempts (0+ successes out of N tries), not a single deterministic build. Reads _inventionCurrentBlueprint
+// (module-scope, only accessible from this file) for the T1 blueprint's own type id, which
+// js/invention-queue.js needs to match this batch against real in-game invention jobs later (ESI's
+// job object carries blueprint_type_id for the T1 BPC being invented from, and product_type_id for
+// the T2 BLUEPRINT COPY it produces - NOT the ship itself, since that's what an invention job
+// actually creates).
+function queueInventionRow(rowIndex) {
+  const row = _inventionLastComparisonRows[rowIndex];
+  if (!row || !_inventionCurrentBlueprint) return;
+  if (typeof window.addInventionQueueBatch !== 'function') return;
+  const t1Recipe = _inventionCurrentBlueprint;
+  const t1BlueprintName = window.EVE_ITEMS[t1Recipe.blueprintTypeID] || `${t1Recipe.productName || 'T1 item'} Blueprint`;
+  window.addInventionQueueBatch({
+    t2BlueprintTypeId: row.t2BlueprintTypeId,
+    t2ProductTypeId: _inventionCurrentProduct ? _inventionCurrentProduct.typeId : null,
+    t2ProductName: row.t2ProductName,
+    t1BlueprintTypeId: t1Recipe.blueprintTypeID,
+    t1BlueprintName: t1BlueprintName,
+    decryptorName: row.dec.name,
+    resultME: row.resultME,
+    resultTE: row.resultTE,
+    resultRuns: row.resultRuns,
+    targetBPCs: Math.max(1, parseInt(document.getElementById('invention-target-bpcs')?.value) || 1),
+    successChance: row.successChance,
+    plannedAttempts: isFinite(row.requiredAttempts) ? row.requiredAttempts : null,
+    estimatedCost: isFinite(row.totalInventionCost) ? row.totalInventionCost : null
+  });
+}
+window.queueInventionRow = queueInventionRow;
+
 function renderInventionComparisonTable(rows) {
   const container = document.getElementById('invention-comparison-table');
   if (!container) return;
@@ -682,6 +714,7 @@ function renderInventionComparisonTable(rows) {
           ${sortHeader('profitPerRun', 'Profit / 1 Run', 'right')}
           <th class="text-right">Buy List</th>
           <th class="text-right">Calculator</th>
+          <th class="text-right">Queue</th>
         </tr>
       </thead>
       <tbody>
@@ -710,6 +743,9 @@ function renderInventionComparisonTable(rows) {
             <td class="text-right">
               <button onclick="sendInventionRowToCalculator(${rowIndex})" class="lp-chip-btn" style="padding:5px 7px;" ${r.t2BlueprintTypeId ? '' : 'disabled'} title="Open this decryptor's resulting BPC in the Calculator, already set to its ${r.resultRuns} max run${r.resultRuns > 1 ? 's' : ''} and ME${r.resultME >= 0 ? '+' : ''}${r.resultME}/TE${r.resultTE >= 0 ? '+' : ''}${r.resultTE}"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg></button>
             </td>
+            <td class="text-right">
+              <button onclick="queueInventionRow(${rowIndex})" class="lp-chip-btn" style="padding:5px 7px;" title="Add this decryptor + target to the Invention Job Queue below - tracks your real in-game invention attempts against it via EVE SSO once you run them"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M12 5v14M5 12h14"/></svg></button>
+            </td>
           </tr>
         `; }).join('')}
       </tbody>
@@ -718,7 +754,7 @@ function renderInventionComparisonTable(rows) {
       Click any column header to sort by it (click again to reverse).
       <b>Attempts Needed</b> = the average number of invention tries (successes AND failures) to reach your target of ${targetBPCs} successful BPC${targetBPCs > 1 ? 's' : ''}, given this decryptor's success chance - this is where the success rate actually shows up: a worse chance means more attempts, more failed datacores/decryptors spent, and a higher Total Invention Cost for the same goal.
       <b>Buy List</b> copies the datacores + decryptors needed for that many attempts in EVE multibuy format, with your owned stock (from the location filter on the left) already deducted.
-      <b>Total Invention Cost</b> = Attempts Needed × (datacores + decryptor cost per attempt), net of owned stock - you pay this on every attempt, win or lose.
+      <b>Total Invention Cost</b> = Attempts Needed × (datacores + decryptor cost per attempt), the FULL amount regardless of stock on hand - you pay this on every attempt, win or lose. Deduct Stock (left) only affects the Buy List above, never this figure.
       <b>Total Mfg Cost / Total Profit</b> = manufacturing your ${targetBPCs} target BPC${targetBPCs > 1 ? 's' : ''} worth of production, at your chosen Jita buy/sell pricing, minus Total Invention Cost.
       <b>Profit / 1 Run</b> normalizes Total Profit to a single manufacturing run, so decryptors with different run counts per BPC compare fairly.
       Total Invention Cost already includes the invention job's own installation fee, and Total Mfg Cost already includes the manufacturing job's installation fee (facility tax + SCC + system cost index) - not just raw material cost. Materials/decryptors/datacores are priced by the Material Pricing setting on the left (Jita Sell = instant buy price, Jita Buy Order = cheaper but not guaranteed to fill); the resulting BPC's output is always valued at Jita Sell, as if you list it yourself (net of sales tax + broker fee) - real fills can be lower if you have to undercut competition. Not included: the T1 BPC's own acquisition cost (its price if bought fresh, or nothing if you already own the BPO and use it repeatedly).
@@ -892,6 +928,10 @@ window.onload = async () => {
   loadSharedTaxSettings();
   renderInventionPresetDropdown();
   renderInventionActiveStationLabel();
+  // Instant repaint of whatever the queue looked like last session, before any network call -
+  // same "show the cached answer immediately, then refresh in the background" pattern the rest of
+  // this app already uses.
+  if (typeof window.renderInventionQueue === 'function') window.renderInventionQueue();
   // Restore the last-viewed item's search box/icon/name/skill inputs FIRST, before any network
   // calls - these all come from local data (recipeMap, localStorage), so there's no reason to make
   // the user stare at a blank page for a second or two while SSO callback handling, system cost
@@ -907,6 +947,13 @@ window.onload = async () => {
   if (typeof window.handleEsiSSOCallback === 'function') {
     try { await window.handleEsiSSOCallback(); } catch (e) { console.error('SSO callback error:', e); }
   }
+  // Silent (no button-disable, no toast) - same convention js/ledger.js's own on-load sync uses.
+  // Also kicks off the periodic background re-check (js/invention-queue.js) so a job that finishes
+  // while this tab stays open still gets picked up without a manual refresh.
+  if (typeof window.syncInventionQueueWithEve === 'function') {
+    window.syncInventionQueueWithEve(true).catch(e => console.warn('[Invention] Queue sync error:', e));
+  }
+  if (typeof window.scheduleInventionQueueBackgroundSync === 'function') window.scheduleInventionQueueBackgroundSync();
   // System cost index (needed for job fees) and adjusted prices (needed for EIV) - the calculator
   // and ledger both fetch these on load already; this page needs them too now that job fees are
   // calculated here.
