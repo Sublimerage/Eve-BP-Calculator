@@ -59,6 +59,33 @@ function inventionBatchBestResult(batch) {
   if (batch.resultRuns !== null && batch.resultRuns !== undefined) return { me: batch.resultME, te: batch.resultTE, runs: batch.resultRuns, isReal: false };
   return null;
 }
+// How many MORE attempts the queue-time plan estimated you'd still need, given attempts already run -
+// e.g. planned 4 to reach the target, already ran 1, so 3 left. null (not a number) when there's no
+// plan to estimate from at all (an auto-imported batch, decryptor never confirmed) - shown/used
+// differently from "0 more needed" (on track) by callers.
+function inventionBatchRemainingPlannedAttempts(batch) {
+  if (!batch.plannedAttempts) return null;
+  return Math.max(0, batch.plannedAttempts - inventionBatchTotalAttempts(batch));
+}
+// Four visually distinct states, not just "complete or not" - a batch nobody has touched yet reads
+// very differently from one that's actively running in-game, which reads differently again from one
+// where every attempt so far has failed and nothing is currently running (needs your attention: go
+// queue more attempts in-game, or accept the shortfall).
+function inventionBatchDisplayStatus(batch) {
+  const successes = inventionBatchSuccesses(batch);
+  const inProgressRuns = inventionBatchInProgressRuns(batch);
+  const totalRun = inventionBatchTotalAttempts(batch);
+  if (batch.status === 'complete' || successes >= batch.targetBPCs) {
+    return { key: 'complete', label: 'Complete', badgeBg: 'rgba(76,196,145,0.18)', badgeColor: 'var(--green)', border: 'var(--green)', icon: 'check' };
+  }
+  if (inProgressRuns > 0) {
+    return { key: 'in_progress', label: 'In Progress', badgeBg: 'rgba(106,152,222,0.2)', badgeColor: 'var(--blue-300)', border: 'var(--blue)', icon: 'hourglass' };
+  }
+  if (totalRun > 0) {
+    return { key: 'needs_more', label: 'Needs More Attempts', badgeBg: 'rgba(221,107,100,0.18)', badgeColor: 'var(--red-300)', border: 'var(--red)', icon: 'warning' };
+  }
+  return { key: 'planned', label: 'Planned', badgeBg: 'rgba(255,255,255,0.07)', badgeColor: 'var(--text-mute)', border: 'rgba(255,255,255,0.18)', icon: null };
+}
 
 // --- View mode (Compare Decryptors <-> Job Queue) ---
 
@@ -76,6 +103,23 @@ function setInventionViewMode(mode) {
   if (mode === 'queue') renderInventionQueueBom();
 }
 window.setInventionViewMode = setInventionViewMode;
+
+// Settles on whichever view (Compare/Queue) to show on page load - called once from js/invention.js's
+// window.onload, after both a restored item's Compare data and the cached queue have rendered.
+// Prefers your last-used view when there's actually content for it, falls back sensibly otherwise
+// (an item was restored but the queue's empty -> Compare; only a queue exists -> Queue; neither ->
+// leave the initial "search for an item" empty-state showing).
+function restoreInventionViewModeOnLoad() {
+  const hasCompareContent = (document.getElementById('invention-summary-tiles')?.children.length || 0) > 0;
+  const hasQueueContent = loadInventionQueue().length > 0;
+  if (!hasCompareContent && !hasQueueContent) return;
+  const saved = localStorage.getItem(INVENTION_VIEW_MODE_KEY);
+  const mode = (saved === 'queue' && hasQueueContent) ? 'queue'
+    : (saved === 'compare' && hasCompareContent) ? 'compare'
+    : hasCompareContent ? 'compare' : 'queue';
+  setInventionViewMode(mode);
+}
+window.restoreInventionViewModeOnLoad = restoreInventionViewModeOnLoad;
 
 // Called by js/invention.js's queueInventionRow() with a plain data object - this function owns
 // giving it an id/status/attempts array and persisting it.
@@ -359,15 +403,6 @@ if (!window._inventionJobTimerIntervalStarted) {
 
 // --- Rendering ---
 
-function inventionQueueStatusBadge(batch) {
-  const successes = inventionBatchSuccesses(batch);
-  const inProgressRuns = inventionBatchInProgressRuns(batch);
-  if (batch.status === 'complete') return `<span class="lp-badge" style="background:rgba(76,196,145,0.18);color:var(--green);">${window.svgIcon('check')} Complete</span>`;
-  if (inProgressRuns > 0) return `<span class="lp-badge" style="background:rgba(217,184,74,0.18);color:#e7cd77;">${window.svgIcon('hourglass')} In Progress</span>`;
-  if (successes > 0) return `<span class="lp-badge lp-badge-accent">${window.svgIcon('check')} ${successes} Success${successes > 1 ? 'es' : ''}</span>`;
-  return `<span class="lp-badge">Planned</span>`;
-}
-
 function renderInventionQueueBatchCard(batch) {
   const successes = inventionBatchSuccesses(batch);
   const totalRun = inventionBatchTotalAttempts(batch);
@@ -378,6 +413,16 @@ function renderInventionQueueBatchCard(batch) {
     ? `${bestResult.runs} run${bestResult.runs > 1 ? 's' : ''}, ME${bestResult.me >= 0 ? '+' : ''}${bestResult.me}/TE${bestResult.te >= 0 ? '+' : ''}${bestResult.te}${bestResult.isReal ? ' (confirmed)' : ' (planned)'}`
     : 'ME/TE unknown';
   const canSendToCalc = successes > 0 && batch.t2BlueprintTypeId && bestResult;
+  const disp = inventionBatchDisplayStatus(batch);
+  const badgeHTML = `<span class="lp-badge" style="background:${disp.badgeBg};color:${disp.badgeColor};">${disp.icon ? window.svgIcon(disp.icon) + ' ' : ''}${disp.label}</span>`;
+
+  // How many attempts the original plan estimated were still needed, now netted against what's
+  // actually been run - e.g. "~3 more planned" once 1 of a planned 4 has been run. null when there's
+  // nothing to estimate from (auto-imported, decryptor never confirmed).
+  const remainingPlanned = inventionBatchRemainingPlannedAttempts(batch);
+  const plannedLabel = batch.plannedAttempts
+    ? (remainingPlanned > 0 ? ` &middot; ~${remainingPlanned} more attempt${remainingPlanned > 1 ? 's' : ''} planned` : ' &middot; plan fulfilled')
+    : '';
 
   // In-progress attempts each carry their own end_date (several jobs can run in parallel across
   // job slots) - show the soonest, with a count if more than one is running.
@@ -390,8 +435,12 @@ function renderInventionQueueBatchCard(batch) {
     timerHTML = `<div class="inv-job-timer text-[11px] font-bold mono" data-end-ms="${endMs}" style="color:var(--blue-300);">${window.formatDurationCompact(Math.max(0, (endMs - Date.now()) / 1000))} remaining</div><div class="text-[10px]" style="color:var(--text-mute);">${extra}</div>`;
   }
 
+  // Manual log defaults to however many attempts the plan still expects (falls back to 1 with no
+  // plan to go on) - so logging a batch you just ran in-game doesn't need retyping that number.
+  const manualDefaultRuns = remainingPlanned !== null && remainingPlanned > 0 ? remainingPlanned : 1;
+
   return `
-    <div class="lp-inset p-3" style="border-left:3px solid ${batch.status === 'complete' ? 'var(--green)' : 'var(--accent)'};">
+    <div class="lp-inset p-3" style="border-left:3px solid ${disp.border}; ${disp.key === 'needs_more' ? 'background:rgba(221,107,100,0.05);' : ''}">
       <div class="flex items-center justify-between gap-2">
         <div class="flex items-center gap-2 min-w-0">
           <img src="https://images.evetech.net/types/${batch.t2ProductTypeId || batch.t2BlueprintTypeId}/icon?size=32" alt="" class="w-8 h-8 rounded flex-shrink-0" loading="lazy" onerror="this.style.visibility='hidden'">
@@ -400,10 +449,10 @@ function renderInventionQueueBatchCard(batch) {
             <div class="text-[10px] mono truncate" style="color:var(--text-mute);">${window.esc(decLabel)} &middot; target ${batch.targetBPCs} BPC${batch.targetBPCs > 1 ? 's' : ''} &middot; ${window.esc(resultLabel)}</div>
           </div>
         </div>
-        <div class="flex-shrink-0 text-right">${inventionQueueStatusBadge(batch)}${timerHTML}</div>
+        <div class="flex-shrink-0 text-right">${badgeHTML}${timerHTML}</div>
       </div>
       <div class="mt-2 flex items-center justify-between gap-2 text-xs mono flex-wrap">
-        <span style="color:var(--text-mute);">${successes}/${batch.targetBPCs} successes &middot; ${totalRun} attempt${totalRun !== 1 ? 's' : ''} run${failedRuns ? ` &middot; ${failedRuns} failed` : ''}</span>
+        <span style="color:var(--text-mute);">${successes}/${batch.targetBPCs} successes &middot; ${totalRun} attempt${totalRun !== 1 ? 's' : ''} run${failedRuns ? ` &middot; ${failedRuns} failed` : ''}${plannedLabel}</span>
         <div class="flex items-center gap-1.5">
           <button onclick="sendInventionQueueBatchToCalculator('${batch.id}')" class="lp-chip-btn" style="padding:4px 7px;" ${canSendToCalc ? '' : 'disabled'} title="${canSendToCalc ? (bestResult.isReal ? 'Open the resulting BPC in the Calculator, using its CONFIRMED real ME/TE/runs read from your blueprint list' : 'Open the resulting BPC in the Calculator, using the PLANNED ME/TE/runs (no confirmed real result matched yet)') : 'No confirmed success with known ME/TE yet'}">${window.svgIcon('trending')}</button>
           <button onclick="abandonInventionQueueBatch('${batch.id}')" class="lp-chip-btn" style="padding:4px 7px;" title="Remove from queue">${window.svgIcon('x')}</button>
@@ -411,7 +460,7 @@ function renderInventionQueueBatchCard(batch) {
       </div>
       <div class="mt-2 pt-2 flex items-center gap-1.5 text-[11px]" style="border-top:1px solid rgba(255,255,255,0.06);">
         <span style="color:var(--text-mute);" title="EVE only reports an invention job's outcome as one final tally (attempts run, how many succeeded) once it completes - never per-attempt - so this logs a batch, not a single click.">Log result:</span>
-        <input type="number" id="inv-manual-runs-${batch.id}" min="1" value="1" placeholder="Attempts" class="fo-num" style="width:3.4em;padding:3px 5px;">
+        <input type="number" id="inv-manual-runs-${batch.id}" min="1" value="${manualDefaultRuns}" placeholder="Attempts" class="fo-num" style="width:3.4em;padding:3px 5px;">
         <span style="color:var(--text-mute);">run,</span>
         <input type="number" id="inv-manual-success-${batch.id}" min="0" value="0" placeholder="Successes" class="fo-num" style="width:3.4em;padding:3px 5px;">
         <span style="color:var(--text-mute);">succeeded</span>

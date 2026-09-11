@@ -264,6 +264,11 @@ async function selectInventionItem(typeId, name, skipSave) {
 
   if (!skipSave) saveInventionState();
   recalculateInventionImpl();
+  // A fresh pick (not a page-load restore - see skipSave's own comment on the two call sites) always
+  // takes you to Compare, since you just asked to see this item's numbers. A restore instead leaves
+  // view-mode entirely to restoreInventionViewModeOnLoad() (js/invention-queue.js), which respects
+  // whichever view you had open last session.
+  if (!skipSave && typeof window.setInventionViewMode === 'function') window.setInventionViewMode('compare');
 }
 window.selectInventionItem = selectInventionItem;
 
@@ -537,11 +542,15 @@ async function recalculateInventionImpl() {
   renderInventionSummaryTiles(rows);
   renderInventionActiveStationLabel();
 
+  // This function reruns on EVERY settings tweak (Deduct Stock, tax edits, target BPCs, a loaded
+  // preset, ...), not just a fresh item pick - it must never force which view (Compare/Queue) is
+  // showing, or toggling Deduct Stock while looking at the Queue view would silently yank you back
+  // to Compare every time. Only unhide the switch bar / hide the initial empty-state, both safe
+  // regardless of which view is active; setInventionViewMode itself is only ever called from a real
+  // "show me this view" moment - selectInventionItem's own fresh-pick branch, a manual tab click, or
+  // restoreInventionViewModeOnLoad() on page load.
   document.getElementById('invention-mode-switch').classList.remove('hidden');
   document.getElementById('invention-empty-state').classList.add('hidden');
-  // A fresh search result always takes you to Compare (that's what you just asked to see) - you can
-  // still flip to Job Queue afterward, same as any other time.
-  if (typeof window.setInventionViewMode === 'function') window.setInventionViewMode('compare');
 }
 let _recalculateInventionDebounceTimer = null;
 // The public name every HTML oninput handler calls. Debouncing serializes rapid repeated triggers
@@ -972,6 +981,9 @@ window.onload = async () => {
   } catch (e) {
     console.warn('[Invention] Failed to restore previous session state:', e);
   }
+  // Now that both the restored item (if any) and the cached queue have rendered, settle on whichever
+  // view you actually had open last session instead of always defaulting to Compare.
+  if (typeof window.restoreInventionViewModeOnLoad === 'function') window.restoreInventionViewModeOnLoad();
 
   if (typeof window.handleEsiSSOCallback === 'function') {
     try { await window.handleEsiSSOCallback(); } catch (e) { console.error('SSO callback error:', e); }
