@@ -1365,16 +1365,18 @@ html[data-theme="violet"] body.page-calc {
    "Proprietary Notices" - Developer must retain a notice substantially in this form). CCP hf. has
    rebranded to Fenris Creations (confirmed live on eveonline.com's own site footer, which now reads
    "EVE Online(r) and Fenris Creations(tm)... are trademarks of Fenris Creations" / "(c) Fenris
-   Creations. All rights reserved.") - this mirrors that exact current wording. Kept deliberately
-   thin (flex-shrink:0 in the body's own flex column, a few px of padding) since this is a
-   data-dense tool, not a page with room to spare for a large footer. */
+   Creations. All rights reserved.") - this mirrors that exact current wording, shortened to fit a
+   single thin line. Kept deliberately tiny (flex-shrink:0 in the body's own flex column, minimal
+   padding, reduced opacity) since this is a data-dense tool, not a page with room to spare for a
+   large footer. */
 .site-legal-footer {
   flex-shrink: 0;
-  padding: 6px 20px;
-  font-size: 10px;
-  line-height: 1.4;
+  padding: 2px 16px;
+  font-size: 9px;
+  line-height: 1.3;
   color: var(--text-mute);
   text-align: center;
+  opacity: 0.65;
 }
 
 /* Community & Support trigger - a labeled .btn-glass (the same "loud, bright, primary" treatment
