@@ -1385,6 +1385,13 @@ html[data-theme="violet"] body.page-calc {
   color: var(--text-mute);
   text-align: center;
 }
+.site-legal-footer a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(255,255,255,0.25);
+  text-underline-offset: 2px;
+}
+.site-legal-footer a:hover { color: var(--text); text-decoration-color: currentColor; }
 
 /* Community & Support trigger - a labeled .btn-glass (the same "loud, bright, primary" treatment
    as any other true call-to-action button), not a bare 30px icon glyph with only a hover tooltip to
