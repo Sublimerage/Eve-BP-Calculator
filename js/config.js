@@ -191,11 +191,12 @@ const SVG_ICON_PATHS = {
   eye: '<path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/>',
   lock: '<rect x="4" y="10.5" width="16" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>',
   package: '<path d="M21 8 12 3 3 8l9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><line x1="12" y1="13" x2="12" y2="21"/>',
-  // A paint roller - SKINs are cosmetic ship reskins, and this reads as "paint/cosmetic" at a glance
-  // in a way the generic package/box icon never did. Used both for the SKINs category pill and as the
-  // fallback glyph when a SKIN's image 404s on both the icon and render endpoints (the confirmed real
-  // case this fallback exists for - see handleItemIconLoadError's own comment).
-  skin: '<rect x="3" y="3" width="14" height="6" rx="1.5"/><rect x="8" y="9" width="4" height="3"/><line x1="10" y1="12" x2="10" y2="21"/>',
+  // A paint droplet - SKINs are cosmetic ship reskins, and a drop of paint reads as "cosmetic/color"
+  // clearly even at 14-16px, where the earlier paint-roller design read as an ambiguous blob. Used
+  // both for the SKINs category pill and as the fallback glyph when a SKIN's image 404s on both the
+  // icon and render endpoints (the confirmed real case this fallback exists for - see
+  // handleItemIconLoadError's own comment).
+  skin: '<path d="M12 2.69 17.66 8.35a8 8 0 1 1-11.31 0z"/>',
   pin: '<path d="M12 21s7-5.2 7-11a7 7 0 0 0-14 0c0 5.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',
   trending: '<polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/>',
   award: '<circle cx="12" cy="8" r="6"/><path d="M15.5 12.5 17 22l-5-3-5 3 1.5-9.5"/>',
