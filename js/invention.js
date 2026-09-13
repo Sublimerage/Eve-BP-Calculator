@@ -577,14 +577,19 @@ window.recalculateInvention = recalculateInvention;
 function renderInventionSummaryTiles(rows) {
   const container = document.getElementById('invention-summary-tiles');
   if (!container || rows.length === 0) return;
-  const best = rows.reduce((a, b) => (b.totalProfit > a.totalProfit ? b : a), rows[0]);
+  // Ranked by profit per manufacturing run, not total profit - total profit rewards whichever
+  // decryptor happens to need the most runs to hit your target BPC count, which isn't actually
+  // "better", just bigger. Per-run profit is what's comparable across decryptors regardless of
+  // target size (and normalizes for decryptors like Augmentation that produce extra runs/BPC -
+  // see profitPerRun's own definition above).
+  const best = rows.reduce((a, b) => (b.profitPerRun > a.profitPerRun ? b : a), rows[0]);
   const targetBPCs = Math.max(1, parseInt(document.getElementById('invention-target-bpcs').value) || 1);
 
   container.innerHTML = `
     <div class="lp-tile">
       <div class="lp-label truncate">Best Option</div>
       <div class="text-base font-bold mono leading-tight truncate" style="color:var(--accent);">${window.esc(best.dec.name)}</div>
-      <div class="text-xs mt-0.5" style="color:var(--text-mute);">${best.successChance.toFixed(1)}% success chance</div>
+      <div class="text-xs mt-0.5" style="color:var(--text-mute);">${isFinite(best.profitPerRun) ? Math.round(best.profitPerRun).toLocaleString() + ' ISK/run' : '—'} &middot; ${best.successChance.toFixed(1)}% success</div>
     </div>
     <div class="lp-tile">
       <div class="lp-label truncate">Runs Needed</div>
@@ -615,7 +620,7 @@ function renderInventionSummaryTiles(rows) {
 }
 
 let _inventionLastComparisonRows = [];
-let _inventionSortColumn = 'totalProfit';
+let _inventionSortColumn = 'profitPerRun';
 let _inventionSortDescending = true;
 
 function sortInventionComparisonBy(column) {
@@ -727,7 +732,10 @@ function renderInventionComparisonTable(rows) {
   const container = document.getElementById('invention-comparison-table');
   if (!container) return;
   _inventionLastComparisonRows = rows;
-  const bestProfit = rows.length > 0 ? Math.max(...rows.map(r => r.totalProfit)) : 0;
+  // Same profit-PER-RUN ranking the summary tiles' own "Best Option" uses (see
+  // renderInventionSummaryTiles) - keeps the table's award icon pointing at the same decryptor,
+  // not a different one picked by total profit.
+  const bestProfit = rows.length > 0 ? Math.max(...rows.map(r => r.profitPerRun)) : 0;
   const targetBPCs = Math.max(1, parseInt(document.getElementById('invention-target-bpcs').value) || 1);
 
   const sortedRows = [...rows].sort((a, b) => {
@@ -763,7 +771,7 @@ function renderInventionComparisonTable(rows) {
       </thead>
       <tbody>
         ${sortedRows.map(r => {
-          const isBest = r.totalProfit === bestProfit && bestProfit > -Infinity;
+          const isBest = r.profitPerRun === bestProfit && bestProfit > -Infinity;
           const rowIndex = rows.indexOf(r);
           const perAttemptSeconds = r.requiredRuns > 0 ? r.totalInventionSeconds / r.requiredRuns : 0;
           const timeTitle = (r.totalTimeSeconds !== null && isFinite(r.totalTimeSeconds))
