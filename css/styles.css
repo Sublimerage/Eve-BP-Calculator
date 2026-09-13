@@ -263,22 +263,26 @@ img {
   box-shadow: var(--glass-shadow);
 }
 .glass-card { border-radius: var(--radius-card); }
-header { height: 56px; flex-shrink: 0; }
-/* Three-column header grid (left brand+nav / centered site title / right utilities), replacing a
-   flex row with `justify-content:space-between`. That flex version centered the site-title child
-   in whatever space was LEFT OVER between the two flex-shrink-0 side groups - looked fine on any
-   one page alone, but the right-hand group's own width varies a lot page to page (the Calculator's
-   search+My Blueprints+refresh/paste+status cluster vs. the other three pages' bare theme+login),
-   so the leftover space's midpoint - and therefore the title - landed at a different X on every
-   page (reported directly). A grid's center TRACK is sized purely from its own content plus the
-   two `1fr` side tracks splitting whatever's left EQUALLY, so it lands at the same X everywhere
-   regardless of how much either side group contains. minmax(0,...) on the side tracks lets their
-   content overflow past the track boundary exactly as the old flex-shrink-0 groups already did,
-   rather than force-growing the grid past the viewport if one side's content is wide. */
-body.page-calc .site-header-row {
-  display: grid;
-  grid-template-columns: minmax(0,1fr) auto minmax(0,1fr);
-  align-items: center;
+header { height: 56px; flex-shrink: 0; position: relative; }
+/* Site title centered on the header's own total width via absolute positioning - NOT flex/grid
+   distribution. Two earlier attempts both touched the header's actual layout and both broke
+   something: a flex `flex:1` child between the two side groups centered in whatever space was left
+   OVER between them, which shifted per page since the right-hand group's width varies a lot
+   (Calculator's utility cluster vs. the other pages' bare theme+login) - reported as misaligned.
+   Converting the header to a 3-column grid fixed that centering but changed how the two side
+   groups themselves size and wrap internally (their flex-wrap content wrapped a second row that
+   never happened under plain flex) - reported directly as "buttons moved, login isn't where it
+   used to be". Absolute positioning leaves the header's own flex layout for the left/right groups
+   completely untouched - pixel-identical to how it always worked - while the title still lands at
+   the exact page-center X on every page, since the math comes from the header's own box width, not
+   from either sibling's content. */
+.site-title-centered {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 /* Same soft-tint treatment as .btn-glass-muted - a fully transparent resting state (the original
