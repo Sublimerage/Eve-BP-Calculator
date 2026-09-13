@@ -300,7 +300,7 @@ const LP_CATEGORY_FILTERS = [
   { id: '18', label: 'Drones', icon: 'drone' },
   { id: '20', label: 'Implants', icon: 'cpu' },
   { id: '16', label: 'Skillbooks', icon: 'book' },
-  { id: '91', label: 'SKINs', icon: 'layers' },
+  { id: '91', label: 'SKINs', icon: 'skin' },
   { id: 'other', label: 'Other', icon: 'package' }
 ];
 
@@ -1634,17 +1634,12 @@ function getLPStoreIconUrl(typeId, isBpc, size) {
   return `https://images.evetech.net/types/${typeId}/${isBpc ? 'bpc' : 'icon'}?size=${size || 32}`;
 }
 
-// Final stage of the icon fallback chain (icon -> render -> this) - swaps a genuinely-imageless
-// item (confirmed: SKINs return 404 on both endpoints) for a small inline placeholder instead of
-// leaving a broken-image box or hiding it outright.
+// Final stage of the icon fallback chain (icon -> render -> this) - now a thin alias for the shared
+// js/config.js implementation (handleItemIconLoadError), which the Calculator's own node-card icon
+// also needs for the exact same reason (a SKIN isolated from an LP Store offer has no image on either
+// endpoint there either). Kept under this name so nothing else calling it needs to change.
 function handleLPIconLoadError(imgEl) {
-  const span = document.createElement('span');
-  span.className = 'w-6 h-6 rounded flex items-center justify-center flex-shrink-0';
-  span.style.background = 'rgba(255,255,255,0.06)';
-  span.style.color = 'var(--text-mute)';
-  span.title = 'No image available for this item';
-  span.innerHTML = window.svgIcon ? window.svgIcon('package', { style: 'width:14px;height:14px;' }) : '';
-  imgEl.replaceWith(span);
+  return window.handleItemIconLoadError(imgEl);
 }
 window.handleLPIconLoadError = handleLPIconLoadError;
 
@@ -1965,7 +1960,13 @@ function renderLPStoreCorpActiveLabel(corpIdOrStr) {
   const el = document.getElementById('lpstore-corp-active-label');
   if (!el) return;
   const corp = LP_STORE_CORPS.find(c => c.corpId === parseInt(corpIdOrStr));
-  el.textContent = corp ? `${corp.corpName} — ${corp.faction}` : '— none selected —';
+  // Only the corp name itself is click-to-copy (the .copy-name convention app.js's own BOM rows
+  // already use) - the faction after the dash is plain text, since only the corp name is ever
+  // useful to paste somewhere (an in-game search, a contract, a message), not "Corp — Faction" as
+  // one string.
+  el.innerHTML = corp
+    ? `<span class="copy-name" data-copy-name="${window.esc(corp.corpName)}" onclick="copyNameToClipboard(event)" title="Click to copy: ${window.esc(corp.corpName)}">${window.esc(corp.corpName)}</span> — ${window.esc(corp.faction)}`
+    : '— none selected —';
   el.style.color = corp ? corp.color : 'var(--text-mute)';
 }
 window.renderLPStoreCorpActiveLabel = renderLPStoreCorpActiveLabel;

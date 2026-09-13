@@ -5,6 +5,25 @@ function esc(s) {
 }
 window.esc = esc;
 
+// Final stage of an item icon's fallback chain (icon -> render -> this) - for an item with genuinely
+// no image on either ESI endpoint. SKINs are the confirmed real case (they 404 on both), which is why
+// the glyph shown here is the SKIN-shaped paint roller, not a generic box. Shared across every page's
+// item icons - the Calculator's own node-card icon (js/app.js) hits this exact gap the moment a SKIN
+// gets isolated into the tree view from an LP Store offer, same as LP Store's own list/search rows
+// already handled; reusing the failed <img>'s own className keeps the placeholder the exact size/
+// shape the image would have been, in whatever context (search row, group header, node card) called
+// this, with no per-caller size parameter needed.
+function handleItemIconLoadError(imgEl) {
+  const span = document.createElement('span');
+  span.className = (imgEl.className || '') + ' flex items-center justify-center flex-shrink-0';
+  span.style.background = 'rgba(255,255,255,0.06)';
+  span.style.color = 'var(--text-mute)';
+  span.title = 'No image available for this item';
+  span.innerHTML = window.svgIcon ? window.svgIcon('skin', { style: 'width:55%;height:55%;' }) : '';
+  imgEl.replaceWith(span);
+}
+window.handleItemIconLoadError = handleItemIconLoadError;
+
 // <input type="number"> validates keystrokes against the BROWSER'S LOCALE, not a fixed period - on a
 // browser/OS set to a language that uses comma as its decimal separator, "." is silently rejected and
 // only whole numbers can be typed at all (a well-known HTML gotcha, unrelated to this app's own code -
@@ -172,6 +191,11 @@ const SVG_ICON_PATHS = {
   eye: '<path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/>',
   lock: '<rect x="4" y="10.5" width="16" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>',
   package: '<path d="M21 8 12 3 3 8l9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><line x1="12" y1="13" x2="12" y2="21"/>',
+  // A paint roller - SKINs are cosmetic ship reskins, and this reads as "paint/cosmetic" at a glance
+  // in a way the generic package/box icon never did. Used both for the SKINs category pill and as the
+  // fallback glyph when a SKIN's image 404s on both the icon and render endpoints (the confirmed real
+  // case this fallback exists for - see handleItemIconLoadError's own comment).
+  skin: '<rect x="3" y="3" width="14" height="6" rx="1.5"/><rect x="8" y="9" width="4" height="3"/><line x1="10" y1="12" x2="10" y2="21"/>',
   pin: '<path d="M12 21s7-5.2 7-11a7 7 0 0 0-14 0c0 5.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',
   trending: '<polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/>',
   award: '<circle cx="12" cy="8" r="6"/><path d="M15.5 12.5 17 22l-5-3-5 3 1.5-9.5"/>',

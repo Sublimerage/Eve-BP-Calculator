@@ -2122,7 +2122,7 @@ function createNodeCard(node) {
   if (borderAccent) card.setAttribute('style', borderAccent);
   card.innerHTML = `
     <div class="flex items-start space-x-3 border-b border-[#3a3025] pb-2.5 mb-2.5">
-      <img src="${iconUrl}" alt="${window.esc(node.productName || node.name)}" class="w-10 h-10 rounded-md border border-white/10 bg-black/40 flex-shrink-0" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
+      <img src="${iconUrl}" alt="${window.esc(node.productName || node.name)}" class="w-10 h-10 rounded-md border border-white/10 bg-black/40 flex-shrink-0" onerror="this.onerror=function(){window.handleItemIconLoadError(this);}; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
       <div class="min-w-0 flex-1">
         <div class="flex items-center justify-between gap-1.5">
           <span class="font-bold text-sm text-white truncate min-w-0 cursor-pointer hover:text-orange-300 hover:underline transition" onclick="copyMaterialNameToClipboard(event, this, '${window.esc(node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()).replace(/'/g, "\\'")}')" title="Click to copy this item's exact name to your clipboard, ready to paste into EVE's search/market">${node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()}</span>
