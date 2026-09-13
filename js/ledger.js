@@ -99,9 +99,11 @@ function renderJobStatusIconHTML(kind) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px; height:12px; flex-shrink:0;">${paths}</svg>`;
 }
 
-let activeQueueViewMode = localStorage.getItem('eve_queue_view_mode') || 'grid'; // 'grid' | 'list'
+let activeQueueViewMode = localStorage.getItem('eve_queue_view_mode') || 'list'; // 'grid' | 'list'
 // Which status groups ("started"/"pending") are collapsed - persisted the same way as card state.
-let collapsedJobGroups = new Set(window.safeParseJSON(localStorage.getItem('eve_collapsed_job_groups'), []));
+// Both start collapsed by default (a fresh install, nothing in localStorage yet) - the user can
+// expand either from here on, and that choice is what gets remembered afterward, not this default.
+let collapsedJobGroups = new Set(window.safeParseJSON(localStorage.getItem('eve_collapsed_job_groups'), ['started', 'pending']));
 
 function saveExpandedJobCardIds() {
   localStorage.setItem('eve_expanded_job_cards', JSON.stringify([...expandedJobCardIds]));
