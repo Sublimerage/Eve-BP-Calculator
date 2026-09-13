@@ -3155,6 +3155,7 @@ const FLYOUT_TITLES = {
   pricing: 'Pricing',
   build: 'Build & Optimize',
   structure: 'System & Structure',
+  implants: 'Pilot Implants',
   fees: 'Taxes & Fees',
   markets: 'Markets',
   // 'store'/'station' are lpstore.html-only section ids (its own icon-rail reuses this exact
