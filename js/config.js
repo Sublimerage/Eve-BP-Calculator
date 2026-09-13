@@ -572,8 +572,32 @@ function toggleCommunityMenu(event) {
   const menu = document.getElementById('community-menu');
   if (!menu) return;
   menu.classList.toggle('hidden');
+  // The button's attention-pulse (see .community-btn-pulse, CSS) is only meant to catch a
+  // first-time visitor's eye - once they've actually opened this once, it's found and doesn't need
+  // to keep drawing attention every subsequent visit.
+  if (!menu.classList.contains('hidden')) {
+    localStorage.setItem('eve_community_menu_seen', '1');
+    const btn = document.getElementById('community-menu-btn');
+    if (btn) btn.classList.remove('community-btn-pulse');
+  }
 }
 window.toggleCommunityMenu = toggleCommunityMenu;
+
+// Stops the pulse before it ever plays for a returning visitor who's already opened this once -
+// without this, every fresh page load would re-add the animation from the HTML's own static class
+// list regardless of past visits.
+function initCommunityMenuButton() {
+  if (localStorage.getItem('eve_community_menu_seen') === '1') {
+    const btn = document.getElementById('community-menu-btn');
+    if (btn) btn.classList.remove('community-btn-pulse');
+  }
+}
+window.initCommunityMenuButton = initCommunityMenuButton;
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initCommunityMenuButton);
+} else {
+  initCommunityMenuButton();
+}
 
 document.addEventListener('click', (e) => {
   const menu = document.getElementById('community-menu');
