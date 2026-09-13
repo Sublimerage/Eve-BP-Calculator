@@ -10,13 +10,13 @@
 <title>Eve Deep Industry — Calculator</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d3915a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='5' r='2.6'/%3E%3Ccircle cx='6' cy='18.5' r='2.6'/%3E%3Ccircle cx='12' cy='18.5' r='2.6'/%3E%3Ccircle cx='18' cy='18.5' r='2.6'/%3E%3Cpath d='M12 7.6v2.6M12 10.2L6 15.9M12 10.2v5.7M12 10.2l6 5.7'/%3E%3C/svg%3E">
 <link class="cache-bust" rel="stylesheet" href="css/tailwind-build.css?v=1.0.9">
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.69.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.71.0">
 <script>(function(){try{var t=localStorage.getItem('eve_color_theme');if(t&&t!=='lime')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body class="page-calc flex flex-col min-h-screen text-slate-200">
 
   <!-- Header: branding + site title + global search + primary account/nav actions -->
-  <header class="px-5 site-header-row gap-3 z-30">
+  <header class="px-5 flex flex-wrap justify-between items-center gap-3 z-30">
     <!-- Logo+title+nav-tabs are glued into one left-anchored group on all three pages, so the tabs
          always land at the same X position - previously nav-tabs sat inside the RIGHT-hand cluster,
          so its position drifted with whatever else was on that side (login button vs pilot badge,
@@ -43,11 +43,10 @@
       </nav>
     </div>
 
-    <!-- Site brand, inline in the same row (not a separate row above the header - that added height
-         for no benefit). flex-1 fills whatever's left between the two flex-shrink-0 groups on
-         either side, with its own text centered inside that space - reads as page-centered on the
-         common case where the two side groups are roughly comparable width. -->
-    <div class="text-center min-w-0">
+    <!-- Site brand - absolutely positioned dead-center on the header's own width (see
+         .site-title-centered), so it doesn't participate in the left/right groups' own flex layout
+         at all and can't affect (or be affected by) either one's sizing. -->
+    <div class="site-title-centered">
       <span class="rajdhani font-bold uppercase" style="font-size:11px; letter-spacing:0.18em; color:var(--accent);">Eve Deep Industry</span>
     </div>
 
