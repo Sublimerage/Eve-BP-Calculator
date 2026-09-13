@@ -330,6 +330,21 @@
               </div>
             </div>
 
+            <!-- Pilot attribute, not a station one - deliberately NOT captured by Production Preset
+                 below (that only snapshots system/structure/rigs/tax), same reason eve_char_skills
+                 isn't either. One shared localStorage value read fresh by calculateAdjustedJobSeconds
+                 (js/config.js), so it applies to every manufacturing-time number on this page without
+                 needing a recalc plumbing change per call site. -->
+            <div class="fo-card" title="Zainou 'Beancounter' Industry implant (slot 8) - reduces manufacturing job time only. No implant in EVE reduces invention time, so this never affects the Invention page's invention-time number, only its follow-on build time.">
+              <div class="fo-card-title">Manufacturing Implant</div>
+              <select id="mfg-implant-select" onchange="saveManufacturingImplantSetting(this.value); recalculate();" class="field-line w-full font-bold text-xs">
+                <option value="0">None</option>
+                <option value="1">Zainou 'Beancounter' Industry BX-801 (-1%)</option>
+                <option value="2">Zainou 'Beancounter' Industry BX-802 (-2%)</option>
+                <option value="4">Zainou 'Beancounter' Industry BX-804 (-4%)</option>
+              </select>
+            </div>
+
             <!-- Preset loader sits last: you configure system / structure / rigs above, or load a
                  saved combination here. Keeps the controls you actually adjust above the fold on
                  shorter screens. -->
@@ -698,11 +713,11 @@
        serially blocking each download on the previous script finishing, while still guaranteeing
        they execute in this exact order once parsing completes - same behavior, faster to get there. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
-  <script src="js/config.js?v=15.8.22" defer></script>
+  <script src="js/config.js?v=15.8.23" defer></script>
   <script src="js/esi.js?v=15.8.22" defer></script>
   <script src="js/tree.js?v=15.1.3" defer></script>
   <script src="js/optimizers.js?v=15.4.3" defer></script>
-  <script src="js/app.js?v=15.43.0" defer></script>
+  <script src="js/app.js?v=15.44.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>

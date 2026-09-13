@@ -202,6 +202,20 @@
           </div>
         </div>
 
+        <!-- Same shared eve_mfg_implant_bonus_pct value the Calculator's own control writes - only
+             ever affects the "+ Mfg" half of this page's time numbers (calculateAdjustedJobSeconds
+             skips it for the invention-time half, since no implant in EVE reduces invention time). -->
+        <div class="fo-card" title="Zainou 'Beancounter' Industry implant (slot 8) - reduces manufacturing job time only. Doesn't change the invention-time number above, only the follow-on build time.">
+          <div class="fo-card-title">Manufacturing Implant</div>
+          <div class="fo-card-note">Shared with the Calculator — editing here updates it there too.</div>
+          <select id="mfg-implant-select" onchange="saveManufacturingImplantSetting(this.value); recalculateInvention();" class="field-line w-full font-bold text-xs">
+            <option value="0">None</option>
+            <option value="1">Zainou 'Beancounter' Industry BX-801 (-1%)</option>
+            <option value="2">Zainou 'Beancounter' Industry BX-802 (-2%)</option>
+            <option value="4">Zainou 'Beancounter' Industry BX-804 (-4%)</option>
+          </select>
+        </div>
+
         <!-- Collapsed by default and deliberately compact (a wrapping chip row, not one full-width
              row per skill) - these rarely need touching once auto-filled from ESI, so they no longer
              claim permanent vertical space above settings you actually adjust often. -->
@@ -297,11 +311,11 @@
        serially blocking each download on the previous script finishing, while still guaranteeing
        they execute in this exact order once parsing completes - same behavior, faster to get there. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
-  <script src="js/config.js?v=8.0.30" defer></script>
+  <script src="js/config.js?v=8.0.31" defer></script>
   <script src="js/esi.js?v=8.0.30" defer></script>
   <script src="js/tree.js?v=8.0.4" defer></script>
   <script src="js/optimizers.js?v=8.0.7" defer></script>
-  <script src="js/invention.js?v=9.16.0" defer></script>
+  <script src="js/invention.js?v=9.17.0" defer></script>
   <script src="js/invention-queue.js?v=1.4.4" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
