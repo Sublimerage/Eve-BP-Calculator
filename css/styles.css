@@ -1361,6 +1361,37 @@ html[data-theme="violet"] body.page-calc {
 }
 .theme-menu.hidden { display: none; }
 
+/* Required proprietary notice (EVE Online Developer License Agreement, section 7.1
+   "Proprietary Notices" - Developer must retain a notice substantially in this form). CCP hf. has
+   rebranded to Fenris Creations (confirmed live on eveonline.com's own site footer, which now reads
+   "EVE Online(r) and Fenris Creations(tm)... are trademarks of Fenris Creations" / "(c) Fenris
+   Creations. All rights reserved.") - this mirrors that exact current wording. Kept deliberately
+   thin (flex-shrink:0 in the body's own flex column, a few px of padding) since this is a
+   data-dense tool, not a page with room to spare for a large footer. */
+.site-legal-footer {
+  flex-shrink: 0;
+  padding: 6px 20px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-mute);
+  text-align: center;
+}
+
+/* Community & Support trigger - a labeled .btn-glass (the same "loud, bright, primary" treatment
+   as any other true call-to-action button), not a bare 30px icon glyph with only a hover tooltip to
+   say what it does - reported directly as too small/unclear to invite a click. The pulse is a soft,
+   slow attention ring for a first-time visitor only (removed the moment they open the panel once,
+   or on any later page load once they have - see toggleCommunityMenu/initCommunityMenuButton, JS),
+   so it invites the first click without nagging every visit after. */
+@keyframes community-btn-pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.45); }
+  50% { box-shadow: 0 0 0 7px rgba(var(--accent-rgb), 0); }
+}
+.community-btn-pulse { animation: community-btn-pulse-ring 2.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .community-btn-pulse { animation: none; }
+}
+
 /* Community & Support panel - same toggle-panel mechanics as .theme-menu (absolute, right-anchored,
    closed by an outside click), just wider content: a Discord invite, in-game mail target, and ISK
    donation targets, instead of theme swatches. */
