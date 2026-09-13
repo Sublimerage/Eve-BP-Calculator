@@ -9,7 +9,7 @@
 <title>Eve Deep Industry — LP Store</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8ff4d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='5'/%3E%3Cpath d='M8.5 12.5L7 21l5-3 5 3-1.5-8.5'/%3E%3C/svg%3E">
 <link class="cache-bust" rel="stylesheet" href="css/tailwind-build.css?v=1.0.9">
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.74.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.76.0">
 <script>(function(){try{var t=localStorage.getItem('eve_color_theme');if(t&&t!=='lime')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
@@ -57,8 +57,9 @@
            browser, which is why the Copy button next to it - not this - is the one guaranteed
            action. -->
       <div class="theme-menu-wrap">
-        <button id="community-menu-btn" onclick="toggleCommunityMenu(event)" class="icon-btn" title="Community, feedback &amp; support">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+        <button id="community-menu-btn" onclick="toggleCommunityMenu(event)" class="btn-glass community-btn-pulse px-3 py-1.5 text-xs flex items-center gap-1.5" title="Feedback, bug reports, Discord &amp; ISK donations">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+          <span class="hidden sm:inline">Feedback &amp; Support</span>
         </button>
         <div id="community-menu" class="community-menu hidden">
           <div class="community-menu-title">Community &amp; Feedback</div>
@@ -630,13 +631,17 @@
     </aside>
   </div>
 
+  <!-- Required proprietary notice (EVE Online Developer License Agreement, section 7.1) - see
+       css/styles.css's own comment on .site-legal-footer for the sourcing. -->
+  <footer class="site-legal-footer">EVE Online&reg; and all related trademarks, logos, and other elements are the property of Fenris Creations. This is unofficial fan-made content, not affiliated with or endorsed by Fenris Creations.</footer>
+
   <!-- js/app.js loaded here too (same as index.html) - it owns the tree canvas (#viewport/
        #tree-container), the Bill of Materials sidebar (#bom-sidebar), and selectItem()/recalculate(),
        all reused as-is for the isolated build view. Registers its own 'load' listener rather than a
        plain window.onload= assignment specifically so js/lpstore.js's own listener (below) can
        coexist instead of clobbering it - see both files' own comments on this. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
-  <script src="js/config.js?v=8.0.34" defer></script>
+  <script src="js/config.js?v=8.0.35" defer></script>
   <script src="js/esi.js?v=8.0.33" defer></script>
   <script src="js/tree.js?v=8.0.4" defer></script>
   <script src="js/optimizers.js?v=8.0.7" defer></script>
