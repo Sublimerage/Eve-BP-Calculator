@@ -15,6 +15,14 @@
 </head>
 <body class="page-calc flex flex-col min-h-screen text-slate-200">
 
+  <!-- Site brand - "Eve Deep Industry" is the umbrella name across all 4 tools; the page-specific
+       name (Calculator/Ledger/Invention/LP Store) stays on the left in the header below, next to
+       the nav tabs, so both are visible at once rather than one replacing the other. Its own row,
+       not squeezed into the header's existing flex layout, so it can't collide with the header
+       search bar (which already claims most of that row's middle space). -->
+  <div class="text-center" style="padding:5px 0 1px;">
+    <span class="rajdhani font-bold uppercase" style="font-size:11px; letter-spacing:0.18em; color:var(--accent);">Eve Deep Industry</span>
+  </div>
 
   <!-- Header: branding + global search + primary account/nav actions -->
   <header class="px-5 flex flex-wrap justify-between items-center gap-3 z-30">
@@ -33,7 +41,7 @@
             <path d="M12 7.2v3M12 10.2L6 16.3M12 10.2v6.1M12 10.2l6 6.1"/>
           </svg>
         </div>
-        <h1 class="text-[13px] font-semibold tracking-wide text-white rajdhani leading-none hidden lg:block">EVE DEEP INDUSTRY</h1>
+        <h1 class="text-[13px] font-semibold tracking-wide text-white rajdhani leading-none hidden lg:block">CALCULATOR</h1>
       </div>
 
       <nav class="primary-tabs">
@@ -718,11 +726,11 @@
        serially blocking each download on the previous script finishing, while still guaranteeing
        they execute in this exact order once parsing completes - same behavior, faster to get there. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
-  <script src="js/config.js?v=15.8.23" defer></script>
+  <script src="js/config.js?v=15.8.24" defer></script>
   <script src="js/esi.js?v=15.8.25" defer></script>
   <script src="js/tree.js?v=15.1.3" defer></script>
   <script src="js/optimizers.js?v=15.4.3" defer></script>
-  <script src="js/app.js?v=15.46.0" defer></script>
+  <script src="js/app.js?v=15.47.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>

@@ -14,6 +14,13 @@
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
 
+  <!-- Site brand - "Eve Deep Industry" is the umbrella name across all 4 tools; the page-specific
+       name (Calculator/Ledger/Invention/LP Store) stays on the left in the header below, next to
+       the nav tabs, so both are visible at once rather than one replacing the other. -->
+  <div class="text-center" style="padding:5px 0 1px;">
+    <span class="rajdhani font-bold uppercase" style="font-size:11px; letter-spacing:0.18em; color:var(--accent);">Eve Deep Industry</span>
+  </div>
+
   <!-- Header -->
   <header class="px-5 flex flex-wrap justify-between items-center gap-2 z-30">
     <div class="flex items-center gap-3 flex-shrink-0">
@@ -23,7 +30,7 @@
             <circle cx="12" cy="8" r="5"/><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5"/>
           </svg>
         </div>
-        <h1 class="text-[13px] font-semibold tracking-wide text-white rajdhani leading-none hidden lg:block">EVE DEEP INDUSTRY</h1>
+        <h1 class="text-[13px] font-semibold tracking-wide text-white rajdhani leading-none hidden lg:block">LP STORE</h1>
       </div>
 
       <nav class="primary-tabs">
@@ -577,12 +584,12 @@
        plain window.onload= assignment specifically so js/lpstore.js's own listener (below) can
        coexist instead of clobbering it - see both files' own comments on this. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
-  <script src="js/config.js?v=8.0.31" defer></script>
+  <script src="js/config.js?v=8.0.32" defer></script>
   <script src="js/esi.js?v=8.0.33" defer></script>
   <script src="js/tree.js?v=8.0.4" defer></script>
   <script src="js/optimizers.js?v=8.0.7" defer></script>
-  <script src="js/app.js?v=15.46.0" defer></script>
-  <script src="js/lpstore.js?v=7.28.0" defer></script>
+  <script src="js/app.js?v=15.47.0" defer></script>
+  <script src="js/lpstore.js?v=7.29.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>

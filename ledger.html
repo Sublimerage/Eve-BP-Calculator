@@ -15,6 +15,13 @@
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
 
+  <!-- Site brand - "Eve Deep Industry" is the umbrella name across all 4 tools; the page-specific
+       name (Calculator/Ledger/Invention/LP Store) stays on the left in the header below, next to
+       the nav tabs, so both are visible at once rather than one replacing the other. -->
+  <div class="text-center" style="padding:5px 0 1px;">
+    <span class="rajdhani font-bold uppercase" style="font-size:11px; letter-spacing:0.18em; color:var(--accent);">Eve Deep Industry</span>
+  </div>
+
   <!-- Header navbar -->
   <header class="px-5 flex flex-wrap justify-between items-center gap-2 z-30">
     <!-- Logo+title+nav-tabs glued into one left-anchored group, same as the other two pages, so
@@ -29,7 +36,7 @@
             <line x1="8" y1="17" x2="16" y2="17"/>
           </svg>
         </div>
-        <h1 class="text-[13px] font-semibold tracking-wide text-white rajdhani leading-none hidden lg:block">EVE DEEP INDUSTRY</h1>
+        <h1 class="text-[13px] font-semibold tracking-wide text-white rajdhani leading-none hidden lg:block">LEDGER</h1>
       </div>
 
       <nav class="primary-tabs">
@@ -332,7 +339,7 @@
        serially blocking each download on the previous script finishing, while still guaranteeing
        they execute in this exact order once parsing completes - same behavior, faster to get there. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
-  <script src="js/config.js?v=8.0.31" defer></script>
+  <script src="js/config.js?v=8.0.32" defer></script>
   <script src="js/esi.js?v=8.0.33" defer></script>
   <script src="js/tree.js?v=8.0.4" defer></script>
   <script src="js/optimizers.js?v=8.0.7" defer></script>
