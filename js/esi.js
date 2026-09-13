@@ -744,6 +744,14 @@ window.getBestOwnedBpoMeTe = getBestOwnedBpoMeTe;
 
 async function fetchUserAndCorpAssets(charId, accessToken) {
   let assetsFetchOk = false;
+  // Set the moment ANY page request outright fails mid-pagination (401 even after a refresh retry,
+  // network error, etc.) - distinct from the loop's OTHER exit path (an empty page, meaning
+  // pagination finished normally). Without this, a token that expired between page 1 and page 2
+  // still left assetsFetchOk=true (page 1 alone set it), so a partial asset list silently reported
+  // "ASSETS REFRESHED" success with genuinely incomplete stock data - exactly what made "stock
+  // numbers are wrong and clicking Refresh Assets again doesn't fix it" possible even though the
+  // very next click usually has a valid token again by then and would have picked up the rest.
+  let assetsPaginationFailed = false;
   try {
     window.rawAssetItems = [];
     let corpId = null;
@@ -871,6 +879,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
         }
       } else {
         hasMore = false;
+        assetsPaginationFailed = true;
       }
     }
     if (corpId && accessToken) {
@@ -901,6 +910,7 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
           }
         } else {
           hasMore = false;
+          assetsPaginationFailed = true;
         }
       }
     }
@@ -995,6 +1005,12 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
     } catch (e) { console.warn('[ESI] Failed to persist fetched assets to localStorage - stock will look correct this session but may revert to stale data on next reload:', e); }
 
     await resolveAndPopulateLocationFilter(accessToken);
+    // Only a CLEAN pagination run (no page request outright failed) counts as a real sync - see
+    // assetsPaginationFailed's own comment above. Whatever partial data came in in is still saved
+    // below (better than discarding real, if incomplete, stock info), but "last synced" only advances
+    // and the caller only hears success on a run that actually finished, not one that quietly stopped
+    // partway through and would otherwise have looked identical to a complete refresh.
+    const fullySucceeded = assetsFetchOk && !assetsPaginationFailed;
     if (assetsFetchOk) {
       // Re-persisted now that resolveAndPopulateLocationFilter has filled in resolved location names
       // (and, via applyJournalStockFilter, the freshly-rebuilt userStockMap) that weren't available yet
@@ -1004,13 +1020,15 @@ async function fetchUserAndCorpAssets(charId, accessToken) {
         localStorage.setItem('eve_corp_division_names', JSON.stringify(window.corpDivisionNames || {}));
         localStorage.setItem('eve_user_stock_map', JSON.stringify(window.userStockMap || {}));
       } catch (e) { console.warn('[ESI] Failed to persist resolved location/stock data to localStorage:', e); }
-      localStorage.setItem('eve_assets_last_synced', String(Date.now()));
-      // Shared choke point for both the manual Refresh button AND the automatic re-fetch that
-      // happens on every page load when already logged in - so the "Last synced" text on the
-      // ledger's Stock & Location panel stays honest regardless of which path populated the data.
-      if (typeof window.updateStockLastSyncedDisplay === 'function') window.updateStockLastSyncedDisplay();
+      if (fullySucceeded) {
+        localStorage.setItem('eve_assets_last_synced', String(Date.now()));
+        // Shared choke point for both the manual Refresh button AND the automatic re-fetch that
+        // happens on every page load when already logged in - so the "Last synced" text on the
+        // ledger's Stock & Location panel stays honest regardless of which path populated the data.
+        if (typeof window.updateStockLastSyncedDisplay === 'function') window.updateStockLastSyncedDisplay();
+      }
     }
-    return assetsFetchOk;
+    return fullySucceeded;
   } catch (err) {
     console.warn('Assets fetch error:', err);
     return false;

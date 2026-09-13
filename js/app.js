@@ -3066,13 +3066,14 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
     const costOrInStockHTML = isAcquired
       ? `<span class="font-bold mono flex-shrink-0" style="color:var(--text-mute);">${window.svgIcon('check')} In Stock</span>`
       : `<span class="font-bold mono flex-shrink-0" style="color:var(--cost);">${Math.round(item.lineCost).toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(item.typeId) : ''}</span>`;
-    if (!isAcquired) {
-      row.title = 'Click to find and focus this material in the build diagram';
-      row.onclick = () => highlightNodeByTypeId(item.typeId);
-    }
+    // Clickable regardless of stock status - an "Already in Stock" row is still a real material in
+    // the build diagram, just one you don't need to buy; there's no reason jumping to it in the tree
+    // should only work for the ones you still need to shop for.
+    row.title = 'Click to find and focus this material in the build diagram';
+    row.onclick = () => highlightNodeByTypeId(item.typeId);
 
     if (isCompact) {
-      row.className = 'lp-list-item' + (isAcquired ? '' : ' cursor-pointer');
+      row.className = 'lp-list-item cursor-pointer';
       row.style.cssText = 'padding-left:0; padding-right:0;';
       row.innerHTML = `
         <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" alt="${window.esc(item.name)}" class="w-5 h-5 rounded flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
@@ -3082,7 +3083,7 @@ function renderBillOfMaterials(rootNode, brokerFee = 0) {
         <span class="flex-shrink-0 w-24 text-right">${costOrInStockHTML}</span>
       `;
     } else {
-      row.className = 'lp-card p-2.5 transition' + (isAcquired ? '' : ' cursor-pointer');
+      row.className = 'lp-card p-2.5 transition cursor-pointer';
       row.innerHTML = `
         <div class="flex items-start gap-2.5">
           <img src="https://images.evetech.net/types/${item.typeId}/icon?size=32" alt="${window.esc(item.name)}" class="w-8 h-8 rounded-md flex-shrink-0" loading="lazy" onerror="this.onerror=null; this.src='https://images.evetech.net/types/${item.typeId}/render?size=32';">
