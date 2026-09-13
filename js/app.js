@@ -1419,6 +1419,21 @@ function positionFixedDropdown(inputEl, resultsEl) {
 const searchInput = document.getElementById('item-search');
 const searchResults = document.getElementById('search-results');
 
+// #search-results lives (in the HTML) inside .stat-strip, which has its own position:relative +
+// z-index:10 - that alone establishes a stacking context, and a positioned descendant can't
+// escape its ancestor's stacking context just by declaring a bigger z-index of its own (that
+// fixed a *different*, containing-block-only bug on this same dropdown - see .stat-strip's own
+// backdrop-filter override in styles.css). Concretely: #search-results' z-index:500 was only
+// ever being compared against other things inside .stat-strip, while .stat-strip itself
+// (z-index:10) lost to .icon-rail (z-index:40) and .flyout-panel (z-index:100) - the dropdown
+// rendered correctly positioned but still visually buried under both. Reparenting it to be a
+// direct child of body sidesteps the whole ancestor-stacking-context problem instead of trying
+// to out-z-index it; positionFixedDropdown's coordinates are viewport-relative regardless of
+// where in the DOM the element actually lives, so nothing else about it needs to change.
+if (searchResults && searchResults.parentElement !== document.body) {
+  document.body.appendChild(searchResults);
+}
+
 if (searchInput) {
   searchInput.addEventListener('input', async () => {
     const q = searchInput.value.trim();
