@@ -1369,10 +1369,17 @@ html[data-theme="violet"] body.page-calc {
    single thin line. The bar's height comes from padding + line-height, not font size - so this
    stays at the same readable 10.5px caption size used everywhere else (.stat-label etc.) and gets
    thin purely by dropping vertical padding to 0 and tightening line-height, instead of shrinking
-   text (which was tried and made it hard to read without actually shrinking the bar much). */
+   text (which was tried and made it hard to read without actually shrinking the bar much).
+   The remaining dead space below the text was body's own outer canvas padding
+   (clamp(16px,0.9vw,28px) on all sides, for the floating-glass-panel gap look) - this footer is
+   the last item in that flex column, so it inherited that same inset as trailing space below the
+   text. Cancelled with a negative bottom margin equal to that same clamp() (kept as an actual
+   clamp(), not a fixed px, so it still fully cancels at every viewport width), then a small
+   deliberate 4px put back so the text isn't flush against the literal window edge. */
 .site-legal-footer {
   flex-shrink: 0;
-  padding: 0 16px;
+  padding: 0 16px 4px;
+  margin-bottom: calc(-1 * clamp(16px, 0.9vw, 28px));
   font-size: 10.5px;
   line-height: 1.15;
   color: var(--text-mute);
