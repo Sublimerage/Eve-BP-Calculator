@@ -297,34 +297,58 @@ async function fetchWithAuth(url, options = {}, token, suppressLogout = false, c
 // expire in ~20 minutes; without this, any reload or long session inevitably hits a 401 and gets
 // logged out. charId defaults to the active character - see fetchWithAuth's own comment on why a
 // caller acting on behalf of a specific non-active character should pass its id explicitly.
+//
+// Single-flighted per character: syncWithEveIndustryJobs (and similar) fire several ESI calls in
+// parallel, and if the access token has already expired by the time they run, ALL of them hit a 401
+// at once and each independently called this function - reported directly as a sync that silently
+// dropped some data (missing blueprint entries broke ME/TE job-matching) the first time, then worked
+// cleanly on an immediate retry. Root cause confirmed from that report's console log: EVE SSO
+// rotates the refresh token on every use, so of several simultaneous refresh POSTs using the SAME
+// stored refresh_token, only the first to arrive succeeds - the rest get rejected (that token's
+// already been spent by the winner) and silently return null (suppressLogout paths), quietly
+// starving whichever ESI call lost the race of its data. Caching the in-flight PROMISE (not just a
+// boolean) per charId means every concurrent caller during that window awaits the one real network
+// call and shares its result, instead of racing separate refresh attempts against each other.
+const _refreshTokenInFlight = new Map(); // charId -> Promise<string|null>
 async function refreshEsiAccessToken(charId) {
   charId = charId || getActiveCharId();
-  const record = getCharacterRecord(charId);
-  if (!record || !record.refreshToken) return null;
+  if (_refreshTokenInFlight.has(charId)) return _refreshTokenInFlight.get(charId);
+
+  const doRefresh = (async () => {
+    const record = getCharacterRecord(charId);
+    if (!record || !record.refreshToken) return null;
+    try {
+      const body = new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: window.HARDCODED_CLIENT_ID,
+        refresh_token: record.refreshToken
+      });
+      const res = await fetch('https://login.eveonline.com/v2/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body
+      });
+      if (!res.ok) return null;
+      const tokenData = await res.json();
+      if (!tokenData.access_token) return null;
+      const expiresAt = Date.now() + ((parseInt(tokenData.expires_in) || 1200) * 1000);
+      updateCharacterFields(charId, {
+        accessToken: tokenData.access_token,
+        tokenExpiry: expiresAt,
+        ...(tokenData.refresh_token ? { refreshToken: tokenData.refresh_token } : {})
+      });
+      return tokenData.access_token;
+    } catch (err) {
+      console.warn('ESI token refresh failed:', err);
+      return null;
+    }
+  })();
+
+  _refreshTokenInFlight.set(charId, doRefresh);
   try {
-    const body = new URLSearchParams({
-      grant_type: 'refresh_token',
-      client_id: window.HARDCODED_CLIENT_ID,
-      refresh_token: record.refreshToken
-    });
-    const res = await fetch('https://login.eveonline.com/v2/oauth/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body
-    });
-    if (!res.ok) return null;
-    const tokenData = await res.json();
-    if (!tokenData.access_token) return null;
-    const expiresAt = Date.now() + ((parseInt(tokenData.expires_in) || 1200) * 1000);
-    updateCharacterFields(charId, {
-      accessToken: tokenData.access_token,
-      tokenExpiry: expiresAt,
-      ...(tokenData.refresh_token ? { refreshToken: tokenData.refresh_token } : {})
-    });
-    return tokenData.access_token;
-  } catch (err) {
-    console.warn('ESI token refresh failed:', err);
-    return null;
+    return await doRefresh;
+  } finally {
+    _refreshTokenInFlight.delete(charId);
   }
 }
 
@@ -1877,16 +1901,62 @@ async function fetchCompletedCorpIndustryJobs() {
 }
 window.fetchCompletedCorpIndustryJobs = fetchCompletedCorpIndustryJobs;
 
+// Fetches every page of a paginated ESI endpoint. Page 1 is always fetched alone (there's no way to
+// know the page count before asking), but once that response's X-Pages header is readable, every
+// remaining page is fired in parallel instead of waiting for each one's own round trip before
+// starting the next - a character/corp with a large BPO/BPC library can easily run into dozens of
+// pages, and doing those sequentially is exactly what made "Sync EVE Jobs" take several minutes for
+// well-stocked accounts (reported directly). X-Pages isn't guaranteed to be exposed to browser
+// fetch() for every ESI route/CORS configuration, though - if it can't be read here, this falls back
+// to the original one-page-at-a-time probing (continuing from page 2) so correctness never depends
+// on the optimization actually working.
+async function fetchAllEsiPages(urlWithoutPage, accessToken, charId) {
+  const results = [];
+  const firstRes = await fetchWithAuth(`${urlWithoutPage}&page=1`, {}, accessToken, true, charId);
+  if (!firstRes || !firstRes.ok) return results;
+  const firstPage = await firstRes.json();
+  if (!Array.isArray(firstPage) || firstPage.length === 0) return results;
+  results.push(...firstPage);
+
+  const totalPages = parseInt(firstRes.headers.get('x-pages'), 10);
+  if (isFinite(totalPages) && totalPages >= 1) {
+    if (totalPages > 1) {
+      const pageNumbers = [];
+      for (let p = 2; p <= totalPages; p++) pageNumbers.push(p);
+      const rest = await Promise.all(pageNumbers.map(async (p) => {
+        try {
+          const res = await fetchWithAuth(`${urlWithoutPage}&page=${p}`, {}, accessToken, true, charId);
+          if (!res || !res.ok) return [];
+          const data = await res.json();
+          return Array.isArray(data) ? data : [];
+        } catch (e) { return []; }
+      }));
+      rest.forEach(page => results.push(...page));
+    }
+    return results;
+  }
+
+  // X-Pages wasn't readable for this endpoint/browser - fall back to sequential probing from page 2.
+  let page = 2;
+  let hasMore = true;
+  while (hasMore) {
+    const res = await fetchWithAuth(`${urlWithoutPage}&page=${page}`, {}, accessToken, true, charId);
+    if (!res || !res.ok) break;
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      results.push(...data);
+      page++;
+    } else {
+      hasMore = false;
+    }
+  }
+  return results;
+}
+window.fetchAllEsiPages = fetchAllEsiPages;
+
 // Fetches the character's owned blueprints (with real ME/TE research levels) from ESI. A job's
 // blueprint_id references a specific blueprint item instance - this is the only place its actual
 // researched ME/TE lives, since the industry jobs endpoint itself doesn't carry that data.
-// Both blueprint endpoints below are paginated by ESI exactly like /assets/ is (same "keep fetching
-// incrementing ?page= until an empty array comes back" pattern already used for assets, rather than
-// trusting the X-Pages header) - a character/corp with a large enough blueprint library (a big BPO
-// collection easily clears the ~1000-per-page default) would otherwise silently lose everything past
-// page 1 here. That's what made blueprints sitting in a well-stocked can look like "some show, some
-// don't" - which ones were missing depended only on where they fell in ESI's own paging, not on
-// anything about the can itself.
 // overrideCharId/overrideToken: lets a caller fetch a SPECIFIC registered character's blueprints
 // (not just the active one) - used by the Ledger's multi-character blueprintMeTeMap merge, which
 // loops over every character sharing the active one's corp to see personally-owned blueprints a
@@ -1896,25 +1966,11 @@ async function fetchCharacterBlueprints(overrideCharId, overrideToken) {
   const charId = overrideCharId || getActiveCharId();
   const accessToken = overrideToken || getActiveCharacterToken();
   if (!charId || !accessToken) return [];
-  const results = [];
-  let page = 1;
-  let hasMore = true;
   try {
-    while (hasMore) {
-      const res = await fetchWithAuth(`https://esi.evetech.net/latest/characters/${charId}/blueprints/?datasource=tranquility&page=${page}`, {}, accessToken, true, charId);
-      if (!res || !res.ok) break;
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        results.push(...data);
-        page++;
-      } else {
-        hasMore = false;
-      }
-    }
-    return results;
+    return await fetchAllEsiPages(`https://esi.evetech.net/latest/characters/${charId}/blueprints/?datasource=tranquility`, accessToken, charId);
   } catch (e) {
     console.warn('Character blueprints fetch failed:', e);
-    return results;
+    return [];
   }
 }
 window.fetchCharacterBlueprints = fetchCharacterBlueprints;
@@ -1924,25 +1980,11 @@ async function fetchCorpBlueprints() {
   const corpId = activeRecord && activeRecord.corpId;
   const accessToken = activeRecord && activeRecord.accessToken;
   if (!corpId || !accessToken) return [];
-  const results = [];
-  let page = 1;
-  let hasMore = true;
   try {
-    while (hasMore) {
-      const res = await fetchWithAuth(`https://esi.evetech.net/latest/corporations/${corpId}/blueprints/?datasource=tranquility&page=${page}`, {}, accessToken, true, activeRecord.charId);
-      if (!res || !res.ok) break;
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        results.push(...data);
-        page++;
-      } else {
-        hasMore = false;
-      }
-    }
-    return results;
+    return await fetchAllEsiPages(`https://esi.evetech.net/latest/corporations/${corpId}/blueprints/?datasource=tranquility`, accessToken, activeRecord.charId);
   } catch (e) {
     console.warn('Corp blueprints fetch failed (likely missing role):', e);
-    return results;
+    return [];
   }
 }
 window.fetchCorpBlueprints = fetchCorpBlueprints;
