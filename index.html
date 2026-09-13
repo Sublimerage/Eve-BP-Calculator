@@ -145,6 +145,9 @@
       <div id="icon-btn-structure" class="icon-rail-btn" onclick="openFlyoutSection('structure')">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V10l5-3 5 3v11"/><path d="M14 21v-7l6-3v10"/><line x1="2" y1="21" x2="22" y2="21"/></svg><span class="icon-label">Structure</span>
       </div>
+      <div id="icon-btn-implants" class="icon-rail-btn" onclick="openFlyoutSection('implants')">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1.5"/><line x1="9" y1="2" x2="9" y2="7"/><line x1="15" y1="2" x2="15" y2="7"/><line x1="9" y1="17" x2="9" y2="22"/><line x1="15" y1="17" x2="15" y2="22"/><line x1="2" y1="9" x2="7" y2="9"/><line x1="2" y1="15" x2="7" y2="15"/><line x1="17" y1="9" x2="22" y2="9"/><line x1="17" y1="15" x2="22" y2="15"/></svg><span class="icon-label">Implants</span>
+      </div>
       <div id="icon-btn-fees" class="icon-rail-btn" onclick="openFlyoutSection('fees')">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="8" y1="16" x2="16" y2="8"/></svg><span class="icon-label">Fees</span>
       </div>
@@ -330,21 +333,6 @@
               </div>
             </div>
 
-            <!-- Pilot attribute, not a station one - deliberately NOT captured by Production Preset
-                 below (that only snapshots system/structure/rigs/tax), same reason eve_char_skills
-                 isn't either. One shared localStorage value read fresh by calculateAdjustedJobSeconds
-                 (js/config.js), so it applies to every manufacturing-time number on this page without
-                 needing a recalc plumbing change per call site. -->
-            <div class="fo-card" title="Zainou 'Beancounter' Industry implant (slot 8) - reduces manufacturing job time only. No implant in EVE reduces invention time, so this never affects the Invention page's invention-time number, only its follow-on build time.">
-              <div class="fo-card-title">Manufacturing Implant</div>
-              <select id="mfg-implant-select" onchange="saveManufacturingImplantSetting(this.value); recalculate();" class="field-line w-full font-bold text-xs">
-                <option value="0">None</option>
-                <option value="1">Zainou 'Beancounter' Industry BX-801 (-1%)</option>
-                <option value="2">Zainou 'Beancounter' Industry BX-802 (-2%)</option>
-                <option value="4">Zainou 'Beancounter' Industry BX-804 (-4%)</option>
-              </select>
-            </div>
-
             <!-- Preset loader sits last: you configure system / structure / rigs above, or load a
                  saved combination here. Keeps the controls you actually adjust above the fold on
                  shorter screens. -->
@@ -362,6 +350,23 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
                 Save Current as Preset
               </button>
+            </div>
+          </div>
+
+          <!-- Pilot Implants - deliberately its own icon-rail tab, not folded into Structure. A
+               structure/rig choice is about the STATION you build at; an implant is about the
+               character in the pod, so it doesn't belong under "Structure" and isn't captured by
+               Production Preset (which only snapshots system/structure/rigs/tax) any more than
+               eve_char_skills is. -->
+          <div id="flyout-implants" class="flyout-section">
+            <div class="fo-card" title="Zainou 'Beancounter' Industry implant (slot 8) - reduces manufacturing job time only. No implant in EVE reduces invention time, so this never affects the Invention page's invention-time number, only its follow-on build time.">
+              <div class="fo-card-title">Manufacturing Implant</div>
+              <select id="mfg-implant-select" onchange="saveManufacturingImplantSetting(this.value); recalculate();" class="field-line w-full font-bold text-xs">
+                <option value="0">None</option>
+                <option value="1">Zainou 'Beancounter' Industry BX-801 (-1%)</option>
+                <option value="2">Zainou 'Beancounter' Industry BX-802 (-2%)</option>
+                <option value="4">Zainou 'Beancounter' Industry BX-804 (-4%)</option>
+              </select>
             </div>
           </div>
 
@@ -717,7 +722,7 @@
   <script src="js/esi.js?v=15.8.22" defer></script>
   <script src="js/tree.js?v=15.1.3" defer></script>
   <script src="js/optimizers.js?v=15.4.3" defer></script>
-  <script src="js/app.js?v=15.44.0" defer></script>
+  <script src="js/app.js?v=15.45.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
