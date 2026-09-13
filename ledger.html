@@ -15,13 +15,6 @@
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
 
-  <!-- Site brand - "Eve Deep Industry" is the umbrella name across all 4 tools; the page-specific
-       name (Calculator/Ledger/Invention/LP Store) stays on the left in the header below, next to
-       the nav tabs, so both are visible at once rather than one replacing the other. -->
-  <div class="text-center" style="padding:5px 0 1px;">
-    <span class="rajdhani font-bold uppercase" style="font-size:11px; letter-spacing:0.18em; color:var(--accent);">Eve Deep Industry</span>
-  </div>
-
   <!-- Header navbar -->
   <header class="px-5 flex flex-wrap justify-between items-center gap-2 z-30">
     <!-- Logo+title+nav-tabs glued into one left-anchored group, same as the other two pages, so
@@ -45,6 +38,13 @@
         <a href="invention.html" class="nav-tab"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3h4"/><path d="M10.5 3v5.3L5.9 16.8A2 2 0 007.6 20h8.8a2 2 0 001.7-3.2L13.5 8.3V3"/><path d="M8.2 14.5h7.6"/></svg>Invention</a>
         <a href="lpstore.html" class="nav-tab"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5"/></svg>LP Store</a>
       </nav>
+    </div>
+
+    <!-- Site brand, inline in the same row (not a separate row above the header - that added height
+         for no benefit). flex-1 fills whatever's left between the two flex-shrink-0 groups on
+         either side, with its own text centered inside that space. -->
+    <div class="flex-1 text-center min-w-0">
+      <span class="rajdhani font-bold uppercase" style="font-size:11px; letter-spacing:0.18em; color:var(--accent);">Eve Deep Industry</span>
     </div>
 
     <div class="flex items-center gap-3 mono flex-wrap flex-shrink-0">
