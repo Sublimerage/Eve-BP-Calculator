@@ -1717,9 +1717,9 @@ function loadSavedState() {
     if (savedProduct && savedProduct.id && savedProduct.name) {
       selectItem(savedProduct.id, savedProduct.name, true);
     } else {
-      selectItem(48519, 'Drekavac Blueprint');
+      selectItem(944, 'Punisher Blueprint');
     }
-  } catch (e) { selectItem(48519, 'Drekavac Blueprint'); }
+  } catch (e) { selectItem(944, 'Punisher Blueprint'); }
 }
 
 function recalculate() {
