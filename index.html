@@ -10,7 +10,7 @@
 <title>Eve Deep Industry — Calculator</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d3915a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='5' r='2.6'/%3E%3Ccircle cx='6' cy='18.5' r='2.6'/%3E%3Ccircle cx='12' cy='18.5' r='2.6'/%3E%3Ccircle cx='18' cy='18.5' r='2.6'/%3E%3Cpath d='M12 7.6v2.6M12 10.2L6 15.9M12 10.2v5.7M12 10.2l6 5.7'/%3E%3C/svg%3E">
 <link class="cache-bust" rel="stylesheet" href="css/tailwind-build.css?v=1.0.9">
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.79.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.80.0">
 <script>(function(){try{var t=localStorage.getItem('eve_color_theme');if(t&&t!=='lime')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body class="page-calc flex flex-col min-h-screen text-slate-200">
@@ -95,19 +95,8 @@
               <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
               Join the Discord
             </a>
-            <div class="community-menu-note" style="margin-top:10px; margin-bottom:0;">Prefer EVE mail? Send feedback to:</div>
-            <div class="community-menu-row">
-              <span class="community-menu-row-label">Character</span>
-              <span class="flex items-center gap-1.5">
-                <span class="copy-name" data-copy-name="Sublime Rage" onclick="copyNameToClipboard(event)" title="Click to copy">Sublime Rage</span>
-                <a href="showinfo:1377//90416002" onclick="event.stopPropagation();" title="Try opening this character in the EVE client (not guaranteed to work from a browser)" style="color:var(--text-mute); display:inline-flex;">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                </a>
-              </span>
-            </div>
-
-            <div class="community-menu-title">Support Development</div>
-            <div class="community-menu-note">This tool is free - ISK donations are appreciated and help keep it going.</div>
+            <div class="community-menu-title">Support &amp; Feedback In-Game</div>
+            <div class="community-menu-note">Prefer EVE mail, or want to support development with an ISK donation? Both go to either of these:</div>
             <div class="community-menu-row">
               <span class="community-menu-row-label">Character</span>
               <span class="flex items-center gap-1.5">
@@ -789,7 +778,7 @@
 
   <!-- Required proprietary notice (EVE Online Developer License Agreement, section 7.1) - see
        css/styles.css's own comment on .site-legal-footer for the sourcing. -->
-  <footer class="site-legal-footer">EVE Online&reg; and related trademarks/logos are property of Fenris Creations. Unofficial fan-made content, not affiliated with or endorsed by Fenris Creations.</footer>
+  <footer class="site-legal-footer"><a href="https://www.eveonline.com/" target="_blank" rel="noopener noreferrer">EVE Online&reg;</a> and related trademarks/logos are property of <a href="https://fenris.com" target="_blank" rel="noopener noreferrer">Fenris Creations</a>. Unofficial fan-made content, not affiliated with or endorsed by <a href="https://fenris.com" target="_blank" rel="noopener noreferrer">Fenris Creations</a>.</footer>
 
   <!-- Load Split JavaScript Modules in strict order with version cache-busting.
        defer lets the browser fetch all of these in parallel (eve_db.js is the big one) instead of
