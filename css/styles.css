@@ -421,9 +421,14 @@ header { height: 56px; flex-shrink: 0; position: relative; }
    stays flush and square against the right edge rather than floating with rounded corners. */
 #blueprint-browser-drawer { border-radius: 0; border-right: none; border-top: none; border-bottom: none; }
 /* Everything else floats with a margin from the viewport edge (see body padding), so it keeps
-   full rounded corners on every side. The history drawer is fixed-positioned, so its inset needs
-   to match the page padding explicitly rather than relying on flow layout. */
-#history-drawer { position: fixed; left: 28px; right: 28px; bottom: 28px; width: auto; }
+   full rounded corners on every side. The history drawer is fixed-positioned, so its left/right
+   inset needs to match the page padding explicitly rather than relying on flow layout. The bottom
+   inset used to be that same 28px, measured from the true viewport edge, back when nothing else
+   lived down there - now the site-legal-footer sits below it, so bottom instead keys off
+   --footer-clearance (js/ledger.js's updateFooterClearance: the footer's real measured height
+   plus the same row-gap that already separates every other flow-sibling pair in the body column,
+   not a guess), so the drawer floats flush above the footer using that same gap convention. */
+#history-drawer { position: fixed; left: 28px; right: 28px; bottom: var(--footer-clearance, 16px); width: auto; }
 
 /* ===== Buttons ===== */
 .btn-glass {
