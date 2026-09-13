@@ -3708,7 +3708,38 @@ function toggleHistoryDrawerSize() {
 }
 window.toggleHistoryDrawerSize = toggleHistoryDrawerSize;
 
+// The drawer above is position:fixed, so its own bottom inset (see #history-drawer in
+// styles.css) is measured from the true viewport edge - it has no idea the site-legal-footer
+// (a real flow element, last in body's own column) is also sitting down there now. Guessing a
+// fixed px value for that clearance would break again the moment the footer's text wraps to a
+// second line at a narrower window width, so this measures the footer's actual rendered height
+// (same "measure, don't guess" reasoning as applyHistoryDrawerState's collapsed-height read
+// above) and exposes it as --footer-clearance, which #history-drawer's own bottom inset keys off
+// of directly - the drawer now sits exactly where the footer's own flow-space begins (its real
+// height plus the same row-gap that already separates every other pair of flow siblings in the
+// body column), so it floats flush above the footer instead of overlapping it or leaving a
+// mismatched dead gap above it.
+//
+// .content-row's margin-bottom is set directly here too, rather than via a second CSS var: it
+// only has to clear the fixed drawer itself (the footer's own space is already handled
+// automatically by flex, since content-row and the footer are real flow siblings) - drawer height
+// plus a small resting gap, both independent of the footer's height entirely.
+function updateFooterClearance() {
+  const footer = document.querySelector('.site-legal-footer');
+  const drawer = document.getElementById('history-drawer');
+  const contentRow = document.querySelector('.content-row');
+  if (!footer) return;
+  const gapPx = parseFloat(getComputedStyle(document.body).rowGap) || 8;
+  document.documentElement.style.setProperty('--footer-clearance', (footer.getBoundingClientRect().height + gapPx) + 'px');
+  if (drawer && contentRow) {
+    contentRow.style.marginBottom = (drawer.getBoundingClientRect().height + 14) + 'px';
+  }
+}
+window.addEventListener('resize', updateFooterClearance);
+updateFooterClearance();
+
 window.onload = async () => {
+  updateFooterClearance();
   if (typeof window.buildPrepackedIndexes === 'function') {
     window.buildPrepackedIndexes();
   }
