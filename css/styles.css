@@ -1915,9 +1915,14 @@ body.page-calc #paste-modal > div {
   -webkit-backdrop-filter: none !important;
 }
 /* Same containing-block fix, without touching border (blueprint-browser-drawer keeps its real
-   left-edge divider; .glass-card keeps its own dedicated border-width rule further down). */
+   left-edge divider; .glass-card keeps its own dedicated border-width rule further down).
+   .stat-strip joined this list once the item-search box moved into one of its stat cards: its
+   own blur(0px) was the fixed-positioning origin for #search-results, so the dropdown rendered
+   offset by exactly .stat-strip's own (top, left) instead of the input's real screen position -
+   the same "wildly offset dropdown" bug as the flyout panel above, just on a different ancestor. */
 body.page-calc #blueprint-browser-drawer,
-body.page-calc .glass-card {
+body.page-calc .glass-card,
+body.page-calc .stat-strip {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
