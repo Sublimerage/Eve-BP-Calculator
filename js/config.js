@@ -191,6 +191,8 @@ const SVG_ICON_PATHS = {
   eye: '<path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/>',
   lock: '<rect x="4" y="10.5" width="16" height="10.5" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>',
   package: '<path d="M21 8 12 3 3 8l9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><line x1="12" y1="13" x2="12" y2="21"/>',
+  message: '<path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/>',
+  'external-link': '<path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
   // A paint droplet - SKINs are cosmetic ship reskins, and a drop of paint reads as "cosmetic/color"
   // clearly even at 14-16px, where the earlier paint-roller design read as an ambiguous blob. Used
   // both for the SKINs category pill and as the fallback glyph when a SKIN's image 404s on both the
@@ -553,6 +555,30 @@ document.addEventListener('click', (e) => {
   const menu = document.getElementById('theme-menu');
   if (!menu || menu.classList.contains('hidden')) return;
   if (!menu.contains(e.target) && !e.target.closest('#theme-menu-btn')) {
+    menu.classList.add('hidden');
+  }
+});
+
+// Same toggle-panel pattern as the theme menu above (icon button + absolute-positioned panel,
+// closed by an outside click) - Discord invite, in-game mail target, and ISK donation targets, all
+// in one place reachable from every page's header. The character/corp NAME itself doubles as a
+// showinfo: link (EVE's own real chat-link scheme, confirmed via live forum examples: character is
+// type 1377, corporation is type 2, format showinfo:TYPE//ID) in case the visitor's OS has EVE's
+// client registered as that protocol's handler - unconfirmed whether that actually fires reliably
+// from a plain browser (one 2017 third-party dev's own account says it doesn't by default), so the
+// dedicated Copy button next to it is the one guaranteed-to-work action, not this.
+function toggleCommunityMenu(event) {
+  if (event) event.stopPropagation();
+  const menu = document.getElementById('community-menu');
+  if (!menu) return;
+  menu.classList.toggle('hidden');
+}
+window.toggleCommunityMenu = toggleCommunityMenu;
+
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('community-menu');
+  if (!menu || menu.classList.contains('hidden')) return;
+  if (!menu.contains(e.target) && !e.target.closest('#community-menu-btn')) {
     menu.classList.add('hidden');
   }
 });
