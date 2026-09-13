@@ -1490,7 +1490,8 @@ function renderJobBOMBlockHTML(job, materialStockInfo, isFocusMode) {
         const facilityFactor = 1 - (structureType.teBonus / 100);
         const rigTEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(job.productTypeId, 'TE') : 0;
         const rigFactor = 1 - (rigTEBonus / 100);
-        totalBuildSeconds = baseTime * skillTimeFactor * facilityFactor * rigFactor * (job.runsNeeded || 1);
+        const implantFactor = 1 - ((window.getManufacturingImplantBonusPercent ? window.getManufacturingImplantBonusPercent() : 0) / 100);
+        totalBuildSeconds = baseTime * skillTimeFactor * facilityFactor * rigFactor * implantFactor * (job.runsNeeded || 1);
       } else {
         totalBuildSeconds = 0;
       }

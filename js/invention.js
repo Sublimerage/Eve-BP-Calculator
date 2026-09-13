@@ -289,7 +289,7 @@ function renderInventionSkillInputs(skills) {
       <div class="flex items-center gap-1.5 px-2 py-1 rounded-md" style="background:rgba(255,255,255,0.035);">
         <span class="text-xs ${isEncryption ? 'text-amber-300' : 'text-cyan-300'} font-semibold" title="${isEncryption ? 'Encryption skill (affects chance /40)' : 'Science skill (affects chance /30, combined with the other science skill)'}">${window.esc(sk.name || `Skill ${sk.skillId}`)}</span>
         <input type="number" min="0" max="5" value="${trainedLevel}" data-skill-id="${sk.skillId}" data-is-encryption="${isEncryption}"
-          oninput="recalculateInvention()" class="invention-skill-input field-line field-editable mono w-10 text-center font-bold text-xs p-0.5" style="color:var(--text);">
+          oninput="recalculateInvention()" class="invention-skill-input field-line field-editable num-no-spin mono w-14 text-center font-bold text-xs" style="color:var(--text);">
       </div>
     `;
   }).join('');
@@ -970,6 +970,7 @@ window.onload = async () => {
     window.buildPrepackedIndexes();
   }
   loadSharedTaxSettings();
+  if (typeof window.restoreManufacturingImplantSetting === 'function') window.restoreManufacturingImplantSetting('mfg-implant-select');
   renderInventionPresetDropdown();
   renderInventionActiveStationLabel();
   // Instant repaint of whatever the queue looked like last session, before any network call -

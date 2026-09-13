@@ -649,10 +649,34 @@ function extractBuildTime(recipe) {
 }
 window.extractBuildTime = extractBuildTime;
 
-// Applies TE research, character skills (Industry/Advanced Industry), and the selected facility's
-// time bonus to a single job's raw SDE duration. Reactions can't be TE-researched, so TE is ignored
-// for them. Shared by the per-card time display, the total-tree time summary, the ledger, and the
-// invention calculator.
+// Applies TE research, character skills (Industry/Advanced Industry), the selected facility's time
+// bonus, and a manufacturing implant to a single job's raw SDE duration. Reactions can't be
+// TE-researched, so TE is ignored for them. Shared by the per-card time display, the total-tree time
+// summary, the ledger, and the invention calculator - the invention calculator reuses this same
+// function with isReaction=true for its OWN (non-manufacturing) invention time, which is why the
+// implant factor below is gated the same way TE already is: no Beancounter implant in EVE reduces
+// invention time, only manufacturing time, so it must never apply to that call.
+const MANUFACTURING_IMPLANT_BONUS_KEY = 'eve_mfg_implant_bonus_pct';
+function getManufacturingImplantBonusPercent() {
+  return parseFloat(localStorage.getItem(MANUFACTURING_IMPLANT_BONUS_KEY)) || 0;
+}
+window.getManufacturingImplantBonusPercent = getManufacturingImplantBonusPercent;
+
+function saveManufacturingImplantSetting(value) {
+  localStorage.setItem(MANUFACTURING_IMPLANT_BONUS_KEY, value || '0');
+}
+window.saveManufacturingImplantSetting = saveManufacturingImplantSetting;
+
+// Restores a page's own <select id="mfg-implant-select"> to the shared saved value on load - the
+// setting itself lives in one localStorage key read fresh by calculateAdjustedJobSeconds, same as
+// eve_char_skills, so every page's copy of the control always agrees.
+function restoreManufacturingImplantSetting(selectId) {
+  const el = document.getElementById(selectId);
+  if (!el) return;
+  el.value = String(getManufacturingImplantBonusPercent());
+}
+window.restoreManufacturingImplantSetting = restoreManufacturingImplantSetting;
+
 const _loggedSkillDiagnosticIds = new Set();
 function logSkillDiagnosticOnce(typeId, message) {
   const key = `${typeId}`;
@@ -689,7 +713,8 @@ function calculateAdjustedJobSeconds(baseTimeSeconds, customTE, runsNeeded, isRe
   const facilityFactor = 1 - (structureType.teBonus / 100);
   const rigTEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(productTypeId, 'TE') : 0;
   const rigFactor = 1 - (rigTEBonus / 100);
-  return baseTimeSeconds * teFactor * skillTimeFactor * facilityFactor * rigFactor * (runsNeeded || 1);
+  const implantFactor = isReaction ? 1 : (1 - (getManufacturingImplantBonusPercent() / 100));
+  return baseTimeSeconds * teFactor * skillTimeFactor * facilityFactor * rigFactor * implantFactor * (runsNeeded || 1);
 }
 window.calculateAdjustedJobSeconds = calculateAdjustedJobSeconds;
 

@@ -3317,6 +3317,7 @@ window.addEventListener('load', async () => {
       window.ensureDefaultTrackedMarkets().then(() => renderTrackedMarketsList()).catch(err => console.warn('Default market seeding failed:', err));
     }
     loadTaxSettings(); // Load custom taxes from localStorage!
+    if (typeof window.restoreManufacturingImplantSetting === 'function') window.restoreManufacturingImplantSetting('mfg-implant-select');
     renderStructureBonusChips(); // ME/TE/cost chips under the structure dropdown (after loadTaxSettings sets the <select>)
     loadSavedState(); // Load previous product & overrides persistently from localStorage!
     updateHeaderLedgerCount(); // Update badge on load!
