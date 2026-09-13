@@ -285,6 +285,23 @@ header { height: 56px; flex-shrink: 0; position: relative; }
   white-space: nowrap;
 }
 
+/* Data-load status pill - just the dot at rest, the full text (INITIALIZING.../RECIPES & PRICES
+   LOADED/an error) slides out on hover instead of permanently occupying header width for something
+   only worth a glance right after page load. No JS changes needed - every call site still just sets
+   #status-text's textContent and #status-dot's className exactly as before; this is a pure CSS
+   reveal, keyed off :hover on the badge itself. */
+.status-badge-compact { padding: 6px; transition: padding 0.15s ease; }
+.status-badge-compact:hover { padding: 6px 10px; }
+.status-badge-text {
+  display: inline-block;
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  transition: max-width 0.2s ease, opacity 0.15s ease, margin-left 0.2s ease;
+}
+.status-badge-compact:hover .status-badge-text { max-width: 220px; opacity: 1; margin-left: 8px; }
+
 /* Same soft-tint treatment as .btn-glass-muted - a fully transparent resting state (the original
    design here) is too easy to miss against the dark background, same problem those toolbar buttons
    had. A faint permanent lime wash makes them read as clickable controls at a glance. */
@@ -299,12 +316,20 @@ header { height: 56px; flex-shrink: 0; position: relative; }
 .icon-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; }
 .icon-btn:hover { color: var(--accent); background: rgba(var(--accent-rgb),0.28); border-color: rgba(var(--accent-rgb),0.55); }
 
-/* ===== Header global search (index.html) ===== */
+/* ===== Header brand + global search (index.html) ===== */
 /* Fixed width regardless of title text length ("DEEP-INDUSTRY" vs "EVE INDUSTRY LEDGER" vs
    "INVENTION CALCULATOR") so nav-tabs, glued directly after this block, lands at the identical X
    position on all three pages. */
 .header-brand { width: 232px; }
-.header-search-wrap { position: relative; flex: 1 1 auto; min-width: 140px; max-width: 460px; }
+/* flex:0 0 auto (not the old 1 1 auto) - this box now lives inside the Calculator's stat-strip
+   search card, a COLUMN flex container (.stat), not the header's row layout it was original built
+   for. flex-grow along a column's main axis means "grow to fill height", which silently stretched
+   this box to the full card height while the <input> inside it stayed its own natural (much
+   shorter) height - the search icon centers correctly on ITS OWN parent (this box), so it ended up
+   centered on the tall invisible box instead of on the actual visible input/placeholder text,
+   reported directly as "the lens icon isn't centered with the search text". Sizing to content
+   height fixes that; width still comes from .header-search-input's own width:100% below. */
+.header-search-wrap { position: relative; flex: 0 0 auto; min-width: 140px; max-width: 460px; }
 /* This is the primary action of the whole page (search for the item to build), so unlike
    .field-line's "nothing until you interact" rule, it carries a persistent lime tint at rest -
    the same soft-tint language as .icon-btn/.btn-glass-muted - so it visibly reads as THE thing to
@@ -1335,6 +1360,29 @@ html[data-theme="violet"] body.page-calc {
   gap: 6px;
 }
 .theme-menu.hidden { display: none; }
+
+/* Community & Support panel - same toggle-panel mechanics as .theme-menu (absolute, right-anchored,
+   closed by an outside click), just wider content: a Discord invite, in-game mail target, and ISK
+   donation targets, instead of theme swatches. */
+.community-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  width: 260px;
+  background: var(--glass-fill), var(--bg-0);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--glass-shadow);
+  padding: 14px;
+}
+.community-menu.hidden { display: none; }
+.community-menu-title { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-mute); margin-bottom: 8px; }
+.community-menu-title:not(:first-child) { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); }
+.community-menu-note { font-size: 11px; color: var(--text-mute); line-height: 1.5; margin-bottom: 8px; }
+.community-menu-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; font-size: 12px; }
+.community-menu-row-label { color: var(--text-soft); }
+.community-menu-row .copy-name { font-weight: 600; color: var(--text); }
 .theme-swatch {
   width: 40px;
   display: flex;
@@ -1601,6 +1649,16 @@ body.page-calc .lp-pill:hover { background: rgba(255,255,255,0.1); color: var(--
 body.page-calc .lp-pill.active {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   color: #0a1002;
+}
+/* An .lp-badge-accent nested inside an active pill (the Invention page's Job Queue count, e.g.)
+   inherits nothing from the rule above - .lp-badge-accent sets its OWN color:var(--accent) and a
+   translucent accent-tinted background, which is exactly the two colors the pill's own active-state
+   gradient now uses too. The badge and its own number both read as lime-on-lime against the pill's
+   lime gradient - reported directly as present but unreadable. Darkening just the badge's background
+   here (its text color is untouched) restores the contrast the badge always had against its more
+   usual dark card background, without changing .lp-badge-accent's appearance anywhere else it's used. */
+body.page-calc .lp-pill.active .lp-badge-accent {
+  background: rgba(10,16,2,0.3);
 }
 body.page-calc .lp-row {
   padding-top: 14px;
