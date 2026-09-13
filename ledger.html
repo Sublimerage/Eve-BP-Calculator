@@ -10,7 +10,7 @@
 <title>Eve Deep Industry — Ledger</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8ff4d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='4.5' width='14' height='16' rx='2'/%3E%3Cpath d='M9 3.5h6a1 1 0 011 1V6H8V4.5a1 1 0 011-1z'/%3E%3Cpath d='M8.5 12.5l2 2 4.5-4.5'/%3E%3Cline x1='8' y1='17' x2='16' y2='17'/%3E%3C/svg%3E">
 <link class="cache-bust" rel="stylesheet" href="css/tailwind-build.css?v=1.0.9">
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.71.0">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.74.0">
 <script>(function(){try{var t=localStorage.getItem('eve_color_theme');if(t&&t!=='lime')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 </head>
 <body class="page-calc theme-unify flex flex-col min-h-screen text-slate-200">
@@ -53,6 +53,58 @@
           <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="5"/><circle cx="15" cy="9" r="5"/><circle cx="12" cy="15" r="5"/></svg>
         </button>
         <div id="theme-menu" class="theme-menu hidden"></div>
+      </div>
+
+      <!-- Community & Support - same toggle-panel pattern as the theme menu above
+           (js/config.js toggleCommunityMenu). The character/corp name is also wrapped in a
+           showinfo: link (EVE's real chat-link scheme - confirmed via live forum examples:
+           character is type 1377, corporation is type 2) in case the visitor's OS has the EVE
+           client registered as that protocol's handler; not confirmed reliable from a plain
+           browser, which is why the Copy button next to it - not this - is the one guaranteed
+           action. -->
+      <div class="theme-menu-wrap">
+        <button id="community-menu-btn" onclick="toggleCommunityMenu(event)" class="icon-btn" title="Community, feedback &amp; support">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+        </button>
+        <div id="community-menu" class="community-menu hidden">
+          <div class="community-menu-title">Community &amp; Feedback</div>
+          <div class="community-menu-note">Bug reports, feature requests, or just want to chat about the tool? The Discord is the best place to reach us.</div>
+          <a href="https://discord.gg/BZTf2SSgd2" target="_blank" rel="noopener noreferrer" class="btn-glass w-full py-1.5 text-xs flex items-center justify-center gap-1.5">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+            Join the Discord
+          </a>
+          <div class="community-menu-note" style="margin-top:10px; margin-bottom:0;">Prefer EVE mail? Send feedback to:</div>
+          <div class="community-menu-row">
+            <span class="community-menu-row-label">Character</span>
+            <span class="flex items-center gap-1.5">
+              <span class="copy-name" data-copy-name="Sublime Rage" onclick="copyNameToClipboard(event)" title="Click to copy">Sublime Rage</span>
+              <a href="showinfo:1377//90416002" onclick="event.stopPropagation();" title="Try opening this character in the EVE client (not guaranteed to work from a browser)" style="color:var(--text-mute); display:inline-flex;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </a>
+            </span>
+          </div>
+
+          <div class="community-menu-title">Support Development</div>
+          <div class="community-menu-note">This tool is free - ISK donations are appreciated and help keep it going.</div>
+          <div class="community-menu-row">
+            <span class="community-menu-row-label">Character</span>
+            <span class="flex items-center gap-1.5">
+              <span class="copy-name" data-copy-name="Sublime Rage" onclick="copyNameToClipboard(event)" title="Click to copy">Sublime Rage</span>
+              <a href="showinfo:1377//90416002" onclick="event.stopPropagation();" title="Try opening this character in the EVE client (not guaranteed to work from a browser)" style="color:var(--text-mute); display:inline-flex;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </a>
+            </span>
+          </div>
+          <div class="community-menu-row">
+            <span class="community-menu-row-label">Corporation</span>
+            <span class="flex items-center gap-1.5">
+              <span class="copy-name" data-copy-name="Sublimor Mortis" onclick="copyNameToClipboard(event)" title="Click to copy">Sublimor Mortis</span>
+              <a href="showinfo:2//98809098" onclick="event.stopPropagation();" title="Try opening this corporation in the EVE client (not guaranteed to work from a browser)" style="color:var(--text-mute); display:inline-flex;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px;"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </a>
+            </span>
+          </div>
+        </div>
       </div>
       <div id="esi-login-container">
         <button onclick="startEsiSSOLogin()" class="btn-glass btn-glass-muted px-3.5 py-2 text-xs flex items-center gap-1.5" title="Login with EVE Online to import your character assets">
@@ -339,7 +391,7 @@
        serially blocking each download on the previous script finishing, while still guaranteeing
        they execute in this exact order once parsing completes - same behavior, faster to get there. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
-  <script src="js/config.js?v=8.0.33" defer></script>
+  <script src="js/config.js?v=8.0.34" defer></script>
   <script src="js/esi.js?v=8.0.33" defer></script>
   <script src="js/tree.js?v=8.0.4" defer></script>
   <script src="js/optimizers.js?v=8.0.7" defer></script>
