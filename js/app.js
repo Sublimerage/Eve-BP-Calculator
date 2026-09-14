@@ -3228,8 +3228,13 @@ const viewport = document.getElementById('viewport');
 const content = document.getElementById('pan-zoom-content');
 
 if (viewport) {
+  // Right mouse button drags to pan (was middle-click) - the browser's own right-click context
+  // menu has to be suppressed on the viewport specifically, or it pops up over the diagram every
+  // time a drag starts/ends.
+  viewport.addEventListener('contextmenu', (e) => e.preventDefault());
+
   viewport.addEventListener('mousedown', (e) => {
-    if (e.button === 1) {
+    if (e.button === 2) {
       e.preventDefault();
       window.isPanning = true;
       window.startX = e.clientX - window.panX;
@@ -3247,7 +3252,7 @@ if (viewport) {
   });
 
   window.addEventListener('mouseup', (e) => {
-    if (e.button === 1 && window.isPanning) {
+    if (e.button === 2 && window.isPanning) {
       window.isPanning = false;
       viewport.style.cursor = 'grab';
     }
@@ -3378,5 +3383,26 @@ window.addEventListener('keydown', (e) => {
   if (typeof window.centerOnSelectedNode === 'function') {
     e.preventDefault();
     window.centerOnSelectedNode();
+  }
+});
+
+// "I" key: isolate the selected card - same target isolateComponent's own per-card button uses,
+// just without needing to reach for the mouse. No-op if nothing is selected (there's no card to
+// isolate). "Escape" reverses it via the same exitIsolation() the panel's own exit button calls.
+window.addEventListener('keydown', (e) => {
+  const activeEl = document.activeElement;
+  const tag = activeEl ? activeEl.tagName : '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (activeEl && activeEl.isContentEditable)) return;
+
+  if (e.key.toLowerCase() === 'i' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (window.selectedInstanceId != null && typeof window.isolateComponent === 'function') {
+      e.preventDefault();
+      window.isolateComponent(null, window.selectedInstanceId);
+    }
+    return;
+  }
+  if (e.key === 'Escape' && window.isolatedInstanceId != null && typeof window.exitIsolation === 'function') {
+    e.preventDefault();
+    window.exitIsolation(null);
   }
 });
