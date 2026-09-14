@@ -3228,38 +3228,55 @@ const viewport = document.getElementById('viewport');
 const content = document.getElementById('pan-zoom-content');
 
 if (viewport) {
-  // Middle mouse button drags to pan. Right-click was tried instead (per a later request) and
-  // reverted (per an even later request) - holding the right button arms the browser/OS's own
-  // context-menu gesture recognition, which on real hardware doesn't just mean an extra
-  // "contextmenu" event to suppress: it can outright defer/swallow the mousemove events during
-  // the hold, then release them all at once on mouseup - reported as "doesn't pan while held,
-  // gets stuck, then keeps panning after release until you click again." That's a browser/OS-level
-  // behavior no amount of preventDefault() on our end can reliably fix, so this is back to
-  // middle-click, which never had any of these problems.
-  viewport.addEventListener('mousedown', (e) => {
-    if (e.button === 1) {
+  // Right mouse button drags to pan, via the Pointer Events API - NOT plain mousedown/mousemove/
+  // mouseup, which was tried first and was unreliable on real hardware: a right-button hold also
+  // arms the browser's own context-menu gesture recognition, and plain mouse events aren't
+  // guaranteed to dispatch promptly while that's being resolved - reported as "doesn't pan while
+  // held, gets stuck, then dumps all the movement at once on release." move/end listeners are on
+  // window (same as the original middle-click version), not just #viewport, so tracking never
+  // depends on the cursor staying inside the viewport's own box. setPointerCapture is layered on
+  // top as a *bonus* - the same technique map/canvas tools (Mapbox GL JS, Figma, etc.) use for
+  // exactly this gesture - but wrapped defensively: it can throw (confirmed while testing this),
+  // and a thrown, uncaught error there would silently abort the rest of pointerdown and leave
+  // isPanning stuck false, i.e. right-click doing nothing at all.
+  viewport.addEventListener('contextmenu', (e) => e.preventDefault());
+  window.addEventListener('contextmenu', (e) => {
+    if (window.isPanning) e.preventDefault();
+  });
+
+  viewport.addEventListener('pointerdown', (e) => {
+    if (e.button === 2) {
       e.preventDefault();
+      try { viewport.setPointerCapture(e.pointerId); } catch (err) {}
       window.isPanning = true;
+      window.panPointerId = e.pointerId;
       window.startX = e.clientX - window.panX;
       window.startY = e.clientY - window.panY;
       viewport.style.cursor = 'grabbing';
     }
   });
 
-  window.addEventListener('mousemove', (e) => {
-    if (window.isPanning) {
+  window.addEventListener('pointermove', (e) => {
+    if (window.isPanning && e.pointerId === window.panPointerId) {
       window.panX = e.clientX - window.startX;
       window.panY = e.clientY - window.startY;
       updateTransform();
     }
   });
 
-  window.addEventListener('mouseup', (e) => {
-    if (e.button === 1 && window.isPanning) {
-      window.isPanning = false;
-      viewport.style.cursor = 'grab';
-    }
-  });
+  function endViewportPan(e) {
+    if (!window.isPanning) return;
+    if (e && e.pointerId !== undefined && e.pointerId !== window.panPointerId) return;
+    window.isPanning = false;
+    try { viewport.releasePointerCapture(window.panPointerId); } catch (err) {}
+    window.panPointerId = null;
+    viewport.style.cursor = 'grab';
+  }
+  window.addEventListener('pointerup', endViewportPan);
+  window.addEventListener('pointercancel', endViewportPan);
+  // Safety net: if pointerup/pointercancel is ever missed (window loses focus mid-drag), don't
+  // leave panning stuck on with no way to turn it back off short of reloading the page.
+  window.addEventListener('blur', () => endViewportPan(null));
 
   viewport.addEventListener('wheel', (e) => {
     e.preventDefault();
