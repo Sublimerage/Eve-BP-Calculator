@@ -1478,16 +1478,26 @@ function renderJobBOMBlockHTML(job, materialStockInfo, isFocusMode) {
 
     let buildTimeUI = '';
     let totalBuildSeconds = job.totalBuildSeconds;
+    // Not stored on the job object itself, so inferred the same way app.js's own isReaction flag
+    // is first derived - a real recipe genuinely can't have both a mfgMaterials and a
+    // reactionMaterials list, so this is exact, not a guess. Used below both for the legacy
+    // fallback calc and for the hover tooltip, which otherwise always named Industry/Advanced
+    // Industry even on a reaction job (those skills don't affect reactions at all - see
+    // REACTIONS_SKILL_ID in config.js; the Reactions skill does, at 4%/level).
+    const jobRecipe = window.recipeMap && window.recipeMap[job.productTypeId];
+    const jobIsReaction = !!(jobRecipe && jobRecipe.reactionMaterials && jobRecipe.reactionMaterials.length > 0);
+    const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5, allSkills: { [window.REACTIONS_SKILL_ID || 45746]: 5 } });
+    const reactionsLevel = (skills.allSkills && skills.allSkills[window.REACTIONS_SKILL_ID || 45746]) || 0;
+
     if (totalBuildSeconds === undefined) {
       // Legacy jobs added before totalBuildSeconds existed: fall back to the root job's own time only,
       // adjusted for skills/facility/rig but not TE (TE per sub-component isn't recoverable without the
       // full tree, which isn't available on this page).
       const baseTime = job.baseTime || 0;
       if (baseTime > 0) {
-        const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
-        const indFactor = 1 - (0.04 * (skills.industry || 0));
-        const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
-        const skillTimeFactor = indFactor * advIndFactor;
+        const skillTimeFactor = jobIsReaction
+          ? (1 - (0.04 * reactionsLevel))
+          : (1 - (0.04 * (skills.industry || 0))) * (1 - (0.03 * (skills.advIndustry || 0)));
         const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { teBonus: 30.0 };
         const facilityFactor = 1 - (structureType.teBonus / 100);
         const rigTEBonus = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(job.productTypeId, 'TE') : 0;
@@ -1498,13 +1508,13 @@ function renderJobBOMBlockHTML(job, materialStockInfo, isFocusMode) {
         totalBuildSeconds = 0;
       }
     }
-    const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
     const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { shortLabel: 'Sotiyo' };
     const structureName = structureType.shortLabel;
     const rigTEBonusDisplay = window.getEffectiveRigBonusForTypeId ? window.getEffectiveRigBonusForTypeId(job.productTypeId, 'TE') : 0;
 
     if (totalBuildSeconds > 0) {
-      const hoverTitle = `Total time to build this item and every sub-component you're manufacturing yourself.\nIndustry: ${skills.industry}/5 | Advanced Industry: ${skills.advIndustry}/5 | Facility: ${structureName}${rigTEBonusDisplay > 0 ? ` | Rig: -${rigTEBonusDisplay.toFixed(2)}% TE` : ''}`;
+      const skillLabel = jobIsReaction ? `Reactions: ${reactionsLevel}/5` : `Industry: ${skills.industry}/5 | Advanced Industry: ${skills.advIndustry}/5`;
+      const hoverTitle = `Total time to build this item and every sub-component you're manufacturing yourself.\n${skillLabel} | Facility: ${structureName}${rigTEBonusDisplay > 0 ? ` | Rig: -${rigTEBonusDisplay.toFixed(2)}% TE` : ''}`;
 
       const effJobProfit = getEffectiveJobProfit(job);
       const iskPerHour = effJobProfit !== undefined ? (effJobProfit / (totalBuildSeconds / 3600)) : null;

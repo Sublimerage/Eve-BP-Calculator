@@ -760,28 +760,56 @@ function logSkillDiagnosticOnce(typeId, message) {
   console.info(message);
 }
 
+// Reactions type ID (localized/renamed nowhere - it's a fixed skill in the SDE): the ONLY skill
+// that affects reaction time (4% reduction per level, confirmed against EVE University's wiki and
+// EVE Ref's mirror of the in-game skill description). Industry/Advanced Industry are
+// manufacturing-only skills and have no effect on reactions - a real bug here previously (this
+// function applied both to every job, reactions included, with reactions only picking up any
+// skill-based reduction at all by accident, via whatever happened to be listed in that specific
+// formula's requiredSkills, at the wrong 1%/level rate meant for unrelated required-skill bonuses).
+const REACTIONS_SKILL_ID = 45746;
+window.REACTIONS_SKILL_ID = REACTIONS_SKILL_ID;
+
 function calculateAdjustedJobSeconds(baseTimeSeconds, customTE, runsNeeded, isReaction, productTypeId, requiredSkills) {
   if (!baseTimeSeconds || baseTimeSeconds <= 0) return 0;
-  const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
-  const indFactor = 1 - (0.04 * (skills.industry || 0));
-  const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
+  const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5, allSkills: { [REACTIONS_SKILL_ID]: 5 } });
 
-  let requiredSkillFactor = 1.0;
-  if (Array.isArray(requiredSkills) && requiredSkills.length > 0) {
-    if (!skills.allSkills) {
-      logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId} requires skills but no full skill sheet is loaded (skills.allSkills missing) - log in via ESI SSO to fetch your trained skill levels, otherwise these bonuses stay at 0.`);
-    } else {
-      requiredSkills.forEach(reqSkill => {
-        const playerLevel = skills.allSkills[reqSkill.skillId] || 0;
-        requiredSkillFactor *= (1 - (0.01 * playerLevel));
-      });
-      logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId}: required skills ${JSON.stringify(requiredSkills)}, your trained levels: ${requiredSkills.map(s => `${s.skillId}=${skills.allSkills[s.skillId] || 0}`).join(', ')}, combined factor: ${requiredSkillFactor.toFixed(4)}`);
+  // The isReaction PARAMETER also gets passed true by invention.js purely to reuse this
+  // function's "skip TE-research" behavior below - invention isn't actually a reaction, and its
+  // own time is genuinely reduced by Industry/Advanced Industry, not the Reactions skill. So which
+  // skill applies can't just trust that parameter - it re-derives real reaction status from the
+  // product's own recipe data instead, which invention's product (always a manufactured item)
+  // never has a reactionMaterials list for.
+  const recipeForSkillCheck = window.recipeMap && window.recipeMap[productTypeId];
+  const isActualReaction = !!(recipeForSkillCheck && recipeForSkillCheck.reactionMaterials && recipeForSkillCheck.reactionMaterials.length > 0);
+
+  let skillTimeFactor;
+  if (isActualReaction) {
+    const reactionsLevel = (skills.allSkills && skills.allSkills[REACTIONS_SKILL_ID]) || 0;
+    skillTimeFactor = 1 - (0.04 * reactionsLevel);
+    logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId} (reaction): Reactions skill level ${reactionsLevel}, factor: ${skillTimeFactor.toFixed(4)}. Industry/Advanced Industry do not apply to reactions.`);
+  } else {
+    const indFactor = 1 - (0.04 * (skills.industry || 0));
+    const advIndFactor = 1 - (0.03 * (skills.advIndustry || 0));
+
+    let requiredSkillFactor = 1.0;
+    if (Array.isArray(requiredSkills) && requiredSkills.length > 0) {
+      if (!skills.allSkills) {
+        logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId} requires skills but no full skill sheet is loaded (skills.allSkills missing) - log in via ESI SSO to fetch your trained skill levels, otherwise these bonuses stay at 0.`);
+      } else {
+        requiredSkills.forEach(reqSkill => {
+          const playerLevel = skills.allSkills[reqSkill.skillId] || 0;
+          requiredSkillFactor *= (1 - (0.01 * playerLevel));
+        });
+        logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId}: required skills ${JSON.stringify(requiredSkills)}, your trained levels: ${requiredSkills.map(s => `${s.skillId}=${skills.allSkills[s.skillId] || 0}`).join(', ')}, combined factor: ${requiredSkillFactor.toFixed(4)}`);
+      }
+    } else if (requiredSkills !== undefined) {
+      logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId}: recipe has no requiredSkills data (empty array) - either this item genuinely needs none, or your local database predates this feature and needs regenerating (generate_db.py).`);
     }
-  } else if (requiredSkills !== undefined) {
-    logSkillDiagnosticOnce(productTypeId, `[BuildTime/Skills] Item ${productTypeId}: recipe has no requiredSkills data (empty array) - either this item genuinely needs none, or your local database predates this feature and needs regenerating (generate_db.py).`);
+
+    skillTimeFactor = indFactor * advIndFactor * requiredSkillFactor;
   }
 
-  const skillTimeFactor = indFactor * advIndFactor * requiredSkillFactor;
   const te = isReaction ? 0 : (customTE || 0);
   const teFactor = 1 - (te / 100);
   const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { teBonus: 30.0 };

@@ -2107,7 +2107,7 @@ function createNodeCard(node) {
   let buildTimeUI = '';
   if (node.isBuildingSelf && node.isManufacturable) {
     const baseTime = extractBuildTime(node.recipe);
-    const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5 });
+    const skills = window.safeParseJSON(localStorage.getItem('eve_char_skills'), { industry: 5, advIndustry: 5, allSkills: { [window.REACTIONS_SKILL_ID || 45746]: 5 } });
     const structureType = window.getActiveStructureType ? window.getActiveStructureType() : { shortLabel: 'Sotiyo', teBonus: 30.0 };
     const structureName = structureType.shortLabel;
     const structureTEBonus = `${structureType.teBonus}%`;
@@ -2115,7 +2115,13 @@ function createNodeCard(node) {
 
     if (baseTime > 0) {
       const totalSeconds = calculateAdjustedJobSeconds(baseTime, node.customTE, node.runsNeeded, node.isReaction, node.productTypeId, node.recipe.requiredSkills);
-      const hoverTitle = `Skill Reductions Applied:\n• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)${rigTEBonus > 0 ? `\n• Rig Bonus: -${rigTEBonus.toFixed(2)}% TE` : ''}\n• Base SDE Time: ${window.formatDuration(baseTime)}`;
+      // Reactions and manufacturing are reduced by entirely different skills (Reactions vs.
+      // Industry/Advanced Industry - see REACTIONS_SKILL_ID in config.js), so the tooltip has to
+      // name the one that's actually in effect rather than always showing Industry/Adv. Industry.
+      const skillLine = node.isReaction
+        ? `• Reactions Level: ${(skills.allSkills && skills.allSkills[window.REACTIONS_SKILL_ID || 45746]) || 0}/5`
+        : `• Industry Level: ${skills.industry}/5\n• Advanced Industry Level: ${skills.advIndustry}/5`;
+      const hoverTitle = `Skill Reductions Applied:\n${skillLine}\n• Structure Bonus: ${structureName} (${structureTEBonus} TE reduction)${rigTEBonus > 0 ? `\n• Rig Bonus: -${rigTEBonus.toFixed(2)}% TE` : ''}\n• Base SDE Time: ${window.formatDuration(baseTime)}`;
 
       buildTimeUI = `
         <div class="flex justify-between text-xs text-slate-400 mono cursor-help" title="${window.esc(hoverTitle)}">
