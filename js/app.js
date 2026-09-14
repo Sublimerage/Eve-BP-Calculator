@@ -3228,23 +3228,16 @@ const viewport = document.getElementById('viewport');
 const content = document.getElementById('pan-zoom-content');
 
 if (viewport) {
-  // Right mouse button drags to pan (was middle-click). Suppressing the browser's native
-  // right-click context menu ONLY on #viewport isn't enough: during a real drag the cursor
-  // routinely strays outside the viewport's own box (over the BOM sidebar, icon rail, header)
-  // before the button is released, so the eventual "contextmenu" event's target is that OTHER
-  // element - a listener scoped just to #viewport never sees it there, the native menu slips
-  // through mid-drag, and it steals the mouseup that was supposed to turn panning back off. That's
-  // exactly what read as "glitchy, gets stuck, not fluid": isPanning was left permanently true
-  // until the next unrelated left-click happened to reset it. Listening on window instead (guarded
-  // by isPanning, so an unrelated right-click elsewhere on the page still gets its normal menu)
-  // catches it regardless of which element the cursor ends up over.
-  viewport.addEventListener('contextmenu', (e) => e.preventDefault());
-  window.addEventListener('contextmenu', (e) => {
-    if (window.isPanning) e.preventDefault();
-  });
-
+  // Middle mouse button drags to pan. Right-click was tried instead (per a later request) and
+  // reverted (per an even later request) - holding the right button arms the browser/OS's own
+  // context-menu gesture recognition, which on real hardware doesn't just mean an extra
+  // "contextmenu" event to suppress: it can outright defer/swallow the mousemove events during
+  // the hold, then release them all at once on mouseup - reported as "doesn't pan while held,
+  // gets stuck, then keeps panning after release until you click again." That's a browser/OS-level
+  // behavior no amount of preventDefault() on our end can reliably fix, so this is back to
+  // middle-click, which never had any of these problems.
   viewport.addEventListener('mousedown', (e) => {
-    if (e.button === 2) {
+    if (e.button === 1) {
       e.preventDefault();
       window.isPanning = true;
       window.startX = e.clientX - window.panX;
@@ -3262,17 +3255,7 @@ if (viewport) {
   });
 
   window.addEventListener('mouseup', (e) => {
-    if (e.button === 2 && window.isPanning) {
-      window.isPanning = false;
-      viewport.style.cursor = 'grab';
-    }
-  });
-
-  // Safety net: if a button-2 mouseup is ever missed entirely (window loses focus mid-drag - alt
-  // tab, an OS-level right-click gesture, devtools stealing focus, etc.), don't leave panning
-  // stuck on with no way to turn it back off short of reloading the page.
-  window.addEventListener('blur', () => {
-    if (window.isPanning) {
+    if (e.button === 1 && window.isPanning) {
       window.isPanning = false;
       viewport.style.cursor = 'grab';
     }
