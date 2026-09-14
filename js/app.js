@@ -1710,6 +1710,8 @@ function saveActiveState() {
     localStorage.setItem('eve_custom_buy_modes', JSON.stringify(window.customBuyModes));
     localStorage.setItem('eve_custom_me_overrides', JSON.stringify(window.customMEOverrides));
     localStorage.setItem('eve_custom_te_overrides', JSON.stringify(window.customTEOverrides));
+    localStorage.setItem('eve_bulk_me_target', JSON.stringify(window.bulkMETarget || null));
+    localStorage.setItem('eve_bulk_me_snapshot', JSON.stringify(window.bulkMEOriginalSnapshot || null));
     localStorage.setItem('eve_global_runs', window.globalRuns);
     localStorage.setItem('eve_global_jobs', window.globalJobs);
     localStorage.setItem('eve_root_sell_strategy', window.rootSellStrategy);
@@ -1723,6 +1725,8 @@ function loadSavedState() {
     window.customBuyModes = window.safeParseJSON(localStorage.getItem('eve_custom_buy_modes'), {});
     window.customMEOverrides = window.safeParseJSON(localStorage.getItem('eve_custom_me_overrides'), {});
     window.customTEOverrides = window.safeParseJSON(localStorage.getItem('eve_custom_te_overrides'), {});
+    window.bulkMETarget = window.safeParseJSON(localStorage.getItem('eve_bulk_me_target'), null);
+    window.bulkMEOriginalSnapshot = window.safeParseJSON(localStorage.getItem('eve_bulk_me_snapshot'), null);
     window.globalRuns = parseInt(localStorage.getItem('eve_global_runs')) || 1;
     window.globalJobs = parseInt(localStorage.getItem('eve_global_jobs')) || 1;
     window.rootSellStrategy = localStorage.getItem('eve_root_sell_strategy') || 'market-sell';
@@ -3368,6 +3372,7 @@ window.addEventListener('load', async () => {
     if (typeof window.restoreManufacturingImplantSetting === 'function') window.restoreManufacturingImplantSetting('mfg-implant-select');
     renderStructureBonusChips(); // ME/TE/cost chips under the structure dropdown (after loadTaxSettings sets the <select>)
     loadSavedState(); // Load previous product & overrides persistently from localStorage!
+    if (typeof window.updateBulkMEStatusUI === 'function') window.updateBulkMEStatusUI(); // Reflect a restored bulk ME/TE target (loadSavedState doesn't re-render the Build tab's own static card)
     updateHeaderLedgerCount(); // Update badge on load!
   } catch (err) {
     console.error("State restoration error:", err);

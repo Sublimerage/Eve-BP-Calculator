@@ -15,11 +15,144 @@ function syncTreeBuildStates(node) {
   }
 }
 
+// --- Action: Bulk ME/TE Target (Build tab "Bulk ME/TE" card) ---
+// A component only qualifies the same way its own per-card ME/TE fields do (see the card
+// template in app.js): a real recipe with manufacturing materials, not a reaction (reactions have
+// no ME/TE research at all).
+function isTypeMEEligible(typeId) {
+  const recipe = window.recipeMap && window.recipeMap[typeId];
+  if (!recipe) return false;
+  const hasMfg = recipe.mfgMaterials && recipe.mfgMaterials.length > 0;
+  const hasReaction = recipe.reactionMaterials && recipe.reactionMaterials.length > 0;
+  return hasMfg && !hasReaction;
+}
+
+// Called from toggleBuildSelf/buildAllComponents whenever a component becomes Build for the
+// first time - if a bulk target is armed, this is what makes it "keep applying" to anything
+// switched to Build from now on, not just what was already Build at the moment Apply was clicked.
+function stampBulkMETargetIfArmed(typeId) {
+  if (!window.bulkMETarget || !isTypeMEEligible(typeId)) return;
+  window.customMEOverrides[typeId] = window.bulkMETarget.me;
+  window.customTEOverrides[typeId] = window.bulkMETarget.te;
+}
+window.stampBulkMETargetIfArmed = stampBulkMETargetIfArmed;
+
+// Sets every currently-built non-root component to the given ME/TE right now, AND arms
+// window.bulkMETarget so toggleBuildSelf/buildAllComponents keep stamping it onto anything
+// switched to Build afterward too - until clearBulkMETarget() (the toast's "Stop" action, or the
+// card's own Stop button) turns that back off. Forcibly overwrites even a component with its own
+// auto-filled-from-owned-BPO value, same as any other manual ME/TE edit already does - this is a
+// deliberate "assume everything's maxed/at this level" planning tool, not meant to defer to what
+// you actually own.
+function applyBulkMETarget(me, te) {
+  const clampedME = Math.max(0, Math.min(10, parseFloat(me) || 0));
+  const clampedTE = Math.max(0, Math.min(20, parseFloat(te) || 0));
+
+  // Captured once - the very first bulk action since the last full Reset - not re-captured on a
+  // second Max/Apply click (which would otherwise overwrite the true "before any of this" baseline
+  // with an already-bulk-modified state). This is what resetBulkMETarget() restores wholesale,
+  // deliberately not a per-click undo stack - the user explicitly asked for one full reset back to
+  // "before pressing any button," not stepped undo.
+  if (!window.bulkMEOriginalSnapshot) {
+    window.bulkMEOriginalSnapshot = {
+      me: { ...window.customMEOverrides },
+      te: { ...window.customTEOverrides }
+    };
+  }
+  window.bulkMETarget = { me: clampedME, te: clampedTE };
+
+  function stampTree(node, isRoot) {
+    if (!node) return;
+    if (!isRoot && node.isBuildingSelf && node.isManufacturable && !node.isReaction) {
+      window.customMEOverrides[node.typeId] = clampedME;
+      window.customTEOverrides[node.typeId] = clampedTE;
+    }
+    if (node.children) node.children.forEach(c => stampTree(c, false));
+  }
+  if (window.recipeTreeRoot) stampTree(window.recipeTreeRoot, true);
+
+  if (window.currentProduct) {
+    window.selectItem(window.currentProduct.id, window.currentProduct.name, true);
+  } else if (typeof window.recalculate === 'function') {
+    window.recalculate();
+  }
+  if (typeof window.updateBulkMEStatusUI === 'function') window.updateBulkMEStatusUI();
+
+  if (typeof window.showToast === 'function') {
+    window.showToast(`Set every built component to ME ${clampedME}% / TE ${clampedTE}% - will keep applying to anything you switch to Build from here on.`, 'success', { action: { label: 'Stop', onClick: () => window.clearBulkMETarget() } });
+  }
+}
+window.applyBulkMETarget = applyBulkMETarget;
+
+function applyBulkMETargetMax() {
+  applyBulkMETarget(10, 20);
+}
+window.applyBulkMETargetMax = applyBulkMETargetMax;
+
+// Stops future auto-apply only - does not touch ME/TE values already set on components, and does
+// NOT clear bulkMEOriginalSnapshot (a later Reset still needs to reach back past this point to the
+// real original baseline, not just to whatever was true when Stop was clicked).
+function clearBulkMETarget() {
+  window.bulkMETarget = null;
+  if (typeof window.recalculate === 'function') window.recalculate();
+  if (typeof window.updateBulkMEStatusUI === 'function') window.updateBulkMEStatusUI();
+  if (typeof window.showToast === 'function') {
+    window.showToast('Stopped auto-applying bulk ME/TE to newly built components. Values already set are unchanged.', 'info');
+  }
+}
+window.clearBulkMETarget = clearBulkMETarget;
+
+// Full restore to exactly how every component's ME/TE stood before the first Max/Apply click -
+// wholesale replaces customMEOverrides/customTEOverrides with the snapshot captured back in
+// applyBulkMETarget, then clears both the target (stops future auto-apply too) and the snapshot
+// itself, so the next Max/Apply click captures a fresh baseline rather than reusing this one.
+function resetBulkMETarget() {
+  if (!window.bulkMEOriginalSnapshot) return;
+  window.customMEOverrides = { ...window.bulkMEOriginalSnapshot.me };
+  window.customTEOverrides = { ...window.bulkMEOriginalSnapshot.te };
+  window.bulkMETarget = null;
+  window.bulkMEOriginalSnapshot = null;
+  if (window.currentProduct) {
+    window.selectItem(window.currentProduct.id, window.currentProduct.name, true);
+  } else if (typeof window.recalculate === 'function') {
+    window.recalculate();
+  }
+  if (typeof window.updateBulkMEStatusUI === 'function') window.updateBulkMEStatusUI();
+  if (typeof window.showToast === 'function') {
+    window.showToast('Every component\'s ME/TE restored to what it was before Bulk ME/TE was ever used.', 'success');
+  }
+}
+window.resetBulkMETarget = resetBulkMETarget;
+
+// Reflects bulkMETarget/bulkMEOriginalSnapshot (loaded from localStorage on page load, or set/
+// cleared by the functions above) in the Build tab's own "Bulk ME/TE" card - shown/called from
+// index.html's window.onload and from every apply/clear/reset above. The row (and its Reset
+// button) stays visible even after Stop, as long as there's still a snapshot to restore to.
+function updateBulkMEStatusUI() {
+  const statusRow = document.getElementById('bulk-me-status');
+  const statusText = document.getElementById('bulk-me-status-text');
+  const stopBtn = document.getElementById('bulk-me-stop-btn');
+  if (!statusRow || !statusText) return;
+  const isArmed = !!window.bulkMETarget;
+  const hasSnapshot = !!window.bulkMEOriginalSnapshot;
+  if (!isArmed && !hasSnapshot) {
+    statusRow.classList.add('hidden');
+    return;
+  }
+  statusRow.classList.remove('hidden');
+  statusText.textContent = isArmed
+    ? `Auto-applying ME ${window.bulkMETarget.me}% / TE ${window.bulkMETarget.te}% to newly built components`
+    : 'Bulk ME/TE stopped - components keep their current values.';
+  if (stopBtn) stopBtn.classList.toggle('hidden', !isArmed);
+}
+window.updateBulkMEStatusUI = updateBulkMEStatusUI;
+
 // --- Action: Toggle Component Build / Buy Mode ---
 async function toggleBuildSelf(e, typeId) {
   if (e) e.stopPropagation();
   const currentState = (window.buildSelfOverrides[typeId] !== undefined) ? window.buildSelfOverrides[typeId] : false;
   window.buildSelfOverrides[typeId] = !currentState;
+  if (!currentState) stampBulkMETargetIfArmed(typeId);
 
   const root = window.recipeTreeRoot;
   // An LP Store isolated direct-sell offer's root is a hand-built synthetic node with no real
@@ -75,7 +208,11 @@ async function buildAllComponents() {
     if (!node) return;
     if (node.isManufacturable) {
       window.buildSelfOverrides[node.typeId] = true;
-      if (node.displayTypeId) window.buildSelfOverrides[node.displayTypeId] = true;
+      stampBulkMETargetIfArmed(node.typeId);
+      if (node.displayTypeId) {
+        window.buildSelfOverrides[node.displayTypeId] = true;
+        stampBulkMETargetIfArmed(node.displayTypeId);
+      }
     }
     if (node.children) {
       node.children.forEach(c => markAllBuild(c));
