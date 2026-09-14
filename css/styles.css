@@ -264,26 +264,6 @@ img {
 }
 .glass-card { border-radius: var(--radius-card); }
 header { height: 56px; flex-shrink: 0; position: relative; }
-/* Site title centered on the header's own total width via absolute positioning - NOT flex/grid
-   distribution. Two earlier attempts both touched the header's actual layout and both broke
-   something: a flex `flex:1` child between the two side groups centered in whatever space was left
-   OVER between them, which shifted per page since the right-hand group's width varies a lot
-   (Calculator's utility cluster vs. the other pages' bare theme+login) - reported as misaligned.
-   Converting the header to a 3-column grid fixed that centering but changed how the two side
-   groups themselves size and wrap internally (their flex-wrap content wrapped a second row that
-   never happened under plain flex) - reported directly as "buttons moved, login isn't where it
-   used to be". Absolute positioning leaves the header's own flex layout for the left/right groups
-   completely untouched - pixel-identical to how it always worked - while the title still lands at
-   the exact page-center X on every page, since the math comes from the header's own box width, not
-   from either sibling's content. */
-.site-title-centered {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  white-space: nowrap;
-}
 
 /* Data-load status pill - just the dot at rest, the full text (INITIALIZING.../RECIPES & PRICES
    LOADED/an error) slides out on hover instead of permanently occupying header width for something
@@ -317,9 +297,9 @@ header { height: 56px; flex-shrink: 0; position: relative; }
 .icon-btn:hover { color: var(--accent); background: rgba(var(--accent-rgb),0.28); border-color: rgba(var(--accent-rgb),0.55); }
 
 /* ===== Header brand + global search (index.html) ===== */
-/* Fixed width regardless of title text length ("DEEP-INDUSTRY" vs "EVE INDUSTRY LEDGER" vs
-   "INVENTION CALCULATOR") so nav-tabs, glued directly after this block, lands at the identical X
-   position on all three pages. */
+/* Fixed width so nav-tabs, glued directly after this block, land at the identical X position on
+   every page - the brand text itself is now the same "Eve Deep Industry" on all 4 pages (used to
+   vary per page, e.g. "INVENTION CALCULATOR", back when this showed the page name instead). */
 .header-brand { width: 232px; }
 /* flex:0 0 auto (not the old 1 1 auto) - this box now lives inside the Calculator's stat-strip
    search card, a COLUMN flex container (.stat), not the header's row layout it was original built
@@ -482,11 +462,15 @@ nav.primary-tabs { display: flex; align-items: center; gap: 4px; height: 100%; }
 /* Coal-neutral: selection/navigation state reads as plain lifted gray, not tinted with the
    accent - accent color is reserved for the brand mark and true primary actions (see .btn-glass),
    not sprinkled onto every "this is selected" state. Same treatment regardless of which page's
-   tab is active - the per-page brand color still shows up in the header's logo mark. */
+   tab is active - the per-page brand color still shows up in the header's logo mark. Background/
+   border opacity raised (was 0.07/0.12 - reported as barely visible, too close to .nav-tab's own
+   hover state) plus a bolder weight, so the active tab is unmistakable at a glance without
+   reaching for color. */
 .nav-tab-active, .nav-tab-active-violet {
   color: var(--text) !important;
-  background: rgba(255,255,255,0.07);
-  border-color: rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.11);
+  border-color: rgba(255,255,255,0.28);
+  font-weight: 600;
 }
 
 /* ===== Stat strip (replaces the old grid-of-boxed-cards summary bar) ===== */
