@@ -254,6 +254,31 @@
             </div>
 
             <div class="fo-card">
+              <div class="fo-card-title">Bulk ME/TE</div>
+              <div class="fo-card-note">Sets every built component (not the item itself) to this ME/TE at once, and keeps applying it to anything you switch to Build afterward too.</div>
+              <div class="fo-row">
+                <span class="fo-row-label">Target</span>
+                <div class="fo-row-ctl">
+                  <input type="text" inputmode="decimal" id="bulk-me-target" value="10" oninput="sanitizeDecimalInput(event)" class="fo-num" style="width:34px;" title="Material Efficiency %">
+                  <span class="fo-num-suffix">ME</span>
+                  <input type="text" inputmode="decimal" id="bulk-te-target" value="20" oninput="sanitizeDecimalInput(event)" class="fo-num" style="width:34px;" title="Time Efficiency %">
+                  <span class="fo-num-suffix">TE</span>
+                </div>
+              </div>
+              <div class="fo-btn-row">
+                <button onclick="applyBulkMETargetMax()" class="btn-glass py-2 px-3 text-xs">Max (10/20)</button>
+                <button onclick="applyBulkMETarget(document.getElementById('bulk-me-target').value, document.getElementById('bulk-te-target').value)" class="btn-glass btn-glass-muted py-2 px-3 text-xs">Apply</button>
+              </div>
+              <div id="bulk-me-status" class="hidden" style="margin-top:8px;">
+                <div id="bulk-me-status-text" class="fo-card-note" style="margin-top:0; margin-bottom:6px;"></div>
+                <div class="fo-btn-row">
+                  <button id="bulk-me-stop-btn" onclick="clearBulkMETarget()" class="btn-glass btn-glass-muted py-1.5 text-[11px] mono" title="Stop auto-applying to newly built components. Values already set are left as they are.">Stop Auto-Apply</button>
+                  <button onclick="resetBulkMETarget()" class="btn-glass btn-glass-muted py-1.5 text-[11px] mono" title="Restore every component's ME/TE to exactly what it was before Bulk ME/TE was first used">Reset All</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="fo-card">
               <div class="fo-card-title">Auto-Build by Margin</div>
               <div class="fo-card-note">Switch every component whose own build margin beats this to Build.</div>
               <div class="fo-row">
@@ -783,8 +808,8 @@
   <script src="js/config.js?v=15.8.28" defer></script>
   <script src="js/esi.js?v=15.8.25" defer></script>
   <script src="js/tree.js?v=15.1.3" defer></script>
-  <script src="js/optimizers.js?v=15.4.3" defer></script>
-  <script src="js/app.js?v=15.55.0" defer></script>
+  <script src="js/optimizers.js?v=15.4.5" defer></script>
+  <script src="js/app.js?v=15.57.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
