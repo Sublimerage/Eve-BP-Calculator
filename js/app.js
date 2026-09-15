@@ -2291,7 +2291,7 @@ function createNodeCard(node, autoCompact) {
     const isBuyEligible = !node.isBuildingSelf || !node.children || node.children.length === 0;
     const compactBuyStrategy = isBuyEligible ? window.getNodePriceStrategy(node) : null;
     const compactBuyToggle = isBuyEligible ? `
-        <button onclick="toggleComponentBuyMode(event, ${node.typeId})" class="toggle-btn flex-shrink-0 ${compactBuyStrategy === 'lp' ? '' : (compactBuyStrategy === 'buy' ? 'toggle-btn-active-accent' : 'toggle-btn-active-buy')}" style="${compactBuyStrategy === 'lp' ? 'color:#c084fc;border-color:#c084fc;' : ''}" title="${compactBuyStrategy === 'lp' ? 'Acquiring via LP store offer - click to switch to a market Buy Order' : compactBuyStrategy === 'buy' ? 'Buying via Buy Order - click to switch to instant Sell-order buying' : 'Buying via instant Sell Orders - click to switch to a Buy Order'}">
+        <button onclick="toggleComponentBuyMode(event, ${node.typeId})" class="toggle-btn flex-shrink-0 ${compactBuyStrategy === 'lp' ? '' : (compactBuyStrategy === 'buy' ? 'toggle-btn-active-accent' : 'toggle-btn-active-buy')}" style="padding:5px 7px;${compactBuyStrategy === 'lp' ? 'color:#c084fc;border-color:#c084fc;' : ''}" title="${compactBuyStrategy === 'lp' ? 'Acquiring via LP store offer - click to switch to a market Buy Order' : compactBuyStrategy === 'buy' ? 'Buying via Buy Order - click to switch to instant Sell-order buying' : 'Buying via instant Sell Orders - click to switch to a Buy Order'}">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">${
             compactBuyStrategy === 'lp' ? '<circle cx="12" cy="8" r="5"/><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5"/>'
             : compactBuyStrategy === 'buy' ? '<path d="M6 3h9l3 3v15H6z"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/>'
@@ -2299,15 +2299,11 @@ function createNodeCard(node, autoCompact) {
           }</svg>
         </button>` : '';
 
-    // w-96 (was w-72) - the buy-mode icon above, plus the hidden-descendant-count badge on the
-    // expand chevron (its own width varies card to card - "+3" vs "+82"), already eat a good chunk
-    // of a chip's fixed overhead before the qty/cost row even gets a turn, so w-80 (the expanded
-    // card's own width) still truncated ordinary numbers like "14,682" down to "14..." - not just
-    // extreme same-tier-merge totals. w-96 (matching the root card) gives enough slack for every
-    // normal case; the qty/cost spans keep truncate+min-w-0 as a fallback for whatever's still too
-    // wide even at this size (a huge merge total, say), so the row can never wrap and grow the chip
-    // taller, which is the one thing compacting exists to prevent.
-    card.className = 'diagram-node diagram-node-compact glass-card p-2.5 shadow-lg transition-all relative w-96';
+    // w-[352px] (10% over w-80) - matches the expanded card's own width, which got the same bump
+    // for the same reason: room for the Sell/Buy price row below without truncating on expensive
+    // items. The two icon buttons below get a touch less horizontal padding than the default
+    // toggle-btn - they carry no text, so the usual padding was pure waste at this size.
+    card.className = 'diagram-node diagram-node-compact glass-card p-2.5 shadow-lg transition-all relative w-[352px]';
     card.title = 'Click to expand';
     card.onclick = (e) => toggleNodeCollapse(e, node.instanceId, node.pathKey);
     card.innerHTML = `
@@ -2321,7 +2317,7 @@ function createNodeCard(node, autoCompact) {
           </div>
         </div>
         ${compactBuyToggle}
-        <span class="toggle-btn toggle-btn-active-accent flex-shrink-0">
+        <span class="toggle-btn toggle-btn-active-accent flex-shrink-0" style="padding:5px 7px;">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,18 15,12 9,6"/></svg>${hiddenCount > 0 ? ` +${hiddenCount}` : ''}
         </span>
       </div>
@@ -2333,19 +2329,21 @@ function createNodeCard(node, autoCompact) {
   // node-parent-highlight already use), not the old design's hardcoded-hex left-border stripe,
   // which didn't reference the current palette at all and looked like a leftover from another
   // theme entirely.
-  // w-80 (was w-72) - widened as part of trading width for height: the price/cost block below
-  // packs Sell+Buy onto one row and collapses every label-then-value pair onto a single line,
-  // which needs the extra ~32px to keep numbers from crowding into the truncation ellipsis.
-  let cardStyle = 'w-80';
+  // w-[352px] (was w-72, then w-80 - now 10% over that) - widened as part of trading width for
+  // height: the price/cost block below packs Sell+Buy onto one row and collapses every
+  // label-then-value pair onto a single line, which needs room to keep numbers from crowding into
+  // the truncation ellipsis - a big-ticket item (a whole ship as someone else's material, say) can
+  // run into the billions of ISK, which w-80 alone still wasn't quite wide enough for.
+  let cardStyle = 'w-[352px]';
   let borderAccent = '';
   if (isRoot) { cardStyle = 'w-96'; }
   // isRedemptionRequirement (LP Store page only, js/lpstore.js injectLPRedemptionNodes) - an item
   // turned in to redeem an LP offer, not a build material at all, so it gets its own color rather
   // than falling into the ordinary "bought, not built" blue below.
-  else if (node.isRedemptionRequirement) { cardStyle = 'w-80'; borderAccent = 'border-top-color:#c084fc;'; }
-  else if (!node.isBuildingSelf) { cardStyle = 'w-80'; borderAccent = 'border-top-color:var(--blue);'; }
-  else if (node.isReaction) { cardStyle = 'w-80'; borderAccent = 'border-top-color:var(--violet);'; }
-  else if (node.batchYield > 1) { cardStyle = 'w-80'; borderAccent = 'border-top-color:var(--accent);'; }
+  else if (node.isRedemptionRequirement) { cardStyle = 'w-[352px]'; borderAccent = 'border-top-color:#c084fc;'; }
+  else if (!node.isBuildingSelf) { cardStyle = 'w-[352px]'; borderAccent = 'border-top-color:var(--blue);'; }
+  else if (node.isReaction) { cardStyle = 'w-[352px]'; borderAccent = 'border-top-color:var(--violet);'; }
+  else if (node.batchYield > 1) { cardStyle = 'w-[352px]'; borderAccent = 'border-top-color:var(--accent);'; }
 
   const totalProduced = node.runsNeeded * node.batchYield;
   const surplus = totalProduced - node.qtyNeeded;
@@ -2598,17 +2596,19 @@ function createNodeCard(node, autoCompact) {
         <div class="flex items-center gap-2">
           <div class="min-w-0 flex-1 truncate" title="Lowest Sell: ${prices.sell.toLocaleString()} ISK">
             <span class="text-slate-500 uppercase tracking-wide" style="font-size:9.5px;">Sell</span>
-            <span class="text-green-400 font-bold ml-1">${prices.sell.toLocaleString()}${window.estimatedPriceMarker ? window.estimatedPriceMarker(productTypeId) : ''}</span>
+            <span class="text-green-400 font-bold ml-1 text-xs">${prices.sell.toLocaleString()}${window.estimatedPriceMarker ? window.estimatedPriceMarker(productTypeId) : ''}</span>
           </div>
           <div class="min-w-0 flex-1 truncate" title="Highest Buy: ${prices.buy.toLocaleString()} ISK">
             <span class="text-slate-500 uppercase tracking-wide" style="font-size:9.5px;">Buy</span>
-            <span class="text-slate-300 ml-1">${prices.buy.toLocaleString()}${window.estimatedPriceMarker ? window.estimatedPriceMarker(productTypeId) : ''}</span>
+            <span class="text-slate-300 ml-1 text-xs">${prices.buy.toLocaleString()}${window.estimatedPriceMarker ? window.estimatedPriceMarker(productTypeId) : ''}</span>
           </div>
-          <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="icon-btn flex-shrink-0" style="width:24px;height:24px;" title="Compare price and trade volume across your tracked markets">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><polyline points="17,1 21,5 17,9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7,23 3,19 7,15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+        </div>
+        <div class="flex items-center justify-between text-xs">
+          <span class="${!isRoot && savingsPct !== null ? 'text-green-400 font-semibold' : ''}">${!isRoot && savingsPct !== null ? `Order Savings <span class="ml-1">${savingsPct}%</span>` : ''}</span>
+          <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="icon-btn flex-shrink-0" style="width:22px;height:22px;" title="Compare price and trade volume across your tracked markets">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><polyline points="17,1 21,5 17,9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7,23 3,19 7,15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
           </button>
         </div>
-        ${!isRoot && savingsPct !== null ? `<div class="flex justify-between text-green-400 font-semibold text-xs"><span>Order Savings</span><span>${savingsPct}%</span></div>` : ''}
         ${node.jobFee > 0 && node.isBuildingSelf ? `<div class="flex justify-between text-xs"><span class="text-[#e85555] font-semibold">Job Inst. Fee</span><span class="text-[#e85555] font-semibold">+${Math.round(node.jobFee).toLocaleString()} ISK</span></div>` : ''}
         <div class="flex items-center justify-between border-t border-[#3a3025] pt-1.5">
           <span class="text-slate-400 uppercase tracking-wide" style="font-size:9.5px;">${isRoot ? 'Total Production Cost' : node.isBuildingSelf ? 'Calculated Build Cost' : node._lpAcquiredOffer ? 'LP Redemption Cost' : 'Market Buy Cost'}</span>
