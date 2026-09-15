@@ -8,8 +8,8 @@
 <meta http-equiv="Expires" content="0">
 <title>Eve Deep Industry — LP Store</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c8ff4d' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='8' r='5'/%3E%3Cpath d='M8.5 12.5L7 21l5-3 5 3-1.5-8.5'/%3E%3C/svg%3E">
-<link class="cache-bust" rel="stylesheet" href="css/tailwind-build.css?v=1.0.9">
-<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.85.0">
+<link class="cache-bust" rel="stylesheet" href="css/tailwind-build.css?v=1.0.12">
+<link class="cache-bust" rel="stylesheet" href="css/styles.css?v=27.87.0">
 <script>(function(){try{var t=localStorage.getItem('eve_color_theme');if(t&&t!=='lime')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <!-- GoatCounter - privacy-friendly page-view analytics, no cookies/consent banner needed -->
 <script data-goatcounter="https://sublimerage.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
@@ -218,7 +218,7 @@
             <div class="fo-card">
               <div class="fo-card-title">Bulk Actions</div>
               <div class="fo-btn-row">
-                <button onclick="buildAllComponents()" class="btn-glass py-2 px-3 text-xs">Build All</button>
+                <button id="build-all-btn" onclick="buildAllComponents()" class="btn-glass py-2 px-3 text-xs">Build All</button>
                 <button onclick="buyAllSubComponents()" class="btn-glass btn-glass-muted py-2 px-3 text-xs">Buy All</button>
               </div>
               <div class="fo-card-note">Acts on the isolated build tree for the current offer.</div>
@@ -459,6 +459,14 @@
         <span id="lpstore-inspector-name" class="px-2.5 py-1.5 glass-card text-slate-200 font-semibold truncate" style="max-width:260px;"></span>
       </div>
 
+      <!-- Isolate-mode indicator - see index.html's own copy of this for the full comment. -->
+      <div id="isolate-mode-banner" class="hidden absolute top-3 left-3 z-40 flex items-center gap-2 px-3 py-1.5 glass-card mono text-xs max-w-[min(45vw,260px)]" style="border-color:rgba(var(--accent-rgb),0.5);" onclick="event.stopPropagation()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 flex-shrink-0" style="color:var(--accent);"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/></svg>
+        <span class="text-slate-300 truncate min-w-0">Isolated: <span id="isolate-mode-banner-name" class="font-bold text-white"></span></span>
+        <span class="text-slate-600 flex-shrink-0">·</span>
+        <button onclick="exitIsolation(event)" class="font-semibold hover:underline flex-shrink-0" style="color:var(--accent);">Esc to exit</button>
+      </div>
+
       <div class="absolute top-3 right-3 z-40 flex items-center gap-1.5 mono text-xs" onclick="event.stopPropagation()">
         <span id="zoom-level-text" class="px-2.5 py-1.5 glass-card text-slate-300 font-semibold">100%</span>
         <button onclick="collapseAllNodes()" class="icon-btn" title="Collapse every branch that has inputs, to shrink very tall builds">
@@ -475,8 +483,8 @@
         </button>
       </div>
 
-      <div id="viewport-hint" class="absolute bottom-3 left-3 z-40 px-3 py-1.5 mono text-slate-400 text-[11px]" title="Click Card: Highlight Inputs &amp; Output · Click BOM Row: Center Material · [F]: Center Output">
-        Click card to highlight · Click BOM row to center · [F] to center output
+      <div id="viewport-hint" class="absolute bottom-3 left-3 z-40 px-3 py-1.5 mono text-slate-400 text-[11px]" title="Click Card: Highlight Inputs &amp; Output · Click BOM Row: Center Material · [F]: Center Output · Arrow Keys: Walk Tree · [Space]: Compact/Expand Selected">
+        Click card to highlight · Click BOM row to center · [F] to center output · Arrow keys to walk tree · [Space] to compact/expand
       </div>
 
       <!-- Market Economics pull-up drawer - LP Store isolation mode only (lives inside #viewport,
@@ -625,12 +633,12 @@
        plain window.onload= assignment specifically so js/lpstore.js's own listener (below) can
        coexist instead of clobbering it - see both files' own comments on this. -->
   <script src="eve_db.js?v=16.4.0" defer></script>
-  <script src="js/config.js?v=8.0.36" defer></script>
+  <script src="js/config.js?v=8.0.38" defer></script>
   <script src="js/esi.js?v=8.0.33" defer></script>
-  <script src="js/tree.js?v=8.0.4" defer></script>
-  <script src="js/optimizers.js?v=8.0.9" defer></script>
-  <script src="js/app.js?v=15.57.0" defer></script>
-  <script src="js/lpstore.js?v=7.29.0" defer></script>
+  <script src="js/tree.js?v=8.0.6" defer></script>
+  <script src="js/optimizers.js?v=8.0.11" defer></script>
+  <script src="js/app.js?v=15.73.0" defer></script>
+  <script src="js/lpstore.js?v=7.30.0" defer></script>
   <script src="js/custom-select.js?v=1.5.0" defer></script>
 </body>
 </html>
