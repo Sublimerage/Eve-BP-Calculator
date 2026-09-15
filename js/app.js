@@ -2280,6 +2280,25 @@ function createNodeCard(node, autoCompact) {
   if (!isRoot && !isIsolated && (window.collapsedInstanceIds.has(nodeStableKey(node)) || (autoCompact && !window.expandedOverrideIds.has(nodeStableKey(node))))) {
     const compactDisplayName = node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
     const hiddenCount = countDescendants(node);
+
+    // Same "Buy via: Sell/Buy" state the full card's own two labeled buttons control (below, in the
+    // non-compact branch) - shown here as one small icon instead, since a chip has no room for text
+    // buttons. Doubles as the indicator: whichever icon is showing IS the current strategy. Only
+    // offered where the full card would offer it too (nothing to buy if this node builds itself and
+    // has real children). 'lp' gets its own icon/color (matching the full card's purple LP pill) so
+    // it reads correctly at a glance, but a click always lands on 'buy' - LP stays reachable only
+    // from the expanded card's own dedicated button (see toggleComponentBuyMode's own comment).
+    const isBuyEligible = !node.isBuildingSelf || !node.children || node.children.length === 0;
+    const compactBuyStrategy = isBuyEligible ? window.getNodePriceStrategy(node) : null;
+    const compactBuyToggle = isBuyEligible ? `
+        <button onclick="toggleComponentBuyMode(event, ${node.typeId})" class="toggle-btn flex-shrink-0 ${compactBuyStrategy === 'lp' ? '' : (compactBuyStrategy === 'buy' ? 'toggle-btn-active-accent' : 'toggle-btn-active-buy')}" style="${compactBuyStrategy === 'lp' ? 'color:#c084fc;border-color:#c084fc;' : ''}" title="${compactBuyStrategy === 'lp' ? 'Acquiring via LP store offer - click to switch to a market Buy Order' : compactBuyStrategy === 'buy' ? 'Buying via Buy Order - click to switch to instant Sell-order buying' : 'Buying via instant Sell Orders - click to switch to a Buy Order'}">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5">${
+            compactBuyStrategy === 'lp' ? '<circle cx="12" cy="8" r="5"/><path d="M8.5 12.5L7 21l5-3 5 3-1.5-8.5"/>'
+            : compactBuyStrategy === 'buy' ? '<path d="M6 3h9l3 3v15H6z"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/>'
+            : '<polygon points="13,2 3,14 11,14 9,22 21,10 13,10"/>'
+          }</svg>
+        </button>` : '';
+
     card.className = 'diagram-node diagram-node-compact glass-card p-2.5 shadow-lg transition-all relative w-72';
     card.title = 'Click to expand';
     card.onclick = (e) => toggleNodeCollapse(e, node.instanceId, node.pathKey);
@@ -2293,6 +2312,7 @@ function createNodeCard(node, autoCompact) {
             <span class="font-bold" style="color:var(--cost);">${Math.round(effectiveCost || 0).toLocaleString()} ISK</span>
           </div>
         </div>
+        ${compactBuyToggle}
         <span class="toggle-btn toggle-btn-active-accent flex-shrink-0">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,18 15,12 9,6"/></svg>${hiddenCount > 0 ? ` +${hiddenCount}` : ''}
         </span>

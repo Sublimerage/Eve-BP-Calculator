@@ -580,6 +580,20 @@ function setComponentBuyMode(e, typeId, mode) {
   if (typeof window.recalculate === 'function') window.recalculate();
 }
 
+// A compact chip has no room for the full card's two labeled Sell/Buy buttons, so this is a single
+// icon that both shows and flips the current strategy - same underlying state (customBuyModes), just
+// a click-to-switch control instead of two separate ones. Never lands on 'lp': that stays reachable
+// only from the full card's own dedicated button (see createNodeCard's own comment on why), so
+// flipping away from it here always goes to 'buy', not a third cycle position.
+function toggleComponentBuyMode(e, typeId) {
+  if (e) e.stopPropagation();
+  const globalStrategy = document.getElementById('input-price-mode')?.value || 'sell';
+  const current = window.customBuyModes[typeId] || globalStrategy;
+  window.customBuyModes[typeId] = (current === 'buy') ? 'sell' : 'buy';
+  if (typeof window.recalculate === 'function') window.recalculate();
+}
+window.toggleComponentBuyMode = toggleComponentBuyMode;
+
 function getNodePriceStrategy(node) {
   const globalStrategy = document.getElementById('input-price-mode')?.value || 'sell';
   return window.customBuyModes[node.typeId] || globalStrategy;
