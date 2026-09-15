@@ -196,33 +196,72 @@ function onCardTEChange(e, typeId, instanceId) {
 }
 
 // --- Action: Build All Sub-Components ---
-// Re-syncs the EXISTING tree's isBuildingSelf flags and re-renders in place, rather than calling
-// selectItem() to rebuild the whole tree from scratch - a rebuild hands every node a fresh
-// instanceId (see tree.js's ++instanceCounter), which silently invalidates whatever card the user
-// had selected/centered on and made the camera appear to jump to an arbitrary spot after clicking
-// these buttons. The tree already holds full child data regardless of build/buy state (that's what
-// lets the profit optimizer below simulate every combination without rebuilding), so a flag sync is
-// all that's needed here.
+// buildRecursiveRecipeTree (tree.js) only fetches a node's OWN children while that node's OWN
+// isBuildingSelf is true at fetch time - so a component sitting in Buy mode has an empty children
+// array, not because it has no sub-materials, but because they were simply never fetched. Marking
+// it to Build here doesn't retroactively fill that in; only a real rebuild does. That rebuild can
+// then reveal a brand new layer of manufacturable children underneath it that this function has
+// never even seen - which themselves need marking and another rebuild to reveal what's under THEM,
+// and so on - so this loops mark-then-rebuild until a full pass finds nothing new to flip, reaching
+// the true bottom of the tree in one click instead of leaving deeper components stuck in Buy mode
+// until something else happens to force a rebuild.
+// Uses selectItem(..., preserveView=true) for that rebuild - the same mechanism the per-card Build/
+// Buy toggle (toggleBuildSelf) already relies on - rather than a flag-sync-only re-render. That
+// used to be deliberately avoided here because a rebuild hands every node a fresh instanceId
+// (tree.js's ++instanceCounter), which would silently invalidate any card the user had expanded/
+// collapsed. node.pathKey (tree.js) now gives collapsedInstanceIds/expandedOverrideIds a stable key
+// that survives a rebuild (see nodeStableKey in app.js), so that concern no longer applies.
 async function buildAllComponents() {
   function markAllBuild(node) {
-    if (!node) return;
+    let changedAny = false;
+    if (!node) return changedAny;
     if (node.isManufacturable) {
+      if (window.buildSelfOverrides[node.typeId] !== true) changedAny = true;
       window.buildSelfOverrides[node.typeId] = true;
       stampBulkMETargetIfArmed(node.typeId);
       if (node.displayTypeId) {
+        if (window.buildSelfOverrides[node.displayTypeId] !== true) changedAny = true;
         window.buildSelfOverrides[node.displayTypeId] = true;
         stampBulkMETargetIfArmed(node.displayTypeId);
       }
     }
     if (node.children) {
-      node.children.forEach(c => markAllBuild(c));
+      node.children.forEach(c => { if (markAllBuild(c)) changedAny = true; });
     }
+    return changedAny;
   }
 
-  if (window.recipeTreeRoot) {
-    markAllBuild(window.recipeTreeRoot);
-    syncTreeBuildStates(window.recipeTreeRoot);
+  if (!window.recipeTreeRoot) return;
+  const root = window.recipeTreeRoot;
+
+  // An LP Store isolated direct-sell offer's root is a hand-built synthetic node with no real
+  // recipe of its own (see toggleBuildSelf's own comment for the full explanation) - selectItem()
+  // would destroy it, so this path only ever needs a flag sync + recalculate, same as before.
+  const isLPSynthetic = root.isLPIsolatedRoot && !root.recipe;
+  if (isLPSynthetic || !window.currentProduct) {
+    markAllBuild(root);
+    syncTreeBuildStates(root);
     if (typeof window.recalculate === 'function') window.recalculate();
+    return;
+  }
+
+  const btn = document.getElementById('build-all-btn');
+  const originalLabel = btn ? btn.innerHTML : null;
+  if (btn) btn.disabled = true;
+
+  let changed = markAllBuild(root);
+  let guard = 0;
+  while (changed && guard < 25) {
+    if (btn) btn.innerHTML = `Building all${'.'.repeat((guard % 3) + 1)}`;
+    await window.selectItem(window.currentProduct.id, window.currentProduct.name, true);
+    changed = markAllBuild(window.recipeTreeRoot);
+    guard++;
+  }
+  if (guard === 0 && typeof window.recalculate === 'function') window.recalculate();
+
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = originalLabel;
   }
 }
 
@@ -249,12 +288,75 @@ function resetSmartBuyModes() {
   }
 }
 
+// --- Shared: One-Time Full-Depth Tree Expansion (used by every optimizer below) ---
+// buildRecursiveRecipeTree (tree.js) only fetches a node's OWN children while that node's OWN
+// isBuildingSelf was true at fetch time - every node deeper than depth 0 defaults to Buy until
+// something overrides it, so on a freshly-loaded deep build almost nothing past depth 1 has ever
+// been fetched at all. Buy isn't a "collapsed" state hiding data that already exists - the
+// sub-materials were simply never created as node objects. Every optimizer below walks
+// node.children to find its candidates/leaves, so without this, each one can only ever reach
+// whatever happened to already be fetched - exactly the same blind spot buildAllComponents() had
+// before it started mark-then-rebuilding (see its own comment).
+// Uses that identical mark-then-rebuild loop: mark every manufacturable node found so far to Build,
+// do a real rebuild via selectItem(..., preserveView=true), see what NEW manufacturable nodes that
+// revealed, and repeat until a full pass finds nothing new - reaching the true bottom of the tree
+// (or maxDepth/circular cutoff) in a bounded number of passes.
+// Returns the buildSelfOverrides snapshot from BEFORE this ran, so a caller that only needed the
+// tree's STRUCTURE fully discovered (not "build everything") can restore it. The fetched
+// node.children stay populated in memory regardless of what buildSelfOverrides/isBuildingSelf say
+// afterward - only a real rebuild (another selectItem() call) would ever clear them again, and
+// nothing after this function returns triggers one; syncTreeBuildStates only touches the flags.
+// Returns null (nothing to restore, nothing changed) if there's no tree, no active product, or the
+// tree root is an LP Store isolated direct-sell offer's hand-built synthetic root (see
+// toggleBuildSelf's own comment) - selectItem() would destroy that kind of root rather than rebuild it.
+async function cascadeExpandFullTree() {
+  if (!window.recipeTreeRoot || !window.currentProduct) return null;
+  const root = window.recipeTreeRoot;
+  if (root.isLPIsolatedRoot && !root.recipe) return null;
+
+  function markAllManufacturable(node) {
+    let changedAny = false;
+    if (!node) return changedAny;
+    if (node.isManufacturable) {
+      if (window.buildSelfOverrides[node.typeId] !== true) changedAny = true;
+      window.buildSelfOverrides[node.typeId] = true;
+      if (node.displayTypeId && window.buildSelfOverrides[node.displayTypeId] !== true) {
+        window.buildSelfOverrides[node.displayTypeId] = true;
+        changedAny = true;
+      }
+    }
+    if (node.children) node.children.forEach(c => { if (markAllManufacturable(c)) changedAny = true; });
+    return changedAny;
+  }
+
+  const originalOverrides = { ...window.buildSelfOverrides };
+  let changed = markAllManufacturable(root);
+  let guard = 0;
+  while (changed && guard < 25) {
+    await window.selectItem(window.currentProduct.id, window.currentProduct.name, true);
+    changed = markAllManufacturable(window.recipeTreeRoot);
+    guard++;
+  }
+  return originalOverrides;
+}
+
 // Optimizer 1: True Greedy Build vs Buy Profit Margin Optimizer
 async function applyBuildProfitOptimizer() {
   const inputThreshold = parseFloat(document.getElementById('build-profit-threshold')?.value);
   const threshold = isNaN(inputThreshold) ? 5.0 : Math.max(0, inputThreshold);
 
   if (!window.recipeTreeRoot) return;
+
+  // Reach every manufacturable node in the tree, not just whatever's already been fetched (see
+  // cascadeExpandFullTree's own comment). Deliberately left at "everything Build" afterward, not
+  // restored: calculateTreeNodeCost prices a Buy-mode node flatly at market and never recurses into
+  // its children, so every ancestor along a candidate's path must actually be building for its cost
+  // to thread down to that candidate at all. "Build everything" is exactly the right starting
+  // baseline for a "decide Build vs Buy for every component in this build" optimizer - the loop
+  // below then flips each candidate to Buy wherever that isn't profitable, top-down, so a candidate
+  // whose parent already got flipped to Buy correctly shows no further gain from building it either
+  // (you're buying the parent pre-made; its own sub-materials are moot).
+  await cascadeExpandFullTree();
 
   // Pre-fetch market prices for all type IDs before evaluating build margins
   const allTypeIds = new Set();
@@ -350,9 +452,30 @@ async function applyBuildProfitOptimizer() {
 }
 
 // Optimizer 2: Component Market Spread Threshold
-function applyComponentSpreadOptimizer() {
+async function applyComponentSpreadOptimizer() {
   const inputThreshold = parseFloat(document.getElementById('buy-savings-threshold')?.value);
   const threshold = isNaN(inputThreshold) ? 5.0 : Math.max(0, inputThreshold);
+
+  if (!window.recipeTreeRoot) return;
+
+  // Unlike applyBuildProfitOptimizer, this optimizer never decides Build vs Buy - it only picks a
+  // buy-order-vs-instant-sell-order STRATEGY for whatever's already a leaf, so
+  // cascadeExpandFullTree's temporary "build everything" gets restored afterward rather than kept.
+  // optimizeNode's own recursion into node.children below is unconditional (not gated on
+  // isBuildingSelf), so once the cascade has fetched every manufacturable node's children at least
+  // once, restoring the real Build/Buy split still leaves every genuine leaf - at any depth -
+  // reachable, without this button silently also flipping the whole build to Build mode as a side effect.
+  const originalOverrides = await cascadeExpandFullTree();
+  if (originalOverrides) {
+    window.buildSelfOverrides = originalOverrides;
+    syncTreeBuildStates(window.recipeTreeRoot);
+    const allTypeIds = new Set();
+    if (typeof window.collectAllTypeIds === 'function') {
+      window.collectAllTypeIds(window.recipeTreeRoot, allTypeIds);
+      await window.fetchMarketPrices(Array.from(allTypeIds));
+    }
+    if (typeof window.recalculate === 'function') window.recalculate();
+  }
 
   function optimizeNode(node) {
     if (!node) return;
@@ -380,16 +503,31 @@ function applyComponentSpreadOptimizer() {
     }
   }
 
-  if (window.recipeTreeRoot) {
-    optimizeNode(window.recipeTreeRoot);
-    if (typeof window.recalculate === 'function') window.recalculate();
-  }
+  optimizeNode(window.recipeTreeRoot);
+  if (typeof window.recalculate === 'function') window.recalculate();
 }
 
 // Optimizer 3: Build Cost Savings Impact Threshold
-function applyBudgetImpactOptimizer() {
+async function applyBudgetImpactOptimizer() {
   const inputThreshold = parseFloat(document.getElementById('total-cost-savings-threshold')?.value);
   const threshold = isNaN(inputThreshold) ? 1.0 : Math.max(0, inputThreshold);
+
+  if (!window.recipeTreeRoot) return;
+
+  // See applyComponentSpreadOptimizer's own comment just above - same reasoning applies here:
+  // this optimizer only picks a buy-order-vs-instant-sell-order strategy for existing leaves, so
+  // the temporary "build everything" cascade gets restored, not kept.
+  const originalOverrides = await cascadeExpandFullTree();
+  if (originalOverrides) {
+    window.buildSelfOverrides = originalOverrides;
+    syncTreeBuildStates(window.recipeTreeRoot);
+    const allTypeIds = new Set();
+    if (typeof window.collectAllTypeIds === 'function') {
+      window.collectAllTypeIds(window.recipeTreeRoot, allTypeIds);
+      await window.fetchMarketPrices(Array.from(allTypeIds));
+    }
+    if (typeof window.recalculate === 'function') window.recalculate();
+  }
 
   function optimizeNode(node) {
     if (!node) return;
@@ -427,10 +565,8 @@ function applyBudgetImpactOptimizer() {
     }
   }
 
-  if (window.recipeTreeRoot) {
-    optimizeNode(window.recipeTreeRoot);
-    if (typeof window.recalculate === 'function') window.recalculate();
-  }
+  optimizeNode(window.recipeTreeRoot);
+  if (typeof window.recalculate === 'function') window.recalculate();
 }
 
 function setComponentBuyMode(e, typeId, mode) {

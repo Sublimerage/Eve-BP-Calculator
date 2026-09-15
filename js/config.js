@@ -630,7 +630,14 @@ var customMEOverrides = {};
 var customTEOverrides = {};     
 var selectedInstanceId = null;  
 var isolatedInstanceId = null;  
-var collapsedInstanceIds = new Set(); // instanceIds of nodes whose children are hidden from the diagram
+// Despite the name, these are keyed by node.pathKey (tree.js), not the raw instanceId - see
+// nodeStableKey in app.js for why (instanceId doesn't survive a preserveView rebuild, pathKey does).
+var collapsedInstanceIds = new Set(); // positions explicitly collapsed to a compact chip by the user
+// Positions explicitly expanded back to full size by the user, overriding the auto-compact rule
+// in renderTreeDiagram (a wide tier's siblings compact automatically past a sibling-count
+// threshold, without needing an explicit click) - see toggleNodeCollapse in app.js for how a click
+// picks the right one of these two sets to update based on what's actually on screen right now.
+var expandedOverrideIds = new Set();
 var activeMfgSCI = 0.0425;
 var activeReactSCI = 0.0110;
 var activeInventionSCI = 0.0200;
@@ -846,6 +853,7 @@ window.customTEOverrides = customTEOverrides;
 window.selectedInstanceId = selectedInstanceId;
 window.isolatedInstanceId = isolatedInstanceId;
 window.collapsedInstanceIds = collapsedInstanceIds;
+window.expandedOverrideIds = expandedOverrideIds;
 window.activeMfgSCI = activeMfgSCI;
 window.activeReactSCI = activeReactSCI;
 window.activeInventionSCI = activeInventionSCI;

@@ -1649,6 +1649,7 @@ async function selectItem(typeId, name, preserveView = false) {
   if (!preserveView) {
     window.selectedInstanceId = null;
     window.isolatedInstanceId = null;
+    window.isolatedPathKey = null;
     window.rootSellStrategy = 'market-sell';
     window.rootCustomPrice = 0;
     window.globalRuns = 1;
@@ -1662,6 +1663,18 @@ async function selectItem(typeId, name, preserveView = false) {
     window.customTEOverrides = {};
   }
 
+  // toggleBuildSelf/onCardMEChange/onCardTEChange all call selectItem with preserveView=true
+  // specifically so clicking Build/Buy or editing a card's ME/TE doesn't feel like it reset
+  // anything - but the rebuild below still hands every node a fresh instanceId (tree.js's
+  // ++instanceCounter), and window.selectedInstanceId is tracked by that raw id at every one of
+  // its many call sites. Captured here instead - the one place recipeTreeRoot's instanceIds
+  // actually change - rather than keeping a parallel pathKey in sync at each of those call sites,
+  // which is exactly the kind of thing that's easy to miss in one of them (see how
+  // window.isolatedPathKey needs the same treatment, just at its own two, far fewer, call sites).
+  const prevSelectedPathKey = (preserveView && window.selectedInstanceId != null && window.recipeTreeRoot)
+    ? (findNodeByInstanceId(window.recipeTreeRoot, window.selectedInstanceId) || {}).pathKey
+    : null;
+
   window.recipeTreeRootProductTypeId = null;
   if (window.isBlueprintName(name)) {
     const resolvedProductTypeId = await window.resolveProductIdFromBlueprintNameAsync(name);
@@ -1672,6 +1685,12 @@ async function selectItem(typeId, name, preserveView = false) {
 
   const maxDepth = 10;
   window.recipeTreeRoot = await window.buildRecursiveRecipeTree(typeId, name, 1, 0, maxDepth, new Set(), null);
+
+  if (prevSelectedPathKey) {
+    const resyncedNode = findNodeByPathKey(window.recipeTreeRoot, prevSelectedPathKey);
+    if (resyncedNode) window.selectedInstanceId = resyncedNode.instanceId;
+  }
+
   recalculate();
   if (!preserveView) { resetPanZoom(); } else { setTimeout(drawConnectingLines, 50); }
 
@@ -1906,8 +1925,17 @@ function recalculate() {
   window.recipeTreeRoot.totalBuildSeconds = totalBuildSeconds;
 
   if (window.isolatedInstanceId) {
-    const isoNode = findNodeByInstanceId(window.recipeTreeRoot, window.isolatedInstanceId);
-    if (isoNode) { renderIsolatedDiagram(); } else { window.isolatedInstanceId = null; renderTreeDiagram(window.recipeTreeRoot, priceStrategy, profitSell, roiSell); }
+    let isoNode = findNodeByInstanceId(window.recipeTreeRoot, window.isolatedInstanceId);
+    if (!isoNode && window.isolatedPathKey) {
+      // A preserveView rebuild (toggleBuildSelf, an ME/TE edit - see selectItem's own comment)
+      // hands every node a fresh instanceId, so the isolated node's old id no longer exists in the
+      // new tree even though the SAME logical node still does. Re-find it by pathKey and re-sync
+      // isolatedInstanceId, instead of falling through to "isolated node gone" and silently kicking
+      // the user out of isolate mode just for clicking Build/Buy or editing ME/TE on a card.
+      isoNode = findNodeByPathKey(window.recipeTreeRoot, window.isolatedPathKey);
+      if (isoNode) window.isolatedInstanceId = isoNode.instanceId;
+    }
+    if (isoNode) { renderIsolatedDiagram(); } else { window.isolatedInstanceId = null; window.isolatedPathKey = null; updateIsolateModeBanner(); renderTreeDiagram(window.recipeTreeRoot, priceStrategy, profitSell, roiSell); }
   } else { renderTreeDiagram(window.recipeTreeRoot, priceStrategy, profitSell, roiSell); }
   
   renderBillOfMaterials(window.recipeTreeRoot, brokerFee);
@@ -1932,10 +1960,29 @@ function recalculate() {
   }
 }
 
-function renderTreeDiagram(rootNode, priceStrategy, profitSell, roiSell) {
-  const container = document.getElementById('tree-container');
-  if (!container) return;
-  container.innerHTML = '';
+// A column with more siblings than this auto-compacts to chips without needing an explicit click -
+// see renderTreeDiagram's second pass below. Chosen to roughly match "still comfortably fits on one
+// screen without scrolling" for a typical window height at the default zoom.
+const AUTO_COMPACT_SIBLING_THRESHOLD = 8;
+
+// collapsedInstanceIds/expandedOverrideIds key off this rather than the raw instanceId - instanceId
+// is a monotonically-increasing counter (tree.js) that a preserveView rebuild (toggleBuildSelf,
+// buildAllComponents, an ME/TE edit) hands out fresh on every node, so a Set keyed by instanceId
+// alone goes entirely stale the moment any of those run, silently reverting every manually-expanded
+// card back to whatever the auto-compact threshold says. node.pathKey (tree.js) is the chain of
+// typeIds from root to this position, which stays identical across such a rebuild as long as the
+// tree's shape above this node hasn't changed - falls back to instanceId for the rare hand-built
+// node that never went through buildRecursiveRecipeTree (an LP Store synthetic root/redemption node).
+function nodeStableKey(node) { return (node && node.pathKey) || (node && node.instanceId); }
+
+// The traverse/merge/auto-compact/column-render pipeline, factored out of renderTreeDiagram so
+// renderIsolatedDiagram can reuse it unchanged for just a subtree - isolating a component used to
+// show only its direct children and direct parent (one level each way), which meant it could never
+// answer "what does this whole branch actually look like." Running the exact same pipeline rooted
+// at the isolated node instead of window.recipeTreeRoot gives the full recursive branch, with the
+// same per-tier compacting/merging that already keeps a capital ship's full tree manageable -
+// without needing a second, parallel implementation of any of this to keep in sync.
+function renderSubtreeColumns(container, rootNode) {
   if (!rootNode) return;
   const levels = [];
   function traverse(node) {
@@ -1951,17 +1998,128 @@ function renderTreeDiagram(rootNode, priceStrategy, profitSell, roiSell) {
     // node.children still populated with stale data from when it WAS building. drawLinesForNode
     // already skips drawing a line to a non-building node's children; without the same check here,
     // those stale children kept getting cards rendered anyway - present on screen with no line
-    // connecting them to anything, exactly the bug this fixes.
-    if (window.collapsedInstanceIds.has(node.instanceId) || !node.isBuildingSelf) return;
+    // connecting them to anything, exactly the bug this fixes. Only EXPLICIT collapse is checked
+    // here - auto-compact (below) can't be folded into this same recursive pass, since a depth's
+    // final sibling count isn't known until every branch feeding it has been visited, which for a
+    // node with several parents-in-common ancestors doesn't happen until traversal is done.
+    if (window.collapsedInstanceIds.has(nodeStableKey(node)) || !node.isBuildingSelf) return;
     if (node.children) { node.children.forEach(child => { if (child) traverse(child); }); }
   }
   traverse(rootNode);
+
+  // Second pass: merge same-tier duplicates of the same material - e.g. five different components
+  // in one column all separately needing Tritanium used to render as five near-identical cards.
+  // Scoped deliberately narrow: only TRUE leaves (no children at all, not just currently-hidden
+  // ones) get merged, and only against others in the exact same column. That sidesteps the much
+  // harder question of what a merged BRANCH node's own children would even mean (two consumers
+  // needing different quantities of the same sub-assembly would need different quantities of
+  // THAT node's own inputs too, recursively) - raw materials are the common, high-value case and
+  // have no such problem, since there's nothing beneath them to reconcile.
+  // Runs before auto-compact (below) so the sibling-count threshold judges the column AFTER
+  // dedup, not before - a tier that looks like 15 siblings but is really 3 duplicate materials +
+  // 9 unique ones should be judged as 9-ish wide, not 15.
+  const mergeRedirect = {};
+  levels.forEach((nodesAtDepth, depth) => {
+    if (!nodesAtDepth || depth === 0) return;
+    const groups = new Map();
+    nodesAtDepth.forEach(node => {
+      // isBuildingSelf excluded even when childless (max-depth/circular cutoff can leave a
+      // manufactured node with no rendered children) - its own runsNeeded/batchYield surplus and
+      // EIV figures are per-instance and merging would make those numbers wrong, so only true
+      // bought/raw materials (nothing beneath them to reconcile, ever) are eligible.
+      const isTrueLeaf = (!node.children || node.children.length === 0) && !node.isBuildingSelf;
+      if (!isTrueLeaf) return;
+      const pid = node.productTypeId || node.typeId;
+      if (!groups.has(pid)) groups.set(pid, []);
+      groups.get(pid).push(node);
+    });
+    const mergedAwayIds = new Set();
+    groups.forEach(group => {
+      if (group.length < 2) return;
+      const survivor = group[0];
+      // parentName is captured now (not looked up later from a bare id) purely so the tooltip
+      // can say WHICH component needs how much, not just a count - findNodeByInstanceId is cheap
+      // enough here since a merge group is realistically a handful of nodes, not hundreds.
+      survivor._mergedSources = group.map(n => {
+        const parent = n.parentInstanceId ? findNodeByInstanceId(rootNode, n.parentInstanceId) : null;
+        const parentName = parent ? (parent.productName || parent.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()) : 'this build';
+        return { instanceId: n.instanceId, qtyNeeded: n.qtyNeeded, parentName };
+      });
+      survivor._mergedQtyNeeded = group.reduce((sum, n) => sum + (n.qtyNeeded || 0), 0);
+      survivor._mergedCost = group.reduce((sum, n) => sum + (n.calculatedCost || 0), 0);
+      for (let i = 1; i < group.length; i++) {
+        mergeRedirect[group[i].instanceId] = survivor.instanceId;
+        mergedAwayIds.add(group[i].instanceId);
+      }
+    });
+    if (mergedAwayIds.size > 0) {
+      levels[depth] = nodesAtDepth.filter(n => !mergedAwayIds.has(n.instanceId));
+    }
+  });
+  // drawConnectingLinesForTree reads this to redirect a merged-away child's line endpoint to the
+  // surviving card - every original parent still iterates its own real child node objects (the
+  // tree's actual parent/child relationships are untouched, only which nodes get their own
+  // rendered card changes), so this is the only place that needs to know a merge happened at all.
+  window.__mergeRedirect = mergeRedirect;
+
+  // Third pass: auto-compact any column wider than AUTO_COMPACT_SIBLING_THRESHOLD, same visual
+  // treatment as an explicit collapse (a compact chip, descendants hidden) but derived from how
+  // crowded the column actually turned out rather than a manual click - this is what makes a huge
+  // build manageable without first having to know to click Collapse All. An explicit choice always
+  // wins over this rule in either direction: collapsedInstanceIds forces compact even in a small
+  // column, expandedOverrideIds forces full-size even in an oversized one (see toggleNodeCollapse).
+  const autoCompactIds = new Set();
+  const hiddenByCompactIds = new Set();
+  function markDescendantsHidden(node) {
+    if (!node || !node.children) return;
+    node.children.forEach(child => {
+      if (!child) return;
+      hiddenByCompactIds.add(child.instanceId);
+      markDescendantsHidden(child);
+    });
+  }
+  levels.forEach((nodesAtDepth, depth) => {
+    if (!nodesAtDepth || depth === 0) return;
+    const overCap = nodesAtDepth.length > AUTO_COMPACT_SIBLING_THRESHOLD;
+    nodesAtDepth.forEach(node => {
+      const effectivelyCompact = window.collapsedInstanceIds.has(nodeStableKey(node))
+        || (overCap && !window.expandedOverrideIds.has(nodeStableKey(node)));
+      if (effectivelyCompact) {
+        autoCompactIds.add(node.instanceId);
+        markDescendantsHidden(node);
+      }
+    });
+  });
+  if (hiddenByCompactIds.size > 0) {
+    for (let d = 0; d < levels.length; d++) {
+      if (levels[d]) levels[d] = levels[d].filter(n => !hiddenByCompactIds.has(n.instanceId));
+    }
+  }
+
+  // Each depth level is one plain single-file column - deliberately NOT a wrapping grid. That was
+  // tried (wrap into a grid of sub-columns once a tier has many siblings) and reverted: it broke
+  // the diagram's actual point, which is showing WHICH card connects to WHICH - a line between two
+  // cards that used to travel cleanly through the empty gap between two single-file columns now had
+  // to cross through whatever unrelated cards the grid happened to place in its path, and since
+  // #tree-svg renders behind .diagram-node (z-index 1 vs 2 - fine when lines rarely cross a card,
+  // not fine once they routinely do), those crossings were often just invisible. Collapsing (now
+  // including auto-compact above) is what actually carries the size fix: a capital ship's wide top
+  // tier collapsing down to one-line chips already took a real 178,000px-tall column down to
+  // ~1,750px on its own, without needing to touch how siblings are arranged at all.
   levels.reverse().forEach((nodesAtDepth) => {
     const colDiv = document.createElement('div');
     colDiv.className = 'flex flex-col space-y-6 justify-center';
-    nodesAtDepth.forEach(node => { if (node) { colDiv.appendChild(createNodeCard(node)); } });
+    nodesAtDepth.forEach(node => { if (node) { colDiv.appendChild(createNodeCard(node, autoCompactIds.has(node.instanceId))); } });
     container.appendChild(colDiv);
   });
+}
+
+function renderTreeDiagram(rootNode, priceStrategy, profitSell, roiSell) {
+  const container = document.getElementById('tree-container');
+  if (!container) return;
+  container.innerHTML = '';
+  if (!rootNode) return;
+  renderSubtreeColumns(container, rootNode);
   applyNodeHighlightClasses();
 }
 
@@ -1975,41 +2133,74 @@ function countDescendants(node) {
   return count;
 }
 
-function toggleNodeCollapse(e, instanceId) {
+// A node can be compact for two different reasons - explicitly collapsed, or auto-compacted for
+// sitting in an oversized column (renderTreeDiagram) - and a click always means "flip whatever
+// it's actually showing right now," not "toggle the explicit flag specifically" (which would be a
+// no-op on an auto-compacted chip that was never explicitly collapsed in the first place - it'd try
+// to ADD it to collapsedInstanceIds, which does nothing new since the auto-compact rule already had
+// it compact). Reading the card's own rendered class is the simplest single source of truth for
+// "which one is it right now" without duplicating the sibling-count threshold logic here too.
+function toggleNodeCollapse(e, instanceId, pathKey) {
   if (e) e.stopPropagation();
-  if (window.collapsedInstanceIds.has(instanceId)) {
-    window.collapsedInstanceIds.delete(instanceId);
+  // The inline onclick="...(event, id, '${node.pathKey}')" build (below) stringifies a genuinely
+  // missing pathKey into the literal text "undefined" rather than an actual undefined value - guard
+  // against that specific string too, or a node lacking a pathKey silently collapses/expands under
+  // a meaningless shared key instead of falling back to its own instanceId.
+  const key = (pathKey && pathKey !== 'undefined') ? pathKey : instanceId;
+  const cardEl = document.getElementById(`node-card-${instanceId}`);
+  const currentlyCompact = cardEl ? cardEl.classList.contains('diagram-node-compact') : window.collapsedInstanceIds.has(key);
+  if (currentlyCompact) {
+    // Expand: force full-size regardless of why it was compact - just clearing
+    // collapsedInstanceIds wouldn't be enough if the column is still over the auto-compact
+    // threshold, which would otherwise put it right back into a chip on the next render.
+    window.collapsedInstanceIds.delete(key);
+    window.expandedOverrideIds.add(key);
   } else {
-    window.collapsedInstanceIds.add(instanceId);
+    window.expandedOverrideIds.delete(key);
+    window.collapsedInstanceIds.add(key);
   }
   if (typeof window.recalculate === 'function') window.recalculate();
 }
 window.toggleNodeCollapse = toggleNodeCollapse;
 
-// Collapses every node in the current tree that actually has children to hide.
+// Collapses every node in the tree except the root - a leaf (nothing to hide) still collapses,
+// purely to save space, same as any other node now. Root itself is deliberately never collapsible
+// (createNodeCard excludes it outright) - collapsing it here anyway used to hide the root's own
+// children from the tree entirely (traverse's own early-return doesn't know root is special),
+// which is why Collapse All previously left only the root card visible instead of a column of chips.
 function collapseAllNodes() {
   if (!window.recipeTreeRoot) return;
-  function walk(node) {
+  function walk(node, isRoot) {
     if (!node) return;
-    if (node.children && node.children.length > 0) {
-      window.collapsedInstanceIds.add(node.instanceId);
-      node.children.forEach(walk);
+    if (!isRoot) {
+      window.collapsedInstanceIds.add(nodeStableKey(node));
+      window.expandedOverrideIds.delete(nodeStableKey(node));
     }
+    if (node.children) node.children.forEach(c => walk(c, false));
   }
-  walk(window.recipeTreeRoot);
+  walk(window.recipeTreeRoot, true);
   if (typeof window.recalculate === 'function') window.recalculate();
   centerOnRootNode();
 }
 window.collapseAllNodes = collapseAllNodes;
 
+// Forces every node full-size right now, including anything that would otherwise auto-compact for
+// being in an oversized column - a snapshot action (like Collapse All), not a standing "never
+// auto-compact again" mode, so a later switch to an even bigger build still auto-compacts normally.
 function expandAllNodes() {
   window.collapsedInstanceIds.clear();
+  function walk(node, isRoot) {
+    if (!node) return;
+    if (!isRoot) window.expandedOverrideIds.add(nodeStableKey(node));
+    if (node.children) node.children.forEach(c => walk(c, false));
+  }
+  if (window.recipeTreeRoot) walk(window.recipeTreeRoot, true);
   if (typeof window.recalculate === 'function') window.recalculate();
   centerOnRootNode();
 }
 window.expandAllNodes = expandAllNodes;
 
-function createNodeCard(node) {
+function createNodeCard(node, autoCompact) {
   const productTypeId = node.productTypeId || node.typeId;
   const prices = window.priceCache[productTypeId] || { sell: 0, buy: 0 };
   const isRoot = node.depth === 0;
@@ -2026,20 +2217,64 @@ function createNodeCard(node) {
   card.setAttribute('data-instance-id', node.instanceId);
   card.onclick = (e) => onNodeClick(e, node.instanceId);
 
+  const iconUrlEarly = window.getItemIconUrl(productTypeId, window.TYPE_ID_TO_NAME[productTypeId] || node.name, 128);
+
+  // A merged card (renderTreeDiagram's own same-tier duplicate-material pass) shows the SUM across
+  // every consumer instead of just its own qty/cost, plus a small "×N" badge with a breakdown
+  // tooltip naming which components need how much. Every other node's _mergedSources is simply
+  // undefined, so effectiveQty/effectiveCost fall straight through to the plain node values.
+  const mergedSources = node._mergedSources;
+  const effectiveQty = mergedSources ? node._mergedQtyNeeded : node.qtyNeeded;
+  const effectiveCost = mergedSources ? node._mergedCost : node.calculatedCost;
+  const mergedBadge = mergedSources ? ` <span class="text-[10px]" style="color:var(--accent);" title="Shared by ${mergedSources.length} components:\n${mergedSources.map(s => `• ${s.parentName}: ${s.qtyNeeded.toLocaleString()}`).join('\n')}">×${mergedSources.length}</span>` : '';
+
+  // Collapsed (explicit OR auto-compact, passed in by renderTreeDiagram) non-root, non-isolated
+  // cards render as a compact "chip" instead of the full card - just the icon, name, qty, cost, and
+  // a single click-anywhere-to-expand control. No longer requires node.children.length > 0: a leaf
+  // (nothing to hide - raw materials, "Buy" items) can still be compacted purely to save space, it
+  // just has nothing to reveal on expand. The isolated card is excluded even if it would otherwise
+  // be compact - isolating a card means you specifically want to see its own detail, not a chip.
+  if (!isRoot && !isIsolated && (window.collapsedInstanceIds.has(nodeStableKey(node)) || (autoCompact && !window.expandedOverrideIds.has(nodeStableKey(node))))) {
+    const compactDisplayName = node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim();
+    const hiddenCount = countDescendants(node);
+    card.className = 'diagram-node diagram-node-compact glass-card p-2.5 shadow-lg transition-all relative w-72';
+    card.title = 'Click to expand';
+    card.onclick = (e) => toggleNodeCollapse(e, node.instanceId, node.pathKey);
+    card.innerHTML = `
+      <div class="flex items-center gap-2.5">
+        <img src="${iconUrlEarly}" alt="${window.esc(compactDisplayName)}" class="w-8 h-8 rounded-md border border-white/10 bg-black/40 flex-shrink-0" onerror="this.onerror=function(){window.handleItemIconLoadError(this);}; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-xs text-white truncate" title="${window.esc(compactDisplayName)}">${window.esc(compactDisplayName)}${mergedBadge}</div>
+          <div class="text-[11px] mono flex items-center justify-between gap-2">
+            <span class="text-orange-400">Qty: ${effectiveQty.toLocaleString()}</span>
+            <span class="font-bold" style="color:var(--cost);">${Math.round(effectiveCost || 0).toLocaleString()} ISK</span>
+          </div>
+        </div>
+        <span class="toggle-btn toggle-btn-active-accent flex-shrink-0">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,18 15,12 9,6"/></svg>${hiddenCount > 0 ? ` +${hiddenCount}` : ''}
+        </span>
+      </div>
+    `;
+    return card;
+  }
+
   // Card status accent - a colored top edge (matching the same language node-selected/
   // node-parent-highlight already use), not the old design's hardcoded-hex left-border stripe,
   // which didn't reference the current palette at all and looked like a leftover from another
   // theme entirely.
-  let cardStyle = 'w-72';
+  // w-80 (was w-72) - widened as part of trading width for height: the price/cost block below
+  // packs Sell+Buy onto one row and collapses every label-then-value pair onto a single line,
+  // which needs the extra ~32px to keep numbers from crowding into the truncation ellipsis.
+  let cardStyle = 'w-80';
   let borderAccent = '';
   if (isRoot) { cardStyle = 'w-96'; }
   // isRedemptionRequirement (LP Store page only, js/lpstore.js injectLPRedemptionNodes) - an item
   // turned in to redeem an LP offer, not a build material at all, so it gets its own color rather
   // than falling into the ordinary "bought, not built" blue below.
-  else if (node.isRedemptionRequirement) { cardStyle = 'w-72'; borderAccent = 'border-top-color:#c084fc;'; }
-  else if (!node.isBuildingSelf) { cardStyle = 'w-72'; borderAccent = 'border-top-color:var(--blue);'; }
-  else if (node.isReaction) { cardStyle = 'w-72'; borderAccent = 'border-top-color:var(--violet);'; }
-  else if (node.batchYield > 1) { cardStyle = 'w-72'; borderAccent = 'border-top-color:var(--accent);'; }
+  else if (node.isRedemptionRequirement) { cardStyle = 'w-80'; borderAccent = 'border-top-color:#c084fc;'; }
+  else if (!node.isBuildingSelf) { cardStyle = 'w-80'; borderAccent = 'border-top-color:var(--blue);'; }
+  else if (node.isReaction) { cardStyle = 'w-80'; borderAccent = 'border-top-color:var(--violet);'; }
+  else if (node.batchYield > 1) { cardStyle = 'w-80'; borderAccent = 'border-top-color:var(--accent);'; }
 
   const totalProduced = node.runsNeeded * node.batchYield;
   const surplus = totalProduced - node.qtyNeeded;
@@ -2143,14 +2378,14 @@ function createNodeCard(node) {
     }
   }
 
-  card.className = `diagram-node glass-card p-3 shadow-lg transition-all relative ${cardStyle}`;
+  card.className = `diagram-node glass-card p-2.5 shadow-lg transition-all relative ${cardStyle}`;
   if (borderAccent) card.setAttribute('style', borderAccent);
   card.innerHTML = `
     <div class="flex items-start space-x-3 border-b border-[#3a3025] pb-2.5 mb-2.5">
       <img src="${iconUrl}" alt="${window.esc(node.productName || node.name)}" class="w-10 h-10 rounded-md border border-white/10 bg-black/40 flex-shrink-0" onerror="this.onerror=function(){window.handleItemIconLoadError(this);}; this.src='https://images.evetech.net/types/${productTypeId}/icon?size=64';">
       <div class="min-w-0 flex-1">
         <div class="flex items-center justify-between gap-1.5">
-          <span class="font-bold text-sm text-white truncate min-w-0 cursor-pointer hover:text-orange-300 hover:underline transition" onclick="copyMaterialNameToClipboard(event, this, '${window.esc(node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()).replace(/'/g, "\\'")}')" title="Click to copy this item's exact name to your clipboard, ready to paste into EVE's search/market">${node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()}</span>
+          <span class="font-bold text-sm text-white truncate min-w-0 cursor-pointer hover:text-orange-300 hover:underline transition" onclick="copyMaterialNameToClipboard(event, this, '${window.esc(node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()).replace(/'/g, "\\'")}')" title="Click to copy this item's exact name to your clipboard, ready to paste into EVE's search/market">${node.productName || node.name.replace(/ Blueprint$/i, '').replace(/ Reaction Formula$/i, '').replace(/ Formula$/i, '').trim()}</span>${mergedBadge}
           <div class="flex items-center space-x-1 flex-shrink-0">
             ${node.isRedemptionRequirement ? `<span class="text-[9px] mono px-1.5 py-0.5 rounded flex-shrink-0" style="background:rgba(192,132,252,0.15); color:#c084fc;" title="Turned in to redeem this LP store offer - not a build material.">REDEEM</span>` : ''}
             ${isRoot ? `
@@ -2166,13 +2401,14 @@ function createNodeCard(node) {
                 </div>
               </div>
             ` : ''}
-            ${node.children && node.children.length > 0 ? `
-              <button onclick="toggleNodeCollapse(event, ${node.instanceId})" class="toggle-btn ${window.collapsedInstanceIds.has(node.instanceId) ? 'toggle-btn-active-accent' : ''}" title="${window.collapsedInstanceIds.has(node.instanceId) ? 'Expand: show inputs again' : 'Collapse: hide inputs'}">
-                ${window.collapsedInstanceIds.has(node.instanceId)
-                  ? `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,18 15,12 9,6"/></svg> +${countDescendants(node)}`
-                  : `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"/></svg> Hide`}
+            ${!isRoot ? (() => {
+              const hasChildren = node.children && node.children.length > 0;
+              return `
+              <button onclick="toggleNodeCollapse(event, ${node.instanceId}, '${node.pathKey}')" class="toggle-btn" title="Collapse to a compact chip">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"/></svg>${hasChildren ? ' Hide' : ' Compact'}
               </button>
-            ` : ''}
+            `;
+            })() : ''}
             ${isIsolated ? `
               <button onclick="exitIsolation(event)" class="icon-btn" style="width:26px;height:26px;" title="Exit isolation view">
                 <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -2185,13 +2421,13 @@ function createNodeCard(node) {
           </div>
         </div>
         <div class="text-sm text-orange-400 mono flex items-center justify-between mt-0.5">
-          <span>${isRoot ? `Output Qty: ${node.qtyNeeded.toLocaleString()} ${node.productName}` : `Req Qty: ${node.qtyNeeded.toLocaleString()}`}</span>
+          <span>${isRoot ? `Output Qty: ${node.qtyNeeded.toLocaleString()} ${node.productName}` : `Req Qty: ${effectiveQty.toLocaleString()}`}</span>
           ${stockQty > 0 ? `<span class="text-slate-400 text-xs" title="In Stock in Hangar">Stock: ${stockQty.toLocaleString()}</span>` : ''}
         </div>
         ${stockQty > 0 ? (() => {
           const totalSegs = 10;
-          const filledSegs = Math.min(totalSegs, Math.round((stockQty / node.qtyNeeded) * totalSegs));
-          return `<div class="seg-bar mt-1.5" title="Stock covers ${Math.min(100, Math.round((stockQty / node.qtyNeeded) * 100))}% of what this needs">${Array.from({length: totalSegs}, (_, i) => `<div class="${i < filledSegs ? 'filled' : ''}"></div>`).join('')}</div>`;
+          const filledSegs = Math.min(totalSegs, Math.round((stockQty / effectiveQty) * totalSegs));
+          return `<div class="seg-bar mt-1.5" title="Stock covers ${Math.min(100, Math.round((stockQty / effectiveQty) * 100))}% of what this needs">${Array.from({length: totalSegs}, (_, i) => `<div class="${i < filledSegs ? 'filled' : ''}"></div>`).join('')}</div>`;
         })() : ''}
         ${node.isBuildingSelf && node.batchYield > 1 && !node.isLPIsolatedRoot ? `<div class="text-orange-300 text-xs mono font-semibold mt-0.5">(${node.runsNeeded} Run${node.runsNeeded > 1 ? 's' : ''} @ ${node.batchYield}/run ${surplus > 0 ? `→ ${surplus} Surplus` : ''})</div>` : ''}
       </div>
@@ -2204,7 +2440,7 @@ function createNodeCard(node) {
         </div>
       ` : ''}
       ${isRoot ? `
-        <div class="border-t border-[#3a3025] pt-2.5 flex items-center ${node.isLPIsolatedRoot ? 'justify-between' : 'gap-3'} text-sm mono" onclick="event.stopPropagation()">
+        <div class="border-t border-[#3a3025] pt-2.5 flex items-center ${node.isLPIsolatedRoot ? 'justify-between' : 'gap-3'} text-sm mono">
           ${node.isLPIsolatedRoot ? `
             <span class="text-slate-300 font-bold" title="How many separate times you redeem this LP store offer - NOT blueprint runs. Each redemption grants a fixed amount (shown above), so everything scales as this count times that fixed amount.">Times Redeemed:</span>
             <div class="flex items-center space-x-1">
@@ -2226,7 +2462,7 @@ function createNodeCard(node) {
       ${sellStrategyUI}
 
       ${(!isRoot && node.isManufacturable) || (!isRoot && (!node.isBuildingSelf || !node.children || node.children.length === 0)) || (node.isBuildingSelf && node.isManufacturable && !node.isReaction) ? `
-        <div class="border-t border-[#3a3025] pt-2.5 space-y-2" onclick="event.stopPropagation()">
+        <div class="border-t border-[#3a3025] pt-2 space-y-1.5">
           ${!isRoot && node.isManufacturable ? `
             <div class="flex items-center justify-between text-xs mono">
               <span class="text-slate-400 font-semibold">Mode:</span>
@@ -2287,59 +2523,52 @@ function createNodeCard(node) {
         </div>
       ` : ''}
 
-      <div class="text-sm mono space-y-2 border-t border-[#3a3025] pt-2.5">
-        <div>
-          <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">Lowest Sell</div>
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-green-400 font-bold">${prices.sell.toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(productTypeId) : ''}</span>
-            <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="icon-btn flex-shrink-0" style="width:26px;height:26px;" title="Compare price and trade volume across your tracked markets">
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;"><polyline points="17,1 21,5 17,9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7,23 3,19 7,15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
-            </button>
+      <div class="text-sm mono space-y-1.5 border-t border-[#3a3025] pt-2.5">
+        <div class="flex items-center gap-2">
+          <div class="min-w-0 flex-1 truncate" title="Lowest Sell: ${prices.sell.toLocaleString()} ISK">
+            <span class="text-slate-500 uppercase tracking-wide" style="font-size:9.5px;">Sell</span>
+            <span class="text-green-400 font-bold ml-1">${prices.sell.toLocaleString()}${window.estimatedPriceMarker ? window.estimatedPriceMarker(productTypeId) : ''}</span>
           </div>
+          <div class="min-w-0 flex-1 truncate" title="Highest Buy: ${prices.buy.toLocaleString()} ISK">
+            <span class="text-slate-500 uppercase tracking-wide" style="font-size:9.5px;">Buy</span>
+            <span class="text-slate-300 ml-1">${prices.buy.toLocaleString()}${window.estimatedPriceMarker ? window.estimatedPriceMarker(productTypeId) : ''}</span>
+          </div>
+          <button onclick="openMarketComparison(event, ${productTypeId}, '${window.esc(node.productName || node.name)}')" class="icon-btn flex-shrink-0" style="width:24px;height:24px;" title="Compare price and trade volume across your tracked markets">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><polyline points="17,1 21,5 17,9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7,23 3,19 7,15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+          </button>
         </div>
-        <div>
-          <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">Highest Buy</div>
-          <div class="text-slate-300">${prices.buy.toLocaleString()} ISK${window.estimatedPriceMarker ? window.estimatedPriceMarker(productTypeId) : ''}</div>
-        </div>
-        ${!isRoot && savingsPct !== null ? `<div class="flex justify-between text-green-400 font-semibold text-xs"><span>Order Savings:</span><span>${savingsPct}%</span></div>` : ''}
-        ${node.jobFee > 0 && node.isBuildingSelf ? `
-        <div class="border-t border-[#3a3025] pt-2">
-          <div class="text-[#e85555] text-xs uppercase tracking-wide" style="font-size:10.5px;">Job Inst. Fee</div>
-          <div class="text-[#e85555] font-semibold">+${Math.round(node.jobFee).toLocaleString()} ISK</div>
-        </div>` : ''}
-        <div class="border-t border-[#3a3025] pt-2">
-          <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">${isRoot ? 'Total Production Cost' : node.isBuildingSelf ? 'Calculated Build Cost' : node._lpAcquiredOffer ? 'LP Redemption Cost' : 'Market Buy Cost'}</div>
-          <div class="font-bold" style="color:var(--cost);">${Math.round(node.calculatedCost || 0).toLocaleString()} ISK</div>
+        ${!isRoot && savingsPct !== null ? `<div class="flex justify-between text-green-400 font-semibold text-xs"><span>Order Savings</span><span>${savingsPct}%</span></div>` : ''}
+        ${node.jobFee > 0 && node.isBuildingSelf ? `<div class="flex justify-between text-xs"><span class="text-[#e85555] font-semibold">Job Inst. Fee</span><span class="text-[#e85555] font-semibold">+${Math.round(node.jobFee).toLocaleString()} ISK</span></div>` : ''}
+        <div class="flex items-center justify-between border-t border-[#3a3025] pt-1.5">
+          <span class="text-slate-400 uppercase tracking-wide" style="font-size:9.5px;">${isRoot ? 'Total Production Cost' : node.isBuildingSelf ? 'Calculated Build Cost' : node._lpAcquiredOffer ? 'LP Redemption Cost' : 'Market Buy Cost'}</span>
+          <span class="font-bold" style="color:var(--cost);">${Math.round(effectiveCost || 0).toLocaleString()} ISK</span>
         </div>
         ${isRoot ? `
-          <div class="border-t border-green-500/40 pt-2 mt-1">
-            <div class="text-slate-400 text-xs uppercase tracking-wide" style="font-size:10.5px;">${window.rootSellStrategy === 'custom-contract' ? 'Net Profit, Contract Output' : 'Net Profit, Sell Output'}</div>
-            <div class="hero-num ${(node.netProfitSell || 0) >= 0 ? 'profit' : 'loss'}">${Math.round(node.netProfitSell || 0).toLocaleString()} ISK</div>
+          <div class="flex items-center justify-between border-t border-green-500/40 pt-1.5">
+            <span class="text-slate-400 uppercase tracking-wide" style="font-size:9.5px;">${window.rootSellStrategy === 'custom-contract' ? 'Net Profit, Contract Output' : 'Net Profit, Sell Output'}</span>
+            <span class="hero-num ${(node.netProfitSell || 0) >= 0 ? 'profit' : 'loss'}">${Math.round(node.netProfitSell || 0).toLocaleString()} ISK</span>
           </div>
         ` : ''}
       </div>
       ${(buildTimeUI || isRoot) ? `
-        <div class="border-t border-[#3a3025] pt-2.5">
-          <div class="section-label text-[11px] mb-1">Time and Efficiency</div>
-          <div class="text-sm mono space-y-1">
-            ${buildTimeUI}
-            ${isRoot ? `
-              <div class="flex justify-between font-bold" title="This job's own time PLUS every sub-component you're manufacturing yourself (not buying) - this is the number the Ledger's countdown timer actually uses, since building sub-components takes real time before you can even start the final job.">
-                <span class="text-slate-300">Total Project Time:</span>
-                ${node.totalBuildSeconds > 0
-                  ? `<span class="text-orange-300 font-bold">${window.formatDuration(node.totalBuildSeconds)}</span>`
-                  : `<span class="text-slate-500 italic">No Time Data</span>`}
-              </div>
-            ` : ''}
-            ${isRoot ? `
-              <div class="flex justify-between font-bold" title="Total net sell profit divided by the total time to build this item and every sub-component you're manufacturing yourself.">
-                <span class="text-slate-300">Est. ISK/Hour:</span>
-                ${node.totalBuildSeconds > 0
-                  ? `<span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${Math.round((node.netProfitSell || 0) / (node.totalBuildSeconds / 3600)).toLocaleString()} ISK</span>`
-                  : `<span class="text-slate-500 italic">No Time Data</span>`}
-              </div>
-            ` : ''}
-          </div>
+        <div class="text-sm mono space-y-1 border-t border-[#3a3025] pt-1.5">
+          ${buildTimeUI}
+          ${isRoot ? `
+            <div class="flex justify-between font-bold" title="This job's own time PLUS every sub-component you're manufacturing yourself (not buying) - this is the number the Ledger's countdown timer actually uses, since building sub-components takes real time before you can even start the final job.">
+              <span class="text-slate-300">Total Project Time:</span>
+              ${node.totalBuildSeconds > 0
+                ? `<span class="text-orange-300 font-bold">${window.formatDuration(node.totalBuildSeconds)}</span>`
+                : `<span class="text-slate-500 italic">No Time Data</span>`}
+            </div>
+          ` : ''}
+          ${isRoot ? `
+            <div class="flex justify-between font-bold" title="Total net sell profit divided by the total time to build this item and every sub-component you're manufacturing yourself.">
+              <span class="text-slate-300">Est. ISK/Hour:</span>
+              ${node.totalBuildSeconds > 0
+                ? `<span class="${(node.netProfitSell || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${Math.round((node.netProfitSell || 0) / (node.totalBuildSeconds / 3600)).toLocaleString()} ISK</span>`
+                : `<span class="text-slate-500 italic">No Time Data</span>`}
+            </div>
+          ` : ''}
         </div>
       ` : ''}
     </div>
@@ -2601,6 +2830,25 @@ function findNodeByInstanceId(root, id) {
   return null;
 }
 
+// Same idea as nodeStableKey/resolveRenderedNode - pathKey survives a preserveView rebuild
+// (toggleBuildSelf, an ME/TE edit) where instanceId doesn't, so re-finding a node by pathKey after
+// one of those is how window.isolatedInstanceId gets re-synced to the freshly-rebuilt tree instead
+// of going stale and silently kicking the user out of isolate mode (see recalculate's own use of
+// this).
+function findNodeByPathKey(root, pathKey) {
+  if (!root || pathKey == null) return null;
+  if (root.pathKey === pathKey) return root;
+  if (root.children) {
+    for (const child of root.children) {
+      if (child) {
+        const found = findNodeByPathKey(child, pathKey);
+        if (found) return found;
+      }
+    }
+  }
+  return null;
+}
+
 function applyNodeHighlightClasses() {
   const allCards = document.querySelectorAll('.diagram-node');
   
@@ -2625,7 +2873,10 @@ function applyNodeHighlightClasses() {
       card.classList.add('node-child-highlight');
     } else if (instanceId === parentInstanceId) {
       card.classList.add('node-parent-highlight');
-    } else {
+    } else if (window.isolatedInstanceId == null) {
+      // Same reasoning as drawConnectingLinesForTree's own isDimmedConnection - isolate mode
+      // already shows nothing but the one branch in view, so there's no "sea of unrelated cards"
+      // for dimming to help a selection stand out against.
       card.classList.add('node-dimmed');
     }
   });
@@ -2651,18 +2902,44 @@ function highlightNodeByTypeId(typeId) {
     return null;
   }
 
-  const targetNode = findMatchingNode(window.recipeTreeRoot);
+  let targetNode = findMatchingNode(window.recipeTreeRoot);
   if (targetNode) {
+    // A BOM row can point at a material that renderTreeDiagram's own merge pass folded into a
+    // shared card elsewhere (window.__mergeRedirect) - resolve to that survivor and make sure its
+    // real position is actually open, or this silently selects a node with no card to center on.
+    targetNode = resolveRenderedNode(targetNode);
+    const needsExpand = ensureNodeVisible(targetNode);
     window.selectedInstanceId = targetNode.instanceId;
+    if (needsExpand && typeof window.recalculate === 'function') window.recalculate();
     applyNodeHighlightClasses();
     drawConnectingLines();
     centerOnSelectedNode();
   }
 }
 
+// Shows/hides the "you're isolated" banner (index.html/lpstore.html) and keeps its name current -
+// called whenever isolate mode is entered, exited, or re-rendered, so it never goes stale (e.g.
+// after a Build/Buy click extends the isolated branch and the banner needs to reflect that this is
+// still the same isolated card, just with more now showing beneath it).
+function updateIsolateModeBanner() {
+  const banner = document.getElementById('isolate-mode-banner');
+  if (!banner) return;
+  if (window.isolatedInstanceId == null) {
+    banner.classList.add('hidden');
+    return;
+  }
+  const node = findNodeByInstanceId(window.recipeTreeRoot, window.isolatedInstanceId);
+  const nameEl = document.getElementById('isolate-mode-banner-name');
+  if (nameEl) nameEl.textContent = node ? (node.productName || node.name) : '';
+  banner.classList.remove('hidden');
+}
+window.updateIsolateModeBanner = updateIsolateModeBanner;
+
 function isolateComponent(e, instanceId) {
   if (e) e.stopPropagation();
+  const node = findNodeByInstanceId(window.recipeTreeRoot, instanceId);
   window.isolatedInstanceId = instanceId;
+  window.isolatedPathKey = node ? node.pathKey : null;
   window.selectedInstanceId = instanceId;
   renderIsolatedDiagram();
   setTimeout(drawConnectingLines, 50);
@@ -2673,6 +2950,8 @@ function exitIsolation(e) {
   if (e) e.stopPropagation();
   const targetId = window.isolatedInstanceId || window.selectedInstanceId;
   window.isolatedInstanceId = null;
+  window.isolatedPathKey = null;
+  updateIsolateModeBanner();
   recalculate();
   setTimeout(() => {
     window.selectedInstanceId = targetId;
@@ -2689,35 +2968,36 @@ function renderIsolatedDiagram() {
 
   const isolatedNode = findNodeByInstanceId(window.recipeTreeRoot, window.isolatedInstanceId);
   if (!isolatedNode) return;
+  updateIsolateModeBanner();
 
   const parentNode = isolatedNode.parentInstanceId ? findNodeByInstanceId(window.recipeTreeRoot, isolatedNode.parentInstanceId) : null;
 
-  const inputCol = document.createElement('div');
-  inputCol.className = 'flex flex-col space-y-4 justify-center';
-  
   if (!isolatedNode.isBuildingSelf || isolatedNode.children.length === 0) {
-    inputCol.innerHTML = `<div class="bg-[#0a0d0e] border border-orange-500/20 p-3 text-xs text-slate-400 mono ">${!isolatedNode.isBuildingSelf ? 'Purchased off Market (No decomposed inputs)' : 'No inputs (Base Material)'}</div>`;
-  } else {
-    isolatedNode.children.forEach(child => {
-      if (child) inputCol.appendChild(createNodeCard(child));
-    });
+    const placeholderCol = document.createElement('div');
+    placeholderCol.className = 'flex flex-col space-y-4 justify-center';
+    placeholderCol.innerHTML = `<div class="bg-[#0a0d0e] border border-orange-500/20 p-3 text-xs text-slate-400 mono ">${!isolatedNode.isBuildingSelf ? 'Purchased off Market (No decomposed inputs)' : 'No inputs (Base Material)'}</div>`;
+    container.appendChild(placeholderCol);
   }
 
-  const centerCol = document.createElement('div');
-  centerCol.className = 'flex flex-col justify-center';
-  centerCol.appendChild(createNodeCard(isolatedNode));
+  // Everything connected to the isolated node, all the way down - not just its direct children.
+  // Reuses the exact same traverse/merge/auto-compact pipeline the main diagram runs, rooted at
+  // isolatedNode instead of window.recipeTreeRoot, so a big component's own branch gets the same
+  // compacting treatment instead of an unbounded column. isolatedNode's own column (the traversal's
+  // own root) naturally ends up rightmost among these, right where the old fixed "center" card used
+  // to sit.
+  renderSubtreeColumns(container, isolatedNode);
 
+  // Output side deliberately stays exactly one level - the immediate parent this node feeds into,
+  // not the full path back to the final product. That's the one relationship outside isolatedNode's
+  // own subtree, so it's still drawn separately below rather than through renderSubtreeColumns.
   const outputCol = document.createElement('div');
   outputCol.className = 'flex flex-col justify-center';
-  
+
   if (parentNode) {
     outputCol.appendChild(createNodeCard(parentNode));
   } else {
     outputCol.innerHTML = `<div class="bg-[#0a0d0e] border border-orange-500/50 p-3 text-xs text-orange-300 font-bold mono ">Final Target Output</div>`;
   }
-
-  container.appendChild(inputCol);
-  container.appendChild(centerCol);
   container.appendChild(outputCol);
 
   applyNodeHighlightClasses();
@@ -2786,55 +3066,35 @@ function drawConnectingLines() {
   const containerRect = container.getBoundingClientRect();
 
   if (window.isolatedInstanceId !== null) {
-    const MathEl = document.getElementById(`node-card-${window.isolatedInstanceId}`);
-    if (!MathEl) return;
-
-    const isoRect = MathEl.getBoundingClientRect();
-    const isoLeftX = (isoRect.left - containerRect.left) / window.zoomScale;
-    const isoRightX = (isoRect.right - containerRect.left) / window.zoomScale;
-    const isoCenterY = (isoRect.top + isoRect.height / 2 - containerRect.top) / window.zoomScale;
-
     const isolatedNode = findNodeByInstanceId(window.recipeTreeRoot, window.isolatedInstanceId);
     if (!isolatedNode) return;
 
-    if (isolatedNode.isBuildingSelf && isolatedNode.children) {
-      isolatedNode.children.forEach(child => {
-        if (child) {
-          const childEl = document.getElementById(`node-card-${child.instanceId}`);
-          if (childEl) {
-            const childRect = childEl.getBoundingClientRect();
-            const startX = (childRect.right - containerRect.left) / window.zoomScale;
-            const startY = (childRect.top + childRect.height / 2 - containerRect.top) / window.zoomScale;
-
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            path.setAttribute('d', `M ${startX} ${startY} C ${startX + 40} ${startY}, ${isoLeftX - 40} ${isoCenterY}, ${isoLeftX} ${isoCenterY}`);
-            path.setAttribute('stroke', '#c8ff4d');
-            path.setAttribute('stroke-width', '3.5');
-            path.setAttribute('stroke-opacity', '1.0');
-            path.setAttribute('fill', 'none');
-            svg.appendChild(path);
-          }
-        }
-      });
-    }
+    // Every line INSIDE the isolated branch (isolatedNode down through its full recursive
+    // subtree, per renderIsolatedDiagram's own use of renderSubtreeColumns) reuses the exact same
+    // walk/highlight/merge-redirect logic the main diagram uses - only the ONE line going the
+    // other way, up to the immediate parent/output, is special-cased below, since that parent
+    // isn't part of isolatedNode's own subtree.
+    drawConnectingLinesForTree(isolatedNode);
 
     if (isolatedNode.parentInstanceId) {
       const parentNode = findNodeByInstanceId(window.recipeTreeRoot, isolatedNode.parentInstanceId);
-      if (parentNode) {
-        const parentEl = document.getElementById('node-card-' + parentNode.instanceId);
-        if (parentEl) {
-          const parentRect = parentEl.getBoundingClientRect();
-          const endX = (parentRect.left - containerRect.left) / window.zoomScale;
-          const endY = (parentRect.top + parentRect.height / 2 - containerRect.top) / window.zoomScale;
+      const isoEl = document.getElementById(`node-card-${window.isolatedInstanceId}`);
+      const parentEl = parentNode ? document.getElementById('node-card-' + parentNode.instanceId) : null;
+      if (isoEl && parentEl) {
+        const isoRect = isoEl.getBoundingClientRect();
+        const isoRightX = (isoRect.right - containerRect.left) / window.zoomScale;
+        const isoCenterY = (isoRect.top + isoRect.height / 2 - containerRect.top) / window.zoomScale;
+        const parentRect = parentEl.getBoundingClientRect();
+        const endX = (parentRect.left - containerRect.left) / window.zoomScale;
+        const endY = (parentRect.top + parentRect.height / 2 - containerRect.top) / window.zoomScale;
 
-          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          path.setAttribute('d', `M ${isoRightX} ${isoCenterY} C ${isoRightX + 40} ${isoCenterY}, ${endX - 40} ${endY}, ${endX} ${endY}`);
-          path.setAttribute('stroke', '#6a98de');
-          path.setAttribute('stroke-width', '3.5');
-          path.setAttribute('stroke-opacity', '1.0');
-          path.setAttribute('fill', 'none');
-          svg.appendChild(path);
-        }
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M ${isoRightX} ${isoCenterY} C ${isoRightX + 40} ${isoCenterY}, ${endX - 40} ${endY}, ${endX} ${endY}`);
+        path.setAttribute('stroke', '#6a98de');
+        path.setAttribute('stroke-width', '3.5');
+        path.setAttribute('stroke-opacity', '1.0');
+        path.setAttribute('fill', 'none');
+        svg.appendChild(path);
       }
     }
     return;
@@ -2868,7 +3128,12 @@ function drawConnectingLinesForTree(root) {
 
     node.children.forEach(child => {
       if (child) {
-        const childEl = document.getElementById(`node-card-${child.instanceId}`);
+        // A merged-away duplicate material (renderTreeDiagram's own merge pass) has no card of its
+        // own anymore - every parent that originally needed it still redirects here to the one
+        // surviving card instead, so a shared material naturally ends up with a line from every
+        // real consumer converging on it.
+        const redirectedChildId = (window.__mergeRedirect && window.__mergeRedirect[child.instanceId]) || child.instanceId;
+        const childEl = document.getElementById(`node-card-${redirectedChildId}`);
         if (childEl) {
           const childRect = childEl.getBoundingClientRect();
           
@@ -2885,7 +3150,12 @@ function drawConnectingLinesForTree(root) {
             (child.instanceId === window.selectedInstanceId && node.instanceId === parentInstanceId);
 
           const isHighlightedConnection = isInputConnection || isOutputConnection;
-          const isDimmedConnection = (window.selectedInstanceId !== null) && !isHighlightedConnection;
+          // Isolate mode already shows nothing but this one branch - every line in it is relevant,
+          // so skip the "fade everything except the current selection" treatment that exists to
+          // make a selection stand out among a sea of UNrelated lines in the full diagram. Without
+          // this, the whole branch beyond the isolated node's own immediate neighbors would render
+          // at near-zero opacity by default, defeating the point of showing it at all.
+          const isDimmedConnection = (window.selectedInstanceId !== null) && !isHighlightedConnection && window.isolatedInstanceId == null;
 
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           path.setAttribute('d', `M ${startX} ${startY} C ${controlX1} ${startY}, ${controlX2} ${endY}, ${endX} ${endY}`);
@@ -3436,4 +3706,183 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     window.exitIsolation(null);
   }
+});
+
+// A same-tier merged material (renderTreeDiagram's own merge pass) redirects every duplicate
+// consumer's own tree node to one surviving card - see window.__mergeRedirect and drawLinesForNode's
+// own use of it. Any code that selects a node by instanceId (keyboard navigation, Space-to-toggle)
+// needs the same redirect, or it can land on a duplicate that was never given a card of its own:
+// window.selectedInstanceId then points at nothing on screen, so highlighting, centering, and every
+// further arrow press silently do nothing useful - looking exactly like navigation "stopped
+// working," when the actual cause is a stale, card-less selection.
+function resolveRenderedNode(node) {
+  if (!node) return node;
+  const redirectedId = (window.__mergeRedirect && window.__mergeRedirect[node.instanceId]) || node.instanceId;
+  if (redirectedId === node.instanceId) return node;
+  return findNodeByInstanceId(window.recipeTreeRoot, redirectedId) || node;
+}
+
+// Walks a node's ancestor chain, force-expanding any that are hiding it - the same "expand
+// regardless of why it was compact" move toggleNodeCollapse makes for a single card, just applied
+// up the whole chain at once. A survivor card's real tree position (see resolveRenderedNode above)
+// can sit under a completely different, independently-collapsed branch of the tree from wherever
+// navigation started - resolving the id alone isn't enough if that branch was never opened, so
+// keyboard navigation calls this on every target before centering on it. Returns whether anything
+// actually changed, so the caller knows a recalculate() (not just a highlight refresh) is needed.
+// stopAtInstanceId caps the walk at (and including) that node, and short-circuits entirely if node
+// itself already IS the boundary - isolate mode passes its single rendered output parent's id
+// here, since renderIsolatedDiagram never renders anything above it. Without a cap, walking all the
+// way to the real tree root while isolated would force-expand ancestors nothing on screen even
+// shows right now, and those overrides would then unexpectedly persist into the main diagram once
+// the user exits isolation.
+function ensureNodeVisible(node, stopAtInstanceId) {
+  if (!node) return false;
+  if (stopAtInstanceId != null && node.instanceId === stopAtInstanceId) return false;
+  let changed = false;
+  let n = node.parentInstanceId != null ? findNodeByInstanceId(window.recipeTreeRoot, node.parentInstanceId) : null;
+  while (n) {
+    const key = nodeStableKey(n);
+    if (window.collapsedInstanceIds.has(key)) {
+      window.collapsedInstanceIds.delete(key);
+      changed = true;
+    }
+    if (n.depth > 0 && !window.expandedOverrideIds.has(key)) {
+      const el = document.getElementById(`node-card-${n.instanceId}`);
+      const isCompact = !el || el.classList.contains('diagram-node-compact');
+      if (isCompact) {
+        window.expandedOverrideIds.add(key);
+        changed = true;
+      }
+    }
+    if (stopAtInstanceId != null && n.instanceId === stopAtInstanceId) break;
+    n = n.parentInstanceId != null ? findNodeByInstanceId(window.recipeTreeRoot, n.parentInstanceId) : null;
+  }
+  return changed;
+}
+
+// Arrow keys: walk the tree without reaching for the mouse. Up/Down move to the next/prev card in
+// the same on-screen column (see the 'prevSibling'/'nextSibling' branch below for why that's a DOM
+// walk and not current's own real tree siblings). Left/Right follow the diagram's actual on-screen
+// layout, not a generic "children indent rightward" assumption - renderTreeDiagram appends depth
+// columns via levels.reverse(), so the root/final output sits on the RIGHT and raw materials are
+// on the LEFT. Right therefore jumps to the parent (toward the output) and Left jumps to the first
+// child (deeper into materials). ensureNodeVisible force-opens whatever's hiding the destination -
+// a compact chip along the way, same as clicking it would, but also a same-tier merged material's
+// real position under a totally different, independently-collapsed branch (see
+// resolveRenderedNode/window.__mergeRedirect) - so "walk into" always lands somewhere on screen.
+// Every move re-centers the view on the new card via the same centerOnInstanceId "F" and a BOM-row
+// click already use, so the selection never lands somewhere off-screen. A dead end (root has no
+// parent/siblings, a leaf has no child) is a no-op rather than wrapping around, which would be
+// surprising in a tree this shape.
+//
+// Isolate mode also uses this, since renderIsolatedDiagram (see its own comment) now renders the
+// isolated node's full subtree with real parent/child/sibling relationships throughout - but it
+// only ever renders ONE extra node beyond that subtree, the immediate output parent. Real
+// parent/child lookups would otherwise walk straight past that single rendered card into nodes
+// nothing on screen shows, landing exactly back in the "arrows silently do nothing" bug this whole
+// redirect/visibility system exists to prevent - so the output parent gets its own pair of rules
+// below: nothing further out (Right dead-ends there) and "in" means back to the isolated node
+// specifically, not some real child of that parent that was never rendered here at all.
+function navigateTreeSelection(direction) {
+  if (!window.recipeTreeRoot) return;
+
+  const isolatedNode = window.isolatedInstanceId != null ? findNodeByInstanceId(window.recipeTreeRoot, window.isolatedInstanceId) : null;
+  const isolateOutputParentId = isolatedNode && isolatedNode.parentInstanceId != null ? isolatedNode.parentInstanceId : null;
+
+  if (window.selectedInstanceId == null) {
+    // Nothing selected yet - the first press just selects/centers the isolated node (or root, in
+    // the normal view), giving a clear starting point to walk from instead of silently no-op-ing
+    // against a "current node" never actually shown as selected.
+    const startId = isolatedNode ? isolatedNode.instanceId : window.recipeTreeRoot.instanceId;
+    window.selectedInstanceId = startId;
+    applyNodeHighlightClasses();
+    centerOnInstanceId(startId);
+    return;
+  }
+
+  let current = findNodeByInstanceId(window.recipeTreeRoot, window.selectedInstanceId);
+  if (!current) return;
+  current = resolveRenderedNode(current);
+  if (current.instanceId !== window.selectedInstanceId) {
+    // Self-heal a selection left pointing at a merged-away duplicate (from before this redirect
+    // existed, or from clicking a BOM row/some other path that doesn't go through a card click).
+    window.selectedInstanceId = current.instanceId;
+  }
+
+  let target = null;
+
+  if (isolatedNode && current.instanceId === isolateOutputParentId) {
+    if (direction === 'child') target = isolatedNode;
+    // 'parent' (and Up/Down, which find no DOM sibling either - the output card sits alone in its
+    // own column) fall through as a dead end - there's genuinely nothing further out rendered.
+  } else if (direction === 'parent') {
+    if (current.parentInstanceId != null) target = findNodeByInstanceId(window.recipeTreeRoot, current.parentInstanceId);
+  } else if (direction === 'child') {
+    if (current.children && current.children.length > 0) target = current.children[0];
+  } else if (direction === 'prevSibling' || direction === 'nextSibling') {
+    // "Next/prev sibling" means the next/prev card in the same on-screen column, NOT the next/prev
+    // entry in current's own real parent.children - those only line up when nothing in the column
+    // has been merged. Once renderTreeDiagram's merge pass folds same-tier duplicates into one
+    // shared card, a column mixes materials that really belong to several different parents, and a
+    // card visually right next to the selected one can easily be a different parent's input
+    // entirely - walking by real tree-siblings would silently skip straight past it. Walking the
+    // actual DOM order of the column (every depth tier is one plain top-to-bottom column - see
+    // renderTreeDiagram's own comment on why it's deliberately not a wrapping grid) always matches
+    // what's really on screen, merged or not.
+    const currentEl = document.getElementById(`node-card-${current.instanceId}`);
+    const siblingEl = currentEl ? (direction === 'prevSibling' ? currentEl.previousElementSibling : currentEl.nextElementSibling) : null;
+    if (siblingEl && siblingEl.classList.contains('diagram-node')) {
+      const siblingId = parseInt(siblingEl.getAttribute('data-instance-id'));
+      target = findNodeByInstanceId(window.recipeTreeRoot, siblingId);
+    }
+  }
+
+  if (!target) return;
+  target = resolveRenderedNode(target);
+  const needsExpand = ensureNodeVisible(target, isolateOutputParentId);
+
+  window.selectedInstanceId = target.instanceId;
+  if (needsExpand && typeof window.recalculate === 'function') {
+    window.recalculate();
+  } else {
+    applyNodeHighlightClasses();
+  }
+  centerOnInstanceId(target.instanceId);
+}
+window.navigateTreeSelection = navigateTreeSelection;
+
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const dirByKey = { ArrowUp: 'prevSibling', ArrowDown: 'nextSibling', ArrowLeft: 'child', ArrowRight: 'parent' };
+  const direction = dirByKey[e.key];
+  if (!direction) return;
+  const activeEl = document.activeElement;
+  const tag = activeEl ? activeEl.tagName : '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (activeEl && activeEl.isContentEditable)) return;
+  e.preventDefault();
+  navigateTreeSelection(direction);
+});
+
+// Space: compact/expand the selected card - same toggleNodeCollapse a chip's own click-anywhere
+// uses, just without needing the mouse. Works in isolate mode too now that it renders a real,
+// multi-level subtree (see renderIsolatedDiagram). Root is excluded (it's never collapsible - see
+// toggleNodeCollapse's own callers, createNodeCard never gives root a compact chip in the first
+// place).
+window.addEventListener('keydown', (e) => {
+  if (e.key !== ' ' && e.key !== 'Spacebar') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (window.selectedInstanceId == null || !window.recipeTreeRoot) return;
+  const activeEl = document.activeElement;
+  const tag = activeEl ? activeEl.tagName : '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON' || (activeEl && activeEl.isContentEditable)) return;
+  let node = findNodeByInstanceId(window.recipeTreeRoot, window.selectedInstanceId);
+  if (!node) return;
+  node = resolveRenderedNode(node);
+  if (node.depth === 0) return;
+  if (node.instanceId !== window.selectedInstanceId) {
+    window.selectedInstanceId = node.instanceId;
+    applyNodeHighlightClasses();
+  }
+  e.preventDefault();
+  toggleNodeCollapse(null, node.instanceId, node.pathKey);
 });

@@ -820,6 +820,7 @@ async function isolateDirectSellOffer(result) {
   window.selectedInstanceId = null;
   window.isolatedInstanceId = null;
   window.collapsedInstanceIds = new Set();
+  window.expandedOverrideIds = new Set();
   window.rootSellStrategy = 'market-sell';
   window.rootCustomPrice = 0;
   window.currentProduct = { id: offer.type_id, name: result.outputName };

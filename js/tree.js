@@ -364,6 +364,15 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
 
   const node = {
     instanceId: ++instanceCounter,
+    // A stable identity for "this position in the tree" that survives a full rebuild (instanceId
+    // does not - it's a monotonically-increasing counter, so a preserveView selectItem() rebuild
+    // like toggleBuildSelf's or buildAllComponents' hands every node a brand new one). A single
+    // recipe's materials list can never contain the same typeId twice (tree.js's own matMap dedup
+    // right below sees to that), so the chain of typeIds from root to here is always unique per
+    // position - letting collapsedInstanceIds/expandedOverrideIds key off pathKey instead of
+    // instanceId so a card's expand/collapse state survives a rebuild instead of silently
+    // reverting to whatever the auto-compact threshold says.
+    pathKey: (parentNode && parentNode.pathKey ? parentNode.pathKey + '>' : '') + blueprintTypeId,
     parentInstanceId: parentNode ? parentNode.instanceId : null,
     typeId: blueprintTypeId,
     displayTypeId: blueprintTypeId,
@@ -536,6 +545,12 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
               } else {
                 return {
                   instanceId: ++instanceCounter,
+                  // See the root node constructor's own comment on pathKey above - raw materials
+                  // (no blueprint of their own, hence this branch) are the bulk of every tree and
+                  // the most common same-tier merge/compact target, so a missing pathKey here is
+                  // what silently broke the Compact button and collapse/expand persistence for
+                  // almost every material in a real build.
+                  pathKey: (node.pathKey ? node.pathKey + '>' : '') + mat.typeId,
                   parentInstanceId: node.instanceId,
                   typeId: mat.typeId,
                   displayTypeId: mat.typeId,
@@ -551,6 +566,7 @@ async function buildRecursiveRecipeTree(blueprintTypeId, name, qtyNeeded, curren
             } catch (err) {
               return {
                 instanceId: ++instanceCounter,
+                pathKey: (node.pathKey ? node.pathKey + '>' : '') + mat.typeId,
                 parentInstanceId: node.instanceId,
                 typeId: mat.typeId,
                 displayTypeId: mat.typeId,
