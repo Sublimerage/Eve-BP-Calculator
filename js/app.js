@@ -1642,7 +1642,7 @@ async function applySharedBuildFromUrl() {
 }
 window.applySharedBuildFromUrl = applySharedBuildFromUrl;
 
-async function selectItem(typeId, name, preserveView = false) {
+async function selectItem(typeId, name, preserveView = false, anchorInstanceId = null) {
   if (searchInput) searchInput.value = name;
   if (searchResults) searchResults.classList.add('hidden');
   window.currentProduct = { id: typeId, name };
@@ -1675,6 +1675,26 @@ async function selectItem(typeId, name, preserveView = false) {
     ? (findNodeByInstanceId(window.recipeTreeRoot, window.selectedInstanceId) || {}).pathKey
     : null;
 
+  // Same problem, different symptom: clicking Build/Buy or editing ME/TE (see toggleBuildSelf's/
+  // onCardMEChange's own callers) re-renders the whole diagram from scratch, and adding or removing
+  // even one column shifts every OTHER column's local position within #pan-zoom-content - panX/panY
+  // themselves never change, but the card the user was just looking at visibly jumps anyway because
+  // the content around it reflowed. anchorInstanceId is the specific card whose button/input was
+  // just interacted with (its own card, found via closest('.diagram-node') at the call site) -
+  // capturing its on-screen rect now and re-measuring it after the rebuild (below, once the new DOM
+  // exists) gives the exact screen-pixel drift to cancel out of panX/panY, so that one card - and
+  // everything else, since it's all rigidly laid out relative to it - stays visually still.
+  let anchorPathKey = null;
+  let anchorRectBefore = null;
+  if (preserveView && anchorInstanceId != null && window.recipeTreeRoot) {
+    const anchorNode = findNodeByInstanceId(window.recipeTreeRoot, anchorInstanceId);
+    if (anchorNode) {
+      anchorPathKey = anchorNode.pathKey;
+      const anchorEl = document.getElementById(`node-card-${anchorInstanceId}`);
+      if (anchorEl) anchorRectBefore = anchorEl.getBoundingClientRect();
+    }
+  }
+
   window.recipeTreeRootProductTypeId = null;
   if (window.isBlueprintName(name)) {
     const resolvedProductTypeId = await window.resolveProductIdFromBlueprintNameAsync(name);
@@ -1692,6 +1712,22 @@ async function selectItem(typeId, name, preserveView = false) {
   }
 
   recalculate();
+
+  if (anchorPathKey && anchorRectBefore) {
+    const anchorNodeAfter = findNodeByPathKey(window.recipeTreeRoot, anchorPathKey);
+    const anchorElAfter = anchorNodeAfter ? document.getElementById(`node-card-${anchorNodeAfter.instanceId}`) : null;
+    if (anchorElAfter) {
+      const rectAfter = anchorElAfter.getBoundingClientRect();
+      // translate() is the outermost function in updateTransform's transform list, so its effect on
+      // the final screen position is a uniform, scale-independent shift - subtracting the anchor's
+      // own screen-position drift from panX/panY cancels that drift for every card at once, not
+      // just this one.
+      window.panX -= (rectAfter.left - anchorRectBefore.left);
+      window.panY -= (rectAfter.top - anchorRectBefore.top);
+      updateTransform();
+    }
+  }
+
   if (!preserveView) { resetPanZoom(); } else { setTimeout(drawConnectingLines, 50); }
 
   const statusText = document.getElementById('status-text');

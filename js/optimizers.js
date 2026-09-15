@@ -171,7 +171,12 @@ async function toggleBuildSelf(e, typeId) {
   }
 
   if (window.currentProduct) {
-    await window.selectItem(window.currentProduct.id, window.currentProduct.name, true);
+    // The card the Build/Buy button actually lives on, so selectItem can keep it pinned to its
+    // current screen position through the rebuild instead of the whole diagram visibly jumping -
+    // see selectItem's own anchorInstanceId comment for why that happens at all.
+    const anchorEl = e && e.target ? e.target.closest('.diagram-node') : null;
+    const anchorInstanceId = anchorEl ? parseInt(anchorEl.getAttribute('data-instance-id')) : null;
+    await window.selectItem(window.currentProduct.id, window.currentProduct.name, true, anchorInstanceId);
   }
 }
 
@@ -181,7 +186,7 @@ function onCardMEChange(e, typeId, instanceId) {
   const val = Math.max(0, Math.min(10, parseFloat(e.target.value) || 0));
   window.customMEOverrides[typeId] = val;
   if (window.currentProduct) {
-    window.selectItem(window.currentProduct.id, window.currentProduct.name, true);
+    window.selectItem(window.currentProduct.id, window.currentProduct.name, true, instanceId);
   }
 }
 
