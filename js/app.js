@@ -1771,6 +1771,11 @@ function saveActiveState() {
     localStorage.setItem('eve_global_jobs', window.globalJobs);
     localStorage.setItem('eve_root_sell_strategy', window.rootSellStrategy);
     localStorage.setItem('eve_root_custom_price', window.rootCustomPrice);
+    // Keyed by pathKey (see nodeStableKey/tree.js), not the raw instanceId - stable across a full
+    // reload's fresh tree build as long as the same product and build overrides come back too
+    // (both saved right alongside these), which is exactly what loadSavedState restores first.
+    localStorage.setItem('eve_collapsed_instance_ids', JSON.stringify(Array.from(window.collapsedInstanceIds || [])));
+    localStorage.setItem('eve_expanded_override_ids', JSON.stringify(Array.from(window.expandedOverrideIds || [])));
   } catch (e) { console.warn('[App] Failed to save the current build state - it will be lost on reload:', e); }
 }
 
@@ -1786,6 +1791,8 @@ function loadSavedState() {
     window.globalJobs = parseInt(localStorage.getItem('eve_global_jobs')) || 1;
     window.rootSellStrategy = localStorage.getItem('eve_root_sell_strategy') || 'market-sell';
     window.rootCustomPrice = parseFloat(localStorage.getItem('eve_root_custom_price')) || 0;
+    window.collapsedInstanceIds = new Set(window.safeParseJSON(localStorage.getItem('eve_collapsed_instance_ids'), []));
+    window.expandedOverrideIds = new Set(window.safeParseJSON(localStorage.getItem('eve_expanded_override_ids'), []));
 
     const savedProduct = window.safeParseJSON(localStorage.getItem('eve_active_product'), null);
     if (savedProduct && savedProduct.id && savedProduct.name) {
