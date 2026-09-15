@@ -2299,7 +2299,15 @@ function createNodeCard(node, autoCompact) {
           }</svg>
         </button>` : '';
 
-    card.className = 'diagram-node diagram-node-compact glass-card p-2.5 shadow-lg transition-all relative w-72';
+    // w-96 (was w-72) - the buy-mode icon above, plus the hidden-descendant-count badge on the
+    // expand chevron (its own width varies card to card - "+3" vs "+82"), already eat a good chunk
+    // of a chip's fixed overhead before the qty/cost row even gets a turn, so w-80 (the expanded
+    // card's own width) still truncated ordinary numbers like "14,682" down to "14..." - not just
+    // extreme same-tier-merge totals. w-96 (matching the root card) gives enough slack for every
+    // normal case; the qty/cost spans keep truncate+min-w-0 as a fallback for whatever's still too
+    // wide even at this size (a huge merge total, say), so the row can never wrap and grow the chip
+    // taller, which is the one thing compacting exists to prevent.
+    card.className = 'diagram-node diagram-node-compact glass-card p-2.5 shadow-lg transition-all relative w-96';
     card.title = 'Click to expand';
     card.onclick = (e) => toggleNodeCollapse(e, node.instanceId, node.pathKey);
     card.innerHTML = `
@@ -2308,8 +2316,8 @@ function createNodeCard(node, autoCompact) {
         <div class="min-w-0 flex-1">
           <div class="font-bold text-xs text-white truncate" title="${window.esc(compactDisplayName)}">${window.esc(compactDisplayName)}${mergedBadge}</div>
           <div class="text-[11px] mono flex items-center justify-between gap-2">
-            <span class="text-orange-400">Qty: ${effectiveQty.toLocaleString()}</span>
-            <span class="font-bold" style="color:var(--cost);">${Math.round(effectiveCost || 0).toLocaleString()} ISK</span>
+            <span class="text-orange-400 truncate min-w-0" title="Qty: ${effectiveQty.toLocaleString()}">Qty: ${effectiveQty.toLocaleString()}</span>
+            <span class="font-bold truncate min-w-0 flex-shrink-0" style="color:var(--cost);" title="${Math.round(effectiveCost || 0).toLocaleString()} ISK">${Math.round(effectiveCost || 0).toLocaleString()} ISK</span>
           </div>
         </div>
         ${compactBuyToggle}
